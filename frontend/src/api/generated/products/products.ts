@@ -88,7 +88,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * One page in catalog order: product type order, then model number.
+ * One page in catalog order: product type order, category order, then model number.
  * @summary List products
  */
 export const listProducts = (
@@ -407,7 +407,7 @@ export function useGetProduct<TData = Awaited<ReturnType<typeof getProduct>>, TE
 
 
 /**
- * The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the type never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).
+ * The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the category never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).
  * @summary Update a product
  */
 export const updateProduct = (
@@ -820,7 +820,7 @@ export const useReplaceVariantAddons = <TError = ErrorType<Error>,
       return useMutation(getReplaceVariantAddonsMutationOptions(options), queryClient);
     }
     /**
- * For the add-on picker; in catalog order (product type, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.
+ * For the add-on picker; in catalog order (product type, category, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.
  * @summary List or search variants across the catalog
  */
 export const searchVariants = (

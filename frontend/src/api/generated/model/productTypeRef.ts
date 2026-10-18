@@ -7,6 +7,8 @@
 import type { ProductTypeRefName } from './productTypeRefName';
 
 export interface ProductTypeRef {
+  /** Badge text, e.g. ZB */
+  abbreviation?: string;
   /** Badge colour, #rrggbb */
   color?: string;
   id: string;

@@ -12,32 +12,38 @@
   "searchHint": "Modellnummer, Name oder SKU",
   "typeFilter": "Produkttyp",
   "allTypes": "Alle Produkttypen",
+  "categoryFilter": "Kategorie",
+  "allCategories": "Alle Kategorien",
   "deleteTitle": "Produkt löschen",
   "deleteMessage": "„{{name}}“ mit allen Varianten und Zubehör-Verknüpfungen löschen? Das kann nicht rückgängig gemacht werden.",
   "column": {
     "image": "Bild",
     "modelNumber": "Modellnummer",
     "name": "Name",
-    "type": "Produkttyp",
+    "typeCategory": "Produkttyp / Kategorie",
     "variants": "Varianten",
     "price": "Preis",
     "status": "Status"
   },
   "problems_one": "{{count}} Attributwert muss geprüft werden",
   "problems_other": "{{count}} Attributwerte müssen geprüft werden",
-  "unavailableHint": "Aktiv, aber sein Produkttyp ist inaktiv.",
+  "unavailableHint": "Aktiv, aber sein Produkttyp oder seine Kategorie ist inaktiv.",
   "noPrice": "–",
   "section": {
     "basics": "Grunddaten",
     "attributes": "Attribute",
-    "attributesHint": "Werte der Attribute des Produkttyps, die pro Produkt gesetzt werden.",
+    "attributesHint": "Werte der Attribute der Kategorie, die pro Produkt gesetzt werden.",
     "variants": "Varianten",
     "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör."
   },
   "field": {
     "productType": "Produkttyp",
+    "productTypeHint": "Das System oder die Produktlinie, z. B. Zigbee",
     "chooseType": "Produkttyp auswählen",
     "inactiveType": "{{name}} (inaktiv)",
+    "category": "Kategorie",
+    "categoryHint": "Die Geräteart; legt die Attribute fest",
+    "chooseCategory": "Kategorie auswählen",
     "modelNumber": "Modellnummer",
     "modelNumberHint": "z. B. M485/GW-ZB.10; eindeutig im Katalog",
     "nameEn": "Name (Englisch)",
@@ -47,9 +53,9 @@
     "active": "Aktiv",
     "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung."
   },
-  "typeChange": "Sie haben den Produkttyp geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute des neuen Typs geprüft; Werte, die der neue Typ nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zum neuen Typ passen, werden an den Varianten markiert.",
-  "chooseTypeFirst": "Wählen Sie einen Produkttyp, um seine Attribute auszufüllen.",
-  "storedErrors": "Einige gespeicherte Werte passen nicht zu den aktuellen Attributen des Produkttyps. Sie sind unten markiert; korrigieren Sie sie vor dem Speichern.",
+  "categoryChange": "Sie haben die Kategorie geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute der neuen Kategorie geprüft; Werte, die die neue Kategorie nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zur neuen Kategorie passen, werden an den Varianten markiert.",
+  "chooseCategoryFirst": "Wählen Sie eine Kategorie, um ihre Attribute auszufüllen.",
+  "storedErrors": "Einige gespeicherte Werte passen nicht zu den aktuellen Attributen der Kategorie. Sie sind unten markiert; korrigieren Sie sie vor dem Speichern.",
   "notFound": {
     "title": "Produkt nicht gefunden",
     "message": "Dieses Produkt gibt es nicht (mehr)."
@@ -83,7 +89,7 @@
     "section": {
       "basics": "Grunddaten",
       "attributes": "Attribute",
-      "attributesHint": "Werte der Attribute des Produkttyps, die pro Variante gesetzt werden."
+      "attributesHint": "Werte der Attribute der Kategorie, die pro Variante gesetzt werden."
     },
     "field": {
       "nameEn": "Name (Englisch)",
@@ -98,7 +104,7 @@
       "active": "Aktiv",
       "activeHint": "Inaktive Varianten können nicht zu Projekten hinzugefügt werden."
     },
-    "productInactive": "Diese Variante ist nicht verfügbar, weil ihr Produkt oder Produkttyp inaktiv ist.",
+    "productInactive": "Diese Variante ist nicht verfügbar, weil ihr Produkt, Produkttyp oder ihre Kategorie inaktiv ist.",
     "notFound": {
       "title": "Variante nicht gefunden",
       "message": "Diese Variante gibt es nicht (mehr)."
@@ -122,6 +128,7 @@
     "saved": "Zubehör gespeichert.",
     "unsaved": "Das Zubehör hat ungespeicherte Änderungen.",
     "typeFilter": "Produkttyp",
+    "categoryFilter": "Kategorie",
     "sku": "SKU {{sku}}",
     "shown_one": "{{count}} Variante angezeigt",
     "shown_other": "{{count}} Varianten angezeigt",

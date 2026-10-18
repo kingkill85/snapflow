@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -69,8 +70,8 @@ func (ta *tally) add(what string, code int, body string) {
 func TestConcurrentReorderAndAddons(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "P"))
-	q := newProduct(t, api, productBody(pt.ID, "Q"))
+	p := newProduct(t, api, productBody(pt, "P"))
+	q := newProduct(t, api, productBody(pt, "Q"))
 	pv := []variant{quickVariant(t, api, p.ID, "1"), quickVariant(t, api, p.ID, "1"), quickVariant(t, api, p.ID, "1"), quickVariant(t, api, p.ID, "1")}
 	qv := []variant{quickVariant(t, api, q.ID, "1"), quickVariant(t, api, q.ID, "1"), quickVariant(t, api, q.ID, "1")}
 	ids := func(vs []variant) []string {
@@ -140,7 +141,7 @@ func TestConcurrentReorderAndAddons(t *testing.T) {
 func TestConcurrentDeleteAndAddons(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	host := newProduct(t, api, productBody(pt.ID, "HOST"))
+	host := newProduct(t, api, productBody(pt, "HOST"))
 	hosts := make([]variant, 4)
 	for i := range hosts {
 		hosts[i] = quickVariant(t, api, host.ID, "1")
@@ -149,7 +150,7 @@ func TestConcurrentDeleteAndAddons(t *testing.T) {
 
 	ta := &tally{t: t}
 	for i := range rounds {
-		gone := newProduct(t, api, productBody(pt.ID, fmt.Sprintf("GONE-%d", i)))
+		gone := newProduct(t, api, productBody(pt, fmt.Sprintf("GONE-%d", i)))
 		g := make([]variant, perProduct)
 		for j := range g {
 			g[j] = quickVariant(t, api, gone.ID, "1")
@@ -204,10 +205,10 @@ func TestBusinessKeyText(t *testing.T) {
 
 	// Control and format characters are refused.
 	for _, model := range []string{"M1\tX", "M1\nX", "M1\u200bX", "M1\u202eX", "M1\x00X"} {
-		assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(pt.ID, model)),
+		assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(pt, model)),
 			"body.modelNumber validation.control_chars")
 	}
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
+	p := newProduct(t, api, productBody(pt, "M1"))
 	for _, sku := range []string{"S\t1", "S\r\n1", "S\u2060"} {
 		b := variantBody("bad sku", "1")
 		b["sku"] = sku
@@ -216,11 +217,11 @@ func TestBusinessKeyText(t *testing.T) {
 
 	// NFC: a decomposed \u00e9 is stored composed and is the same key as a
 	// composed one.
-	decomposed := newProduct(t, api, productBody(pt.ID, " Cafe\u0301-1 "))
+	decomposed := newProduct(t, api, productBody(pt, " Cafe\u0301-1 "))
 	if decomposed.ModelNumber != "Caf\u00e9-1" {
 		t.Errorf("model number %q, want NFC", decomposed.ModelNumber)
 	}
-	assertError(t, api.Post("/api/products", api.Admin.Cookie, productBody(pt.ID, "CAF\u00c9-1")), http.StatusConflict, "product.model_number_taken")
+	assertError(t, api.Post("/api/products", api.Admin.Cookie, productBody(pt, "CAF\u00c9-1")), http.StatusConflict, "product.model_number_taken")
 
 	b := variantBody("nfc", "1")
 	b["sku"] = "Sku-Cafe\u0301"
@@ -237,42 +238,129 @@ func TestInactiveType(t *testing.T) {
 	active := newType(t, api, "active", []any{})
 	old := newType(t, api, "old", []any{})
 	other := newType(t, api, "other_old", []any{})
-	p := newProduct(t, api, productBody(old.ID, "KEEP"))
-	q := newProduct(t, api, productBody(active.ID, "MOVE"))
-	updateType(t, api, old, []any{}, false)
-	updateType(t, api, other, []any{}, false)
+	p := newProduct(t, api, productBody(old, "KEEP"))
+	q := newProduct(t, api, productBody(active, "MOVE"))
+	setTypeActive(t, api, old, false)
+	setTypeActive(t, api, other, false)
 
 	// New products cannot use an inactive type.
-	assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(old.ID, "NEW")),
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(old, "NEW")),
 		"body.productTypeId product.type_inactive")
 	// An existing product keeps its own inactive type...
-	if resp := update(api, p, productBody(old.ID, "KEEP")); resp.Code != http.StatusOK {
+	if resp := update(api, p, productBody(old, "KEEP")); resp.Code != http.StatusOK {
 		t.Errorf("keep inactive type: got %d: %s", resp.Code, resp.Body)
 	}
 	// ...but cannot move to another inactive one, from an active or an
 	// inactive type.
-	assertFields(t, update(api, q, productBody(old.ID, "MOVE")), "body.productTypeId product.type_inactive")
+	assertFields(t, update(api, q, productBody(old, "MOVE")), "body.productTypeId product.type_inactive")
 	p = getProduct(t, api, p.ID)
-	assertFields(t, update(api, p, productBody(other.ID, "KEEP")), "body.productTypeId product.type_inactive")
+	assertFields(t, update(api, p, productBody(other, "KEEP")), "body.productTypeId product.type_inactive")
 }
 
-// A type change never refuses because of the variants: their values are
-// flagged against the new type and summarised in variantsWithProblems.
-func TestTypeChangeFlagsVariants(t *testing.T) {
+func TestInactiveCategory(t *testing.T) {
+	api := apptest.New(t)
+	active := newType(t, api, "active", []any{})
+	old := newType(t, api, "old", []any{})
+	other := newType(t, api, "other_old", []any{})
+	p := newProduct(t, api, productBody(old, "KEEP"))
+	q := newProduct(t, api, productBody(active, "MOVE"))
+	updateCategory(t, api, old, []any{}, false)
+	updateCategory(t, api, other, []any{}, false)
+	withCategory := func(k kind, categoryID string) kind { return kind{ID: k.ID, CategoryID: categoryID} }
+
+	// New products cannot use an inactive category.
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(withCategory(active, old.CategoryID), "NEW")),
+		"body.categoryId product.category_inactive")
+	// An existing product keeps its own inactive category, also with another
+	// (active) product type...
+	if resp := update(api, p, productBody(withCategory(active, old.CategoryID), "KEEP")); resp.Code != http.StatusOK {
+		t.Errorf("keep inactive category: got %d: %s", resp.Code, resp.Body)
+	}
+	// ...but cannot move to another inactive one, from an active or an
+	// inactive category.
+	assertFields(t, update(api, q, productBody(withCategory(active, old.CategoryID), "MOVE")), "body.categoryId product.category_inactive")
+	p = getProduct(t, api, p.ID)
+	assertFields(t, update(api, p, productBody(withCategory(active, other.CategoryID), "KEEP")), "body.categoryId product.category_inactive")
+	// Both problems at once.
+	setTypeActive(t, api, other, false)
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, productBody(other, "NEW")),
+		"body.productTypeId product.type_inactive", "body.categoryId product.category_inactive")
+}
+
+// Catalog order is product type order, then category order, then model
+// number; the product list and the variant search filter by either or both.
+func TestCatalogOrderAndFilters(t *testing.T) {
+	api := apptest.New(t)
+	zigbee, knx := newProductType(t, api, "zigbee"), newProductType(t, api, "knx")
+	gateways, dimmers := newCategory(t, api, "gateways", []any{}), newCategory(t, api, "dimmers", []any{})
+	add := func(pt productType, c category, model string) {
+		p := newProduct(t, api, productBody(kind{ID: pt.ID, CategoryID: c.ID}, model))
+		quickVariant(t, api, p.ID, "1")
+	}
+	add(knx, gateways, "K-GW")
+	add(zigbee, dimmers, "Z-DIM-B")
+	add(knx, dimmers, "K-DIM")
+	add(zigbee, gateways, "Z-GW")
+	add(zigbee, dimmers, "z-dim-a")
+
+	hits := func(query string) []string {
+		t.Helper()
+		out := []string{}
+		for _, h := range decode[variantPage](t, api.Get("/api/variants"+query, api.Admin.Cookie)).Items {
+			out = append(out, h.ModelNumber)
+		}
+		return out
+	}
+	check := func(step string, want []string, filters ...string) {
+		t.Helper()
+		query := ""
+		if len(filters) > 0 {
+			query = "?" + strings.Join(filters, "&")
+		}
+		if got := models(list(t, api, api.Admin.Cookie, query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: products %v, want %v", step, got, want)
+		}
+		if got := hits(query); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: variants %v, want %v", step, got, want)
+		}
+	}
+	check("catalog order", []string{"Z-GW", "z-dim-a", "Z-DIM-B", "K-GW", "K-DIM"})
+	check("type filter", []string{"K-GW", "K-DIM"}, "productTypeId="+knx.ID)
+	check("category filter", []string{"z-dim-a", "Z-DIM-B", "K-DIM"}, "categoryId="+dimmers.ID)
+	check("both filters", []string{"z-dim-a", "Z-DIM-B"}, "productTypeId="+zigbee.ID, "categoryId="+dimmers.ID)
+
+	// Reordering categories changes the order within each type.
+	if resp := api.Put("/api/categories/order", api.Admin.Cookie, map[string]any{"ids": []string{dimmers.ID, gateways.ID}}); resp.Code != http.StatusOK {
+		t.Fatal(resp.Body)
+	}
+	check("category order", []string{"z-dim-a", "Z-DIM-B", "Z-GW", "K-DIM", "K-GW"})
+	// Product type order comes first.
+	if resp := api.Put("/api/product-types/order", api.Admin.Cookie, map[string]any{"ids": []string{knx.ID, zigbee.ID}}); resp.Code != http.StatusOK {
+		t.Fatal(resp.Body)
+	}
+	check("type order", []string{"K-DIM", "K-GW", "z-dim-a", "Z-DIM-B", "Z-GW"})
+	if resp := api.Get("/api/variants?categoryId=nope", api.Admin.Cookie); resp.Code != http.StatusUnprocessableEntity {
+		t.Errorf("bad category id: got %d", resp.Code)
+	}
+}
+
+// A category change never refuses because of the variants: their values are
+// flagged against the new category and summarised in variantsWithProblems.
+func TestCategoryChangeFlagsVariants(t *testing.T) {
 	api := apptest.New(t)
 	free := newType(t, api, "free", []any{})
 	strict := newType(t, api, "strict", []any{
 		map[string]any{"key": "colour", "label": text("Colour"), "type": "text", "scope": "variant", "required": true},
 	})
-	p := newProduct(t, api, productBody(free.ID, "M1"))
+	p := newProduct(t, api, productBody(free, "M1"))
 	quickVariant(t, api, p.ID, "1")
 	quickVariant(t, api, p.ID, "2")
 	if got := getProduct(t, api, p.ID); got.VariantsWithProblems != 0 {
 		t.Errorf("before: %d", got.VariantsWithProblems)
 	}
-	resp := update(api, p, productBody(strict.ID, "M1"))
+	resp := update(api, p, productBody(kind{ID: free.ID, CategoryID: strict.CategoryID}, "M1"))
 	if resp.Code != http.StatusOK {
-		t.Fatalf("type change: got %d: %s", resp.Code, resp.Body)
+		t.Fatalf("category change: got %d: %s", resp.Code, resp.Body)
 	}
 	moved := decode[product](t, resp)
 	if moved.VariantsWithProblems != 2 ||
@@ -290,12 +378,12 @@ func TestMovedScopeOnRead(t *testing.T) {
 	api := apptest.New(t)
 	def := map[string]any{"key": "colour", "label": text("Colour"), "type": "text"}
 	pt := newType(t, api, "lamp", []any{def})
-	b := productBody(pt.ID, "M1")
+	b := productBody(pt, "M1")
 	b["attributes"] = map[string]any{"colour": "red"}
 	p := newProduct(t, api, b)
 
 	moved := map[string]any{"key": "colour", "label": text("Colour"), "type": "text", "scope": "variant"}
-	updateType(t, api, pt, []any{moved}, true)
+	updateCategory(t, api, pt, []any{moved}, true)
 	got := getProduct(t, api, p.ID)
 	if !reflect.DeepEqual(got.Attributes, map[string]any{"colour": "red"}) || len(got.StaleAttributes) != 0 ||
 		!reflect.DeepEqual(errorLocations(got.AttributeErrors), []string{"attributes.colour attribute.wrong_scope"}) {
@@ -311,11 +399,11 @@ func TestMovedScopeOnRead(t *testing.T) {
 func TestSearchDescriptions(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	b := productBody(pt.ID, "M1")
+	b := productBody(pt, "M1")
 	b["description"] = map[string]string{"en": "Four channel 100% dimmer", "de": "Vierkanal-Dimmer"}
 	p := newProduct(t, api, b)
 	quickVariant(t, api, p.ID, "1")
-	newProduct(t, api, productBody(pt.ID, "M2"))
+	newProduct(t, api, productBody(pt, "M2"))
 	for _, search := range []string{"vierkanal", "FOUR CHANNEL", "100%"} {
 		if got := models(list(t, api, api.Admin.Cookie, "?search="+urlEncode(search))); !reflect.DeepEqual(got, []string{"M1"}) {
 			t.Errorf("list %q: %v", search, got)
@@ -331,15 +419,15 @@ func TestSearchDescriptions(t *testing.T) {
 }
 
 // The add-on picker browses: without a search, every variant in catalog
-// order (type order, model number, variant order), paged, optionally of one
-// type.
+// order (type order, category order, model number, variant order), paged,
+// optionally of one type (TestCatalogOrderAndFilters covers categories).
 func TestVariantBrowse(t *testing.T) {
 	api := apptest.New(t)
 	first := newType(t, api, "first", []any{})
 	second := newType(t, api, "second", []any{})
-	a := newProduct(t, api, productBody(second.ID, "A1"))
-	z := newProduct(t, api, productBody(first.ID, "Z9"))
-	b := newProduct(t, api, productBody(second.ID, "b2"))
+	a := newProduct(t, api, productBody(second, "A1"))
+	z := newProduct(t, api, productBody(first, "Z9"))
+	b := newProduct(t, api, productBody(second, "b2"))
 	a1, a2 := quickVariant(t, api, a.ID, "1"), quickVariant(t, api, a.ID, "1")
 	z1 := quickVariant(t, api, z.ID, "1")
 	b1 := quickVariant(t, api, b.ID, "1")
@@ -383,8 +471,8 @@ func TestVariantBrowse(t *testing.T) {
 func TestDeadlockIsRetried(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	host := quickVariant(t, api, newProduct(t, api, productBody(pt.ID, "HOST")).ID, "1")
-	other := newProduct(t, api, productBody(pt.ID, "OTHER"))
+	host := quickVariant(t, api, newProduct(t, api, productBody(pt, "HOST")).ID, "1")
+	other := newProduct(t, api, productBody(pt, "OTHER"))
 	x, y := quickVariant(t, api, other.ID, "1"), quickVariant(t, api, other.ID, "1")
 	if x.ID < y.ID { // the replace locks add-ons in id order: y first, then x
 		x, y = y, x

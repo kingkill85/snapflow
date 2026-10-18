@@ -4,12 +4,27 @@ import { fileURLToPath } from 'node:url'
 import { type Locator, type Page } from '@playwright/test'
 
 import { admin } from '../env'
-import { chooseLanguage, chooseOption, expect, navigate, optionTexts, row, test, type Api, type Attribute, type ProductType, type StoredFile, unique, uniqueKey } from '../fixtures'
+import {
+  type Api,
+  type Attribute,
+  type CategoryInput,
+  chooseLanguage,
+  chooseOption,
+  expect,
+  navigate,
+  optionTexts,
+  type ProductType,
+  row,
+  type StoredFile,
+  test,
+  unique,
+  uniqueKey,
+} from '../fixtures'
 
-// Products, variants, add-ons and images (step 1c). Products and product types
-// are global and other specs run in parallel, so every spec seeds its own
-// product types and finds its rows by unique model numbers, or filters the
-// list by its own type.
+// Products, variants, add-ons and images (step 1c). Products, product types
+// and categories are global and other specs run in parallel, so every spec
+// seeds its own product types and categories and finds its rows by unique
+// model numbers, or filters the list by its own type.
 
 const listPath = '/catalog/products'
 
@@ -88,26 +103,29 @@ async function openListOfType(page: Page, type: ProductType) {
   await expect(page).toHaveURL(new RegExp(`type=${type.id}`))
 }
 
-/** A product of a new type with variants named after `names`. */
-async function seedProduct(api: Api, names: string[], typeInput: Parameters<Api['createProductType']>[0] = {}, values: Record<string, unknown> = {}) {
-  const type = await api.createProductType(typeInput)
-  const product = await api.createProduct({ productTypeId: type.id, attributes: values })
+/** A product of a new type and a new category (`categoryInput`) with variants named after `names`. */
+async function seedProduct(api: Api, names: string[], categoryInput: Partial<CategoryInput> = {}, values: Record<string, unknown> = {}) {
+  const kind = await api.createKind(categoryInput)
+  const product = await api.createProduct({ ...kind.ids, attributes: values })
   for (const [i, name] of names.entries()) {
     await api.createVariant(product.id, { name: { en: name }, sku: modelNumber(`SKU${i}`), price: `${10 + i}.00` })
   }
-  return { type, product: await api.product(product.id) }
+  return { ...kind, product: await api.product(product.id) }
 }
 
 test('an admin creates a product with every kind of attribute; the values persist', async ({ page, api }) => {
-  const type = await api.createProductType({ name: { en: unique('Actuator') }, attributes: everyKind })
+  const { type, category } = await api.createKind({ name: { en: unique('Actuator') }, attributes: everyKind }, { abbreviation: 'ZB', color: '#1f6feb' })
   const model = modelNumber()
   const name = unique('Dimmer')
 
   await page.goto(listPath)
   await page.getByRole('link', { name: 'New product' }).first().click()
   await expect(page.getByRole('heading', { name: 'New product', level: 1 })).toBeVisible()
-  await expect(attributes(page)).toContainText('Choose a product type to fill in its attributes.')
+  await expect(attributes(page)).toContainText('Choose a category to fill in its attributes.')
   await chooseOption(basics(page).getByLabel('Product type'), type.name.en)
+  // The attributes come from the category, not the product type.
+  await expect(attributes(page)).toContainText('Choose a category to fill in its attributes.')
+  await chooseOption(basics(page).getByLabel('Category'), category.name.en)
   await basics(page).getByLabel('Model number').fill(model)
   await basics(page).getByLabel('Name (English)').fill(name)
   await basics(page).getByLabel('Name (German)').fill(`${name} DE`)
@@ -141,6 +159,7 @@ test('an admin creates a product with every kind of attribute; the values persis
   const stored = await api.product(id)
   expect(stored).toMatchObject({
     productTypeId: type.id,
+    categoryId: category.id,
     modelNumber: model,
     name: { en: name, de: `${name} DE` },
     description: { en: 'Dims two channels.' },
@@ -174,12 +193,16 @@ test('an admin creates a product with every kind of attribute; the values persis
   // Other specs fill the list: find it.
   await page.getByLabel('Search').fill(model)
   await expect(row(page, model)).toContainText(name)
-  await expect(row(page, model)).toContainText(type.name.en)
+  await expect(row(page, model)).toContainText(`ZB${type.name.en}`)
+  await expect(row(page, model)).toContainText(category.name.en)
   await expect(row(page, model)).toContainText('Active')
 })
 
 test('in German, numbers and prices take a decimal comma', async ({ page, api }) => {
-  const type = await api.createProductType({ name: { en: unique('Actuator'), de: unique('Aktor') }, attributes: everyKind })
+  const { type, category } = await api.createKind(
+    { name: { en: unique('Actuator'), de: unique('Aktor') }, attributes: everyKind },
+    { name: { en: unique('System'), de: unique('System DE') } },
+  )
   const model = modelNumber()
   await page.goto(listPath)
   await chooseLanguage(page, 'Deutsch')
@@ -188,6 +211,7 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
   await page.getByRole('link', { name: 'Neues Produkt' }).first().click()
   const grunddaten = region(page, 'Grunddaten')
   await chooseOption(grunddaten.getByLabel('Produkttyp'), type.name.de!)
+  await chooseOption(grunddaten.getByLabel('Kategorie'), category.name.de!)
   await grunddaten.getByLabel('Modellnummer').fill(model)
   await grunddaten.getByLabel('Name (Englisch)').fill(unique('Dimmer'))
   const attrs = region(page, 'Attribute')
@@ -359,9 +383,9 @@ test('variants are reordered and deleted on the product page', async ({ page, ap
 })
 
 test('add-ons: browse, filter, search by SKU, add, mark required, reorder and save', async ({ page, api }) => {
-  // 25 accessories of their own type, more than one page of the picker (20).
-  const accessoryType = await api.createProductType({ name: { en: unique('Frame') } })
-  const accessory = await api.createProduct({ productTypeId: accessoryType.id, name: { en: unique('Design frame') } })
+  // 25 accessories of their own type and category, more than one page of the picker (20).
+  const accessoryKind = await api.createKind({ name: { en: unique('Frames') } }, { name: { en: unique('Frame line') } })
+  const accessory = await api.createProduct({ ...accessoryKind.ids, name: { en: unique('Design frame') } })
   const skuPrefix = modelNumber('FR')
   const frame = (n: number) => `Frame ${String(n).padStart(2, '0')}`
   for (let n = 1; n <= 25; n++) {
@@ -377,9 +401,14 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   await expect(results(page).getByRole('listitem').first()).toBeVisible()
   await expect(results(page)).toContainText(/\d+ variants? shown/)
 
-  await chooseOption(addons(page).getByLabel('Product type'), accessoryType.name.en)
+  await chooseOption(addons(page).getByLabel('Product type'), accessoryKind.type.name.en)
   await expect(results(page).getByRole('listitem')).toHaveCount(20)
   await expect(results(page)).toContainText('20 variants shown')
+  // Rows name the product with its type badge and its category.
+  await expect(results(page).getByRole('listitem').first()).toContainText(`${accessory.name.en} · ${accessoryKind.category.name.en}`)
+  // The category filter narrows the same way; another category shows nothing of these.
+  await chooseOption(addons(page).getByLabel('Category'), accessoryKind.category.name.en)
+  await expect(results(page).getByRole('listitem')).toHaveCount(20)
   await results(page).getByRole('button', { name: 'Show more' }).click()
   await expect(results(page).getByRole('listitem')).toHaveCount(25)
   await expect(results(page)).toContainText('25 variants shown')
@@ -440,8 +469,8 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   await expect(basics(page).getByLabel('Model number')).toHaveValue(accessory.modelNumber)
 })
 
-test('availability follows the product type, the product and the variant', async ({ page, api }) => {
-  const { type, product } = await seedProduct(api, ['Alpha', 'Bravo'])
+test('availability follows the product type, the category, the product and the variant', async ({ page, api }) => {
+  const { type, category, product } = await seedProduct(api, ['Alpha', 'Bravo'])
   const search = async (text: string) => {
     await page.getByLabel('Search').fill(text)
     await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(text)}`))
@@ -454,9 +483,14 @@ test('availability follows the product type, the product and the variant', async
   await expect(page.getByText('No products match these filters.')).toBeVisible()
   await page.getByLabel('Show inactive').check()
   await expect(row(page, product.modelNumber)).toContainText('Unavailable')
-  await expect(row(page, product.modelNumber).getByTitle('Active, but its product type is inactive.')).toBeVisible()
+  await expect(row(page, product.modelNumber).getByTitle('Active, but its product type or category is inactive.')).toBeVisible()
 
   await api.updateProductType(type.id, { isActive: true })
+  // A deactivated category likewise.
+  await api.updateCategory(category.id, { isActive: false })
+  await page.reload()
+  await expect(row(page, product.modelNumber)).toContainText('Unavailable')
+  await api.updateCategory(category.id, { isActive: true })
   await page.reload()
   await expect(row(page, product.modelNumber)).toContainText('Active')
   await page.getByLabel('Show inactive').uncheck()
@@ -478,7 +512,7 @@ test('availability follows the product type, the product and the variant', async
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(variantRows(page).filter({ hasText: 'Bravo' })).toContainText('Unavailable')
   await variantRows(page).filter({ hasText: 'Bravo' }).getByRole('link', { name: 'Bravo' }).click()
-  await expect(page.getByText('This variant is not available because its product or product type is inactive.')).toBeVisible()
+  await expect(page.getByText('This variant is not available because its product, product type or category is inactive.')).toBeVisible()
   await page.getByRole('link', { name: 'Back to product' }).click()
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page.getByText('No products match these filters.')).toBeVisible()
@@ -488,17 +522,17 @@ test('availability follows the product type, the product and the variant', async
 })
 
 test('after a schema change the product shows its stale and invalid values', async ({ page, api }) => {
-  const type = await api.createProductType({
+  const { type, category, ids } = await api.createKind({
     attributes: [
       { key: 'colour', label: { en: 'Colour' }, type: 'enum', scope: 'product', options: [option('white', 'White'), option('black', 'Black')] },
       { key: 'protocols', label: { en: 'Protocols' }, type: 'list', itemType: 'enum', scope: 'product', options: [option('knx', 'KNX'), option('bus', 'Bus')] },
       { key: 'legacy', label: { en: 'Legacy' }, type: 'text', scope: 'product' },
     ],
   })
-  const product = await api.createProduct({ productTypeId: type.id, attributes: { colour: 'black', protocols: ['knx', 'bus'], legacy: 'old value' } })
+  const product = await api.createProduct({ ...ids, attributes: { colour: 'black', protocols: ['knx', 'bus'], legacy: 'old value' } })
   // Remove an attribute, replace an option of each choice.
-  const current = await api.productType(type.id)
-  await api.updateProductType(type.id, {
+  const current = await api.category(category.id)
+  await api.updateCategory(category.id, {
     attributes: [
       { ...current.attributes[0], options: [option('white', 'White'), option('anthracite', 'Anthracite')] },
       { ...current.attributes[1], options: [option('knx', 'KNX'), option('zigbee', 'Zigbee')] },
@@ -509,7 +543,7 @@ test('after a schema change the product shows its stale and invalid values', asy
   await expect(row(page, product.modelNumber).getByTitle('3 attribute values need attention')).toBeVisible()
 
   await row(page, product.modelNumber).getByRole('link', { name: product.modelNumber }).click()
-  await expect(page.getByText("Some stored values do not match the product type's current attributes.")).toBeVisible()
+  await expect(page.getByText("Some stored values do not match the category's current attributes.")).toBeVisible()
   const attrs = attributes(page)
   await expect(attrs.getByLabel('Colour')).toHaveText('black (not an option)')
   await expect(attrs.getByLabel('Colour')).toHaveAccessibleDescription(/not one of the allowed options/)
@@ -538,23 +572,23 @@ test('after a schema change the product shows its stale and invalid values', asy
   await expect(row(page, product.modelNumber).getByTitle(/need attention/)).toHaveCount(0)
 })
 
-test("changing a product's type flags its variants", async ({ page, api }) => {
-  const from = await api.createProductType({ attributes: [{ key: 'power', label: { en: 'Power' }, type: 'number', unit: 'W', scope: 'variant' }] })
-  const to = await api.createProductType({ name: { en: unique('Sensor') }, attributes: [{ key: 'range', label: { en: 'Range' }, type: 'integer', scope: 'variant' }] })
-  const product = await api.createProduct({ productTypeId: from.id })
+test("changing a product's category flags its variants", async ({ page, api }) => {
+  const { ids } = await api.createKind({ attributes: [{ key: 'power', label: { en: 'Power' }, type: 'number', unit: 'W', scope: 'variant' }] })
+  const to = await api.createCategory({ name: { en: unique('Sensors') }, attributes: [{ key: 'range', label: { en: 'Range' }, type: 'integer', scope: 'variant' }] })
+  const product = await api.createProduct(ids)
   await api.createVariant(product.id, { name: { en: 'Flagged' }, attributes: { power: 5 } })
   await api.createVariant(product.id, { name: { en: 'Clean' } })
 
   await page.goto(`${listPath}/${product.id}`)
-  await chooseOption(basics(page).getByLabel('Product type'), to.name.en)
-  await expect(page.getByText('You changed the product type.')).toBeVisible()
+  await chooseOption(basics(page).getByLabel('Category'), to.name.en)
+  await expect(page.getByText('You changed the category.')).toBeVisible()
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
   const summary = variants(page).getByRole('status').filter({ hasText: '1 variant has values that no longer match the schema:' })
   await expect(summary).toBeVisible()
   await expect(summary.getByRole('link')).toHaveText(['Flagged'])
   await expect(variantRows(page).filter({ hasText: 'Flagged' }).getByTitle('1 attribute value needs attention')).toBeVisible()
-  expect((await api.product(product.id)).variantsWithProblems).toBe(1)
+  expect(await api.product(product.id)).toMatchObject({ categoryId: to.id, productTypeId: ids.productTypeId, variantsWithProblems: 1 })
 
   await summary.getByRole('link', { name: 'Flagged' }).click()
   await expect(page.getByRole('heading', { name: 'Edit variant', level: 1 })).toBeVisible()
@@ -569,25 +603,33 @@ test("changing a product's type flags its variants", async ({ page, api }) => {
 })
 
 test('the product editor reports each mistake at its field', async ({ page, api }) => {
-  const type = await api.createProductType({ attributes: [{ key: 'model_name', label: { en: 'Model name' }, type: 'text', scope: 'product', required: true }] })
-  const inactive = await api.createProductType({ name: { en: unique('Retired') }, isActive: false })
-  const taken = await api.createProduct({ productTypeId: type.id, modelNumber: modelNumber('Abc'), attributes: { model_name: 'X' } })
+  const { type, category, ids } = await api.createKind({
+    attributes: [{ key: 'model_name', label: { en: 'Model name' }, type: 'text', scope: 'product', required: true }],
+  })
+  const inactive = await api.createKind({ name: { en: unique('Retired') }, isActive: false }, { name: { en: unique('Retired line') }, isActive: false })
+  const taken = await api.createProduct({ ...ids, modelNumber: modelNumber('Abc'), attributes: { model_name: 'X' } })
 
   await page.goto(`${listPath}/new`)
-  // A new product cannot use an inactive type (D78).
+  // A new product cannot use an inactive type or category (D78).
   const typeSelect = basics(page).getByLabel('Product type')
+  const categorySelect = basics(page).getByLabel('Category')
   const offered = await optionTexts(typeSelect)
   expect(offered).toContain(type.name.en)
-  expect(offered.filter((o) => o.includes(inactive.name.en))).toEqual([])
+  expect(offered.filter((o) => o.includes(inactive.type.name.en))).toEqual([])
+  const offeredCategories = await optionTexts(categorySelect)
+  expect(offeredCategories).toContain(category.name.en)
+  expect(offeredCategories.filter((o) => o.includes(inactive.category.name.en))).toEqual([])
 
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(typeSelect).toHaveAccessibleDescription('This field is required.')
+  await expect(typeSelect).toHaveAccessibleDescription(/This field is required\./)
+  await expect(categorySelect).toHaveAccessibleDescription(/This field is required\./)
   await expect(typeSelect).toBeFocused()
   await expect(basics(page).getByLabel('Model number')).toHaveAccessibleDescription('This field is required.')
   await expect(basics(page).getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
 
   // The server: invisible characters in the model number, a required attribute.
   await chooseOption(typeSelect, type.name.en)
+  await chooseOption(categorySelect, category.name.en)
   await basics(page).getByLabel('Model number').fill(`Zero​Width-${taken.modelNumber}`)
   await basics(page).getByLabel('Name (English)').fill(unique('Valid'))
   await page.getByRole('button', { name: 'Create' }).click()
@@ -680,14 +722,16 @@ test('a variant save over a newer version is refused, and Reload shows that vers
   expect((await api.product(product.id)).variants[0]).toMatchObject({ price: '99.90', name: { en: 'Standard', de: 'Standard DE' } })
 })
 
-test('the list searches, filters by type and shows inactive products; the filters survive a visit', async ({ page, api }) => {
-  const type = await api.createProductType({ name: { en: unique('Gateway') } })
+test('the list searches, filters by type and category and shows inactive products; the filters survive a visit', async ({ page, api }) => {
+  const { type, ids } = await api.createKind({ name: { en: unique('Gateways') } }, { name: { en: unique('Gateway line') } })
+  const other = await api.createCategory({ name: { en: unique('Sensors') } })
   const word = uniqueKey('needle')
-  const p1 = await api.createProduct({ productTypeId: type.id, description: { en: `Bridges the bus and ${word} networks.` } })
-  const p2 = await api.createProduct({ productTypeId: type.id })
+  const p1 = await api.createProduct({ ...ids, description: { en: `Bridges the bus and ${word} networks.` } })
+  const p2 = await api.createProduct(ids)
   const sku = modelNumber('SKU')
   await api.createVariant(p2.id, { name: { en: 'Standard' }, sku })
-  const p3 = await api.createProduct({ productTypeId: type.id, isActive: false })
+  const p3 = await api.createProduct({ ...ids, isActive: false })
+  const p4 = await api.createProduct({ ...ids, categoryId: other.id })
 
   await page.goto(listPath)
   // A word of the description.
@@ -702,12 +746,19 @@ test('the list searches, filters by type and shows inactive products; the filter
   // The type filter; the inactive product only with Show inactive.
   await page.getByLabel('Search').fill('')
   await chooseOption(page.getByLabel('Product type'), type.name.en)
-  await expect(page.getByRole('row')).toHaveCount(3)
+  await expect(page.getByRole('row')).toHaveCount(4)
   await expect(row(page, p3.modelNumber)).toHaveCount(0)
   await page.getByLabel('Show inactive').check()
   await expect(row(page, p3.modelNumber)).toContainText('Inactive')
-  await expect(page.getByRole('row')).toHaveCount(4)
+  await expect(page.getByRole('row')).toHaveCount(5)
   await page.getByLabel('Show inactive').uncheck()
+  // The category filter narrows further.
+  await chooseOption(page.getByLabel('Category'), other.name.en)
+  await expect(page.getByRole('row')).toHaveCount(2)
+  await expect(row(page, p4.modelNumber)).toContainText(other.name.en)
+  await expect(page).toHaveURL(new RegExp(`category=${other.id}`))
+  await chooseOption(page.getByLabel('Category'), 'All categories')
+  await expect(page.getByRole('row')).toHaveCount(4)
 
   // Opening a product and going back keeps the filters (D86).
   await page.getByLabel('Search').fill(word)
@@ -745,10 +796,10 @@ test('the list searches, filters by type and shows inactive products; the filter
 })
 
 test('the list pages by 50 and moves back from a page past the end', async ({ page, api }) => {
-  const type = await api.createProductType({ name: { en: unique('Bulk') } })
+  const { type, ids } = await api.createKind({}, { name: { en: unique('Bulk') } })
   const prefix = modelNumber('BULK')
   const model = (n: number) => `${prefix}-${String(n).padStart(3, '0')}`
-  await Promise.all(Array.from({ length: 51 }, (_, i) => api.createProduct({ productTypeId: type.id, modelNumber: model(i + 1) })))
+  await Promise.all(Array.from({ length: 51 }, (_, i) => api.createProduct({ ...ids, modelNumber: model(i + 1) })))
 
   await openListOfType(page, type)
   const pages = page.getByRole('navigation', { name: 'Pages' })
@@ -824,8 +875,8 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
 for (const role of ['user', 'tenant_admin'] as const) {
   test(`a ${role} sees products and variants read-only, images included`, async ({ api, sessionFor }) => {
     const image = await api.uploadFile('blue.png', 'image/png', readFileSync(asset('blue.png')))
-    const { type, product } = await seedProduct(api, [], { attributes: everyKind }, { model_name: 'DA-2' })
-    const accessory = await api.createProduct({ productTypeId: type.id, name: { en: unique('Accessory') }, attributes: { model_name: 'F' } })
+    const { ids, product } = await seedProduct(api, [], { attributes: everyKind }, { model_name: 'DA-2' })
+    const accessory = await api.createProduct({ ...ids, name: { en: unique('Accessory') }, attributes: { model_name: 'F' } })
     const addon = await api.createVariant(accessory.id, { name: { en: 'Frame' } })
     const variant = await api.createVariant(product.id, { name: { en: 'Standard' }, imageFileId: image.id, price: '27.50', attributes: { finish: 'matt' } })
     await api.replaceAddons(product.id, variant.id, [{ addonVariantId: addon.id, required: true }])
@@ -848,6 +899,7 @@ for (const role of ['user', 'tenant_admin'] as const) {
     await expect(page.getByText('You can view this product but not change it.')).toBeVisible()
     await expect(basics(page).getByLabel('Model number')).toBeDisabled()
     await expect(basics(page).getByLabel('Product type')).toBeDisabled()
+    await expect(basics(page).getByLabel('Category')).toBeDisabled()
     await expect(attributes(page).getByLabel('Power')).toBeDisabled()
     await expect(page.getByRole('button', { name: /Update|Create|Add variant|Delete|Move/ })).toHaveCount(0)
     await expect(variants(page).getByRole('link', { name: 'Add variant' })).toHaveCount(0)

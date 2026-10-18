@@ -1,6 +1,6 @@
 import { HttpResponse } from 'msw'
 
-import type { Product, ProductListItem, ProductType, Variant } from '@/api/generated/model'
+import type { Category, Product, ProductListItem, ProductType, Variant } from '@/api/generated/model'
 
 // Test data of the products tests (not shipped: only tests import it).
 
@@ -10,12 +10,32 @@ export const problem = (status: number, body: object) =>
 const at = '2026-01-01T00:00:00Z'
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 
-/** A product type with one product attribute of every kind, and variant attributes. */
-export const dimmerType: ProductType = {
-  id: id(101),
-  key: 'dimmer_actuator',
-  name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
+/** A product type (system) with an abbreviation and a colour. */
+export const zigbeeType: ProductType = {
+  id: id(111),
+  key: 'zigbee',
+  name: { en: 'Zigbee', de: 'Zigbee' },
+  abbreviation: 'ZB',
   color: '#1f6feb',
+  sortOrder: 1,
+  isActive: true,
+  createdAt: at,
+  updatedAt: at,
+  can: { update: true, delete: true },
+}
+
+/** A second product type, without abbreviation or colour. */
+export const knxType: ProductType = { ...zigbeeType, id: id(112), key: 'knx', name: { en: 'KNX' }, abbreviation: undefined, color: undefined, sortOrder: 2 }
+
+export const legacyType: ProductType = { ...knxType, id: id(113), key: 'legacy', name: { en: 'Legacy' }, sortOrder: 3, isActive: false }
+
+export const types = [zigbeeType, knxType, legacyType]
+
+/** A category with one product attribute of every kind, and variant attributes. */
+export const dimmerCategory: Category = {
+  id: id(101),
+  key: 'dimmer_actuators',
+  name: { en: 'Dimmer actuators', de: 'Dimmaktoren' },
   sortOrder: 1,
   isActive: true,
   attributes: [
@@ -65,13 +85,12 @@ export const dimmerType: ProductType = {
   can: { update: true, delete: true },
 }
 
-/** A second type with a different schema, for type changes. */
-export const gatewayType: ProductType = {
-  ...dimmerType,
+/** A second category with a different schema, for category changes. */
+export const gatewayCategory: Category = {
+  ...dimmerCategory,
   id: id(102),
-  key: 'gateway',
-  name: { en: 'Gateway' },
-  color: undefined,
+  key: 'gateways',
+  name: { en: 'Gateways' },
   sortOrder: 2,
   attributes: [
     { key: 'series', label: { en: 'Series' }, type: 'text', scope: 'product' },
@@ -80,9 +99,9 @@ export const gatewayType: ProductType = {
   ],
 }
 
-export const inactiveType: ProductType = { ...gatewayType, id: id(103), key: 'legacy', name: { en: 'Legacy' }, isActive: false, attributes: [] }
+export const inactiveCategory: Category = { ...gatewayCategory, id: id(103), key: 'retired', name: { en: 'Retired' }, isActive: false, attributes: [] }
 
-export const types = [dimmerType, gatewayType, inactiveType]
+export const categories = [dimmerCategory, gatewayCategory, inactiveCategory]
 
 export const ivory: Variant = {
   id: id(301),
@@ -131,8 +150,17 @@ export const black: Variant = {
 
 export const dimmer: Product = {
   id: id(201),
-  productTypeId: dimmerType.id,
-  productType: { id: dimmerType.id, key: dimmerType.key, name: dimmerType.name, color: dimmerType.color, isActive: true },
+  productTypeId: zigbeeType.id,
+  productType: {
+    id: zigbeeType.id,
+    key: zigbeeType.key,
+    name: zigbeeType.name,
+    abbreviation: zigbeeType.abbreviation,
+    color: zigbeeType.color,
+    isActive: true,
+  },
+  categoryId: dimmerCategory.id,
+  category: { id: dimmerCategory.id, key: dimmerCategory.key, name: dimmerCategory.name, isActive: true },
   modelNumber: 'M485/DIM.4',
   name: { en: 'Dimmer 4ch', de: 'Dimmer 4-fach' },
   description: { en: 'Four channels' },
@@ -150,8 +178,10 @@ export const dimmer: Product = {
 
 export const listItem = (overrides: Partial<ProductListItem> = {}): ProductListItem => ({
   id: dimmer.id,
-  productTypeId: dimmerType.id,
+  productTypeId: zigbeeType.id,
   productType: dimmer.productType,
+  categoryId: dimmerCategory.id,
+  category: dimmer.category,
   modelNumber: dimmer.modelNumber,
   name: dimmer.name,
   isActive: true,

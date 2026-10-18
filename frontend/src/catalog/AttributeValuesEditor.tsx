@@ -158,7 +158,7 @@ type AttributeValuesEditorProps = {
   disabled?: boolean
 }
 
-/** Inputs for the values of a list of attribute definitions (e.g. a product type's product attributes). */
+/** Inputs for the values of a list of attribute definitions (e.g. a category's product attributes). */
 export function AttributeValuesEditor({ definitions, values, onChange, errors, disabled }: AttributeValuesEditorProps) {
   const { t } = useTranslation('catalog')
   if (definitions.length === 0) return <p className="text-sm text-muted">{t('empty')}</p>

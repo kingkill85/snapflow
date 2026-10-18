@@ -1,0 +1,89 @@
+{
+  "title": "Categories",
+  "description": "The kinds of devices in the catalog (gateways, touchscreens, dimmer actuators, …). Each category defines which attributes its products have.",
+  "empty": "No categories yet.",
+  "new": "New category",
+  "edit": "Edit category",
+  "readOnly": "You can view this category but not change it.",
+  "created": "Category created.",
+  "showInactive": "Show inactive",
+  "moveUp": "Move {{name}} up",
+  "moveDown": "Move {{name}} down",
+  "deleteTitle": "Delete category",
+  "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
+  "section": {
+    "basics": "Basics",
+    "attributes": "Attributes",
+    "attributesHint": "Values stored on each product, or on each of its variants (e.g. width, bus system, colour).",
+    "instanceAttributes": "Instance attributes",
+    "instanceAttributesHint": "Values filled in per installed unit in a project (e.g. bus address, MAC address)."
+  },
+  "field": {
+    "key": "Key",
+    "keyHint": "e.g. gateways, dimmer_actuators",
+    "name": "Name",
+    "nameEn": "Name (English)",
+    "nameDe": "Name (German)",
+    "descriptionEn": "Description (English)",
+    "descriptionDe": "Description (German)",
+    "active": "Active",
+    "activeHint": "Inactive categories are hidden from the catalog but keep their products.",
+    "attributeCount": "Attributes",
+    "status": "Status",
+    "labelEn": "Label (English)",
+    "labelDe": "Label (German)",
+    "type": "Type",
+    "itemType": "Item type",
+    "scope": "Set per",
+    "unit": "Unit",
+    "unitHint": "Display only, e.g. TE, mA, W",
+    "required": "Required",
+    "requiredHint": "A value must be set.",
+    "position": "Position"
+  },
+  "schema": {
+    "item": "Attribute {{n}}",
+    "empty": "No attributes yet.",
+    "add": "Add attribute",
+    "keyHint": "e.g. width_te, bus_system",
+    "itemName": "attribute {{n}}",
+    "addFirst": "Add attribute at the top"
+  },
+  "type": {
+    "text": "Text",
+    "number": "Number",
+    "integer": "Whole number",
+    "boolean": "Yes/no",
+    "enum": "Choice",
+    "list": "List"
+  },
+  "scope": {
+    "product": "Product",
+    "variant": "Variant",
+    "hint": "Variant values can differ per variant, e.g. colour."
+  },
+  "bounds": {
+    "value": {
+      "min": "Minimum",
+      "max": "Maximum"
+    },
+    "length": {
+      "min": "Minimum length",
+      "max": "Maximum length"
+    },
+    "items": {
+      "min": "Minimum items",
+      "max": "Maximum items"
+    }
+  },
+  "options": {
+    "title": "Options",
+    "item": "Option {{n}}",
+    "add": "Add option",
+    "itemName": "option {{n}}"
+  },
+  "notFound": {
+    "title": "Category not found",
+    "message": "This category does not exist (anymore)."
+  }
+}

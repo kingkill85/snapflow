@@ -31,6 +31,7 @@ export const errorParamNames = {
   'attribute.type': ['expected'],
   'attribute.wrong_scope': ['scope'],
   'auth.too_many_attempts': ['seconds'],
+  'category.key_taken': ['key'],
   'file.too_large': ['maxMb'],
   'file.too_many_pixels': ['megapixels'],
   'function_type.key_taken': ['key'],

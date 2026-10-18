@@ -13,6 +13,19 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+type Category struct {
+	ID                 uuid.UUID
+	Key                string
+	Name               i18n.Text
+	Description        *i18n.Text
+	SortOrder          int32
+	IsActive           bool
+	Attributes         attrschema.Schema
+	InstanceAttributes attrschema.InstanceSchema
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -41,20 +54,19 @@ type Product struct {
 	IsActive      bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	CategoryID    uuid.UUID
 }
 
 type ProductType struct {
-	ID                 uuid.UUID
-	Key                string
-	Name               i18n.Text
-	Description        *i18n.Text
-	Color              *string
-	SortOrder          int32
-	IsActive           bool
-	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.InstanceSchema
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID           uuid.UUID
+	Key          string
+	Name         i18n.Text
+	Color        *string
+	SortOrder    int32
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Abbreviation *string
 }
 
 type ProductVariant struct {

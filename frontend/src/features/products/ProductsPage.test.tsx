@@ -12,7 +12,7 @@ import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
 import { ProductsPage } from './ProductsPage'
-import { dimmer, dimmerType, gatewayType, ids, inactiveType, listItem, types } from './test-fixtures'
+import { categories, dimmer, gatewayCategory, ids, inactiveCategory, knxType, legacyType, listItem, types, zigbeeType } from './test-fixtures'
 
 const routes = [
   { path: '/catalog/products', element: <ProductsPage /> },
@@ -25,6 +25,7 @@ function listHandlers(items: () => ProductListItem[] = () => [listItem()], total
   const requests: URLSearchParams[] = []
   server.use(
     http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+    http.get('/api/categories', () => HttpResponse.json({ items: categories })),
     http.get('/api/products', ({ request }) => {
       requests.push(new URL(request.url).searchParams)
       return HttpResponse.json({ items: items(), total: total?.() ?? items().length })
@@ -42,10 +43,21 @@ describe('ProductsPage', () => {
     await i18n.changeLanguage('en')
   })
 
-  it('lists products with image, type, variant count, price range, status and problems', async () => {
+  it('lists products with image, type, category, variant count, price range, status and problems', async () => {
     listHandlers(() => [
       listItem(),
-      listItem({ id: ids.id(202), modelNumber: 'GW-1', name: { en: 'Gateway' }, priceMin: '99.50', priceMax: '99.50', previewImageFileId: undefined }),
+      listItem({
+        id: ids.id(202),
+        modelNumber: 'GW-1',
+        name: { en: 'Gateway' },
+        productTypeId: knxType.id,
+        productType: { id: knxType.id, key: knxType.key, name: knxType.name, isActive: true },
+        categoryId: gatewayCategory.id,
+        category: { id: gatewayCategory.id, key: gatewayCategory.key, name: gatewayCategory.name, isActive: true },
+        priceMin: '99.50',
+        priceMax: '99.50',
+        previewImageFileId: undefined,
+      }),
       listItem({ id: ids.id(203), modelNumber: 'OLD-1', isActive: false, available: false, variantCount: 0, priceMin: undefined, priceMax: undefined }),
       listItem({ id: ids.id(204), modelNumber: 'TYPE-OFF', available: false, attributeErrors: 2, staleAttributes: 1 }),
     ])
@@ -55,8 +67,11 @@ describe('ProductsPage', () => {
     // Decorative (alt=""): the row names the product.
     expect(first.querySelector('img')).toHaveAttribute('src', `/api/files/${ids.id(901)}`)
     expect(first).toHaveTextContent('Dimmer 4ch')
-    expect(first).toHaveTextContent('Dimmer actuator')
-    expect(within(first).getByTestId('type-color')).toHaveStyle({ backgroundColor: '#1f6feb' })
+    // The product type with its badge (abbreviation on its colour, text for contrast), and the category.
+    const cells = within(first).getAllByRole('cell')
+    expect(cells[3]).toHaveTextContent('ZBZigbeeDimmer actuators')
+    expect(within(cells[3]).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb', color: '#ffffff' })
+    expect(screen.getByRole('columnheader', { name: 'Product type / Category' })).toBeInTheDocument()
     expect(first).toHaveTextContent('$27.00 – $35.00')
     expect(first).toHaveTextContent('Active')
     expect(first).not.toHaveTextContent('attention')
@@ -65,15 +80,19 @@ describe('ProductsPage', () => {
     expect(gateway).toHaveTextContent('$99.50')
     expect(gateway).not.toHaveTextContent('–')
     expect(gateway.querySelector('img')).toBeNull()
+    // A type without abbreviation shows a dot; without colour it is outlined.
+    expect(within(gateway).getByTestId('type-color')).not.toHaveAttribute('style')
+    expect(gateway).toHaveTextContent('KNX')
+    expect(gateway).toHaveTextContent('Gateways')
     expect(within(gateway).getByTestId('thumbnail-placeholder')).toBeInTheDocument()
 
     const old = row('OLD-1')
     expect(old).toHaveTextContent('Inactive')
     expect(old).toHaveTextContent('–')
 
-    // Active, but its type is not: unavailable, with the reason; three values need attention.
+    // Active, but its type or category is not: unavailable, with the reason; three values need attention.
     const typeOff = row('TYPE-OFF')
-    expect(within(typeOff).getByTitle('Active, but its product type is inactive.')).toHaveTextContent('Unavailable')
+    expect(within(typeOff).getByTitle('Active, but its product type or category is inactive.')).toHaveTextContent('Unavailable')
     expect(within(typeOff).getByTitle('3 attribute values need attention')).toBeInTheDocument()
 
     expect(screen.getByRole('link', { name: 'New product' })).toHaveAttribute('href', '/catalog/products/new')
@@ -115,21 +134,32 @@ describe('ProductsPage', () => {
 
     // Inactive types are offered too.
     const typeSelect = screen.getByLabelText('Product type')
-    expect(await optionTexts(u, typeSelect)).toEqual([
-      'All product types',
-      'Dimmer actuator',
-      'Gateway',
-      'Legacy (inactive)',
-    ])
-    await chooseOption(u, typeSelect, 'Gateway')
-    await waitFor(() => expect(last()).toEqual({ search: 'dim 4', productTypeId: gatewayType.id, limit: '50', offset: '0' }))
+    expect(await optionTexts(u, typeSelect)).toEqual(['All product types', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
+    await chooseOption(u, typeSelect, 'KNX')
+    await waitFor(() => expect(last()).toEqual({ search: 'dim 4', productTypeId: knxType.id, limit: '50', offset: '0' }))
+
+    // So are inactive categories; both filters together.
+    const categorySelect = screen.getByLabelText('Category')
+    expect(await optionTexts(u, categorySelect)).toEqual(['All categories', 'Dimmer actuators', 'Gateways', 'Retired (inactive)'])
+    await chooseOption(u, categorySelect, 'Gateways')
+    await waitFor(() =>
+      expect(last()).toEqual({ search: 'dim 4', productTypeId: knxType.id, categoryId: gatewayCategory.id, limit: '50', offset: '0' }),
+    )
 
     await u.click(screen.getByLabelText('Show inactive'))
     await waitFor(() =>
-      expect(last()).toEqual({ search: 'dim 4', productTypeId: gatewayType.id, includeInactive: 'true', limit: '50', offset: '0' }),
+      expect(last()).toEqual({
+        search: 'dim 4',
+        productTypeId: knxType.id,
+        categoryId: gatewayCategory.id,
+        includeInactive: 'true',
+        limit: '50',
+        offset: '0',
+      }),
     )
 
     await chooseOption(u, typeSelect, 'All product types')
+    await chooseOption(u, categorySelect, 'All categories')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', includeInactive: 'true', limit: '50', offset: '0' }))
   })
 
@@ -142,14 +172,14 @@ describe('ProductsPage', () => {
     const checkbox = await screen.findByLabelText('Show inactive')
     const typeSelect = screen.getByLabelText('Product type')
     await userEvent.setup().click(typeSelect)
-    const gateway = await screen.findByRole('option', { name: 'Gateway' })
+    const knx = await screen.findByRole('option', { name: 'KNX' })
 
     // Not through act(), which would finish the navigation first: what the
     // user sees right after the click.
     checkbox.click()
     expect(checkbox).toBeChecked()
-    gateway.click()
-    expect(typeSelect).toHaveTextContent('Gateway')
+    knx.click()
+    expect(typeSelect).toHaveTextContent('KNX')
     await waitFor(() => expect(checkbox).toBeChecked())
   })
 
@@ -159,10 +189,10 @@ describe('ProductsPage', () => {
       () => 120,
     )
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: `/catalog/products?type=${dimmerType.id}` })
+    renderRoutes(routes, { me: adminMe, route: `/catalog/products?type=${zigbeeType.id}` })
 
     expect(await screen.findByText('1–50 of 120')).toBeInTheDocument()
-    expect(last()).toEqual({ productTypeId: dimmerType.id, limit: '50', offset: '0' })
+    expect(last()).toEqual({ productTypeId: zigbeeType.id, limit: '50', offset: '0' })
     expect(screen.getByRole('button', { name: /Previous/ })).toBeDisabled()
 
     await u.click(screen.getByRole('button', { name: /Next/ }))
@@ -170,7 +200,7 @@ describe('ProductsPage', () => {
     await u.click(screen.getByRole('button', { name: /Next/ }))
     expect(await screen.findByText('101–120 of 120')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled()
-    expect(last()).toEqual({ productTypeId: dimmerType.id, limit: '50', offset: '100' })
+    expect(last()).toEqual({ productTypeId: zigbeeType.id, limit: '50', offset: '100' })
 
     await u.click(screen.getByRole('button', { name: /Previous/ }))
     expect(await screen.findByText('51–100 of 120')).toBeInTheDocument()
@@ -234,7 +264,7 @@ describe('ProductsPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Search')).toHaveValue('gw'))
   })
 
-  it('shows inactive products when an inactive type is chosen', async () => {
+  it('shows inactive products when an inactive type or category is chosen', async () => {
     const { last } = listHandlers()
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: '/catalog/products' })
@@ -243,12 +273,21 @@ describe('ProductsPage', () => {
     expect(screen.getByLabelText('Show inactive')).not.toBeChecked()
     await chooseOption(u, screen.getByLabelText('Product type'), 'Legacy (inactive)')
 
-    await waitFor(() => expect(last()).toEqual({ productTypeId: inactiveType.id, includeInactive: 'true', limit: '50', offset: '0' }))
+    await waitFor(() => expect(last()).toEqual({ productTypeId: legacyType.id, includeInactive: 'true', limit: '50', offset: '0' }))
     expect(screen.getByLabelText('Show inactive')).toBeChecked()
 
     // An active type leaves the checkbox as it is.
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
-    await waitFor(() => expect(last()).toEqual({ productTypeId: dimmerType.id, includeInactive: 'true', limit: '50', offset: '0' }))
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Zigbee')
+    await waitFor(() => expect(last()).toEqual({ productTypeId: zigbeeType.id, includeInactive: 'true', limit: '50', offset: '0' }))
+
+    // Likewise for categories.
+    await u.click(screen.getByLabelText('Show inactive'))
+    await waitFor(() => expect(screen.getByLabelText('Show inactive')).not.toBeChecked())
+    await chooseOption(u, screen.getByLabelText('Category'), 'Retired (inactive)')
+    await waitFor(() =>
+      expect(last()).toEqual({ productTypeId: zigbeeType.id, categoryId: inactiveCategory.id, includeInactive: 'true', limit: '50', offset: '0' }),
+    )
+    expect(screen.getByLabelText('Show inactive')).toBeChecked()
   })
 
   it('returns to the filtered list from a product, with Back to list and with Cancel', async () => {
@@ -262,7 +301,7 @@ describe('ProductsPage', () => {
       { path: '/catalog/products', element: <ProductsPage /> },
       { path: '/catalog/products/:id', element: <ProductEditorPage /> },
     ]
-    const filters = `?search=dim&type=${dimmerType.id}&offset=50`
+    const filters = `?search=dim&type=${zigbeeType.id}&offset=50`
     const { router } = renderRoutes(editorRoutes, { me: adminMe, route: `/catalog/products${filters}` })
 
     await u.click(await screen.findByRole('link', { name: 'M485/DIM.4' }))
@@ -271,7 +310,7 @@ describe('ProductsPage', () => {
     expect(await screen.findByText('51–100 of 120')).toBeInTheDocument()
     expect(router.state.location.search).toBe(filters)
     expect(screen.getByLabelText('Search')).toHaveValue('dim')
-    expect(last()).toEqual({ search: 'dim', productTypeId: dimmerType.id, limit: '50', offset: '50' })
+    expect(last()).toEqual({ search: 'dim', productTypeId: zigbeeType.id, limit: '50', offset: '50' })
 
     await u.click(screen.getByRole('link', { name: 'M485/DIM.4' }))
     await u.type(await screen.findByLabelText('Name (German)'), ' neu')

@@ -26,17 +26,21 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
           type: Text
-      - column: product_types.description
+      - column: categories.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: categories.description
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
           type: Text
           pointer: true
       # Attribute schemas (platform/attrschema).
-      - column: product_types.attributes
+      - column: categories.attributes
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
           type: Schema
-      - column: product_types.instance_attributes
+      - column: categories.instance_attributes
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
           type: InstanceSchema
@@ -116,6 +120,13 @@ sql:
       go:
         <<: *go
         out: internal/features/producttypes/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/categories/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/categories/store
   - engine: postgresql
     schema: migrations
     queries: internal/features/files/queries.sql

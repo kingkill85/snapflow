@@ -6,6 +6,6 @@
  */
 
 /**
- * Description per locale
+ * Display name per locale
  */
-export type ProductTypeDescription = {[key: string]: string};
+export type CategoryName = {[key: string]: string};

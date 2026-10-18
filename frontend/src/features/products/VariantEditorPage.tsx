@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { Product, ProductType, Variant } from '@/api/generated/model'
+import type { Category, Product, Variant } from '@/api/generated/model'
 import {
   getGetProductQueryKey,
   getListProductsQueryKey,
@@ -53,9 +53,9 @@ import {
   isNotFound,
   listPath,
   listSearchFrom,
-  noticeFrom,
   productPath,
-  type SaveNotice,
+  useFreshCategories,
+  useSaveNotice,
   useFreshProductTypes,
   variantPath,
 } from './paths'
@@ -81,13 +81,14 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
   // Fetched on every visit; the form edits the version loaded then (D44).
   const query = useGetProduct(productId, { query: fresh })
   const types = useFreshProductTypes()
+  const categories = useFreshCategories()
   const [generation, setGeneration] = useState(0)
-  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
+  const [notice, setNotice] = useSaveNotice()
   const [formDirty, setFormDirty] = useState(false)
   const [addonsDirty, setAddonsDirty] = useState(false)
   const unsaved = useUnsavedChanges(formDirty || addonsDirty)
 
-  const failed = query.error ?? types.error
+  const failed = query.error ?? types.error ?? categories.error
   if (failed) {
     if (isNotFound(failed)) {
       return (
@@ -103,7 +104,16 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
       </Page>
     )
   }
-  if (!query.isFetchedAfterMount || !query.data || !types.isFetchedAfterMount || !types.data) return <Loading />
+  if (
+    !query.isFetchedAfterMount ||
+    !query.data ||
+    !types.isFetchedAfterMount ||
+    !types.data ||
+    !categories.isFetchedAfterMount ||
+    !categories.data
+  ) {
+    return <Loading />
+  }
 
   const product = query.data
   const variant = variantId === undefined ? null : product.variants.find((v) => v.id === variantId)
@@ -120,7 +130,7 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
 
   const readOnly = variant ? !variant.can.update : !product.can.update
   const reload = async () => {
-    await Promise.all([query.refetch(), types.refetch()])
+    await Promise.all([query.refetch(), types.refetch(), categories.refetch()])
     setNotice(null)
     setGeneration((g) => g + 1)
   }
@@ -143,7 +153,7 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
         key={`${variant?.id ?? 'new'}:${generation}`}
         product={product}
         item={variant}
-        type={types.data.items.find((pt) => pt.id === product.productTypeId)}
+        category={categories.data.items.find((c) => c.id === product.categoryId)}
         readOnly={readOnly}
         dirty={formDirty || addonsDirty}
         listState={listState}
@@ -160,6 +170,7 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
           product={product}
           variant={variant}
           types={types.data.items}
+          categories={categories.data.items}
           readOnly={readOnly}
           linkState={listState}
           onDirtyChange={setAddonsDirty}
@@ -177,7 +188,8 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
 type VariantFormProps = {
   product: Product
   item: Variant | null
-  type: ProductType | undefined
+  /** The product's category, whose schema the variant's values follow. */
+  category: Category | undefined
   readOnly: boolean
   /** Whether the page (form or add-ons) has unsaved changes: Cancel instead of Back to product. */
   dirty: boolean
@@ -190,7 +202,7 @@ type VariantFormProps = {
 }
 
 /** A variant's own fields, image and attribute values (add-ons are saved separately). */
-function VariantForm({ product, item, type, readOnly, dirty, listState, onReload, onSaved, onDirtyChange, onLeave }: VariantFormProps) {
+function VariantForm({ product, item, category, readOnly, dirty, listState, onReload, onSaved, onDirtyChange, onLeave }: VariantFormProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
@@ -203,7 +215,7 @@ function VariantForm({ product, item, type, readOnly, dirty, listState, onReload
   const mutation = loaded ? update : create
   const image = useImageUpload()
 
-  const definitions = definitionsFor(type, 'variant')
+  const definitions = definitionsFor(category, 'variant')
   const stored = storedValues(loaded)
   const extras = extraKeys(definitions, stored)
   const [defaults] = useState(() => toVariantFormValues(loaded, definitions))

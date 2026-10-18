@@ -1,5 +1,5 @@
 import { ApiError } from '@/api/client'
-import type { AttributeDefinition, FieldError, InstanceAttributeDefinition, ProductType } from '@/api/generated/model'
+import type { AttributeDefinition, Category, FieldError, InstanceAttributeDefinition } from '@/api/generated/model'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
 
 import { parseDecimal } from './decimal'
@@ -9,7 +9,7 @@ import { parseDecimal } from './decimal'
 // instances (phase 2). The server validates every value (attrschema); this
 // only converts the inputs and catches text that is not a number (D23, D48).
 
-/** One definition of a product type's (or instance) schema. */
+/** One definition of a category's (or instance) schema. */
 export type Definition = AttributeDefinition | InstanceAttributeDefinition
 
 /**
@@ -32,9 +32,9 @@ export const isRaw = (v: unknown): v is RawValue => typeof v === 'object' && v !
 /** Attribute values by key, as a form edits them. */
 export type AttributeFormValues = Record<string, AttributeFormValue>
 
-/** The definitions of a product type that apply to products or to variants. */
-export const definitionsFor = (type: ProductType | undefined, scope: 'product' | 'variant'): AttributeDefinition[] =>
-  (type?.attributes ?? []).filter((a) => (a.scope ?? 'product') === scope)
+/** The definitions of a category that apply to products or to variants. */
+export const definitionsFor = (category: Category | undefined, scope: 'product' | 'variant'): AttributeDefinition[] =>
+  (category?.attributes ?? []).filter((a) => (a.scope ?? 'product') === scope)
 
 /** A definition's empty value; a required yes/no starts as "no", since a checkbox has no "not set". */
 export const emptyValue = (d: Definition): AttributeFormValue =>

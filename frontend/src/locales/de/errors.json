@@ -42,7 +42,7 @@
       "number": "eine Zahl",
       "text": "Text"
     },
-    "unknown": "Dieses Attribut gibt es für diesen Produkttyp nicht.",
+    "unknown": "Dieses Attribut gibt es in dieser Kategorie nicht.",
     "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt."
   },
   "auth": {
@@ -52,6 +52,14 @@
     "required": "Bitte anmelden.",
     "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
+  },
+  "category": {
+    "in_use": "Diese Kategorie wird noch von Produkten verwendet. Deaktivieren Sie sie stattdessen.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
+    "not_found": "Diese Kategorie existiert nicht mehr.",
+    "order_mismatch": "Die Kategorien wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diese Kategorie inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "file": {
     "not_found": "Diese Datei existiert nicht mehr.",
@@ -68,6 +76,8 @@
     "unavailable": "Keine Verbindung zum Server."
   },
   "product": {
+    "category_inactive": "Diese Kategorie ist inaktiv. Wählen Sie eine aktive Kategorie.",
+    "category_not_found": "Die gewählte Kategorie existiert nicht mehr.",
     "model_number_taken": "Die Modellnummer \"{{modelNumber}}\" ist bereits vergeben.",
     "not_found": "Dieses Produkt existiert nicht mehr.",
     "stale": "Jemand anderes hat dieses Produkt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",

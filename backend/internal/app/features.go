@@ -4,6 +4,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	filesstore "github.com/kingkill85/snapflow/backend/internal/features/files/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
@@ -36,8 +37,10 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	functiontypes.Register(api, functiontypes.NewService(functiontypesstore.New(deps.DB)))
 	productTypes := producttypes.NewService(deps.DB)
 	producttypes.Register(api, productTypes)
+	cats := categories.NewService(deps.DB)
+	categories.Register(api, cats)
 	fileSvc := files.NewService(filesstore.New(deps.DB), deps.Storage)
 	files.Register(api, fileSvc)
-	products.Register(api, products.NewService(deps.DB, productTypes, fileSvc))
+	products.Register(api, products.NewService(deps.DB, productTypes, cats, fileSvc))
 	// scaffold:features
 }

@@ -30,10 +30,18 @@ type problem struct {
 }
 
 type typeRef struct {
+	ID           string         `json:"id"`
+	Key          string         `json:"key"`
+	Name         map[string]any `json:"name"`
+	Abbreviation string         `json:"abbreviation"`
+	Color        string         `json:"color"`
+	IsActive     bool           `json:"isActive"`
+}
+
+type categoryRef struct {
 	ID       string         `json:"id"`
 	Key      string         `json:"key"`
 	Name     map[string]any `json:"name"`
-	Color    string         `json:"color"`
 	IsActive bool           `json:"isActive"`
 }
 
@@ -72,6 +80,8 @@ type product struct {
 	ID              string         `json:"id"`
 	ProductTypeID   string         `json:"productTypeId"`
 	ProductType     typeRef        `json:"productType"`
+	CategoryID      string         `json:"categoryId"`
+	Category        categoryRef    `json:"category"`
 	ModelNumber     string         `json:"modelNumber"`
 	Name            map[string]any `json:"name"`
 	Description     map[string]any `json:"description"`
@@ -91,6 +101,8 @@ type listItem struct {
 	ID                 string       `json:"id"`
 	ProductTypeID      string       `json:"productTypeId"`
 	ProductType        typeRef      `json:"productType"`
+	CategoryID         string       `json:"categoryId"`
+	Category           categoryRef  `json:"category"`
 	ModelNumber        string       `json:"modelNumber"`
 	IsActive           bool         `json:"isActive"`
 	Available          bool         `json:"available"`
@@ -112,6 +124,9 @@ type variantHit struct {
 	ID            string         `json:"id"`
 	ProductID     string         `json:"productId"`
 	ProductTypeID string         `json:"productTypeId"`
+	ProductType   typeRef        `json:"productType"`
+	CategoryID    string         `json:"categoryId"`
+	Category      categoryRef    `json:"category"`
 	ModelNumber   string         `json:"modelNumber"`
 	ProductName   map[string]any `json:"productName"`
 	Name          map[string]any `json:"name"`
@@ -127,11 +142,27 @@ type variantPage struct {
 }
 
 type productType struct {
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	IsActive  bool   `json:"isActive"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type category struct {
 	ID         string           `json:"id"`
 	Key        string           `json:"key"`
 	Attributes []map[string]any `json:"attributes"`
 	IsActive   bool             `json:"isActive"`
 	UpdatedAt  string           `json:"updatedAt"`
+}
+
+// kind is a product type and a category created together, for tests that
+// need one of each: ID is the product type, CategoryID the category (with the
+// attribute schema).
+type kind struct {
+	ID         string
+	CategoryID string
+	Key        string
 }
 
 func decode[T any](t *testing.T, resp *httptest.ResponseRecorder) T {
@@ -161,47 +192,79 @@ func schema() []any {
 	}
 }
 
-func typeBody(key string, attributes []any) map[string]any {
+func typeBody(key string) map[string]any {
+	return map[string]any{"key": key, "name": text(key), "abbreviation": "zb", "color": "#1f6feb", "isActive": true}
+}
+
+func categoryBody(key string, attributes []any) map[string]any {
 	return map[string]any{
-		"key": key, "name": text(key), "color": "#1f6feb", "isActive": true,
+		"key": key, "name": text(key), "isActive": true,
 		"attributes": attributes, "instanceAttributes": []any{},
 	}
 }
 
-func newType(t *testing.T, api *apptest.API, key string, attributes []any) productType {
+func newProductType(t *testing.T, api *apptest.API, key string) productType {
 	t.Helper()
-	resp := api.Post("/api/product-types", api.Admin.Cookie, typeBody(key, attributes))
+	resp := api.Post("/api/product-types", api.Admin.Cookie, typeBody(key))
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("create type: got %d: %s", resp.Code, resp.Body)
 	}
 	return decode[productType](t, resp)
 }
 
-// updateType replaces a type's schema and active flag.
-func updateType(t *testing.T, api *apptest.API, pt productType, attributes []any, active bool) productType {
+func newCategory(t *testing.T, api *apptest.API, key string, attributes []any) category {
 	t.Helper()
-	current := decode[productType](t, api.Get("/api/product-types/"+pt.ID, api.Admin.Cookie))
-	b := typeBody(pt.Key, attributes)
-	b["isActive"] = active
-	b["expectedUpdatedAt"] = current.UpdatedAt
-	resp := api.Put("/api/product-types/"+pt.ID, api.Admin.Cookie, b)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("update type: got %d: %s", resp.Code, resp.Body)
+	resp := api.Post("/api/categories", api.Admin.Cookie, categoryBody(key, attributes))
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("create category: got %d: %s", resp.Code, resp.Body)
 	}
-	return decode[productType](t, resp)
+	return decode[category](t, resp)
 }
 
-func productBody(typeID, model string) map[string]any {
+// newType creates a product type and a category named key; the category has
+// the attribute schema.
+func newType(t *testing.T, api *apptest.API, key string, attributes []any) kind {
+	t.Helper()
+	return kind{ID: newProductType(t, api, key).ID, CategoryID: newCategory(t, api, key, attributes).ID, Key: key}
+}
+
+// updateCategory replaces the schema and active flag of k's category.
+func updateCategory(t *testing.T, api *apptest.API, k kind, attributes []any, active bool) category {
+	t.Helper()
+	current := decode[category](t, api.Get("/api/categories/"+k.CategoryID, api.Admin.Cookie))
+	b := categoryBody(current.Key, attributes)
+	b["isActive"] = active
+	b["expectedUpdatedAt"] = current.UpdatedAt
+	resp := api.Put("/api/categories/"+k.CategoryID, api.Admin.Cookie, b)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("update category: got %d: %s", resp.Code, resp.Body)
+	}
+	return decode[category](t, resp)
+}
+
+// setTypeActive sets the active flag of k's product type.
+func setTypeActive(t *testing.T, api *apptest.API, k kind, active bool) {
+	t.Helper()
+	current := decode[productType](t, api.Get("/api/product-types/"+k.ID, api.Admin.Cookie))
+	b := typeBody(current.Key)
+	b["isActive"] = active
+	b["expectedUpdatedAt"] = current.UpdatedAt
+	if resp := api.Put("/api/product-types/"+k.ID, api.Admin.Cookie, b); resp.Code != http.StatusOK {
+		t.Fatalf("update type: got %d: %s", resp.Code, resp.Body)
+	}
+}
+
+func productBody(k kind, model string) map[string]any {
 	return map[string]any{
-		"productTypeId": typeID, "modelNumber": model,
+		"productTypeId": k.ID, "categoryId": k.CategoryID, "modelNumber": model,
 		"name":     map[string]string{"en": "Dimmer " + model, "de": "Dimmer " + model},
 		"isActive": true,
 	}
 }
 
 // dimmerBody is productBody with valid values for schema().
-func dimmerBody(typeID, model string) map[string]any {
-	b := productBody(typeID, model)
+func dimmerBody(k kind, model string) map[string]any {
+	b := productBody(k, model)
 	b["attributes"] = map[string]any{"width_te": 4, "bus_system": "zigbee"}
 	return b
 }

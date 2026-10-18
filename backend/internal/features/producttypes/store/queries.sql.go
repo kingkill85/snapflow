@@ -10,24 +10,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 const createProductType = `-- name: CreateProductType :one
-INSERT INTO product_types (key, name, description, color, is_active, attributes, instance_attributes, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
-RETURNING id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+INSERT INTO product_types (key, name, abbreviation, color, is_active, sort_order)
+VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation
 `
 
 type CreateProductTypeParams struct {
-	Key                string
-	Name               i18n.Text
-	Description        *i18n.Text
-	Color              *string
-	IsActive           bool
-	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.InstanceSchema
+	Key          string
+	Name         i18n.Text
+	Abbreviation *string
+	Color        *string
+	IsActive     bool
 }
 
 // New types go to the end of the order (under LockProductTypeOrder, so two
@@ -36,25 +33,21 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 	row := q.db.QueryRow(ctx, createProductType,
 		arg.Key,
 		arg.Name,
-		arg.Description,
+		arg.Abbreviation,
 		arg.Color,
 		arg.IsActive,
-		arg.Attributes,
-		arg.InstanceAttributes,
 	)
 	var i ProductType
 	err := row.Scan(
 		&i.ID,
 		&i.Key,
 		&i.Name,
-		&i.Description,
 		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.Attributes,
-		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Abbreviation,
 	)
 	return i, err
 }
@@ -72,7 +65,7 @@ func (q *Queries) DeleteProductType(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const getProductType = `-- name: GetProductType :one
-SELECT id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types WHERE id = $1
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation FROM product_types WHERE id = $1
 `
 
 func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType, error) {
@@ -82,20 +75,18 @@ func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType
 		&i.ID,
 		&i.Key,
 		&i.Name,
-		&i.Description,
 		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.Attributes,
-		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Abbreviation,
 	)
 	return i, err
 }
 
 const listProductTypes = `-- name: ListProductTypes :many
-SELECT id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation FROM product_types
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -113,14 +104,12 @@ func (q *Queries) ListProductTypes(ctx context.Context, includeInactive bool) ([
 			&i.ID,
 			&i.Key,
 			&i.Name,
-			&i.Description,
 			&i.Color,
 			&i.SortOrder,
 			&i.IsActive,
-			&i.Attributes,
-			&i.InstanceAttributes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Abbreviation,
 		); err != nil {
 			return nil, err
 		}
@@ -195,22 +184,20 @@ func (q *Queries) SetProductTypeOrder(ctx context.Context, ids []uuid.UUID) erro
 
 const updateProductType = `-- name: UpdateProductType :one
 UPDATE product_types
-SET key = $2, name = $3, description = $4, color = $5, is_active = $6, attributes = $7, instance_attributes = $8,
+SET key = $2, name = $3, abbreviation = $4, color = $5, is_active = $6,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $9
-RETURNING id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+WHERE id = $1 AND updated_at = $7
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation
 `
 
 type UpdateProductTypeParams struct {
-	ID                 uuid.UUID
-	Key                string
-	Name               i18n.Text
-	Description        *i18n.Text
-	Color              *string
-	IsActive           bool
-	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.InstanceSchema
-	ExpectedUpdatedAt  time.Time
+	ID                uuid.UUID
+	Key               string
+	Name              i18n.Text
+	Abbreviation      *string
+	Color             *string
+	IsActive          bool
+	ExpectedUpdatedAt time.Time
 }
 
 // UpdateProductType changes the type only if nobody else has since it was
@@ -221,11 +208,9 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		arg.ID,
 		arg.Key,
 		arg.Name,
-		arg.Description,
+		arg.Abbreviation,
 		arg.Color,
 		arg.IsActive,
-		arg.Attributes,
-		arg.InstanceAttributes,
 		arg.ExpectedUpdatedAt,
 	)
 	var i ProductType
@@ -233,14 +218,12 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		&i.ID,
 		&i.Key,
 		&i.Name,
-		&i.Description,
 		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.Attributes,
-		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Abbreviation,
 	)
 	return i, err
 }

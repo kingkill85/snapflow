@@ -25,7 +25,7 @@ func TestProductCRUD(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
 
-	b := dimmerBody(pt.ID, "  M485/GW-ZB.10  ")
+	b := dimmerBody(pt, "  M485/GW-ZB.10  ")
 	b["description"] = map[string]string{"en": " DIN rail dimmer ", "de": ""}
 	b["attributes"] = map[string]any{"width_te": 4, "bus_system": " zigbee "}
 	p := newProduct(t, api, b)
@@ -33,8 +33,11 @@ func TestProductCRUD(t *testing.T) {
 		!p.Can.Update || !p.Can.Delete || len(p.Variants) != 0 {
 		t.Errorf("created: %+v", p)
 	}
-	if !reflect.DeepEqual(p.ProductType, typeRef{ID: pt.ID, Key: "dimmer", Name: map[string]any{"en": "dimmer"}, Color: "#1f6feb", IsActive: true}) {
+	if !reflect.DeepEqual(p.ProductType, typeRef{ID: pt.ID, Key: "dimmer", Name: map[string]any{"en": "dimmer"}, Abbreviation: "ZB", Color: "#1f6feb", IsActive: true}) {
 		t.Errorf("type ref: %+v", p.ProductType)
+	}
+	if p.CategoryID != pt.CategoryID || !reflect.DeepEqual(p.Category, categoryRef{ID: pt.CategoryID, Key: "dimmer", Name: map[string]any{"en": "dimmer"}, IsActive: true}) {
+		t.Errorf("category ref: %s %+v", p.CategoryID, p.Category)
 	}
 	if !reflect.DeepEqual(p.Description, map[string]any{"en": "DIN rail dimmer"}) {
 		t.Errorf("description: %v", p.Description)
@@ -47,7 +50,7 @@ func TestProductCRUD(t *testing.T) {
 		t.Errorf("get: %+v\nwant %+v", got, p)
 	}
 
-	upd := dimmerBody(pt.ID, "M485/GW-ZB.11")
+	upd := dimmerBody(pt, "M485/GW-ZB.11")
 	upd["isActive"] = false
 	resp := update(api, p, upd)
 	if resp.Code != http.StatusOK {
@@ -64,14 +67,14 @@ func TestProductCRUD(t *testing.T) {
 	}
 	assertError(t, api.Get("/api/products/"+p.ID, api.Admin.Cookie), http.StatusNotFound, "product.not_found")
 	assertError(t, api.Delete("/api/products/"+p.ID, api.Admin.Cookie), http.StatusNotFound, "product.not_found")
-	assertError(t, update(api, p, dimmerBody(pt.ID, "X")), http.StatusNotFound, "product.not_found")
+	assertError(t, update(api, p, dimmerBody(pt, "X")), http.StatusNotFound, "product.not_found")
 }
 
 func TestProductValidation(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
 
-	b := dimmerBody(pt.ID, "  ")
+	b := dimmerBody(pt, "  ")
 	b["name"] = map[string]string{"de": "Nur Deutsch", "fr": "x"}
 	b["description"] = map[string]string{"de": strings.Repeat("x", 5001)}
 	b["attributes"] = map[string]any{"width_te": 30, "bus_system": "dali", "colour": "red", "typo": 1}
@@ -89,20 +92,33 @@ func TestProductValidation(t *testing.T) {
 
 	// A required attribute; a too long model number; an unknown type
 	// (attributes are not checked without a type).
-	b = dimmerBody(pt.ID, strings.Repeat("M", 101))
+	b = dimmerBody(pt, strings.Repeat("M", 101))
 	b["attributes"] = map[string]any{}
 	resp := api.Post("/api/products", api.Admin.Cookie, b)
 	assertFields(t, resp, "body.modelNumber validation.too_long", "body.attributes.width_te attribute.required")
 	if p := decode[problem](t, resp); p.Fields[0].Params["max"] != 100.0 {
 		t.Errorf("params: %+v", p.Fields[0])
 	}
-	b = productBody(missing, "M1")
-	b["attributes"] = map[string]any{"anything": 1}
+	b = productBody(kind{ID: missing, CategoryID: pt.CategoryID}, "M1")
+	b["attributes"] = map[string]any{"width_te": 4}
 	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b), "body.productTypeId product.type_not_found")
+	b = productBody(kind{ID: missing, CategoryID: missing}, "M1")
+	b["attributes"] = map[string]any{"anything": 1}
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b),
+		"body.productTypeId product.type_not_found", "body.categoryId product.category_not_found")
+	// The schema comes from the category, whatever the product type.
+	b = productBody(kind{ID: newProductType(t, api, "zigbee").ID, CategoryID: pt.CategoryID}, "M1")
+	b["attributes"] = map[string]any{"anything": 1}
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b),
+		"body.attributes.width_te attribute.required", "body.attributes.anything attribute.unknown")
+	// Both are required (huma reports missing properties at "body").
+	b = dimmerBody(pt, "M1")
+	delete(b, "categoryId")
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b), "body validation.invalid")
 
 	// Attributes may be left out when nothing is required.
 	free := newType(t, api, "free", []any{})
-	b = productBody(free.ID, "M2")
+	b = productBody(free, "M2")
 	delete(b, "attributes")
 	if p := newProduct(t, api, b); len(p.Attributes) != 0 {
 		t.Errorf("attributes: %v", p.Attributes)
@@ -113,26 +129,26 @@ func TestModelNumberUnique(t *testing.T) {
 	api := apptest.New(t)
 	a := newType(t, api, "a", []any{})
 	b := newType(t, api, "b", []any{})
-	first := newProduct(t, api, productBody(a.ID, "GW-1"))
-	other := newProduct(t, api, productBody(a.ID, "GW-2"))
+	first := newProduct(t, api, productBody(a, "GW-1"))
+	other := newProduct(t, api, productBody(a, "GW-2"))
 
 	// Unique across the whole catalog, ignoring case and surrounding space.
 	for _, model := range []string{"GW-1", "gw-1", " Gw-1 "} {
-		for _, typeID := range []string{a.ID, b.ID} {
-			p := assertError(t, api.Post("/api/products", api.Admin.Cookie, productBody(typeID, model)),
+		for _, k := range []kind{a, b} {
+			p := assertError(t, api.Post("/api/products", api.Admin.Cookie, productBody(k, model)),
 				http.StatusConflict, "product.model_number_taken")
 			if p.Params["modelNumber"] != strings.TrimSpace(model) {
 				t.Errorf("params: %v", p.Params)
 			}
 		}
 	}
-	assertError(t, update(api, other, productBody(a.ID, "GW-1")), http.StatusConflict, "product.model_number_taken")
+	assertError(t, update(api, other, productBody(a, "GW-1")), http.StatusConflict, "product.model_number_taken")
 	// Changing only the case of its own model number is fine.
-	if resp := update(api, first, productBody(a.ID, "gw-1")); resp.Code != http.StatusOK {
+	if resp := update(api, first, productBody(a, "gw-1")); resp.Code != http.StatusOK {
 		t.Errorf("own model number: got %d: %s", resp.Code, resp.Body)
 	}
 	// Names are not unique.
-	b2 := productBody(a.ID, "GW-3")
+	b2 := productBody(a, "GW-3")
 	b2["name"] = map[string]string{"en": "Dimmer GW-1"}
 	newProduct(t, api, b2)
 }
@@ -140,7 +156,7 @@ func TestModelNumberUnique(t *testing.T) {
 func TestPermissions(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
-	p := newProduct(t, api, dimmerBody(pt.ID, "M1"))
+	p := newProduct(t, api, dimmerBody(pt, "M1"))
 	v := quickVariant(t, api, p.ID, "1.00")
 	partner := api.NewTenant("Partner")
 	base := "/api/products/" + p.ID
@@ -166,9 +182,10 @@ func TestPermissions(t *testing.T) {
 			t.Errorf("%s variant search: got %d", role, resp.Code)
 		}
 		writes := map[string]*httptest.ResponseRecorder{
-			"create product": api.Post("/api/products", s.Cookie, dimmerBody(pt.ID, "M2")),
+			"create product": api.Post("/api/products", s.Cookie, dimmerBody(pt, "M2")),
 			"update product": api.Put(base, s.Cookie, map[string]any{
-				"productTypeId": pt.ID, "modelNumber": "M1", "name": text("x"), "isActive": true, "expectedUpdatedAt": p.UpdatedAt,
+				"productTypeId": pt.ID, "categoryId": pt.CategoryID, "modelNumber": "M1", "name": text("x"), "isActive": true,
+				"expectedUpdatedAt": p.UpdatedAt,
 			}),
 			"delete product": api.Delete(base, s.Cookie),
 			"create variant": api.Post(base+"/variants", s.Cookie, variantBody("x", "1")),
@@ -194,18 +211,18 @@ func TestPermissions(t *testing.T) {
 func TestStaleUpdates(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
-	p := newProduct(t, api, dimmerBody(pt.ID, "M1"))
+	p := newProduct(t, api, dimmerBody(pt, "M1"))
 
-	first := update(api, p, dimmerBody(pt.ID, "M1-a"))
+	first := update(api, p, dimmerBody(pt, "M1-a"))
 	if first.Code != http.StatusOK {
 		t.Fatalf("first update: got %d: %s", first.Code, first.Body)
 	}
-	assertError(t, update(api, p, dimmerBody(pt.ID, "M1-b")), http.StatusConflict, "product.stale")
+	assertError(t, update(api, p, dimmerBody(pt, "M1-b")), http.StatusConflict, "product.stale")
 	if got := getProduct(t, api, p.ID); got.ModelNumber != "M1-a" {
 		t.Errorf("after stale update: %s", got.ModelNumber)
 	}
 	// expectedUpdatedAt is required.
-	assertFields(t, api.Put("/api/products/"+p.ID, api.Admin.Cookie, dimmerBody(pt.ID, "M1-c")), "body validation.invalid")
+	assertFields(t, api.Put("/api/products/"+p.ID, api.Admin.Cookie, dimmerBody(pt, "M1-c")), "body validation.invalid")
 
 	v := quickVariant(t, api, p.ID, "1.00")
 	resp := updateVariant(api, v, variantBody("Ivory", "2.00"))
@@ -223,7 +240,7 @@ func TestStaleUpdates(t *testing.T) {
 	pCodes, vCodes := make([]int, 8), make([]int, 8)
 	var wg sync.WaitGroup
 	for i := range pCodes {
-		wg.Go(func() { pCodes[i] = update(api, current, dimmerBody(pt.ID, fmt.Sprintf("M1-%d", i))).Code })
+		wg.Go(func() { pCodes[i] = update(api, current, dimmerBody(pt, fmt.Sprintf("M1-%d", i))).Code })
 		wg.Go(func() { vCodes[i] = updateVariant(api, cv, variantBody(fmt.Sprintf("V%d", i), "1")).Code })
 	}
 	wg.Wait()
@@ -247,8 +264,8 @@ func TestStaleUpdates(t *testing.T) {
 func TestVariants(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
-	p := newProduct(t, api, dimmerBody(pt.ID, "M1"))
-	other := newProduct(t, api, dimmerBody(pt.ID, "M2"))
+	p := newProduct(t, api, dimmerBody(pt, "M1"))
+	other := newProduct(t, api, dimmerBody(pt, "M2"))
 	img := uploadImage(t, api, 1)
 
 	b := variantBody(" Ivory White ", "27")
@@ -334,7 +351,7 @@ func TestVariants(t *testing.T) {
 func TestMoney(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
+	p := newProduct(t, api, productBody(pt, "M1"))
 
 	for in, want := range map[string]string{
 		"27": "27.00", "27.5": "27.50", "27.05": "27.05", "0": "0.00", "0.00": "0.00", "007.10": "7.10",
@@ -361,8 +378,8 @@ func TestMoney(t *testing.T) {
 func TestConcurrentVariants(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
-	other := newProduct(t, api, productBody(pt.ID, "M2"))
+	p := newProduct(t, api, productBody(pt, "M1"))
+	other := newProduct(t, api, productBody(pt, "M2"))
 	const n = 10
 	path := "/api/products/" + p.ID + "/variants"
 
@@ -427,8 +444,8 @@ func TestConcurrentVariants(t *testing.T) {
 func TestReorderVariants(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
-	other := newProduct(t, api, productBody(pt.ID, "M2"))
+	p := newProduct(t, api, productBody(pt, "M1"))
+	other := newProduct(t, api, productBody(pt, "M2"))
 	a, b, c := quickVariant(t, api, p.ID, "1"), quickVariant(t, api, p.ID, "1"), quickVariant(t, api, p.ID, "1")
 	foreign := quickVariant(t, api, other.ID, "1")
 	path := "/api/products/" + p.ID + "/variants/order"
@@ -456,7 +473,7 @@ func TestReorderVariants(t *testing.T) {
 	assertError(t, api.Put("/api/products/"+missing+"/variants/order", api.Admin.Cookie, map[string]any{"ids": []string{}}),
 		http.StatusNotFound, "product.not_found")
 	// An empty product reorders with an empty list.
-	empty := newProduct(t, api, productBody(pt.ID, "M3"))
+	empty := newProduct(t, api, productBody(pt, "M3"))
 	if resp := api.Put("/api/products/"+empty.ID+"/variants/order", api.Admin.Cookie, map[string]any{"ids": []string{}}); resp.Code != http.StatusOK {
 		t.Errorf("empty reorder: got %d", resp.Code)
 	}
@@ -465,8 +482,8 @@ func TestReorderVariants(t *testing.T) {
 func TestAddons(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	pa := newProduct(t, api, productBody(pt.ID, "A"))
-	pb := newProduct(t, api, productBody(pt.ID, "B"))
+	pa := newProduct(t, api, productBody(pt, "A"))
+	pb := newProduct(t, api, productBody(pt, "B"))
 	img := uploadImage(t, api, 2)
 	a1, a2 := quickVariant(t, api, pa.ID, "10"), quickVariant(t, api, pa.ID, "11")
 	bb := variantBody("Frame", "4.5")
@@ -556,7 +573,7 @@ func TestAddons(t *testing.T) {
 func TestConcurrentAddonReplaces(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "A"))
+	p := newProduct(t, api, productBody(pt, "A"))
 	vs := make([]variant, 6)
 	for i := range vs {
 		vs[i] = quickVariant(t, api, p.ID, "1")
@@ -595,9 +612,9 @@ func TestAvailability(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
 	other := newType(t, api, "other", []any{})
-	p := newProduct(t, api, dimmerBody(pt.ID, "M1"))
+	p := newProduct(t, api, dimmerBody(pt, "M1"))
 	v := quickVariant(t, api, p.ID, "1")
-	host := newProduct(t, api, map[string]any{"productTypeId": other.ID, "modelNumber": "H", "name": text("Host"), "isActive": true})
+	host := newProduct(t, api, productBody(other, "H"))
 	hv := quickVariant(t, api, host.ID, "1")
 	addonPath := "/api/products/" + host.ID + "/variants/" + hv.ID + "/addons"
 	if resp := api.Put(addonPath, api.Admin.Cookie, map[string]any{"addons": []any{map[string]any{"addonVariantId": v.ID}}}); resp.Code != http.StatusOK {
@@ -647,7 +664,7 @@ func TestAvailability(t *testing.T) {
 	}
 
 	// The product: deactivating writes nothing to its variants.
-	pb := dimmerBody(pt.ID, "M1")
+	pb := dimmerBody(pt, "M1")
 	pb["isActive"] = false
 	if resp := update(api, getProduct(t, api, p.ID), pb); resp.Code != http.StatusOK {
 		t.Fatal(resp.Body)
@@ -662,24 +679,36 @@ func TestAvailability(t *testing.T) {
 	}
 	check("product reactivated", true, true, true)
 
-	// The type.
-	updateType(t, api, pt, schema(), false)
+	// The product type.
+	setTypeActive(t, api, pt, false)
 	check("type inactive", false, false, false)
-	if got := getProduct(t, api, p.ID); !got.IsActive || !got.Variants[0].IsActive || got.ProductType.IsActive {
+	if got := getProduct(t, api, p.ID); !got.IsActive || !got.Variants[0].IsActive || got.ProductType.IsActive || !got.Category.IsActive {
 		t.Errorf("flags after type deactivation: %+v", got)
 	}
-	updateType(t, api, pt, schema(), true)
+	setTypeActive(t, api, pt, true)
 	check("type reactivated", true, true, true)
 
-	// A variant deactivated on its own stays inactive through a type cycle.
+	// The category.
+	updateCategory(t, api, pt, schema(), false)
+	check("category inactive", false, false, false)
+	if got := getProduct(t, api, p.ID); !got.IsActive || !got.Variants[0].IsActive || !got.ProductType.IsActive || got.Category.IsActive {
+		t.Errorf("flags after category deactivation: %+v", got)
+	}
+	updateCategory(t, api, pt, schema(), true)
+	check("category reactivated", true, true, true)
+
+	// A variant deactivated on its own stays inactive through type and
+	// category cycles.
 	cur = getProduct(t, api, p.ID).Variants[0]
 	b["isActive"] = false
 	if resp := updateVariant(api, cur, b); resp.Code != http.StatusOK {
 		t.Fatal(resp.Body)
 	}
-	updateType(t, api, pt, schema(), false)
-	updateType(t, api, pt, schema(), true)
-	check("variant inactive after type cycle", true, false, true)
+	setTypeActive(t, api, pt, false)
+	setTypeActive(t, api, pt, true)
+	updateCategory(t, api, pt, schema(), false)
+	updateCategory(t, api, pt, schema(), true)
+	check("variant inactive after type and category cycles", true, false, true)
 }
 
 func slicesContains(s []string, v string) bool {
@@ -694,7 +723,7 @@ func slicesContains(s []string, v string) bool {
 func TestSchemaChange(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "dimmer", schema())
-	b := dimmerBody(pt.ID, "M1")
+	b := dimmerBody(pt, "M1")
 	b["attributes"] = map[string]any{"width_te": 12, "bus_system": "zigbee"}
 	p := newProduct(t, api, b)
 	vb := variantBody("Ivory", "1")
@@ -705,7 +734,7 @@ func TestSchemaChange(t *testing.T) {
 	changed := schema()
 	changed[0].(map[string]any)["max"] = 10
 	changed[2].(map[string]any)["required"] = true
-	updateType(t, api, pt, []any{changed[0], changed[2]}, true)
+	updateCategory(t, api, pt, []any{changed[0], changed[2]}, true)
 
 	got := getProduct(t, api, p.ID)
 	if !reflect.DeepEqual(got.Attributes, map[string]any{"width_te": 12.0}) ||
@@ -728,7 +757,7 @@ func TestSchemaChange(t *testing.T) {
 
 	// Saving: the stale value is kept untouched when sent back (even if the
 	// client changed it), removed when left out; new unknown keys fail.
-	ub := dimmerBody(pt.ID, "M1")
+	ub := dimmerBody(pt, "M1")
 	ub["attributes"] = map[string]any{"width_te": 8, "bus_system": "knx"}
 	resp := update(api, got, ub)
 	if resp.Code != http.StatusOK {
@@ -760,31 +789,43 @@ func TestSchemaChange(t *testing.T) {
 	}
 	_ = v
 
-	// Changing the type re-validates the values: unknown ones become stale.
-	plain := newType(t, api, "plain", []any{
+	// Changing the category re-validates the values: unknown ones become
+	// stale. The product type stays.
+	plain := newCategory(t, api, "plain", []any{
 		map[string]any{"key": "voltage", "label": text("V"), "type": "number", "required": true},
 	})
 	cur := getProduct(t, api, p.ID)
-	tb := productBody(plain.ID, "M1")
+	tb := productBody(kind{ID: pt.ID, CategoryID: plain.ID}, "M1")
 	tb["attributes"] = map[string]any{"width_te": 8}
 	assertFields(t, update(api, cur, tb), "body.attributes.voltage attribute.required")
 	tb["attributes"] = map[string]any{"width_te": 8, "voltage": 230}
 	resp = update(api, cur, tb)
 	moved := decode[product](t, resp)
 	if resp.Code != http.StatusOK || !reflect.DeepEqual(moved.Attributes, map[string]any{"voltage": 230.0}) ||
-		!reflect.DeepEqual(moved.StaleAttributes, map[string]any{"width_te": 8.0}) || moved.ProductType.Key != "plain" {
-		t.Errorf("type change: got %d: %+v", resp.Code, moved)
+		!reflect.DeepEqual(moved.StaleAttributes, map[string]any{"width_te": 8.0}) || moved.Category.Key != "plain" ||
+		moved.ProductType.Key != "dimmer" {
+		t.Errorf("category change: got %d: %+v", resp.Code, moved)
 	}
 	if mv := moved.Variants[0]; !reflect.DeepEqual(mv.StaleAttributes, map[string]any{"colour": "white", "finish": "matt"}) {
-		t.Errorf("variant after type change: %+v", mv)
+		t.Errorf("variant after category change: %+v", mv)
+	}
+
+	// Changing only the product type changes nothing about the values.
+	cur = getProduct(t, api, p.ID)
+	tb = productBody(kind{ID: newProductType(t, api, "knx").ID, CategoryID: plain.ID}, "M1")
+	tb["attributes"] = map[string]any{"width_te": 8, "voltage": 230}
+	resp = update(api, cur, tb)
+	if typed := decode[product](t, resp); resp.Code != http.StatusOK || typed.ProductType.Key != "knx" ||
+		!reflect.DeepEqual(typed.StaleAttributes, map[string]any{"width_te": 8.0}) {
+		t.Errorf("type change: got %d: %+v", resp.Code, typed)
 	}
 }
 
 func TestListAggregates(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
-	newProduct(t, api, productBody(pt.ID, "M0"))
+	p := newProduct(t, api, productBody(pt, "M1"))
+	newProduct(t, api, productBody(pt, "M0"))
 	imgA, imgB := uploadImage(t, api, 3), uploadImage(t, api, 4)
 
 	inactive := variantBody("Cheap", "0.50")
@@ -806,7 +847,8 @@ func TestListAggregates(t *testing.T) {
 		t.Errorf("empty product: %+v", empty)
 	}
 	if it.VariantCount != 4 || it.PriceMin != "9.90" || it.PriceMax != "100.10" || it.PreviewImageFileID != imgB ||
-		!it.Available || it.ProductType.Key != "free" || it.ProductType.Color != "#1f6feb" || !it.Can.Update {
+		!it.Available || it.ProductType.Key != "free" || it.ProductType.Color != "#1f6feb" || it.ProductType.Abbreviation != "ZB" ||
+		it.CategoryID != pt.CategoryID || it.Category.Key != "free" || !it.Category.IsActive || !it.Can.Update {
 		t.Errorf("aggregates: %+v", it)
 	}
 }
@@ -817,9 +859,9 @@ func TestSearchAndPagination(t *testing.T) {
 	a := newType(t, api, "a_type", []any{})
 	// Catalog order: b_type first (created first), then a_type.
 	for _, m := range []string{"AB%1", "AB_2", "ABx2", "zz-9", "Mm-1"} {
-		newProduct(t, api, productBody(a.ID, m))
+		newProduct(t, api, productBody(a, m))
 	}
-	named := productBody(b.ID, "Q-1")
+	named := productBody(b, "Q-1")
 	named["name"] = map[string]string{"en": "Gateway", "de": "Schnittstelle"}
 	q := newProduct(t, api, named)
 	vb := variantBody("Weiß", "1")
@@ -862,7 +904,7 @@ func TestSearchAndPagination(t *testing.T) {
 	if got := list(t, api, api.Admin.Cookie, "?limit=200"); len(got.Items) != 6 {
 		t.Errorf("limit 200: %d", len(got.Items))
 	}
-	for _, query := range []string{"?limit=0", "?limit=201", "?limit=-1", "?offset=-1", "?limit=x", "?productTypeId=nope"} {
+	for _, query := range []string{"?limit=0", "?limit=201", "?limit=-1", "?offset=-1", "?limit=x", "?productTypeId=nope", "?categoryId=nope"} {
 		if resp := api.Get("/api/products"+query, api.Admin.Cookie); resp.Code != http.StatusUnprocessableEntity {
 			t.Errorf("%s: got %d", query, resp.Code)
 		}
@@ -903,7 +945,8 @@ func TestSearchAndPagination(t *testing.T) {
 	}
 	hit := decode[variantPage](t, api.Get("/api/variants?search=weiß", api.Admin.Cookie)).Items[0]
 	if hit.ProductID != q.ID || hit.SKU != "SKU-Ivory_77" || hit.Price != "1.00" || !hit.Available ||
-		hit.ProductName["en"] != "Gateway" || hit.Name["en"] != "Weiß" || hit.ProductTypeID != b.ID {
+		hit.ProductName["en"] != "Gateway" || hit.Name["en"] != "Weiß" || hit.ProductTypeID != b.ID ||
+		hit.ProductType.Key != "b_type" || hit.CategoryID != b.CategoryID || hit.Category.Key != "b_type" {
 		t.Errorf("hit: %+v", hit)
 	}
 	if got := decode[variantPage](t, api.Get("/api/variants?limit=1&offset=1", api.Admin.Cookie)); len(got.Items) != 1 || got.Total != 3 || got.Items[0].ModelNumber != "AB%1" {
@@ -916,7 +959,7 @@ func urlEncode(s string) string { return url.QueryEscape(s) }
 func TestNotFound(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
+	p := newProduct(t, api, productBody(pt, "M1"))
 	stamp := time.Now().Format(time.RFC3339)
 	vpath := "/api/products/" + p.ID + "/variants/" + missing
 	for name, tc := range map[string]struct {
@@ -924,7 +967,7 @@ func TestNotFound(t *testing.T) {
 		code string
 	}{
 		"get":            {api.Get("/api/products/"+missing, api.Admin.Cookie), "product.not_found"},
-		"update":         {update(api, product{ID: missing, UpdatedAt: stamp}, productBody(pt.ID, "X")), "product.not_found"},
+		"update":         {update(api, product{ID: missing, UpdatedAt: stamp}, productBody(pt, "X")), "product.not_found"},
 		"delete":         {api.Delete("/api/products/"+missing, api.Admin.Cookie), "product.not_found"},
 		"update variant": {api.Put(vpath, api.Admin.Cookie, map[string]any{"name": text("x"), "price": "1", "isActive": true, "expectedUpdatedAt": stamp}), "variant.not_found"},
 		"delete variant": {api.Delete(vpath, api.Admin.Cookie), "variant.not_found"},
@@ -939,7 +982,7 @@ func TestNotFound(t *testing.T) {
 func TestDeleteProductCascades(t *testing.T) {
 	api := apptest.New(t)
 	pt := newType(t, api, "free", []any{})
-	p := newProduct(t, api, productBody(pt.ID, "M1"))
+	p := newProduct(t, api, productBody(pt, "M1"))
 	img := uploadImage(t, api, 5)
 	vb := variantBody("a", "1")
 	vb["imageFileId"] = img

@@ -20,17 +20,15 @@ import (
 func TestMain(m *testing.M) { os.Exit(testdb.Run(m)) }
 
 type productType struct {
-	ID                 string           `json:"id"`
-	Key                string           `json:"key"`
-	Name               map[string]any   `json:"name"`
-	Description        map[string]any   `json:"description"`
-	Color              string           `json:"color"`
-	SortOrder          int              `json:"sortOrder"`
-	IsActive           bool             `json:"isActive"`
-	Attributes         []map[string]any `json:"attributes"`
-	InstanceAttributes []map[string]any `json:"instanceAttributes"`
-	Can                auth.Actions     `json:"can"`
-	UpdatedAt          string           `json:"updatedAt"`
+	ID           string         `json:"id"`
+	Key          string         `json:"key"`
+	Name         map[string]any `json:"name"`
+	Abbreviation string         `json:"abbreviation"`
+	Color        string         `json:"color"`
+	SortOrder    int            `json:"sortOrder"`
+	IsActive     bool           `json:"isActive"`
+	Can          auth.Actions   `json:"can"`
+	UpdatedAt    string         `json:"updatedAt"`
 }
 
 type problem struct {
@@ -54,11 +52,9 @@ func decode[T any](t *testing.T, resp *httptest.ResponseRecorder) T {
 
 func body(key string) map[string]any {
 	return map[string]any{
-		"key":                key,
-		"name":               map[string]string{"en": "Dimmer actuator", "de": "Dimmaktor"},
-		"isActive":           true,
-		"attributes":         []any{},
-		"instanceAttributes": []any{},
+		"key":      key,
+		"name":     map[string]string{"en": "Zigbee", "de": "Zigbee"},
+		"isActive": true,
 	}
 }
 
@@ -97,30 +93,13 @@ func keys(items []productType) []string {
 func TestCRUD(t *testing.T) {
 	api := apptest.New(t)
 
-	b := body("dimmer_actuator")
-	b["description"] = map[string]string{"en": " DIN rail dimmer ", "de": ""}
-	b["attributes"] = []any{
-		map[string]any{"key": "width_te", "label": map[string]string{"en": "Width"}, "type": "integer",
-			"required": true, "unit": "TE", "min": 1, "max": 24},
-		map[string]any{"key": "bus_system", "label": map[string]string{"en": "Bus system"}, "type": "enum",
-			"options": []any{map[string]any{"key": "zigbee", "label": map[string]string{"en": "Zigbee"}}}},
-		map[string]any{"key": "colour", "label": map[string]string{"en": "Colour"}, "type": "text", "scope": "variant"},
-	}
-	b["instanceAttributes"] = []any{
-		map[string]any{"key": "address", "label": map[string]string{"en": "Address"}, "type": "integer"},
-	}
+	b := body("zigbee")
+	b["abbreviation"] = "ZB"
+	b["color"] = "#1f6feb"
 	created := create(t, api, b)
-	if created.SortOrder != 1 || !created.IsActive || !created.Can.Update || !created.Can.Delete {
+	if created.SortOrder != 1 || !created.IsActive || !created.Can.Update || !created.Can.Delete ||
+		created.Abbreviation != "ZB" || created.Color != "#1f6feb" || created.Name["de"] != "Zigbee" {
 		t.Errorf("created: %+v", created)
-	}
-	if !reflect.DeepEqual(created.Description, map[string]any{"en": "DIN rail dimmer"}) {
-		t.Errorf("description not normalised: %v", created.Description)
-	}
-	if len(created.Attributes) != 3 || created.Attributes[0]["scope"] != "product" || created.Attributes[2]["scope"] != "variant" {
-		t.Errorf("attributes: %v", created.Attributes)
-	}
-	if _, ok := created.InstanceAttributes[0]["scope"]; ok {
-		t.Errorf("instance attribute has a scope: %v", created.InstanceAttributes[0])
 	}
 
 	resp := api.Get("/api/product-types/"+created.ID, api.Admin.Cookie)
@@ -129,33 +108,33 @@ func TestCRUD(t *testing.T) {
 		t.Fatalf("get: got %d: %+v", resp.Code, got)
 	}
 
-	second := create(t, api, body("wall_switch"))
+	second := create(t, api, body("knx"))
 	if second.SortOrder != 2 {
 		t.Errorf("second type got sort order %d, want 2", second.SortOrder)
 	}
 
-	upd := updateBody(created, body("dimmer"))
+	upd := updateBody(created, body("zigbee_3"))
 	upd["isActive"] = false
 	resp = api.Put("/api/product-types/"+created.ID, api.Admin.Cookie, upd)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("update: got %d: %s", resp.Code, resp.Body)
 	}
 	updated := decode[productType](t, resp)
-	if updated.Key != "dimmer" || updated.IsActive || updated.SortOrder != 1 || len(updated.Attributes) != 0 || updated.Description != nil {
+	if updated.Key != "zigbee_3" || updated.IsActive || updated.SortOrder != 1 || updated.Abbreviation != "" || updated.Color != "" {
 		t.Errorf("updated: %+v", updated)
 	}
 
 	if resp := api.Delete("/api/product-types/"+created.ID, api.Admin.Cookie); resp.Code != http.StatusNoContent {
 		t.Fatalf("delete: got %d: %s", resp.Code, resp.Body)
 	}
-	if got := keys(list(t, api, api.Admin.Cookie, "?includeInactive=true")); !reflect.DeepEqual(got, []string{"wall_switch"}) {
+	if got := keys(list(t, api, api.Admin.Cookie, "?includeInactive=true")); !reflect.DeepEqual(got, []string{"knx"}) {
 		t.Errorf("after delete: %v", got)
 	}
 }
 
 func TestPermissions(t *testing.T) {
 	api := apptest.New(t)
-	pt := create(t, api, body("gateway"))
+	pt := create(t, api, body("zigbee"))
 	partner := api.NewTenant("Partner")
 	user := api.NewUser(partner, auth.RoleUser)
 	tenantAdmin := api.NewUser(partner, auth.RoleTenantAdmin)
@@ -177,7 +156,7 @@ func TestPermissions(t *testing.T) {
 		}
 		writes := map[string]*httptest.ResponseRecorder{
 			"create":  api.Post("/api/product-types", s.Cookie, body("other")),
-			"update":  api.Put(path, s.Cookie, updateBody(pt, body("gateway"))),
+			"update":  api.Put(path, s.Cookie, updateBody(pt, body("zigbee"))),
 			"delete":  api.Delete(path, s.Cookie),
 			"reorder": api.Put("/api/product-types/order", s.Cookie, map[string]any{"ids": []string{pt.ID}}),
 		}
@@ -194,18 +173,18 @@ func TestPermissions(t *testing.T) {
 
 func TestKey(t *testing.T) {
 	api := apptest.New(t)
-	create(t, api, body("gateway"))
+	create(t, api, body("zigbee"))
 
-	resp := api.Post("/api/product-types", api.Admin.Cookie, body("gateway"))
+	resp := api.Post("/api/product-types", api.Admin.Cookie, body("zigbee"))
 	if resp.Code != http.StatusConflict {
 		t.Fatalf("duplicate: got %d: %s", resp.Code, resp.Body)
 	}
-	if p := decode[problem](t, resp); p.Code != "product_type.key_taken" || p.Params["key"] != "gateway" {
+	if p := decode[problem](t, resp); p.Code != "product_type.key_taken" || p.Params["key"] != "zigbee" {
 		t.Errorf("duplicate: %+v", p)
 	}
 
 	other := create(t, api, body("switch"))
-	resp = api.Put("/api/product-types/"+other.ID, api.Admin.Cookie, updateBody(other, body("gateway")))
+	resp = api.Put("/api/product-types/"+other.ID, api.Admin.Cookie, updateBody(other, body("zigbee")))
 	if resp.Code != http.StatusConflict || decode[problem](t, resp).Code != "product_type.key_taken" {
 		t.Errorf("update to a taken key: got %d: %s", resp.Code, resp.Body)
 	}
@@ -218,125 +197,43 @@ func TestKey(t *testing.T) {
 
 func TestValidation(t *testing.T) {
 	api := apptest.New(t)
-	attr := func(fields map[string]any) map[string]any {
-		a := map[string]any{"key": "a", "label": map[string]string{"en": "A"}, "type": "text"}
-		for k, v := range fields {
-			a[k] = v
-		}
-		return a
-	}
-	option := func(key, en string) map[string]any {
-		return map[string]any{"key": key, "label": map[string]string{"en": en}}
-	}
-
 	cases := map[string]struct {
 		change func(b map[string]any)
 		want   []string
 	}{
 		"english name": {func(b map[string]any) {
-			b["name"] = map[string]string{"de": "Dimmaktor"}
+			b["name"] = map[string]string{"de": "Zigbee"}
 		}, []string{"body.name.en validation.required"}},
-		"english description": {func(b map[string]any) {
-			b["description"] = map[string]string{"de": "Beschreibung"}
-		}, []string{"body.description.en validation.required"}},
-		"attribute key format and duplicate": {func(b map[string]any) {
-			b["attributes"] = []any{attr(nil), attr(map[string]any{"key": "Bad"}), attr(nil)}
-		}, []string{"body.attributes[1].key attribute.key_format", "body.attributes[2].key attribute.key_duplicate"}},
-		"attribute label": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"label": map[string]string{"de": "A"}})}
-		}, []string{"body.attributes[0].label.en attribute.label_required"}},
-		"enum options": {func(b map[string]any) {
-			b["attributes"] = []any{
-				attr(map[string]any{"type": "enum"}),
-				attr(map[string]any{"key": "b", "type": "enum", "options": []any{option("x", "X"), option("x", "Y"), option("Y", "Y"), option("z", "")}}),
-			}
-		}, []string{
-			"body.attributes[0].options attribute.options_required",
-			"body.attributes[1].options[1].key attribute.option_key_duplicate",
-			"body.attributes[1].options[2].key attribute.key_format",
-			"body.attributes[1].options[3].label.en attribute.label_required",
-		}},
-		"list item type": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"type": "list"})}
-		}, []string{"body.attributes[0].itemType attribute.item_type_required"}},
-		"range": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"type": "number", "min": 5, "max": 1})}
-		}, []string{"body.attributes[0].max attribute.range_invalid"}},
-		"bounds": {func(b map[string]any) {
-			b["attributes"] = []any{
-				attr(map[string]any{"type": "integer", "min": 0.5, "max": 1e16}),
-				attr(map[string]any{"key": "b", "type": "list", "itemType": "text", "min": -1}),
-			}
-		}, []string{
-			"body.attributes[0].min attribute.bound_whole",
-			"body.attributes[0].max attribute.bound_range",
-			"body.attributes[1].min attribute.bound_negative",
-		}},
-		"impossible schemas": {func(b map[string]any) {
-			b["attributes"] = []any{
-				attr(map[string]any{"required": true, "max": 0}),
-				attr(map[string]any{"key": "b", "type": "list", "itemType": "enum", "min": 2, "options": []any{option("x", "X")}}),
-			}
-		}, []string{
-			"body.attributes[0].max attribute.required_max",
-			"body.attributes[1].min attribute.min_above_options",
-		}},
-		"instance attribute scope (not in the API schema)": {func(b map[string]any) {
-			b["instanceAttributes"] = []any{attr(map[string]any{"scope": "variant"})}
-		}, []string{"body.instanceAttributes[0].scope validation.invalid"}},
-		"empty scope (OpenAPI enum)": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"scope": ""})}
-		}, []string{"body.attributes[0].scope validation.invalid"}},
-		"empty item type (OpenAPI enum)": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"type": "list", "itemType": ""})}
-		}, []string{"body.attributes[0].itemType validation.invalid"}},
 		"unknown locales": {func(b map[string]any) {
-			b["name"] = map[string]string{"en": "Dimmer", "fr": "Variateur"}
-			b["description"] = map[string]string{"en": "x", "es": "x"}
-			b["attributes"] = []any{attr(map[string]any{"label": map[string]string{"en": "A", "it": "A"}})}
-		}, []string{
-			"body.name.fr validation.locale",
-			"body.description.es validation.locale",
-			"body.attributes[0].label.it validation.locale",
-		}},
-		"too long texts": {func(b map[string]any) {
+			b["name"] = map[string]string{"en": "Zigbee", "fr": "Zigbee"}
+		}, []string{"body.name.fr validation.locale"}},
+		"too long name": {func(b map[string]any) {
 			b["name"] = map[string]string{"en": strings.Repeat("x", 101)}
-			b["description"] = map[string]string{"en": "x", "de": strings.Repeat("x", 2001)}
-		}, []string{"body.name.en validation.too_long", "body.description.de validation.too_long"}},
+		}, []string{"body.name.en validation.too_long"}},
+		"too long abbreviation": {func(b map[string]any) {
+			b["abbreviation"] = "ABCDEFG"
+		}, []string{"body.abbreviation validation.too_long"}},
+		"control characters in the abbreviation": {func(b map[string]any) {
+			b["abbreviation"] = "Z\u200bB"
+		}, []string{"body.abbreviation validation.control_chars"}},
 		"colour": {func(b map[string]any) {
 			b["color"] = "#12345g"
 		}, []string{"body.color product_type.color_format"}},
-		"too many attributes": {func(b map[string]any) {
-			b["attributes"] = make([]any, 201)
-			b["instanceAttributes"] = make([]any, 201)
-			for i := range 201 {
-				b["attributes"].([]any)[i] = attr(nil)
-				b["instanceAttributes"].([]any)[i] = attr(nil)
-			}
-		}, []string{"body.attributes validation.too_many", "body.instanceAttributes validation.too_many"}},
-		"too many options": {func(b map[string]any) {
-			options := make([]any, 501)
-			for i := range options {
-				options[i] = option("x", "X")
-			}
-			b["attributes"] = []any{attr(map[string]any{"type": "enum", "options": options})}
-		}, []string{"body.attributes[0].options validation.too_many"}},
 		"all errors at once": {func(b map[string]any) {
 			b["key"] = "Bad"
-			b["attributes"] = []any{attr(map[string]any{"type": "enum"})}
-			b["instanceAttributes"] = []any{attr(map[string]any{"key": ""})}
+			b["name"] = map[string]string{}
+			b["abbreviation"] = "TOOLONG"
+			b["color"] = "red"
 		}, []string{
 			"body.key product_type.key_format",
-			"body.attributes[0].options attribute.options_required",
-			"body.instanceAttributes[0].key attribute.key_format",
+			"body.name.en validation.required",
+			"body.abbreviation validation.too_long",
+			"body.color product_type.color_format",
 		}},
-		"unknown type (OpenAPI enum)": {func(b map[string]any) {
-			b["attributes"] = []any{attr(map[string]any{"type": "date"})}
-		}, []string{"body.attributes[0].type validation.invalid"}},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			b := body("dimmer")
+			b := body("zigbee")
 			tc.change(b)
 			assertFields(t, api.Post("/api/product-types", api.Admin.Cookie, b), tc.want...)
 		})
@@ -408,9 +305,17 @@ func TestReorder(t *testing.T) {
 
 func TestDeleteInUse(t *testing.T) {
 	api := apptest.New(t)
-	pt := create(t, api, body("gateway"))
-	resp := api.Post("/api/products", api.Admin.Cookie, map[string]any{
-		"productTypeId": pt.ID, "modelNumber": "GW-1", "name": map[string]string{"en": "Gateway"}, "isActive": false,
+	pt := create(t, api, body("zigbee"))
+	resp := api.Post("/api/categories", api.Admin.Cookie, map[string]any{
+		"key": "gateways", "name": map[string]string{"en": "Gateways"}, "isActive": true,
+		"attributes": []any{}, "instanceAttributes": []any{},
+	})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("create category: got %d: %s", resp.Code, resp.Body)
+	}
+	c := decode[struct{ ID string }](t, resp)
+	resp = api.Post("/api/products", api.Admin.Cookie, map[string]any{
+		"productTypeId": pt.ID, "categoryId": c.ID, "modelNumber": "GW-1", "name": map[string]string{"en": "Gateway"}, "isActive": false,
 	})
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("create product: got %d: %s", resp.Code, resp.Body)
@@ -467,56 +372,60 @@ func assertFields(t *testing.T, resp *httptest.ResponseRecorder, want ...string)
 
 func TestNormalisesOnSave(t *testing.T) {
 	api := apptest.New(t)
-	b := body("dimmer")
+	b := body("zigbee")
 	b["color"] = " #1F6FEB "
-	b["attributes"] = []any{
-		map[string]any{"key": "name", "label": map[string]string{"en": " Name "}, "type": "text",
-			"options": []any{map[string]any{"key": "x", "label": map[string]string{"en": "X"}}}, "itemType": "enum"},
-		map[string]any{"key": "on", "label": map[string]string{"en": "On"}, "type": "boolean", "min": 1, "max": 2},
-	}
+	b["abbreviation"] = " zbé "
+	b["name"] = map[string]string{"en": " Zigbee ", "de": ""}
 	got := create(t, api, b)
-	want := []map[string]any{
-		{"key": "name", "label": map[string]any{"en": "Name"}, "type": "text", "scope": "product"},
-		{"key": "on", "label": map[string]any{"en": "On"}, "type": "boolean", "scope": "product"},
+	if got.Color != "#1f6feb" || got.Abbreviation != "ZBÉ" || !reflect.DeepEqual(got.Name, map[string]any{"en": "Zigbee"}) {
+		t.Errorf("normalised: %+v", got)
 	}
-	if !reflect.DeepEqual(got.Attributes, want) {
-		t.Errorf("attributes: %v", got.Attributes)
-	}
-	if got.Color != "#1f6feb" {
-		t.Errorf("colour: %q", got.Color)
+	// Six characters, not bytes.
+	b = body("knx")
+	b["abbreviation"] = "äöüäöü"
+	if got := create(t, api, b); got.Abbreviation != "ÄÖÜÄÖÜ" {
+		t.Errorf("umlauts: %q", got.Abbreviation)
 	}
 
-	// No colour clears it.
-	resp := api.Put("/api/product-types/"+got.ID, api.Admin.Cookie, updateBody(got, body("dimmer")))
-	if updated := decode[productType](t, resp); resp.Code != http.StatusOK || updated.Color != "" {
-		t.Errorf("clear colour: got %d: %s", resp.Code, resp.Body)
+	// Per character like the frontend's preview: "ß" has no single upper-case
+	// character and stays.
+	b = body("hdl")
+	b["abbreviation"] = "ßx"
+	if got := create(t, api, b); got.Abbreviation != "ßX" {
+		t.Errorf("sharp s: %q", got.Abbreviation)
+	}
+
+	// No colour or abbreviation clears them; blank is none.
+	nb := updateBody(got, body("zigbee"))
+	nb["abbreviation"] = "   "
+	resp := api.Put("/api/product-types/"+got.ID, api.Admin.Cookie, nb)
+	if updated := decode[productType](t, resp); resp.Code != http.StatusOK || updated.Color != "" || updated.Abbreviation != "" {
+		t.Errorf("clear: got %d: %s", resp.Code, resp.Body)
 	}
 }
 
 func TestErrorParams(t *testing.T) {
 	api := apptest.New(t)
-	b := body("dimmer")
+	b := body("zigbee")
 	b["name"] = map[string]string{"en": strings.Repeat("x", 101)}
-	b["attributes"] = []any{
-		map[string]any{"key": "a", "label": map[string]string{"en": "A"}, "type": "number", "min": 5, "max": 1},
-	}
+	b["abbreviation"] = "ABCDEFG"
 	resp := api.Post("/api/product-types", api.Admin.Cookie, b)
 	p := decode[problem](t, resp)
 	if resp.Code != http.StatusUnprocessableEntity || len(p.Fields) != 2 {
 		t.Fatalf("got %d: %s", resp.Code, resp.Body)
 	}
 	if !reflect.DeepEqual(p.Fields[0].Params, map[string]any{"max": 100.0}) ||
-		!reflect.DeepEqual(p.Fields[1].Params, map[string]any{"min": 5.0}) {
+		!reflect.DeepEqual(p.Fields[1].Params, map[string]any{"max": 6.0}) {
 		t.Errorf("params: %+v", p.Fields)
 	}
 }
 
 func TestStaleUpdate(t *testing.T) {
 	api := apptest.New(t)
-	pt := create(t, api, body("dimmer"))
+	pt := create(t, api, body("zigbee"))
 	path := "/api/product-types/" + pt.ID
 
-	first := api.Put(path, api.Admin.Cookie, updateBody(pt, body("dimmer_a")))
+	first := api.Put(path, api.Admin.Cookie, updateBody(pt, body("zigbee_a")))
 	if first.Code != http.StatusOK {
 		t.Fatalf("first update: got %d: %s", first.Code, first.Body)
 	}
@@ -526,21 +435,21 @@ func TestStaleUpdate(t *testing.T) {
 	}
 
 	// A second editor still holds the old version.
-	resp := api.Put(path, api.Admin.Cookie, updateBody(pt, body("dimmer_b")))
+	resp := api.Put(path, api.Admin.Cookie, updateBody(pt, body("zigbee_b")))
 	if resp.Code != http.StatusConflict || decode[problem](t, resp).Code != "product_type.stale" {
 		t.Fatalf("stale update: got %d: %s", resp.Code, resp.Body)
 	}
-	if got := keys(list(t, api, api.Admin.Cookie, "")); !reflect.DeepEqual(got, []string{"dimmer_a"}) {
+	if got := keys(list(t, api, api.Admin.Cookie, "")); !reflect.DeepEqual(got, []string{"zigbee_a"}) {
 		t.Errorf("after stale update: %v", got)
 	}
 
 	// With the current version it works again.
-	if resp := api.Put(path, api.Admin.Cookie, updateBody(updated, body("dimmer_b"))); resp.Code != http.StatusOK {
+	if resp := api.Put(path, api.Admin.Cookie, updateBody(updated, body("zigbee_b"))); resp.Code != http.StatusOK {
 		t.Errorf("fresh update: got %d: %s", resp.Code, resp.Body)
 	}
 
 	// expectedUpdatedAt is required (huma reports a missing property at "body").
-	resp = api.Put(path, api.Admin.Cookie, body("dimmer_c"))
+	resp = api.Put(path, api.Admin.Cookie, body("zigbee_c"))
 	assertFields(t, resp, "body validation.invalid")
 
 	// Concurrent saves of the same version: exactly one wins.
@@ -549,7 +458,7 @@ func TestStaleUpdate(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range codes {
 		wg.Go(func() {
-			codes[i] = api.Put(path, api.Admin.Cookie, updateBody(current, body("dimmer_c"))).Code
+			codes[i] = api.Put(path, api.Admin.Cookie, updateBody(current, body("zigbee_c"))).Code
 		})
 	}
 	wg.Wait()

@@ -11,12 +11,16 @@ export type ListProductsParams = {
  */
 productTypeId?: string;
 /**
+ * Only products of this category
+ */
+categoryId?: string;
+/**
  * Case-insensitive substring of model number, English or German name or description, or a variant's SKU
  * @maxLength 200
  */
 search?: string;
 /**
- * Also list inactive products and products of inactive types
+ * Also list inactive products and products of inactive types or categories
  */
 includeInactive?: boolean;
 /**

@@ -11,7 +11,8 @@ import { expect, test, unique, uniqueKey } from '../fixtures'
 const pages = [
   { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
   { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
-  { name: 'product-type-new', path: '/catalog/product-types/new', heading: 'New product type' },
+  { name: 'categories', path: '/catalog/categories', heading: 'Categories' },
+  { name: 'category-new', path: '/catalog/categories/new', heading: 'New category' },
   { name: 'users', path: '/admin/users', heading: 'Users' },
   { name: 'tenants', path: '/admin/tenants', heading: 'Tenants' },
   { name: 'roles', path: '/admin/roles', heading: 'Roles' },
@@ -29,6 +30,7 @@ const viewports = [
 // scroll (D95).
 const listPages = [
   { name: 'products', path: '/catalog/products', heading: { en: 'Products', de: 'Produkte' } },
+  { name: 'categories', path: '/catalog/categories', heading: { en: 'Categories', de: 'Kategorien' } },
   { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Product types', de: 'Produkttypen' } },
   { name: 'function-types', path: '/catalog/function-types', heading: { en: 'Function types', de: 'Funktionstypen' } },
   { name: 'users', path: '/admin/users', heading: { en: 'Users', de: 'Benutzer' } },
@@ -80,18 +82,17 @@ for (const width of [1280, 1440, 1920]) {
         await api.createFunctionType(uniqueKey('lighting'), unique('Lighting control with presence detection'))
         await api.createTenant(unique('Elektrotechnik Mustermann-Schmidt GmbH & Co. KG'))
         const attribute = { key: 'nominal_power', label: { en: 'Nominal power' }, type: 'number', unit: 'W', scope: 'product' } as const
-        const type = await api.createProductType({
-          name: { en: unique('Universal dimmer actuator'), de: unique('Universal-Dimmaktor') },
-          color: '#1f6feb',
-          attributes: [attribute],
-        })
+        const { type, category, ids } = await api.createKind(
+          { name: { en: unique('Universal dimmer actuators'), de: unique('Universal-Dimmaktoren') }, attributes: [attribute] },
+          { name: { en: unique('HDL Buspro professional'), de: unique('HDL Buspro Profi') }, abbreviation: 'HDLPRO', color: '#1f6feb' },
+        )
         await api.createProduct({
-          productTypeId: type.id,
+          ...ids,
           modelNumber: unique('M485/GW-ZB.10').replace(/\s+/g, '-'),
           name: { en: 'Universal dimmer actuator, 4-fold, with manual operation and status LEDs', de: 'Universal-Dimmaktor, 4-fach, mit Handbedienung und Status-LEDs' },
         })
         // Required afterwards: the product misses the value, a problem badge in the status cell.
-        await api.updateProductType(type.id, { attributes: [{ ...attribute, required: true }] })
+        await api.updateCategory(category.id, { attributes: [{ ...attribute, required: true }] })
         await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
 
         for (const p of listPages) {
@@ -161,10 +162,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.screenshot({ path: `e2e/screenshots/delete-dialog-${viewport.name}-${colorScheme}.png` })
       })
 
-      test('the product type editor fits the screen', async ({ page, api }) => {
-        const type = await api.createProductType({
-          name: { en: 'Universal dimmer actuator with a rather long name for narrow screens' },
-          color: '#1f6feb',
+      test('the category editor and the product type dialog fit the screen', async ({ page, api }) => {
+        const category = await api.createCategory({
+          name: { en: 'Universal dimmer actuators with a rather long name for narrow screens' },
           attributes: [
             { key: 'nominal_power_per_channel', label: { en: 'Nominal power per channel at 230 V' }, type: 'number', unit: 'W', scope: 'variant', min: 0, max: 500, required: true },
             {
@@ -181,10 +181,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
           ],
           instanceAttributes: [{ key: 'bus_address', label: { en: 'Bus address' }, type: 'text', required: true }],
         })
-        await page.goto(`/catalog/product-types/${type.id}`)
-        await expect(page.getByRole('heading', { name: 'Edit product type', level: 1 })).toBeVisible()
+        await page.goto(`/catalog/categories/${category.id}`)
+        await expect(page.getByRole('heading', { name: 'Edit category', level: 1 })).toBeVisible()
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/product-type-collapsed-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await page.screenshot({ path: `e2e/screenshots/category-collapsed-${viewport.name}-${colorScheme}.png`, fullPage: true })
 
         const attrs = page.getByRole('region', { name: 'Attributes', exact: true })
         await attrs.getByRole('button', { name: 'Expand all' }).click()
@@ -194,19 +194,30 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByRole('button', { name: 'Update' }).click()
         await expect(attrs.getByLabel('Minimum', { exact: true })).toHaveAccessibleDescription('Enter a number.')
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/product-type-expanded-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await page.screenshot({ path: `e2e/screenshots/category-expanded-${viewport.name}-${colorScheme}.png`, fullPage: true })
 
-        // The list with a coloured, long name; the read-only view of a user.
-        await page.goto('/catalog/product-types')
-        await expect(page.getByRole('row').filter({ hasText: type.key })).toBeVisible()
+        // The list with a long name.
+        await page.goto('/catalog/categories')
+        await expect(page.getByRole('row').filter({ hasText: category.key })).toBeVisible()
         await expectNoHorizontalOverflow(page)
+
+        // Product types: the list with a badge and a long name, and the dialog with its preview.
+        const type = await api.createProductType({ name: { en: 'Zigbee 3.0 professional line with a rather long name' }, abbreviation: 'ZB3PRO', color: '#1f6feb' })
+        await page.goto('/catalog/product-types')
+        const typeRow = page.getByRole('row').filter({ hasText: type.key })
+        await expect(typeRow).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await typeRow.getByRole('button', { name: 'Edit' }).click()
+        const dialog = page.getByRole('dialog', { name: 'Edit product type' })
+        await expect(dialog.getByTestId('type-abbreviation')).toHaveText('ZB3PRO')
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/product-type-dialog-${viewport.name}-${colorScheme}.png` })
       })
 
       test('the product pages fit the screen', async ({ page, api }) => {
         const image = await api.uploadFile('blue.png', 'image/png', readFileSync(fileURLToPath(new URL('../assets/blue.png', import.meta.url))))
-        const type = await api.createProductType({
-          name: { en: unique('Universal dimmer actuator with a rather long name') },
-          color: '#1f6feb',
+        const { type, ids } = await api.createKind({
+          name: { en: unique('Universal dimmer actuators with a rather long name') },
           attributes: [
             { key: 'nominal_power', label: { en: 'Nominal power per channel at 230 V' }, type: 'number', unit: 'W', scope: 'product', required: true },
             {
@@ -220,9 +231,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
             { key: 'tags', label: { en: 'Tags' }, type: 'list', itemType: 'text', scope: 'product' },
             { key: 'finish', label: { en: 'Surface finish' }, type: 'text', scope: 'variant' },
           ],
-        })
+        }, { name: { en: unique('Zigbee professional line') }, abbreviation: 'ZB', color: '#1f6feb' })
         const product = await api.createProduct({
-          productTypeId: type.id,
+          ...ids,
           modelNumber: unique('M485/GW-ZB.10-EXTRA-LONG').replace(/\s+/g, '-'),
           name: { en: 'Universal dimmer actuator, 4-fold, with manual operation and status LEDs' },
           attributes: { nominal_power: 500, protocols: ['knx', 'matter'], tags: ['flush mounted', 'professional series', 'DIN rail'] },

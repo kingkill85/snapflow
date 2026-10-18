@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { Product, ProductType } from '@/api/generated/model'
+import type { Category, Product, ProductType } from '@/api/generated/model'
 import {
   getGetProductQueryKey,
   getListProductsQueryKey,
@@ -61,9 +61,9 @@ import {
   listHref,
   listPath,
   listSearchFrom,
-  noticeFrom,
   productPath,
-  type SaveNotice,
+  useFreshCategories,
+  useSaveNotice,
   useFreshProductTypes,
 } from './paths'
 import { VariantsSection } from './VariantsSection'
@@ -102,15 +102,18 @@ function NewProduct() {
   const { t } = useTranslation('products')
   const listSearch = listSearchFrom(useLocation().state)
   const types = useFreshProductTypes()
+  const categories = useFreshCategories()
   const [dirty, setDirty] = useState(false)
   const unsaved = useUnsavedChanges(dirty)
   if (types.isError) return <LoadFailed error={types.error} />
-  if (!types.isFetchedAfterMount || !types.data) return <Loading />
+  if (categories.isError) return <LoadFailed error={categories.error} />
+  if (!types.isFetchedAfterMount || !types.data || !categories.isFetchedAfterMount || !categories.data) return <Loading />
   return (
     <Page title={t('new')}>
       <ProductForm
         item={null}
         types={types.data.items}
+        categories={categories.data.items}
         listSearch={listSearch}
         onDirtyChange={setDirty}
         onLeave={unsaved.allow}
@@ -132,20 +135,31 @@ function ExistingProduct({ id }: { id: string }) {
   // current one.
   const query = useGetProduct(id, { query: fresh })
   const types = useFreshProductTypes()
+  const categories = useFreshCategories()
   // Increased to restart the form from a newer version (Reload, or after a save).
   const [generation, setGeneration] = useState(0)
-  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
+  const [notice, setNotice] = useSaveNotice()
   const [dirty, setDirty] = useState(false)
   const unsaved = useUnsavedChanges(dirty)
 
   if (query.isError) return <LoadFailed error={query.error} />
   if (types.isError) return <LoadFailed error={types.error} />
-  if (!query.isFetchedAfterMount || !query.data || !types.isFetchedAfterMount || !types.data) return <Loading />
+  if (categories.isError) return <LoadFailed error={categories.error} />
+  if (
+    !query.isFetchedAfterMount ||
+    !query.data ||
+    !types.isFetchedAfterMount ||
+    !types.data ||
+    !categories.isFetchedAfterMount ||
+    !categories.data
+  ) {
+    return <Loading />
+  }
 
   const product = query.data
   const readOnly = !product.can.update
   const reload = async () => {
-    await Promise.all([query.refetch(), types.refetch()])
+    await Promise.all([query.refetch(), types.refetch(), categories.refetch()])
     setNotice(null)
     setGeneration((g) => g + 1)
   }
@@ -165,6 +179,7 @@ function ExistingProduct({ id }: { id: string }) {
         key={`${product.id}:${generation}`}
         item={product}
         types={types.data.items}
+        categories={categories.data.items}
         listSearch={listSearch}
         onReload={reload}
         onSaved={saved}
@@ -184,6 +199,8 @@ function ExistingProduct({ id }: { id: string }) {
 type ProductFormProps = {
   item: Product | null
   types: ProductType[]
+  /** The categories with their schemas. */
+  categories: Category[]
   /** The product list's filters to return to. */
   listSearch: string
   onReload?: () => Promise<void>
@@ -195,7 +212,7 @@ type ProductFormProps = {
 }
 
 /** The product's own fields and attribute values; read-only for users who may not change it. */
-function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange, onLeave }: ProductFormProps) {
+function ProductForm({ item, types, categories, listSearch, onReload, onSaved, onDirtyChange, onLeave }: ProductFormProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
@@ -211,15 +228,15 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
   const update = useUpdateProduct()
   const mutation = loaded ? update : create
 
-  const typeById = (id: string) => types.find((pt) => pt.id === id)
+  const categoryById = (id: string) => categories.find((c) => c.id === id)
   const stored = storedValues(loaded)
-  const [defaults] = useState(() => toProductFormValues(loaded, definitionsFor(typeById(loaded?.productTypeId ?? ''), 'product')))
+  const [defaults] = useState(() => toProductFormValues(loaded, definitionsFor(categoryById(loaded?.categoryId ?? ''), 'product')))
   // Stored values that do not fit the current schema are marked from the start (D55).
   const [storedErrors] = useState(() =>
     loaded && loaded.attributeErrors.length > 0
       ? toFieldErrors<ProductFormValues>(
           storedValueErrors(loaded.attributeErrors),
-          editorFields('product', definitionsFor(typeById(loaded.productTypeId), 'product'), defaults.values, stored),
+          editorFields('product', definitionsFor(categoryById(loaded.categoryId), 'product'), defaults.values, stored),
         )
       : undefined,
   )
@@ -231,12 +248,12 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
     shouldFocusError: false,
   })
   const { errors, isDirty } = form.formState
-  const productTypeId = useWatch({ control: form.control, name: 'productTypeId' })
+  const categoryId = useWatch({ control: form.control, name: 'categoryId' })
   const values = useWatch({ control: form.control, name: 'values' })
   const keep = useWatch({ control: form.control, name: 'keep' })
-  const type = typeById(productTypeId)
-  const definitions = definitionsFor(type, 'product')
-  const extras = type ? extraKeys(definitions, stored) : []
+  const category = categoryById(categoryId)
+  const definitions = definitionsFor(category, 'product')
+  const extras = category ? extraKeys(definitions, stored) : []
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
 
@@ -255,11 +272,10 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
     setErrorRevision((r) => r + 1)
   }
 
-
   const errorAt = (name: `values.${string}` | `keep.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
 
   const save = async (v: ProductFormValues) => {
-    const defs = definitionsFor(typeById(v.productTypeId), 'product')
+    const defs = definitionsFor(categoryById(v.categoryId), 'product')
     const fields = editorFields('product', defs, v.values, stored)
     const { attributes, errors: inputErrors } = toAttributes(defs, v.values, v.keep, stored)
     if (inputErrors.length > 0) {
@@ -313,22 +329,45 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
       .filter((pt) => pt.isActive || pt.id === loaded?.productTypeId)
       .map((pt) => {
         const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
-        return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+        return {
+          value: pt.id,
+          label,
+          content: (
+            <TypeBadge color={pt.color} abbreviation={pt.abbreviation}>
+              {label}
+            </TypeBadge>
+          ),
+        }
       }),
   ]
-  const typeChanged = loaded !== null && productTypeId !== loaded.productTypeId
+  const categoryOptions = [
+    ...(loaded ? [] : [{ value: '', label: t('field.chooseCategory') }]),
+    ...categories
+      .filter((c) => c.isActive || c.id === loaded?.categoryId)
+      .map((c) => ({ value: c.id, label: c.isActive ? localized(c.name) : t('field.inactiveType', { name: localized(c.name) }) })),
+  ]
+  const categoryChanged = loaded !== null && categoryId !== loaded.categoryId
 
   return (
     <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
       <Fieldset disabled={readOnly}>
         <Section title={t('section.basics')}>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FormSelectField
               control={form.control}
               name="productTypeId"
               label={t('field.productType')}
+              hint={t('field.productTypeHint')}
               options={typeOptions}
               error={fieldError(errors.productTypeId?.message)}
+            />
+            <FormSelectField
+              control={form.control}
+              name="categoryId"
+              label={t('field.category')}
+              hint={t('field.categoryHint')}
+              options={categoryOptions}
+              error={fieldError(errors.categoryId?.message)}
             />
             <Field
               label={t('field.modelNumber')}
@@ -337,11 +376,9 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
               error={fieldError(errors.modelNumber?.message)}
               {...form.register('modelNumber')}
             />
-            <div className="sm:pt-7">
-              <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
-            </div>
           </div>
-          {typeChanged && <Notice tone="warning">{t('typeChange')}</Notice>}
+          <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
+          {categoryChanged && <Notice tone="warning">{t('categoryChange')}</Notice>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('field.nameEn')} error={fieldError(errors.name?.en?.message)} {...form.register('name.en')} />
             <Field label={t('field.nameDe')} error={fieldError(errors.name?.de?.message)} {...form.register('name.de')} />
@@ -358,8 +395,8 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
           </div>
         </Section>
         <Section title={t('section.attributes')} description={t('section.attributesHint')}>
-          {loaded && !typeChanged && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}
-          {type ? (
+          {loaded && !categoryChanged && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}
+          {category ? (
             <>
               <AttributeValuesEditor
                 definitions={definitions}
@@ -375,7 +412,7 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
               />
             </>
           ) : (
-            <p className="text-sm text-muted">{t('chooseTypeFirst')}</p>
+            <p className="text-sm text-muted">{t('chooseCategoryFirst')}</p>
           )}
         </Section>
       </Fieldset>

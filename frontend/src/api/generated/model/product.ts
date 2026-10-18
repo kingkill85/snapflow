@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
+import type { CategoryRef } from './categoryRef';
 import type { FieldError } from './fieldError';
 import type { ProductAttributes } from './productAttributes';
 import type { ProductDescription } from './productDescription';
@@ -20,9 +21,11 @@ export interface Product {
   attributeErrors: FieldError[];
   /** Product-scope attribute values by key */
   attributes: ProductAttributes;
-  /** Product and product type are active */
+  /** Product, product type and category are active */
   available: boolean;
   can: Actions;
+  category: CategoryRef;
+  categoryId: string;
   createdAt: string;
   description?: ProductDescription;
   id: string;
@@ -32,12 +35,12 @@ export interface Product {
   name: ProductName;
   productType: ProductTypeRef;
   productTypeId: string;
-  /** Values whose key the type's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them */
+  /** Values whose key the category's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them */
   staleAttributes: ProductStaleAttributes;
   /** Send it back as expectedUpdatedAt when updating */
   updatedAt: string;
   /** In variant order */
   variants: Variant[];
-  /** Variants with attributeErrors or staleAttributes against the current type's schema */
+  /** Variants with attributeErrors or staleAttributes against the current category's schema */
   variantsWithProblems: number;
 }

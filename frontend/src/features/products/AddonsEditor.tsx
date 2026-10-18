@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '@/api/client'
-import type { Addon, Product, ProductType, SearchVariantsParams, Variant, VariantSearchItem } from '@/api/generated/model'
+import type { Addon, Category, Product, ProductType, SearchVariantsParams, Variant, VariantSearchItem } from '@/api/generated/model'
 import { getGetProductQueryKey, getSearchVariantsQueryKey, searchVariants, useReplaceVariantAddons } from '@/api/generated/products/products'
 import { fileUrl } from '@/catalog/files'
 import { useFormatPrice } from '@/catalog/money'
@@ -60,6 +60,8 @@ type AddonsEditorProps = {
   variant: Variant
   /** The product types, for the picker's type filter. */
   types: ProductType[]
+  /** The categories, for the picker's category filter. */
+  categories: Category[]
   readOnly: boolean
   /** Navigation state for the links to the add-ons' products. */
   linkState?: EditorState
@@ -71,7 +73,7 @@ type AddonsEditorProps = {
  * them required, order and remove them, then save the whole list at once
  * (D53, D83).
  */
-export function AddonsEditor({ product, variant, types, readOnly, linkState, onDirtyChange }: AddonsEditorProps) {
+export function AddonsEditor({ product, variant, types, categories, readOnly, linkState, onDirtyChange }: AddonsEditorProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
@@ -92,15 +94,21 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
   // The picker lists variants in catalog order before anything is typed;
-  // typing and the type filter narrow it; "Show more" loads the next page (D83).
+  // typing and the type and category filters narrow it; "Show more" loads
+  // the next page (D83).
   const [draft, setDraft] = useState('')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setSearch(draft.trim()), searchDelayMs)
     return () => clearTimeout(timer)
   }, [draft])
-  const params: SearchVariantsParams = { ...(search ? { search } : {}), ...(typeFilter ? { productTypeId: typeFilter } : {}) }
+  const params: SearchVariantsParams = {
+    ...(search ? { search } : {}),
+    ...(typeFilter ? { productTypeId: typeFilter } : {}),
+    ...(categoryFilter ? { categoryId: categoryFilter } : {}),
+  }
   const results = useInfiniteQuery({
     queryKey: [...getSearchVariantsQueryKey(params), 'pages'],
     queryFn: ({ pageParam, signal }) => searchVariants({ ...params, limit: pickerPageSize, offset: pageParam }, signal),
@@ -120,8 +128,20 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
     { value: '', label: t('allTypes') },
     ...types.map((pt) => {
       const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
-      return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+      return {
+        value: pt.id,
+        label,
+        content: (
+          <TypeBadge color={pt.color} abbreviation={pt.abbreviation}>
+            {label}
+          </TypeBadge>
+        ),
+      }
     }),
+  ]
+  const categoryOptions = [
+    { value: '', label: t('allCategories') },
+    ...categories.map((c) => ({ value: c.id, label: c.isActive ? localized(c.name) : t('field.inactiveType', { name: localized(c.name) }) })),
   ]
 
   const change = (next: Item[]) => {
@@ -183,16 +203,24 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
     <Section title={t('addons.title')} description={t('addons.description')}>
       {!readOnly && (
         <div className="space-y-2">
-          <div className="grid items-end gap-4 sm:grid-cols-2">
-            <Field
-              type="search"
-              label={t('addons.search')}
-              placeholder={t('addons.searchHint')}
-              maxLength={searchMaxLength}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
+          <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <Field
+                type="search"
+                label={t('addons.search')}
+                placeholder={t('addons.searchHint')}
+                maxLength={searchMaxLength}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+              />
+            </div>
             <SelectField label={t('addons.typeFilter')} value={typeFilter} options={typeOptions} onValueChange={setTypeFilter} />
+            <SelectField
+              label={t('addons.categoryFilter')}
+              value={categoryFilter}
+              options={categoryOptions}
+              onValueChange={setCategoryFilter}
+            />
           </div>
           <div role="region" aria-label={t('addons.results')} className="space-y-2">
             {results.isError ? (
@@ -216,7 +244,9 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
                             </p>
                             {r.sku && <p className="text-xs text-muted">{t('addons.sku', { sku: r.sku })}</p>}
                             <p className="text-muted">
-                              <TypeBadge color={r.productType.color}>{localized(r.productName)}</TypeBadge>
+                              <TypeBadge color={r.productType.color} abbreviation={r.productType.abbreviation} wrap>
+                                {localized(r.productName)} · {localized(r.category.name)}
+                              </TypeBadge>
                             </p>
                           </div>
                           <span className="text-sm tabular-nums">{price(r.price)}</span>

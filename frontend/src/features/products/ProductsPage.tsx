@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useSearchParams } from 'react-router'
 
+import { useListCategories } from '@/api/generated/categories/categories'
 import type { ProductListItem } from '@/api/generated/model'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
 import {
@@ -62,6 +63,7 @@ export function ProductsPage() {
   const [params, setParams] = useSearchParams()
   const search = params.get('search') ?? ''
   const productTypeId = params.get('type') ?? ''
+  const categoryId = params.get('category') ?? ''
   const showInactive = params.get('inactive') === '1'
   const offset = Math.max(0, Math.floor(Number(params.get('offset'))) || 0)
 
@@ -104,10 +106,12 @@ export function ProductsPage() {
   }, [draft, search, setFilters])
 
   const types = useListProductTypes({ includeInactive: true })
+  const categories = useListCategories({ includeInactive: true })
   const list = useListProducts(
     {
       ...(search ? { search } : {}),
       ...(productTypeId ? { productTypeId } : {}),
+      ...(categoryId ? { categoryId } : {}),
       ...(showInactive ? { includeInactive: true } : {}),
       limit: pageSize,
       offset,
@@ -144,19 +148,39 @@ export function ProductsPage() {
     setDeleting(null)
   }
 
-  // Products of an inactive type are unavailable, which the list hides unless
-  // inactive ones are shown: choosing such a type shows them (D87).
+  // Products of an inactive type or category are unavailable, which the list
+  // hides unless inactive ones are shown: choosing such a type or category
+  // shows them (D87).
   const chooseType = (id: string) => {
     const inactive = types.data?.items.some((pt) => pt.id === id && !pt.isActive)
     setFilters(inactive ? { type: id, inactive: '1' } : { type: id })
+  }
+  const chooseCategory = (id: string) => {
+    const inactive = categories.data?.items.some((c) => c.id === id && !c.isActive)
+    setFilters(inactive ? { category: id, inactive: '1' } : { category: id })
   }
 
   const typeOptions = [
     { value: '', label: t('allTypes') },
     ...(types.data?.items ?? []).map((pt) => {
       const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
-      return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+      return {
+        value: pt.id,
+        label,
+        content: (
+          <TypeBadge color={pt.color} abbreviation={pt.abbreviation}>
+            {label}
+          </TypeBadge>
+        ),
+      }
     }),
+  ]
+  const categoryOptions = [
+    { value: '', label: t('allCategories') },
+    ...(categories.data?.items ?? []).map((c) => ({
+      value: c.id,
+      label: c.isActive ? localized(c.name) : t('field.inactiveType', { name: localized(c.name) }),
+    })),
   ]
 
   const columns: Column<ProductListItem>[] = [
@@ -173,12 +197,17 @@ export function ProductsPage() {
     },
     // On narrow screens the table scrolls instead of breaking names word by word.
     { header: t('column.name'), cell: (p) => localized(p.name), className: 'min-w-48' },
+    // The product type (badge and name) with the category below it: one
+    // column, so every column still fits from 1280 px (D95, D105).
     {
-      header: t('column.type'),
+      header: t('column.typeCategory'),
       cell: (p) => (
-        <TypeBadge color={p.productType.color} wrap>
-          {localized(p.productType.name)}
-        </TypeBadge>
+        <div className="space-y-0.5">
+          <TypeBadge color={p.productType.color} abbreviation={p.productType.abbreviation} wrap>
+            {localized(p.productType.name)}
+          </TypeBadge>
+          <p className="break-words text-muted">{localized(p.category.name)}</p>
+        </div>
       ),
       className: 'min-w-36',
     },
@@ -220,11 +249,11 @@ export function ProductsPage() {
       </Link>
     </Button>
   ) : undefined
-  const filtered = search !== '' || productTypeId !== '' || showInactive
+  const filtered = search !== '' || productTypeId !== '' || categoryId !== '' || showInactive
 
   return (
     <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
-      <div className="grid items-end gap-4 sm:grid-cols-3">
+      <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field
           type="search"
           label={t('search')}
@@ -234,6 +263,7 @@ export function ProductsPage() {
           onChange={(e) => setDraft(e.target.value)}
         />
         <SelectField label={t('typeFilter')} value={productTypeId} options={typeOptions} onValueChange={chooseType} />
+        <SelectField label={t('categoryFilter')} value={categoryId} options={categoryOptions} onValueChange={chooseCategory} />
         <div className="sm:pb-2">
           <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setFilters({ inactive: e.target.checked ? '1' : '' })} />
         </div>

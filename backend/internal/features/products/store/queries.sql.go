@@ -18,30 +18,36 @@ const countProducts = `-- name: CountProducts :one
 SELECT count(*)
 FROM products p
 WHERE ($1::uuid IS NULL OR p.product_type_id = $1)
-  AND ($2::boolean
-       OR (p.is_active AND NOT p.product_type_id = ANY ($3::uuid[])))
-  AND ($4::text = ''
-       OR p.model_number ILIKE $4
-       OR p.name ->> 'en' ILIKE $4
-       OR p.name ->> 'de' ILIKE $4
-       OR p.description ->> 'en' ILIKE $4
-       OR p.description ->> 'de' ILIKE $4
-       OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $4))
+  AND ($2::uuid IS NULL OR p.category_id = $2)
+  AND ($3::boolean
+       OR (p.is_active AND NOT p.product_type_id = ANY ($4::uuid[])
+           AND NOT p.category_id = ANY ($5::uuid[])))
+  AND ($6::text = ''
+       OR p.model_number ILIKE $6
+       OR p.name ->> 'en' ILIKE $6
+       OR p.name ->> 'de' ILIKE $6
+       OR p.description ->> 'en' ILIKE $6
+       OR p.description ->> 'de' ILIKE $6
+       OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $6))
 `
 
 type CountProductsParams struct {
-	ProductTypeID   *uuid.UUID
-	IncludeInactive bool
-	InactiveTypeIds []uuid.UUID
-	Search          string
+	ProductTypeID       *uuid.UUID
+	CategoryID          *uuid.UUID
+	IncludeInactive     bool
+	InactiveTypeIds     []uuid.UUID
+	InactiveCategoryIds []uuid.UUID
+	Search              string
 }
 
 // CountProducts counts what ListProducts lists without the page.
 func (q *Queries) CountProducts(ctx context.Context, arg CountProductsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countProducts,
 		arg.ProductTypeID,
+		arg.CategoryID,
 		arg.IncludeInactive,
 		arg.InactiveTypeIds,
+		arg.InactiveCategoryIds,
 		arg.Search,
 	)
 	var count int64
@@ -54,38 +60,41 @@ SELECT count(*)
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 WHERE ($1::uuid IS NULL OR p.product_type_id = $1)
-  AND ($2::text = ''
-       OR p.model_number ILIKE $2
-       OR p.name ->> 'en' ILIKE $2
-       OR p.name ->> 'de' ILIKE $2
-       OR p.description ->> 'en' ILIKE $2
-       OR p.description ->> 'de' ILIKE $2
-       OR v.name ->> 'en' ILIKE $2
-       OR v.name ->> 'de' ILIKE $2
-       OR v.sku ILIKE $2)
+  AND ($2::uuid IS NULL OR p.category_id = $2)
+  AND ($3::text = ''
+       OR p.model_number ILIKE $3
+       OR p.name ->> 'en' ILIKE $3
+       OR p.name ->> 'de' ILIKE $3
+       OR p.description ->> 'en' ILIKE $3
+       OR p.description ->> 'de' ILIKE $3
+       OR v.name ->> 'en' ILIKE $3
+       OR v.name ->> 'de' ILIKE $3
+       OR v.sku ILIKE $3)
 `
 
 type CountVariantsParams struct {
 	ProductTypeID *uuid.UUID
+	CategoryID    *uuid.UUID
 	Search        string
 }
 
 // CountVariants counts what SearchVariants lists without the page.
 func (q *Queries) CountVariants(ctx context.Context, arg CountVariantsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVariants, arg.ProductTypeID, arg.Search)
+	row := q.db.QueryRow(ctx, countVariants, arg.ProductTypeID, arg.CategoryID, arg.Search)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createProduct = `-- name: CreateProduct :one
-INSERT INTO products (product_type_id, model_number, name, description, attributes, is_active)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at
+INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
 `
 
 type CreateProductParams struct {
 	ProductTypeID uuid.UUID
+	CategoryID    uuid.UUID
 	ModelNumber   string
 	Name          i18n.Text
 	Description   *i18n.Text
@@ -96,6 +105,7 @@ type CreateProductParams struct {
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
 	row := q.db.QueryRow(ctx, createProduct,
 		arg.ProductTypeID,
+		arg.CategoryID,
 		arg.ModelNumber,
 		arg.Name,
 		arg.Description,
@@ -113,6 +123,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }
@@ -230,12 +241,13 @@ func (q *Queries) ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uu
 const getProduct = `-- name: GetProduct :one
 
 
-SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at FROM products WHERE id = $1
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products WHERE id = $1
 `
 
-// Products, variants and add-ons are one aggregate. Product type facts
-// (catalog order, active flag) come from producttypes.Service and are passed
-// in as arrays: this feature never reads the product_types table.
+// Products, variants and add-ons are one aggregate. Product type and category
+// facts (catalog order, active flags) come from producttypes.Service and
+// categories.Service and are passed in as arrays: this feature never reads
+// the product_types or categories tables.
 func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (Product, error) {
 	row := q.db.QueryRow(ctx, getProduct, id)
 	var i Product
@@ -249,6 +261,7 @@ func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (Product, error)
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }
@@ -302,7 +315,8 @@ func (q *Queries) InsertAddons(ctx context.Context, arg InsertAddonsParams) erro
 const listAddons = `-- name: ListAddons :many
 SELECT a.variant_id, a.addon_variant_id, a.required, a.sort_order,
        v.name AS variant_name, v.price, v.image_file_id, v.is_active,
-       p.id AS product_id, p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id
+       p.id AS product_id, p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id,
+       p.category_id
 FROM variant_addons a
 JOIN product_variants v ON v.id = a.addon_variant_id
 JOIN products p ON p.id = v.product_id
@@ -324,6 +338,7 @@ type ListAddonsRow struct {
 	ProductName     i18n.Text
 	ProductIsActive bool
 	ProductTypeID   uuid.UUID
+	CategoryID      uuid.UUID
 }
 
 // ListAddons returns the add-ons of the given variants with what the editor
@@ -351,6 +366,7 @@ func (q *Queries) ListAddons(ctx context.Context, variantIds []uuid.UUID) ([]Lis
 			&i.ProductName,
 			&i.ProductIsActive,
 			&i.ProductTypeID,
+			&i.CategoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -363,44 +379,54 @@ func (q *Queries) ListAddons(ctx context.Context, variantIds []uuid.UUID) ([]Lis
 }
 
 const listProducts = `-- name: ListProducts :many
-SELECT p.id, p.product_type_id, p.model_number, p.name, p.description, p.attributes, p.is_active, p.created_at, p.updated_at
+SELECT p.id, p.product_type_id, p.model_number, p.name, p.description, p.attributes, p.is_active, p.created_at, p.updated_at, p.category_id
 FROM products p
 LEFT JOIN unnest($1::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
-WHERE ($2::uuid IS NULL OR p.product_type_id = $2)
-  AND ($3::boolean
-       OR (p.is_active AND NOT p.product_type_id = ANY ($4::uuid[])))
-  AND ($5::text = ''
-       OR p.model_number ILIKE $5
-       OR p.name ->> 'en' ILIKE $5
-       OR p.name ->> 'de' ILIKE $5
-       OR p.description ->> 'en' ILIKE $5
-       OR p.description ->> 'de' ILIKE $5
-       OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $5))
-ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id
-LIMIT $7 OFFSET $6
+LEFT JOIN unnest($2::uuid[]) WITH ORDINALITY AS c (id, ord) ON c.id = p.category_id
+WHERE ($3::uuid IS NULL OR p.product_type_id = $3)
+  AND ($4::uuid IS NULL OR p.category_id = $4)
+  AND ($5::boolean
+       OR (p.is_active AND NOT p.product_type_id = ANY ($6::uuid[])
+           AND NOT p.category_id = ANY ($7::uuid[])))
+  AND ($8::text = ''
+       OR p.model_number ILIKE $8
+       OR p.name ->> 'en' ILIKE $8
+       OR p.name ->> 'de' ILIKE $8
+       OR p.description ->> 'en' ILIKE $8
+       OR p.description ->> 'de' ILIKE $8
+       OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $8))
+ORDER BY t.ord NULLS LAST, c.ord NULLS LAST, lower(p.model_number), p.id
+LIMIT $10 OFFSET $9
 `
 
 type ListProductsParams struct {
-	TypeIds         []uuid.UUID
-	ProductTypeID   *uuid.UUID
-	IncludeInactive bool
-	InactiveTypeIds []uuid.UUID
-	Search          string
-	RowOffset       int32
-	RowLimit        int32
+	TypeIds             []uuid.UUID
+	CategoryIds         []uuid.UUID
+	ProductTypeID       *uuid.UUID
+	CategoryID          *uuid.UUID
+	IncludeInactive     bool
+	InactiveTypeIds     []uuid.UUID
+	InactiveCategoryIds []uuid.UUID
+	Search              string
+	RowOffset           int32
+	RowLimit            int32
 }
 
 // ListProducts is one page of the product list in catalog order: product
-// type order (type_ids, in order), then model number. search is an ILIKE
-// pattern (” for none) over model number, English and German name and
-// description and the variants' SKUs. Without include_inactive only active products of active
-// types are listed.
+// type order (type_ids, in order), category order (category_ids, in order),
+// then model number. search is an ILIKE pattern (” for none) over model
+// number, English and German name and description and the variants' SKUs.
+// Without include_inactive only active products of active types and active
+// categories are listed.
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error) {
 	rows, err := q.db.Query(ctx, listProducts,
 		arg.TypeIds,
+		arg.CategoryIds,
 		arg.ProductTypeID,
+		arg.CategoryID,
 		arg.IncludeInactive,
 		arg.InactiveTypeIds,
+		arg.InactiveCategoryIds,
 		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -422,6 +448,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]P
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CategoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -582,27 +609,31 @@ func (q *Queries) ProductExists(ctx context.Context, id uuid.UUID) (bool, error)
 
 const searchVariants = `-- name: SearchVariants :many
 SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
-       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id
+       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id, p.category_id
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 LEFT JOIN unnest($1::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
-WHERE ($2::uuid IS NULL OR p.product_type_id = $2)
-  AND ($3::text = ''
-       OR p.model_number ILIKE $3
-       OR p.name ->> 'en' ILIKE $3
-       OR p.name ->> 'de' ILIKE $3
-       OR p.description ->> 'en' ILIKE $3
-       OR p.description ->> 'de' ILIKE $3
-       OR v.name ->> 'en' ILIKE $3
-       OR v.name ->> 'de' ILIKE $3
-       OR v.sku ILIKE $3)
-ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
-LIMIT $5 OFFSET $4
+LEFT JOIN unnest($2::uuid[]) WITH ORDINALITY AS c (id, ord) ON c.id = p.category_id
+WHERE ($3::uuid IS NULL OR p.product_type_id = $3)
+  AND ($4::uuid IS NULL OR p.category_id = $4)
+  AND ($5::text = ''
+       OR p.model_number ILIKE $5
+       OR p.name ->> 'en' ILIKE $5
+       OR p.name ->> 'de' ILIKE $5
+       OR p.description ->> 'en' ILIKE $5
+       OR p.description ->> 'de' ILIKE $5
+       OR v.name ->> 'en' ILIKE $5
+       OR v.name ->> 'de' ILIKE $5
+       OR v.sku ILIKE $5)
+ORDER BY t.ord NULLS LAST, c.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
+LIMIT $7 OFFSET $6
 `
 
 type SearchVariantsParams struct {
 	TypeIds       []uuid.UUID
+	CategoryIds   []uuid.UUID
 	ProductTypeID *uuid.UUID
+	CategoryID    *uuid.UUID
 	Search        string
 	RowOffset     int32
 	RowLimit      int32
@@ -620,16 +651,20 @@ type SearchVariantsRow struct {
 	ProductName     i18n.Text
 	ProductIsActive bool
 	ProductTypeID   uuid.UUID
+	CategoryID      uuid.UUID
 }
 
 // SearchVariants is the add-on picker's list across the catalog, in catalog
-// order (product type order, model number, variant order): all variants
-// without a search, else those whose product (as in ListProducts) or own
-// name or SKU matches. product_type_id narrows it to one type.
+// order (product type order, category order, model number, variant order):
+// all variants without a search, else those whose product (as in
+// ListProducts) or own name or SKU matches. product_type_id and category_id
+// narrow it to one type or category.
 func (q *Queries) SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error) {
 	rows, err := q.db.Query(ctx, searchVariants,
 		arg.TypeIds,
+		arg.CategoryIds,
 		arg.ProductTypeID,
+		arg.CategoryID,
 		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -653,6 +688,7 @@ func (q *Queries) SearchVariants(ctx context.Context, arg SearchVariantsParams) 
 			&i.ProductName,
 			&i.ProductIsActive,
 			&i.ProductTypeID,
+			&i.CategoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -692,15 +728,16 @@ func (q *Queries) ShareProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 
 const updateProduct = `-- name: UpdateProduct :one
 UPDATE products
-SET product_type_id = $2, model_number = $3, name = $4, description = $5, attributes = $6, is_active = $7,
+SET product_type_id = $2, category_id = $3, model_number = $4, name = $5, description = $6, attributes = $7, is_active = $8,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $8
-RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at
+WHERE id = $1 AND updated_at = $9
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
 `
 
 type UpdateProductParams struct {
 	ID                uuid.UUID
 	ProductTypeID     uuid.UUID
+	CategoryID        uuid.UUID
 	ModelNumber       string
 	Name              i18n.Text
 	Description       *i18n.Text
@@ -715,6 +752,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 	row := q.db.QueryRow(ctx, updateProduct,
 		arg.ID,
 		arg.ProductTypeID,
+		arg.CategoryID,
 		arg.ModelNumber,
 		arg.Name,
 		arg.Description,
@@ -733,6 +771,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }

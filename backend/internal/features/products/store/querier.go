@@ -25,9 +25,10 @@ type Querier interface {
 	// ExistingVariantIDs returns which of ids exist and keeps them from being
 	// deleted until the transaction ends.
 	ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
-	// Products, variants and add-ons are one aggregate. Product type facts
-	// (catalog order, active flag) come from producttypes.Service and are passed
-	// in as arrays: this feature never reads the product_types table.
+	// Products, variants and add-ons are one aggregate. Product type and category
+	// facts (catalog order, active flags) come from producttypes.Service and
+	// categories.Service and are passed in as arrays: this feature never reads
+	// the product_types or categories tables.
 	GetProduct(ctx context.Context, id uuid.UUID) (Product, error)
 	GetVariant(ctx context.Context, arg GetVariantParams) (ProductVariant, error)
 	// InsertAddons links the add-ons in list order (sort order 1..n).
@@ -36,10 +37,11 @@ type Querier interface {
 	// shows of each add-on variant and its product.
 	ListAddons(ctx context.Context, variantIds []uuid.UUID) ([]ListAddonsRow, error)
 	// ListProducts is one page of the product list in catalog order: product
-	// type order (type_ids, in order), then model number. search is an ILIKE
-	// pattern ('' for none) over model number, English and German name and
-	// description and the variants' SKUs. Without include_inactive only active products of active
-	// types are listed.
+	// type order (type_ids, in order), category order (category_ids, in order),
+	// then model number. search is an ILIKE pattern ('' for none) over model
+	// number, English and German name and description and the variants' SKUs.
+	// Without include_inactive only active products of active types and active
+	// categories are listed.
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListVariants(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
 	ListVariantsOfProducts(ctx context.Context, productIds []uuid.UUID) ([]ProductVariant, error)
@@ -60,9 +62,10 @@ type Querier interface {
 	LockVariantIDs(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ProductExists(ctx context.Context, id uuid.UUID) (bool, error)
 	// SearchVariants is the add-on picker's list across the catalog, in catalog
-	// order (product type order, model number, variant order): all variants
-	// without a search, else those whose product (as in ListProducts) or own
-	// name or SKU matches. product_type_id narrows it to one type.
+	// order (product type order, category order, model number, variant order):
+	// all variants without a search, else those whose product (as in
+	// ListProducts) or own name or SKU matches. product_type_id and category_id
+	// narrow it to one type or category.
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
 	// SetVariantOrder gives the ids sort orders 1..n in the given order.
 	SetVariantOrder(ctx context.Context, ids []uuid.UUID) error

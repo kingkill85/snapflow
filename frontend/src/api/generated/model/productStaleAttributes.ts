@@ -6,6 +6,6 @@
  */
 
 /**
- * Values whose key the type's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them
+ * Values whose key the category's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them
  */
 export type ProductStaleAttributes = {[key: string]: unknown};
