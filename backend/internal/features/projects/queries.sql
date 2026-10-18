@@ -99,3 +99,24 @@ RETURNING *;
 
 -- name: DeleteVersion :execrows
 DELETE FROM project_versions WHERE id = $1 AND project_id = $2;
+
+-- VersionAccess reads a version with what other features (plans) need of
+-- its project. The Share and Lock variants lock the project row: FOR SHARE
+-- orders content changes against status changes (which update the row),
+-- FOR UPDATE also against each other and against version changes.
+-- name: VersionAccess :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1;
+
+-- name: VersionAccessShare :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1
+FOR SHARE OF p;
+
+-- name: VersionAccessLock :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1
+FOR UPDATE OF p;

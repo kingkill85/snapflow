@@ -592,3 +592,84 @@ func (q *Queries) UpdateVersion(ctx context.Context, arg UpdateVersionParams) (P
 	)
 	return i, err
 }
+
+const versionAccess = `-- name: VersionAccess :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1
+`
+
+type VersionAccessRow struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	TenantID  uuid.UUID
+	Status    string
+}
+
+// VersionAccess reads a version with what other features (plans) need of
+// its project. The Share and Lock variants lock the project row: FOR SHARE
+// orders content changes against status changes (which update the row),
+// FOR UPDATE also against each other and against version changes.
+func (q *Queries) VersionAccess(ctx context.Context, id uuid.UUID) (VersionAccessRow, error) {
+	row := q.db.QueryRow(ctx, versionAccess, id)
+	var i VersionAccessRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.TenantID,
+		&i.Status,
+	)
+	return i, err
+}
+
+const versionAccessLock = `-- name: VersionAccessLock :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1
+FOR UPDATE OF p
+`
+
+type VersionAccessLockRow struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	TenantID  uuid.UUID
+	Status    string
+}
+
+func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionAccessLockRow, error) {
+	row := q.db.QueryRow(ctx, versionAccessLock, id)
+	var i VersionAccessLockRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.TenantID,
+		&i.Status,
+	)
+	return i, err
+}
+
+const versionAccessShare = `-- name: VersionAccessShare :one
+SELECT v.id, v.project_id, p.tenant_id, p.status
+FROM project_versions v JOIN projects p ON p.id = v.project_id
+WHERE v.id = $1
+FOR SHARE OF p
+`
+
+type VersionAccessShareRow struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	TenantID  uuid.UUID
+	Status    string
+}
+
+func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (VersionAccessShareRow, error) {
+	row := q.db.QueryRow(ctx, versionAccessShare, id)
+	var i VersionAccessShareRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.TenantID,
+		&i.Status,
+	)
+	return i, err
+}

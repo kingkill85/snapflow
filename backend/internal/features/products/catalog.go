@@ -610,3 +610,98 @@ func catalogVariant(r store.ProductVariant) CatalogVariant {
 	}
 	return v
 }
+
+// ---------------------------------------------------------------- plans
+
+// PlacementVariant is what a plan needs of a placed variant: where it
+// belongs, whether it can still be offered, its add-ons and the instance
+// schema of its category.
+type PlacementVariant struct {
+	ID            uuid.UUID
+	ProductID     uuid.UUID
+	ProductTypeID uuid.UUID
+	CategoryID    uuid.UUID
+	// Active flags of the variant, its product, product type and category;
+	// the variant is available when all are true (D54).
+	VariantActive, ProductActive, TypeActive, CategoryActive bool
+	Addons                                                   []PlacementAddon
+	InstanceAttributes                                       attrschema.InstanceSchema
+}
+
+// Available reports whether the variant can be offered (D54).
+func (v PlacementVariant) Available() bool {
+	return v.VariantActive && v.ProductActive && v.TypeActive && v.CategoryActive
+}
+
+// PlacementAddon is one add-on link of a placed variant.
+type PlacementAddon struct {
+	AddonVariantID uuid.UUID
+	Required       bool
+	Available      bool
+}
+
+// PlacementVariants returns the variants of ids that exist, by id (ids that
+// do not exist are left out). Needs catalog.read.
+func (s *Service) PlacementVariants(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]PlacementVariant, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
+		return nil, err
+	}
+	out := map[uuid.UUID]PlacementVariant{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cat, err := s.loadCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		rows   []store.VariantFactsRow
+		addons []store.ListAddonsRow
+	)
+	err = s.inSnapshot(ctx, func(q *store.Queries) error {
+		var err error
+		if rows, err = q.VariantFacts(ctx, ids); err != nil {
+			return err
+		}
+		addons, err = q.ListAddons(ctx, ids)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		pt, err := cat.typeOf(ctx, s, r.ProductTypeID)
+		if err != nil {
+			return nil, err
+		}
+		c, err := cat.categoryOf(ctx, s, r.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		out[r.ID] = PlacementVariant{
+			ID: r.ID, ProductID: r.ProductID, ProductTypeID: r.ProductTypeID, CategoryID: r.CategoryID,
+			VariantActive: r.IsActive, ProductActive: r.ProductIsActive, TypeActive: pt.IsActive, CategoryActive: c.IsActive,
+			InstanceAttributes: c.InstanceAttributes,
+		}
+	}
+	for _, a := range addons {
+		v, ok := out[a.VariantID]
+		if !ok {
+			continue
+		}
+		pt, err := cat.typeOf(ctx, s, a.ProductTypeID)
+		if err != nil {
+			return nil, err
+		}
+		c, err := cat.categoryOf(ctx, s, a.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		v.Addons = append(v.Addons, PlacementAddon{
+			AddonVariantID: a.AddonVariantID, Required: a.Required,
+			Available: a.IsActive && a.ProductIsActive && pt.IsActive && c.IsActive,
+		})
+		out[a.VariantID] = v
+	}
+	return out, nil
+}
