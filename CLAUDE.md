@@ -18,6 +18,7 @@ make generate       # sqlc + OpenAPI export + TS client (run after any SQL or AP
 make lint           # golangci-lint, oxlint, tsc
 make test           # Go tests (real Postgres via Testcontainers) + Vitest
 make check          # everything CI runs, incl. "generated code is committed"
+make e2e            # Playwright click-through on a fresh snapflow_e2e database (args="--ui" etc.)
 make feature name=product_types   # scaffold a full feature, backend + frontend
 ```
 
