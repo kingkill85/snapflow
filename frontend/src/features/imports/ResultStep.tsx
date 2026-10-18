@@ -2,7 +2,7 @@ import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { Undo2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams } from 'react-router'
+import { Link } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import { getListCategoriesQueryKey, useListCategories } from '@/api/generated/categories/categories'
@@ -14,9 +14,12 @@ import { Badge, Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice
 
 import { Counters } from './Counters'
 import { changedFields, isObject } from './diff'
+import { issuesSection, offsetOf, useClampOffset, useFilters, useScrollToHash } from './filters'
+import { IssuesSection } from './IssuesSection'
 import { attributeLabels, useFieldLabel } from './labels'
 import { DiffList } from './values'
 import { categoryHref, invalidateRunDetails, newPath, pageSize, productHref, useFormatDateTime, variantHref } from './paths'
+import { useRunReload } from './run-reload'
 
 type Conflict = { entity: string; id: string; label: string; productId?: string }
 
@@ -34,6 +37,9 @@ export function ResultStep({ run }: { run: ImportRun }) {
   const queryClient = useQueryClient()
   const undo = useUndoImport()
   const [confirm, setConfirm] = useState(false)
+  const runReload = useRunReload(run.id)
+  const { href } = useFilters()
+  const counts = run.applied ?? run.counts!
 
   const submitUndo = async () => {
     try {
@@ -45,8 +51,9 @@ export function ResultStep({ run }: { run: ImportRun }) {
         invalidateProductQueries(queryClient),
         queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() }),
       ])
-    } catch {
-      // shown in the dialog
+    } catch (e) {
+      // Shown in the dialog; undone or deleted meanwhile, the page shows it.
+      runReload.check(e)
     }
   }
   const conflicts =
@@ -63,7 +70,7 @@ export function ResultStep({ run }: { run: ImportRun }) {
         <Notice tone="warning">{t('result.undone', { date: formatDate(run.undoneAt) })}</Notice>
       )}
       <Section title={t('result.title')} description={run.state === 'undone' ? t('result.undoneDescription') : t('result.description')}>
-        <Counters counts={run.applied ?? run.counts!} applied />
+        <Counters counts={counts} applied issuesHref={(severity) => href({ severity }, { reset: 'issues', section: issuesSection })} />
         {/* Not a form: the actions close the result (the page header leads back to the list). */}
         <SectionActions>
           <Button asChild variant="secondary">
@@ -82,6 +89,7 @@ export function ResultStep({ run }: { run: ImportRun }) {
           )}
         </SectionActions>
       </Section>
+      {counts.errors + counts.warnings > 0 && <IssuesSection run={run} counts={counts} />}
       <ChangeLog run={run} />
       <ConfirmDialog
         open={confirm}
@@ -94,7 +102,7 @@ export function ResultStep({ run }: { run: ImportRun }) {
         error={
           undo.error ? (
             <div className="space-y-2">
-              <ErrorMessage error={undo.error} />
+              <ErrorMessage error={undo.error} action={runReload.action(undo.error)} />
               {conflicts.length > 0 && (
                 <ul aria-label={t('result.conflicts')} className="max-h-48 space-y-1 overflow-y-auto text-sm">
                   {conflicts.map((c) => {
@@ -123,11 +131,15 @@ export function ResultStep({ run }: { run: ImportRun }) {
   )
 }
 
+const changeLogSection = 'log'
+
 function ChangeLog({ run }: { run: ImportRun }) {
   const { t } = useTranslation('imports')
-  const [params, setParams] = useSearchParams()
-  const offset = Math.max(0, Math.floor(Number(params.get('offset'))) || 0)
+  const { params, setFilters } = useFilters()
+  const offset = offsetOf(params, 'offset')
   const changes = useListImportChanges(run.id, { limit: pageSize, offset }, { query: { placeholderData: keepPreviousData } })
+  useClampOffset(changes.data?.total, offset, 'offset', setFilters)
+  useScrollToHash((id) => id === changeLogSection, !changes.isPending && !changes.isPlaceholderData)
   const targets = useListImportTargets(undefined, { query: { staleTime: 60_000 } })
   const types = useListProductTypes({ includeInactive: true })
   const categories = useListCategories({ includeInactive: true })
@@ -142,7 +154,7 @@ function ChangeLog({ run }: { run: ImportRun }) {
   }
 
   return (
-    <Section title={t('changes.title')} description={t('changes.description', { count: changes.data?.total ?? 0 })}>
+    <Section id={changeLogSection} title={t('changes.title')} description={t('changes.description', { count: changes.data?.total ?? 0 })}>
       {changes.isPending ? (
         <Loading />
       ) : changes.isError ? (
@@ -182,7 +194,7 @@ function ChangeLog({ run }: { run: ImportRun }) {
             offset={offset}
             limit={pageSize}
             total={changes.data.total}
-            onChange={(o) => setParams(o > 0 ? { offset: String(o) } : {}, { replace: true })}
+            onChange={(o) => setFilters({ offset: String(o) }, { reset: '', section: changeLogSection })}
           />
         </>
       )}

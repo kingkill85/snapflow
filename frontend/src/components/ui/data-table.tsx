@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/cn'
 
@@ -40,6 +40,8 @@ type DataTableProps<T> = {
  * table semantics from elements whose display changes (D117).
  */
 export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat }: DataTableProps<T>) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const cue = useScrollCue(scroller, rows.length > 0)
   if (rows.length === 0) return <>{empty}</>
   const hasMedia = columns.some((c) => c.mobile === 'media')
   const titleIndex = Math.max(
@@ -59,66 +61,92 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
     return 'max-md:col-span-2 max-md:grid max-md:grid-cols-[minmax(6rem,2fr)_minmax(0,3fr)] max-md:items-baseline max-md:gap-3 max-md:text-left'
   }
   return (
-    <div
-      className={cn(
-        'relative overflow-x-auto max-md:overflow-visible',
-        !flat && 'rounded-control border border-line bg-surface max-md:border-0 max-md:bg-transparent',
-      )}
-    >
-      <table role="table" aria-label={label} className="w-full text-sm max-md:block">
-        <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs')}>
-          <tr role="row">
-            {columns.map((c) => (
-              <th key={c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
-                {c.header}
-              </th>
-            ))}
-            {actions && <th role="columnheader" scope="col" className="w-px" />}
-          </tr>
-        </thead>
-        <tbody role="rowgroup" className={cn('max-md:block', flat ? 'max-md:space-y-2' : 'max-md:space-y-3')}>
-          {rows.map((row) => (
-            <tr
-              key={rowKey(row)}
-              role="row"
-              className={cn(
-                'border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3',
-                flat
-                  ? 'max-md:gap-y-1 max-md:pb-2 max-md:last:pb-0'
-                  : 'max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border',
-              )}
-            >
-              {columns.map((c, i) => {
-                const line = c.mobile !== 'media' && i !== titleIndex
-                const block = c.mobile === 'block'
-                return (
-                  <td
-                    key={c.header}
-                    role="cell"
-                    // On a phone a line's label is the header, as CSS content with empty alternative text
-                    // (index.css): not part of the cell's text, not read twice by screen readers.
-                    data-label={line ? c.header : undefined}
-                    data-mobile={block ? 'block' : undefined}
-                    className={cn(
-                      'px-3 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
-                      flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
-                      c.className,
-                      cellClass(c, i),
-                    )}
-                  >
-                    {line ? <div className="min-w-0 break-words md:contents">{c.cell(row)}</div> : c.cell(row)}
-                  </td>
-                )
-              })}
-              {actions && (
-                <td role="cell" className="py-2 pr-4 pl-3 max-md:col-span-2 max-md:border-t max-md:border-line max-md:p-0 max-md:pt-3">
-                  <div className="flex justify-end gap-2 max-md:flex-wrap max-md:justify-start">{actions(row)}</div>
-                </td>
-              )}
+    <div className={cn('relative', !flat && 'rounded-control border border-line bg-surface max-md:border-0 max-md:bg-transparent')}>
+      <div ref={scroller} className="overflow-x-auto max-md:overflow-visible">
+        <table role="table" aria-label={label} className="w-full text-sm max-md:block">
+          <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs')}>
+            <tr role="row">
+              {columns.map((c) => (
+                <th key={c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
+                  {c.header}
+                </th>
+              ))}
+              {actions && <th role="columnheader" scope="col" className="w-px" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody role="rowgroup" className={cn('max-md:block', flat ? 'max-md:space-y-2' : 'max-md:space-y-3')}>
+            {rows.map((row) => (
+              <tr
+                key={rowKey(row)}
+                role="row"
+                className={cn(
+                  'border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3',
+                  flat
+                    ? 'max-md:gap-y-1 max-md:pb-2 max-md:last:pb-0'
+                    : 'max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border',
+                )}
+              >
+                {columns.map((c, i) => {
+                  const line = c.mobile !== 'media' && i !== titleIndex
+                  const block = c.mobile === 'block'
+                  return (
+                    <td
+                      key={c.header}
+                      role="cell"
+                      // On a phone a line's label is the header, as CSS content with empty alternative text
+                      // (index.css): not part of the cell's text, not read twice by screen readers.
+                      data-label={line ? c.header : undefined}
+                      data-mobile={block ? 'block' : undefined}
+                      className={cn(
+                        'px-3 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
+                        flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
+                        c.className,
+                        cellClass(c, i),
+                      )}
+                    >
+                      {line ? <div className="min-w-0 break-words md:contents">{c.cell(row)}</div> : c.cell(row)}
+                    </td>
+                  )
+                })}
+                {actions && (
+                  <td role="cell" className="py-2 pr-4 pl-3 max-md:col-span-2 max-md:border-t max-md:border-line max-md:p-0 max-md:pt-3">
+                    <div className="flex justify-end gap-2 max-md:flex-wrap max-md:justify-start">{actions(row)}</div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* A table wider than its box fades out at the edge it scrolls to (not on phones: cards there). */}
+      {cue.left && <div aria-hidden="true" data-scroll-cue="left" className={cn(fade, 'left-0 rounded-l-control bg-linear-to-r')} />}
+      {cue.right && <div aria-hidden="true" data-scroll-cue="right" className={cn(fade, 'right-0 rounded-r-control bg-linear-to-l')} />}
     </div>
   )
+}
+
+const fade = 'pointer-events-none absolute inset-y-0 w-10 from-surface to-transparent max-md:hidden'
+
+/** Whether the box can scroll further left or right, kept up to date while it scrolls or resizes. */
+function useScrollCue(ref: RefObject<HTMLDivElement | null>, active: boolean) {
+  const [cue, setCue] = useState({ left: false, right: false })
+  useEffect(() => {
+    const box = ref.current
+    if (!active || !box) return
+    const update = () => {
+      const max = box.scrollWidth - box.clientWidth
+      const next = { left: box.scrollLeft > 1, right: box.scrollLeft < max - 1 }
+      setCue((c) => (c.left === next.left && c.right === next.right ? c : next))
+    }
+    update()
+    box.addEventListener('scroll', update, { passive: true })
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+    observer?.observe(box)
+    if (box.firstElementChild) observer?.observe(box.firstElementChild)
+    return () => {
+      box.removeEventListener('scroll', update)
+      observer?.disconnect()
+    }
+  }, [ref, active])
+  return cue
 }

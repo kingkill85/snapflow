@@ -95,6 +95,10 @@ export function FileDrop({ label, file, onSelect, accept, required, hint, error,
         <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-full bg-canvas text-muted [&_svg]:size-6">
           <FileSpreadsheet />
         </span>
+        {/* Announced when a file is chosen or dropped (the zone's text changes silently otherwise). */}
+        <p aria-live="polite" className="sr-only">
+          {file ? t('upload.chosen', { name: file.name }) : ''}
+        </p>
         {file ? (
           <p className="max-w-full text-sm break-all">
             <span className="font-medium">{file.name}</span> <span className="text-muted tabular-nums">({size(file.size)})</span>
@@ -126,6 +130,8 @@ export function FileDrop({ label, file, onSelect, accept, required, hint, error,
               size="sm"
               variant="secondary"
               onClick={() => input.current?.click()}
+              // The button names its field: "Choose file (File to import)".
+              aria-label={t('upload.chooseFor', { action: file ? t('upload.replace') : t('upload.choose'), label })}
               aria-invalid={error ? true : undefined}
               aria-describedby={message ? messageId : undefined}
             >

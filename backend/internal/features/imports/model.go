@@ -150,6 +150,7 @@ type ImportRunActions struct {
 	Preview bool `json:"preview" doc:"Preview (again) with a profile or mapping"`
 	Apply   bool `json:"apply"`
 	Undo    bool `json:"undo"`
+	Delete  bool `json:"delete" doc:"Delete the run (not while applied: undo it first)"`
 }
 
 // ImportRunError is why an apply failed: an error code with params, at a row.

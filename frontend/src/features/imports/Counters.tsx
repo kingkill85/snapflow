@@ -14,7 +14,16 @@ function Card({ title, lines }: { title: string; lines: Line[] }) {
       <dl className="space-y-1 text-sm">
         {lines.map((l) => (
           <div key={l.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted">{l.to && l.value > 0 ? <TextLink to={l.to}>{l.label}</TextLink> : l.label}</dt>
+            <dt className="text-muted">
+              {l.to && l.value > 0 ? (
+                // Named with its card: "Unchanged" alone is in two cards.
+                <TextLink to={l.to} aria-label={`${title}: ${l.label}`}>
+                  {l.label}
+                </TextLink>
+              ) : (
+                l.label
+              )}
+            </dt>
             <dd
               className={cn(
                 'font-medium tabular-nums',
@@ -34,9 +43,9 @@ function Card({ title, lines }: { title: string; lines: Line[] }) {
 
 type CountersProps = {
   counts: ImportCounts
-  /** Links of the counters to the diff filtered by them (preview only): the query string for entity and status. */
+  /** Links of the counters to the diff filtered by them (preview only), by entity and status ("skipped": rows with errors). */
   filterHref?: (entity: string, status: string) => string
-  /** Links to the issues of a severity (preview only). */
+  /** Links to the issues of a severity. */
   issuesHref?: (severity: string) => string
   /** After the apply the counters say what was written, not what will be. */
   applied?: boolean
@@ -69,7 +78,8 @@ export function Counters({ counts, filterHref, issuesHref, applied, extra }: Cou
             { label: t('counts.addonsChanged'), value: counts.addons.changed },
             { label: t('counts.unchanged'), value: counts.addons.unchanged },
             { label: t('counts.addonsRemoved'), value: counts.addons.removed, tone: 'warning' },
-            { label: t('counts.addonsUnresolved'), value: counts.addons.unresolved, tone: 'warning' },
+            // Unresolved references are warnings (import.addon_not_found): the only filter the API has for them.
+            { label: t('counts.addonsUnresolved'), value: counts.addons.unresolved, tone: 'warning', to: issuesHref?.('warning') },
           ]}
         />
         <Card

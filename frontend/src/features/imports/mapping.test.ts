@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/api/client'
 
-import { customAttribute, formFromMapping, fromColumn, fromConstant, mappingError, mappingFromForm, sameMapping } from './mapping'
+import { customAttribute, formFromMapping, fromColumn, fromConstant, mappingError, mappingFromForm, profileFieldMap, sameMapping } from './mapping'
 
 const columns = [
   { letter: 'A', header: 'Model  number' },
@@ -103,5 +103,54 @@ describe('mapping form', () => {
       'body.mapping.categoryId',
       'body.mapping.fields',
     ])
+  })
+})
+
+describe('add-on order and profile errors', () => {
+  const file = [
+    { letter: 'A', header: 'Model' },
+    { letter: 'B', header: 'Addon 1' },
+    { letter: 'C', header: 'Addon 2' },
+    { letter: 'D', header: 'Optional' },
+  ]
+  // Add-ons out of the file's column order, a column the file lacks between them.
+  const profile = {
+    sourceKind: 'xlsx' as const,
+    headerRow: 1,
+    dataStartRow: 2,
+    productTypeId: 'pt',
+    categoryId: 'cat',
+    fields: [
+      { target: 'addon.optional', column: 'Optional', columnLetter: 'D' },
+      { target: 'addon.required', column: 'Addon 2', columnLetter: 'C' },
+      { target: 'addon.required', column: 'Gone', columnLetter: 'X' },
+      { target: 'addon.required', column: 'Addon 1', columnLetter: 'B' },
+      { target: 'product.modelNumber', column: 'Model', columnLetter: 'A' },
+    ],
+  }
+
+  it("keeps a loaded mapping's add-on order, so the form still equals it; new add-ons go last", () => {
+    const form = formFromMapping(profile, file)
+    expect(form.order).toEqual({ D: 0, C: 1, B: 3 })
+    expect(form.extras).toEqual([{ target: 'addon.required', column: 'Gone', columnLetter: 'X', order: 2 }])
+    const built = mappingFromForm(form, file, 'xlsx')
+    expect(built.mapping.fields.filter((f) => f.target.startsWith('addon.')).map((f) => f.column)).toEqual(['Optional', 'Addon 2', 'Gone', 'Addon 1'])
+    expect(sameMapping(profile, built.mapping)).toBe(true)
+
+    // The model number's column becomes an add-on too: after the loaded ones.
+    const more = mappingFromForm({ ...form, targets: { ...form.targets, A: 'addon.optional' } }, file, 'xlsx')
+    expect(more.mapping.fields.map((f) => f.column)).toEqual(['Optional', 'Addon 2', 'Gone', 'Addon 1', 'Model'])
+  })
+
+  it("maps a profile's errors by its own field index to where the form shows that field", () => {
+    const form = formFromMapping(profile, file)
+    const fields = profileFieldMap(profile, mappingFromForm(form, file, 'xlsx'))
+    expect(fields['mapping.fields[0].column']).toBe('targets.D')
+    expect(fields['mapping.fields[1].column']).toBe('targets.C')
+    expect(fields['mapping.fields[2].column']).toBe('extras.0.target')
+    expect(fields['mapping.fields[3]']).toBe('targets.B')
+    expect(fields['mapping.fields[4].target']).toBe('targets.A')
+    expect(fields['mapping.headerRow']).toBe('headerRow')
+    expect(fields['mapping.fields[5]']).toBeUndefined()
   })
 })

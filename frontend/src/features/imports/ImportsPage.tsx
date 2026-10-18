@@ -1,15 +1,16 @@
 import { keepPreviousData } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
-import { useEffect } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router'
 
 import { useListImports } from '@/api/generated/imports/imports'
 import type { ImportCounts, ImportRun } from '@/api/generated/model'
-import { Badge, Button, type Column, DataTable, EmptyState, ErrorMessage, lastPageOffset, Loading, Page, Pagination, TextLink } from '@/components/ui'
+import { Badge, Button, type Column, DataTable, EmptyState, ErrorMessage, lastPageOffset, Loading, Page, Pagination, RowAction, TextLink } from '@/components/ui'
 
 import { RunStateBadge } from './values'
 import { newPath, pageSize, runPath, useFormatDateTime } from './paths'
+import { DeleteRunDialog } from './DeleteRunDialog'
 
 /** "Products: 3 new, 2 changed, 1 to deactivate" and the same for variants, or nothing without changes. */
 function useCountsSummary() {
@@ -33,7 +34,9 @@ function useCountsSummary() {
 /** catalog/imports: every import run, newest first. */
 export function ImportsPage() {
   const { t } = useTranslation('imports')
+  const { t: tCommon } = useTranslation()
   const formatDate = useFormatDateTime()
+  const [deleting, setDeleting] = useState<ImportRun | null>(null)
   const summary = useCountsSummary()
   const [params, setParams] = useSearchParams()
   const offset = Math.max(0, Math.floor(Number(params.get('offset'))) || 0)
@@ -106,10 +109,20 @@ export function ImportsPage() {
         <ErrorMessage error={list.error} />
       ) : (
         <>
-          <DataTable rows={list.data.items} rowKey={(r) => r.id} columns={columns} empty={<EmptyState title={t('empty')} action={newButton} />} />
+          <DataTable
+            rows={list.data.items}
+            rowKey={(r) => r.id}
+            columns={columns}
+            // Applied runs are undone before they can be deleted (D150).
+            actions={(r) =>
+              r.can.delete && <RowAction variant="danger-quiet" icon={<Trash2 />} label={tCommon('action.delete')} onClick={() => setDeleting(r)} />
+            }
+            empty={<EmptyState title={t('empty')} action={newButton} />}
+          />
           <Pagination offset={offset} limit={pageSize} total={list.data.total} onChange={setOffset} />
         </>
       )}
+      <DeleteRunDialog run={deleting} onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />
     </Page>
   )
 }

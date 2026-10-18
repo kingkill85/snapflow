@@ -13,6 +13,9 @@ import { NewImportPage } from './NewImportPage'
 import {
   applied,
   changes,
+  previewHandler,
+  previewLists,
+  runHandlers,
   counts,
   gateways,
   id,
@@ -24,8 +27,6 @@ import {
   productItem,
   profile,
   run,
-  source,
-  variantItem,
   zigbee,
 } from './test-fixtures'
 
@@ -42,50 +43,6 @@ const routes = [
   { path: '/catalog/imports/:id', element: <ImportRunPage /> },
 ]
 const runRoute = `/catalog/imports/${id(1)}`
-
-/** Serves the run (as `current()` says) and its source preview; records source queries. */
-function runHandlers(current: () => ImportRun) {
-  const sourceQueries: URLSearchParams[] = []
-  server.use(
-    http.get(`/api/imports/${id(1)}`, () => HttpResponse.json(current())),
-    http.get(`/api/imports/${id(1)}/source`, ({ request }) => {
-      const q = new URL(request.url).searchParams
-      sourceQueries.push(q)
-      const headerRow = Number(q.get('headerRow'))
-      return HttpResponse.json({ ...source, headerRow })
-    }),
-  )
-  return { sourceQueries }
-}
-
-/** Records preview requests and answers with `answer`. */
-function previewHandler(answer: (body: { mapping?: ImportMapping; profileId?: string }) => Response | Promise<Response>) {
-  const bodies: { mapping?: ImportMapping; profileId?: string }[] = []
-  server.use(
-    http.post(`/api/imports/${id(1)}/preview`, async ({ request }) => {
-      const body = (await request.json()) as { mapping?: ImportMapping; profileId?: string }
-      bodies.push(body)
-      return answer(body)
-    }),
-  )
-  return bodies
-}
-
-function previewLists(items = [productItem, variantItem], issues = [issue], total?: number) {
-  const itemQueries: URLSearchParams[] = []
-  const issueQueries: URLSearchParams[] = []
-  server.use(
-    http.get(`/api/imports/${id(1)}/items`, ({ request }) => {
-      itemQueries.push(new URL(request.url).searchParams)
-      return HttpResponse.json({ items, total: total ?? items.length })
-    }),
-    http.get(`/api/imports/${id(1)}/issues`, ({ request }) => {
-      issueQueries.push(new URL(request.url).searchParams)
-      return HttpResponse.json({ items: issues, total: issues.length })
-    }),
-  )
-  return { itemQueries, issueQueries }
-}
 
 const targetSelect = (column: string) => screen.getByRole('combobox', { name: `Imported as: ${column}` })
 
@@ -132,8 +89,9 @@ describe('ImportRunPage: mapping', () => {
     await chooseOption(user, screen.getByRole('combobox', { name: 'Product type' }), 'Zigbee')
 
     await user.click(screen.getByRole('button', { name: 'Add fixed value' }))
-    await chooseOption(user, screen.getByRole('combobox', { name: 'Field of fixed value 1' }), 'Width (width_te)')
-    await user.type(screen.getByRole('textbox', { name: 'Value of fixed value 1' }), '4')
+    const constant = screen.getByRole('group', { name: 'Fixed value 1' })
+    await chooseOption(user, within(constant).getByRole('combobox', { name: 'Field' }), 'Width (width_te)')
+    await user.type(within(constant).getByRole('textbox', { name: 'Value' }), '4')
     await user.click(screen.getByLabelText('Pictures from any column'))
     await user.click(screen.getByLabelText('All or nothing'))
 
@@ -212,9 +170,14 @@ describe('ImportRunPage: mapping', () => {
       }),
       http.put(`/api/import-profiles/${id(302)}`, async ({ request }) => {
         updates++
-        const body = (await request.json()) as { expectedUpdatedAt: string }
-        expect(body.expectedUpdatedAt).toBe('2026-10-18T13:00:00Z')
-        if (updates === 1) return HttpResponse.json(profile({ id: id(302), name: 'Mine', updatedAt: '2026-10-18T14:00:00Z' }))
+        const body = (await request.json()) as { expectedUpdatedAt: string; mapping: ImportMapping }
+        // Each update sends the version it read: the created one, then the updated one.
+        expect(body.expectedUpdatedAt).toBe(updates === 1 ? '2026-10-18T13:00:00Z' : '2026-10-18T14:00:00Z')
+        if (updates === 1) {
+          const p = profile({ id: id(302), name: 'Mine', mapping: body.mapping, updatedAt: '2026-10-18T14:00:00Z' })
+          profiles = [profiles[0], p]
+          return HttpResponse.json(p)
+        }
         return problem(409, { code: 'import_profile.stale' })
       }),
     )
@@ -235,16 +198,25 @@ describe('ImportRunPage: mapping', () => {
     expect(previews).toEqual([])
     expect(created?.mapping.fields).toEqual([{ target: 'product.modelNumber', column: 'Model Number', columnLetter: 'A' }])
     expect(screen.getByRole('combobox', { name: 'Profile' })).toHaveTextContent('Mine')
+    // The form is the profile: nothing to update.
+    expect(screen.queryByText(/The mapping differs from the profile/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Update profile' })).not.toBeInTheDocument()
 
+    // A change: the hint offers to update the profile.
+    await chooseOption(user, targetSelect('Name'), 'Product name (English)')
+    expect(screen.getByText('The mapping differs from the profile "Mine". The preview uses the mapping as shown here.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Update profile' }))
     expect(await screen.findByText('Profile saved.')).toBeInTheDocument()
-    // The second update finds the profile changed since: Reload loads it as it is now.
-    server.use(
-      http.put(`/api/import-profiles/${id(302)}`, () => problem(409, { code: 'import_profile.stale' })),
-    )
+    expect(screen.queryByText(/The mapping differs/)).not.toBeInTheDocument()
+
+    // The next update finds the profile changed since: Reload loads it as it is now, replacing the form.
+    await chooseOption(user, targetSelect('Price'), 'Price (USD)')
     await user.click(screen.getByRole('button', { name: 'Update profile' }))
     expect(await screen.findByText(/Someone else changed this profile/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reload profile' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reload profile' }))
+    await waitFor(() => expect(targetSelect('Price')).toHaveTextContent('Not imported'))
+    expect(targetSelect('Name')).toHaveTextContent('Product name (English)')
+    expect(screen.queryByText(/Someone else changed this profile/)).not.toBeInTheDocument()
   })
 
   it('loads a saved profile into the form, its columns matched by header', async () => {
@@ -340,7 +312,7 @@ describe('ImportRunPage: preview', () => {
     expect(itemQueries.at(-1)?.get('offset')).toBe('50')
 
     // A counter filters the changes.
-    await user.click(screen.getByRole('link', { name: 'To deactivate' }))
+    await user.click(screen.getByRole('link', { name: 'Products: To deactivate' }))
     await waitFor(() => expect(Object.fromEntries(itemQueries.at(-1)!)).toMatchObject({ entity: 'product', status: 'deactivate', offset: '0' }))
   })
 
@@ -411,7 +383,7 @@ describe('ImportRunPage: result', () => {
         return HttpResponse.json({ items: changes, total: 642 })
       }),
       http.post(`/api/imports/${id(1)}/undo`, () => {
-        state = applied({ state: 'undone', undoneAt: '2026-10-18T15:00:00Z', can: { preview: false, apply: false, undo: false } })
+        state = applied({ state: 'undone', undoneAt: '2026-10-18T15:00:00Z', can: { preview: false, apply: false, undo: false, delete: true } })
         return HttpResponse.json(state)
       }),
     )

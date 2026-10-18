@@ -5,14 +5,16 @@ type SectionProps = {
   description?: string
   /** Buttons in the section's header, e.g. "Add variant". */
   actions?: ReactNode
+  /** For links to the section (the URL's hash). */
+  id?: string
   children: ReactNode
 }
 
 /** A titled card that groups related content on a page, e.g. one form. */
-export function Section({ title, description, actions, children }: SectionProps) {
+export function Section({ title, description, actions, id, children }: SectionProps) {
   const titleId = useId()
   return (
-    <section aria-labelledby={titleId} className="space-y-4 rounded-control border border-line bg-surface p-6">
+    <section id={id} aria-labelledby={titleId} className="scroll-mt-4 space-y-4 rounded-control border border-line bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h2 id={titleId} className="text-base font-semibold">

@@ -70,7 +70,8 @@
     "done": "done"
   },
   "run": {
-    "meta": "Uploaded by {{user}} on {{date}} · {{size}}"
+    "meta": "Uploaded by {{user}} on {{date}} · {{size}}",
+    "download": "Download file"
   },
   "upload": {
     "title": "File",
@@ -147,15 +148,28 @@
     "addConstant": "Add fixed value",
     "noConstants": "No fixed values.",
     "chooseTarget": "Choose a field",
-    "constantTarget": "Field of fixed value {{n}}",
-    "constantValue": "Value of fixed value {{n}}",
     "constantValueHint": "Value",
     "extrasTitle": "Further mappings",
     "extrasDescription": "Mappings of the profile that fit no column of this file shown above: a column this file lacks, or a second field from the same column.",
     "letter": "(column {{letter}})",
     "optionsTitle": "Options",
     "preview": "Preview",
-    "previewing": "Reading the file…"
+    "previewing": "Reading the file…",
+    "constantN": "Fixed value {{n}}",
+    "constantField": "Field",
+    "constantValueLabel": "Value",
+    "chooseSheet": "Choose a sheet",
+    "noSheet": "Choose one of the file's sheets to see its columns.",
+    "showRows_one": "Show the first row",
+    "showRows_other": "Show the first {{count}} rows",
+    "hideRows": "Hide the rows",
+    "previewingRows_one": "Comparing {{count}} data row with the catalog …",
+    "previewingRows_other": "Comparing {{count}} data rows with the catalog. Large files take a moment.",
+    "previewingHint": "Comparing the rows with the catalog. Large files take a moment.",
+    "profileDiffers": "The mapping differs from the profile \"{{name}}\". The preview uses the mapping as shown here.",
+    "replaceTitle": "Load profile",
+    "replaceMessage": "Load the profile \"{{name}}\"? It replaces the changes you made to the mapping.",
+    "replaceConfirm": "Load profile"
   },
   "targetGroup": {
     "product": "Product",
@@ -241,7 +255,7 @@
   },
   "preview": {
     "title": "Preview",
-    "description": "What the import of {{rows}} rows changes. Nothing has been written yet.",
+    "description": "Previewed on {{date}}: what the import of {{rows}} rows changes. Nothing has been written yet.",
     "editMapping": "Edit mapping",
     "applyTitle": "Apply",
     "applyDescription": "Writes exactly the changes above in one step. You can undo the import afterwards.",
@@ -251,7 +265,8 @@
     "skipping_other": "{{count}} rows with errors are skipped.",
     "apply": "Apply import",
     "applying": "Applying…",
-    "again": "Preview again"
+    "again": "Preview again",
+    "blockedShort": "Rows have errors: with \"All or nothing\" nothing can be applied."
   },
   "items": {
     "title": "Changes",
@@ -259,7 +274,7 @@
     "entity": "Kind",
     "allEntities": "All kinds",
     "status": "Change",
-    "allStatuses": "All changes",
+    "allStatuses": "All, also unchanged",
     "onlySkipped": "Only rows with errors",
     "empty": "Nothing matches these filters.",
     "skipped": "Row errors: skipped",
@@ -269,11 +284,22 @@
     "field": "Field",
     "before": "Before",
     "after": "After",
-    "value": "Value"
+    "value": "Value",
+    "search": "Search",
+    "searchHint": "Model number, SKU, name or row",
+    "changedOnly": "Changes only",
+    "rowShown": "Only row {{row}} is shown.",
+    "allRows": "Show all rows",
+    "noChanges": "Nothing changes: every item of the file is as in the catalog.",
+    "showAll": "Show unchanged items"
   },
   "issues": {
     "title": "Errors and warnings",
-    "description": "{{errors}} errors, {{warnings}} warnings. Rows with errors are not imported; warnings do not stop a row.",
+    "description": "{{errors}}, {{warnings}}. Rows with errors are not imported; warnings do not stop a row.",
+    "errors_one": "{{count}} error",
+    "errors_other": "{{count}} errors",
+    "warnings_one": "{{count}} warning",
+    "warnings_other": "{{count}} warnings",
     "none": "The file has no errors or warnings.",
     "filter": "Show",
     "all": "Errors and warnings",
@@ -289,7 +315,8 @@
     "row": "Row",
     "column": "Column",
     "target": "Imported as",
-    "modelNumber": "Model number"
+    "modelNumber": "Model number",
+    "showRow": "Changes of row {{row}}"
   },
   "failed": {
     "title": "The import failed and was rolled back: nothing was changed.",
@@ -318,5 +345,10 @@
   "languageName": {
     "en": "English",
     "de": "German"
+  },
+  "delete": {
+    "title": "Delete import",
+    "message": "Delete the import of \"{{name}}\"? Its preview, errors and change log are deleted; the catalog does not change.",
+    "applied": "This import is applied: undo it first, then delete it."
   }
 }

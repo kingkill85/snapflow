@@ -10,7 +10,7 @@ import type { ImportRun } from '@/api/generated/model'
 import { Button, ErrorMessage, FileDrop, FormActions, Page, Section, SelectField, useErrorMessage } from '@/components/ui'
 
 import { StepIndicator } from './StepIndicator'
-import { checkImportFile, listPath, maxFileMb, runPath, type RunState } from './paths'
+import { checkImportFile, listPath, maxFileMb, profileParam, runPath } from './paths'
 
 /** Uploads an import file (POST /api/imports) with progress, through the shared API client (as images, D69). */
 function uploadImportFile(file: File, onProgress: (fraction: number) => void, signal: AbortSignal) {
@@ -65,9 +65,8 @@ export function NewImportPage() {
       const run = await uploadImportFile(file, setProgress, controller.signal)
       queryClient.setQueryData(getGetImportQueryKey(run.id), run)
       await queryClient.invalidateQueries({ queryKey: getListImportsQueryKey() })
-      // The run page previews with the profile at once, or shows the mapping.
-      const state: RunState = profileId ? { profileId } : {}
-      void navigate(runPath(run.id), { state })
+      // The run page previews with the profile at once (it stays in the URL until then), or shows the mapping.
+      void navigate({ pathname: runPath(run.id), search: profileId ? `?${new URLSearchParams({ [profileParam]: profileId })}` : '' })
     } catch (e) {
       if (!controller.signal.aborted) {
         if (e instanceof ApiError && ['import.file_type', 'import.too_large', 'import.unreadable', 'import.too_many_rows', 'import.too_many_columns', 'import.too_many_images', 'import.images_too_large'].includes(e.code)) setFileError(e)

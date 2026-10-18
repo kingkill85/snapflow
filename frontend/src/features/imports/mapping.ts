@@ -16,7 +16,13 @@ export const customAttribute = '@attribute'
 
 export type ConstantRow = { target: string; value: string }
 /** A mapping that is not one column's target: a column this file lacks, or a second target of a column. */
-export type ExtraRow = { target: string; column: string; columnLetter: string }
+export type ExtraRow = { target: string; column: string; columnLetter: string; order?: number }
+
+/**
+ * Targets that repeat (the add-ons): their order in the field list is the
+ * order of the variant's add-on list, so the form keeps it (D120).
+ */
+export const isRepeatable = (target: string) => target.startsWith('addon.')
 
 export type MappingForm = {
   sheet: string
@@ -35,6 +41,12 @@ export type MappingForm = {
   targets: Record<string, string>
   /** Attribute keys typed for columns whose target is customAttribute. */
   customKeys: Record<string, string>
+  /**
+   * The position a repeatable target (add-on) of a column had in the loaded
+   * mapping, per column letter: such fields are sent in this order, ones
+   * chosen since after them in column order.
+   */
+  order: Record<string, number>
   constants: ConstantRow[]
   extras: ExtraRow[]
   /** Errors of the whole field list (e.g. "map the model number"). */
@@ -54,6 +66,7 @@ export const emptyForm = (): MappingForm => ({
   imageAnyColumn: false,
   targets: {},
   customKeys: {},
+  order: {},
   constants: [],
   extras: [],
 })
@@ -81,35 +94,37 @@ export function formFromMapping(mapping: ImportMapping, columns: ImportSourceCol
   form.allOrNothing = mapping.allOrNothing ?? true
   if (mapping.productTypeId) form.productType = mapping.productTypeId
   if (mapping.categoryId) form.category = mapping.categoryId
-  for (const field of mapping.fields) {
+  mapping.fields.forEach((field, index) => {
     const hasValue = field.value !== undefined && field.value !== null
     if (field.target === 'product.productType' && hasValue) {
       form.productType = fromConstant
       form.productTypeValue = field.value ?? ''
-      continue
+      return
     }
     if (field.target === 'product.category' && hasValue) {
       form.category = fromConstant
       form.categoryValue = field.value ?? ''
-      continue
+      return
     }
     if (hasValue) {
       form.constants.push({ target: field.target, value: field.value ?? '' })
-      continue
+      return
     }
     if (field.target === 'variant.image' && !field.column && !field.columnLetter) {
       form.imageAnyColumn = true
-      continue
+      return
     }
     if (field.target === 'product.productType') form.productType = fromColumn
     if (field.target === 'product.category') form.category = fromColumn
     const column = findColumn(field, columns)
+    const repeatable = isRepeatable(field.target)
     if (column && !form.targets[column.letter]) {
       form.targets[column.letter] = field.target
+      if (repeatable) form.order[column.letter] = index
     } else {
-      form.extras.push({ target: field.target, column: field.column ?? '', columnLetter: field.columnLetter ?? '' })
+      form.extras.push({ target: field.target, column: field.column ?? '', columnLetter: field.columnLetter ?? '', ...(repeatable ? { order: index } : {}) })
     }
-  }
+  })
   return form
 }
 
@@ -138,18 +153,33 @@ export function mappingFromForm(form: MappingForm, columns: ImportSourceColumn[]
   // A header that appears twice would match its first column only: such columns go by letter.
   const counts = new Map<string, number>()
   for (const c of columns) if (c.header !== '') counts.set(headerKey(c.header), (counts.get(headerKey(c.header)) ?? 0) + 1)
-  for (const c of columns) {
+  // Add-ons go after the other columns, in the order of the loaded mapping (D120).
+  const repeated: { field: ImportField; at: string; order: number; position: number }[] = []
+  const unordered = Number.MAX_SAFE_INTEGER
+  columns.forEach((c, position) => {
     let target = form.targets[c.letter] ?? ''
-    if (target === '') continue
+    if (target === '') return
     if (target === customAttribute) target = `attribute.${(form.customKeys[c.letter] ?? '').trim()}`
     const unique = c.header !== '' && counts.get(headerKey(c.header)) === 1 && form.headerRow > 0
-    add({ target, ...(unique ? { column: c.header } : {}), columnLetter: c.letter }, `targets.${c.letter}`)
-  }
+    const field = { target, ...(unique ? { column: c.header } : {}), columnLetter: c.letter }
+    if (isRepeatable(target)) repeated.push({ field, at: `targets.${c.letter}`, order: form.order[c.letter] ?? unordered, position })
+    else add(field, `targets.${c.letter}`)
+  })
+  const extra = (row: ExtraRow): ImportField => ({
+    target: row.target,
+    ...(row.column ? { column: row.column } : {}),
+    ...(row.columnLetter ? { columnLetter: row.columnLetter } : {}),
+  })
+  form.extras.forEach((row, i) => {
+    if (isRepeatable(row.target)) repeated.push({ field: extra(row), at: `extras.${i}.target`, order: row.order ?? unordered, position: columns.length + i })
+  })
+  repeated.sort((a, b) => (a.order === b.order ? a.position - b.position : a.order < b.order ? -1 : 1))
+  for (const r of repeated) add(r.field, r.at)
   if (form.imageAnyColumn && !Object.values(form.targets).includes('variant.image')) add({ target: 'variant.image' }, 'imageAnyColumn')
   form.constants.forEach((row, i) => add({ target: row.target, value: row.value }, `constants.${i}.value`))
-  form.extras.forEach((row, i) =>
-    add({ target: row.target, ...(row.column ? { column: row.column } : {}), ...(row.columnLetter ? { columnLetter: row.columnLetter } : {}) }, `extras.${i}.target`),
-  )
+  form.extras.forEach((row, i) => {
+    if (!isRepeatable(row.target)) add(extra(row), `extras.${i}.target`)
+  })
 
   const isId = (v: string) => v !== '' && v !== fromColumn && v !== fromConstant
   const mapping: ImportMapping = {
@@ -181,6 +211,36 @@ export function mappingError(error: unknown): unknown {
     return { ...f, location }
   })
   return new ApiError({ status: error.status, code: error.code, params: error.params, fields })
+}
+
+/**
+ * Where the form shows the server's errors about a profile's fields: the
+ * server reports them by the profile's field index, which need not be the
+ * form's (another order, a column the file lacks). Each profile field is
+ * found among the form's by target and column header, letter or value.
+ */
+export function profileFieldMap(profile: ImportMapping, built: Built): ApiFieldMap {
+  const map: Record<string, string> = {}
+  for (const [location, at] of Object.entries(built.fields)) if (!location.startsWith('mapping.fields[')) map[location] = at
+  const used = new Set<number>()
+  const matches = (p: ImportField, f: ImportField) => {
+    if (p.target !== f.target) return false
+    if (p.value !== undefined && p.value !== null) return f.value === p.value
+    if (f.value !== undefined && f.value !== null) return false
+    if (p.column) return headerKey(f.column ?? '') === headerKey(p.column) || (!!p.columnLetter && f.columnLetter?.toUpperCase() === p.columnLetter.toUpperCase())
+    if (p.columnLetter) return f.columnLetter?.toUpperCase() === p.columnLetter.toUpperCase()
+    return !f.column && !f.columnLetter
+  }
+  profile.fields.forEach((p, i) => {
+    const j = built.mapping.fields.findIndex((f, j) => !used.has(j) && matches(p, f))
+    if (j < 0) return
+    used.add(j)
+    for (const suffix of ['', '.target', '.column', '.columnLetter', '.value']) {
+      const at = built.fields[`mapping.fields[${j}]${suffix}`]
+      if (at) map[`mapping.fields[${i}]${suffix}`] = at
+    }
+  })
+  return map
 }
 
 /** Two mappings are the same (e.g. the form still shows the loaded profile). */

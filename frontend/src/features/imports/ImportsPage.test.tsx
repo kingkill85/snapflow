@@ -54,6 +54,38 @@ describe('ImportsPage', () => {
     await waitFor(() => expect(queries.at(-1)?.get('offset')).toBe('50'))
   })
 
+  it('deletes a run after confirming; an applied one offers no delete, and one applied meanwhile says to undo it first', async () => {
+    let items = [applied({ id: id(3), fileName: 'b.xlsx' }), previewed({ id: id(2), fileName: 'a.csv' }), run({ id: id(1), fileName: 'c.csv' })]
+    const deleted: string[] = []
+    server.use(
+      http.get('/api/imports', () => HttpResponse.json({ items, total: items.length })),
+      http.delete('/api/imports/:id', ({ params }) => {
+        if (params.id === id(1)) return problem(409, { code: 'import.state', params: { state: 'applied' } })
+        deleted.push(String(params.id))
+        items = items.filter((r) => r.id !== params.id)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderRoutes(routes, { route: '/catalog/imports' })
+
+    const appliedRow = (await screen.findByRole('link', { name: 'b.xlsx' })).closest('tr')!
+    expect(within(appliedRow).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+
+    await user.click(within(screen.getByRole('link', { name: 'a.csv' }).closest('tr')!).getByRole('button', { name: 'Delete' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Delete import' })
+    expect(dialog).toHaveTextContent('Delete the import of "a.csv"?')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'a.csv' })).not.toBeInTheDocument())
+    expect(deleted).toEqual([id(2)])
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(within(screen.getByRole('link', { name: 'c.csv' }).closest('tr')!).getByRole('button', { name: 'Delete' }))
+    dialog = await screen.findByRole('dialog', { name: 'Delete import' })
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    expect(await within(dialog).findByText('This import is applied: undo it first, then delete it.')).toBeInTheDocument()
+  })
+
   it('offers a new import when there is none', async () => {
     server.use(http.get('/api/imports', () => HttpResponse.json({ items: [], total: 0 })))
     renderRoutes(routes, { route: '/catalog/imports' })
@@ -107,10 +139,34 @@ describe('NewImportPage', () => {
 
     expect(await screen.findByText('run page')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe(`/catalog/imports/${id(7)}`)
-    expect(router.state.location.state).toEqual({ profileId: profile().id })
+    // The profile stays in the URL until the run page's preview with it settled.
+    expect(router.state.location.search).toBe(`?profile=${profile().id}`)
     // The profile is not sent with the file: the run page previews, so a failing preview shows at the mapping.
     expect((body!.get('file') as File).name).toBe('supplier.xlsx')
     expect(body?.get('profileId')).toBeNull()
+  })
+
+  it('aborts a running upload when the page is left', async () => {
+    lookups()
+    let signal: AbortSignal | undefined
+    server.use(
+      http.get('/api/imports', () => HttpResponse.json({ items: [], total: 0 })),
+      http.post('/api/imports', ({ request }) => {
+        signal = request.signal
+        return new Promise<Response>(() => {})
+      }),
+    )
+    const user = userEvent.setup()
+    const { router } = renderRoutes(routes, { route: '/catalog/imports/new' })
+    await user.upload(await screen.findByLabelText('File to import'), xlsx())
+    await user.click(screen.getByRole('button', { name: 'Upload and map columns' }))
+    expect(await screen.findByRole('progressbar', { name: 'Uploading…' })).toBeInTheDocument()
+    await waitFor(() => expect(signal).toBeDefined())
+
+    await user.click(screen.getByRole('link', { name: 'Cancel' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/catalog/imports'))
+    await waitFor(() => expect(signal?.aborted).toBe(true))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows the server refusing the file at the file', async () => {

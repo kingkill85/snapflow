@@ -77,7 +77,7 @@ func TestStarterProfileImport(t *testing.T) {
 	}
 
 	applied := apply(t, api, run.ID.String(), nil)
-	if applied.State != imports.StateApplied || applied.AppliedAt == nil || applied.Applied == nil || applied.Can.Apply || !applied.Can.Undo {
+	if applied.State != imports.StateApplied || applied.AppliedAt == nil || applied.Applied == nil || applied.Can.Apply || !applied.Can.Undo || applied.Can.Delete {
 		t.Fatalf("applied %+v", applied)
 	}
 	if a := applied.Applied; a.Products.New != 4 || a.Variants.New != 6 || a.Categories.New != 4 || a.Addons.New != 3 || a.Images.New != 4 {
@@ -458,7 +458,7 @@ func TestUndo(t *testing.T) {
 		t.Fatal("second run not applied")
 	}
 	undone := undo(t, api, second.ID.String())
-	if undone.State != imports.StateUndone || undone.UndoneAt == nil || undone.Can.Undo || undone.Can.Apply {
+	if undone.State != imports.StateUndone || undone.UndoneAt == nil || undone.Can.Undo || undone.Can.Apply || !undone.Can.Delete {
 		t.Fatalf("undone %+v", undone)
 	}
 	after := catalog(t, api)

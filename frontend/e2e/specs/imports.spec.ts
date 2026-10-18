@@ -1,20 +1,32 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { type Locator, type Page } from '@playwright/test'
 
 import { type Api, chooseOption, expect, navigate, test, unique, uniqueKey } from '../fixtures'
+import { rewriteZip } from '../zip'
 
 // The catalog import (step 1d) through the UI: a SnapFlow 1 workbook with
 // the starter profile (pictures, add-ons, categories created), importing it
 // again changes nothing, undo; and a CSV mapped by hand and saved as a
-// profile. The workbook's model numbers (E2E-GW-1, E2E-DIM-2) and its
-// categories are used by this spec only; the CSV test uses unique ones.
+// profile. Every run imports its own model numbers and categories (the
+// workbook's "E2E" made unique), so reruns against the same server work.
 
 /** frontend/e2e/assets/import-v1.xlsx, made by importsrctest.TestE2EFixture (backend). */
-const workbook = fileURLToPath(new URL('../assets/import-v1.xlsx', import.meta.url))
+const workbookAsset = fileURLToPath(new URL('../assets/import-v1.xlsx', import.meta.url))
+
+/**
+ * A copy of the workbook whose model numbers, SKUs, names and categories
+ * start with a prefix of its own ("E2E" + a unique tag): its path and prefix.
+ */
+function uniqueWorkbook() {
+  const prefix = `E2E${uniqueKey('').replace(/_/g, '').toUpperCase()}`
+  const path = join(mkdtempSync(join(tmpdir(), 'snapflow-import-')), `import-${prefix.toLowerCase()}.xlsx`)
+  rewriteZip(workbookAsset, path, (name, data) => (name === 'xl/sharedStrings.xml' ? Buffer.from(data.toString('utf8').replaceAll('E2E', prefix)) : data))
+  return { path, prefix, fileName: basename(path) }
+}
 
 const region = (page: Page, name: string) => page.getByRole('region', { name, exact: true })
 /** A counter card's value, e.g. counter(page, 'Products', 'New'). */
@@ -71,6 +83,7 @@ test.describe.configure({ mode: 'serial' })
 
 test('a SnapFlow 1 workbook imports with the starter profile; importing it again changes nothing; undo removes it', async ({ page, api }) => {
   await ensureZigbee(api)
+  const { path: workbook, prefix: p, fileName } = uniqueWorkbook()
   await page.goto('/')
   await navigate(page, 'Catalog', 'Import')
   await expect(page.getByRole('heading', { name: 'Import', level: 1 })).toBeVisible()
@@ -83,20 +96,20 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
   await expect(counter(page, 'Images', 'Pictures in the file')).toHaveText('2')
   // The unknown add-on is a warning, not an error.
   await expect(
-    page.getByRole('table', { name: 'Errors and warnings' }).getByRole('row').filter({ hasText: 'The add-on "E2E-PSU-9" was found neither in the file nor in the catalog.' }),
+    page.getByRole('table', { name: 'Errors and warnings' }).getByRole('row').filter({ hasText: `The add-on "${p}-PSU-9" was found neither in the file nor in the catalog.` }),
   ).toContainText('Warning')
   const changes = region(page, 'Changes')
-  await expect(changes.getByText('E2E-GW-1 · White · SKU E2E-GW-1 White')).toBeVisible()
+  await expect(changes.getByText(`${p}-GW-1 · White · SKU ${p}-GW-1 White`)).toBeVisible()
   await expect(changes.getByRole('img', { name: 'Image' }).first()).toBeVisible()
 
   await applyImport(page)
   const firstRun = page.url()
-  await expect(region(page, 'Change log').getByRole('link', { name: 'E2E-DIM-2' }).first()).toBeVisible()
+  await expect(region(page, 'Change log').getByRole('link', { name: `${p}-DIM-2` }).first()).toBeVisible()
 
-  const gw = await productByModel(api, 'E2E-GW-1')
+  const gw = await productByModel(api, `${p}-GW-1`)
   expect(gw?.variants.map((v) => v.name.en).sort()).toEqual(['Black', 'White'])
   expect(gw?.variants.every((v) => v.imageFileId)).toBe(true)
-  const dim = await productByModel(api, 'E2E-DIM-2')
+  const dim = await productByModel(api, `${p}-DIM-2`)
   expect(dim?.variants[0].addons).toHaveLength(1)
 
   // The same file again: everything unchanged.
@@ -109,7 +122,7 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
 
   // The list shows both runs, newest first.
   await page.goto('/catalog/imports')
-  const rows = page.getByRole('row').filter({ hasText: 'import-v1.xlsx' })
+  const rows = page.getByRole('row').filter({ hasText: fileName })
   await expect(rows.first()).toContainText('Previewed')
   await expect(rows.nth(1)).toContainText('Applied')
 
@@ -119,8 +132,8 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
   const dialog = page.getByRole('dialog', { name: 'Undo import' })
   await dialog.getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByText(/The import was undone on/)).toBeVisible()
-  expect(await productByModel(api, 'E2E-GW-1')).toBeUndefined()
-  expect(await productByModel(api, 'E2E-DIM-2')).toBeUndefined()
+  expect(await productByModel(api, `${p}-GW-1`)).toBeUndefined()
+  expect(await productByModel(api, `${p}-DIM-2`)).toBeUndefined()
 })
 
 test('a CSV is mapped by hand, saved as a profile and imported into a fixed product type and category', async ({ page, api }) => {

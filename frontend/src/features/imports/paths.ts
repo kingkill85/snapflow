@@ -27,14 +27,12 @@ export function checkImportFile(file: File): ApiError | undefined {
 /** Rows per page of the runs, the diff, the issues and the change log. */
 export const pageSize = 50
 
-/** Navigation state of a new run: the profile chosen with the upload, previewed at once. */
-export type RunState = { profileId?: string }
-
-export const profileIdFrom = (state: unknown): string | undefined => {
-  if (typeof state !== 'object' || state === null) return undefined
-  const { profileId } = state as Record<string, unknown>
-  return typeof profileId === 'string' ? profileId : undefined
-}
+/**
+ * The search parameter of a new run's page with the profile chosen with the
+ * upload: the page loads it and previews with it at once, and removes it once
+ * that preview settled (D136).
+ */
+export const profileParam = 'profile'
 
 /** Everything a run's page shows below the run itself: its items, issues, changes and source. */
 export async function invalidateRunDetails(queryClient: QueryClient, id: string) {

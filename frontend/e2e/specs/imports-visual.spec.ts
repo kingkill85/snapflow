@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { type Page } from '@playwright/test'
 
 import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
@@ -15,11 +18,16 @@ const viewports = [
 
 type Run = { id: string; state: string }
 
-async function uploadCsv(api: Api, name: string, csv: string): Promise<Run> {
-  const res = await api.ctx.post('/api/imports', { multipart: { file: { name, mimeType: 'text/csv', buffer: Buffer.from(csv) } } })
+async function upload(api: Api, name: string, mimeType: string, buffer: Buffer): Promise<Run> {
+  const res = await api.ctx.post('/api/imports', { multipart: { file: { name, mimeType, buffer } } })
   expect(res.status(), await res.text()).toBe(201)
   return (await res.json()) as Run
 }
+
+const uploadCsv = (api: Api, name: string, csv: string) => upload(api, name, 'text/csv', Buffer.from(csv))
+
+/** frontend/e2e/assets/import-v1.xlsx (sheets "Items"; pictures). */
+const workbook = readFileSync(fileURLToPath(new URL('../assets/import-v1.xlsx', import.meta.url)))
 
 async function post(api: Api, path: string, data: object, status = 200): Promise<Run> {
   const res = await api.ctx.post(path, { data })
@@ -33,7 +41,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 test('every import step fits the screen in both themes and languages', { tag: '@visual' }, async ({ page, api }) => {
-  test.setTimeout(240_000)
+  test.setTimeout(480_000)
   const { ids } = await api.createKind(
     { name: { en: unique('Visual dimmers'), de: unique('Visuelle Dimmer') }, attributes: [{ key: 'width_te', label: { en: 'Width', de: 'Breite' }, type: 'integer', unit: 'TE', scope: 'product' }] },
     { name: { en: unique('Visual system') }, abbreviation: 'VIS', color: '#0f766e' },
@@ -81,6 +89,18 @@ test('every import step fits the screen in both themes and languages', { tag: '@
   await post(api, `/api/imports/${undone.id}/preview`, { mapping: goodMapping })
   await post(api, `/api/imports/${undone.id}/apply`, {})
   await post(api, `/api/imports/${undone.id}/undo`, {})
+  // A profile the next run was previewed with: its mapping step says when the form differs from it.
+  const profile = await post(api, '/api/import-profiles', { name: unique('Visual supplier'), mapping: goodMapping }, 201)
+  const profiled = await uploadCsv(api, 'supplier-profile.csv', csv)
+  await post(api, `/api/imports/${profiled.id}/preview`, { profileId: profile.id })
+  // A profile for a sheet the workbook lacks.
+  const otherSheet = await post(
+    api,
+    '/api/import-profiles',
+    { name: unique('Visual other sheet'), mapping: { ...goodMapping, sourceKind: 'xlsx', sheet: 'Price list 2025' } },
+    201,
+  )
+  const xlsx = await upload(api, 'supplier-workbook.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', workbook)
 
   const steps: { name: string; path: string; act?: (page: Page) => Promise<void> }[] = [
     { name: 'list', path: '/catalog/imports' },
@@ -95,6 +115,25 @@ test('every import step fits the screen in both themes and languages', { tag: '@
       },
     },
     { name: 'mapping-filled', path: `/catalog/imports/${previewed.id}?view=mapping` },
+    {
+      name: 'mapping-busy',
+      path: `/catalog/imports/${uploaded.id}`,
+      act: async (p) => {
+        // The preview never answers: the step shows that it runs.
+        await p.route('**/api/imports/*/preview', () => {})
+        await p.getByRole('button', { name: /^(Preview|Vorschau)$/ }).click()
+        await expect(p.getByText(/^(Reading the file…|Datei wird gelesen …)$/).first()).toBeVisible()
+      },
+    },
+    { name: 'mapping-sheet-missing', path: `/catalog/imports/${xlsx.id}?profile=${otherSheet.id}` },
+    {
+      name: 'mapping-profile-differs',
+      path: `/catalog/imports/${profiled.id}?view=mapping`,
+      act: async (p) => {
+        await p.getByLabel(/^(Create missing categories|Fehlende Kategorien anlegen)$/).check()
+        await expect(p.getByText(/(differs from the profile|weicht vom Profil)/)).toBeVisible()
+      },
+    },
     { name: 'preview', path: `/catalog/imports/${previewed.id}` },
     { name: 'result', path: `/catalog/imports/${applied.id}` },
     {
@@ -107,6 +146,14 @@ test('every import step fits the screen in both themes and languages', { tag: '@
       },
     },
     { name: 'undone', path: `/catalog/imports/${undone.id}` },
+    {
+      name: 'delete',
+      path: `/catalog/imports/${uploaded.id}`,
+      act: async (p) => {
+        await p.getByRole('button', { name: /^(Delete|Löschen)$/ }).click()
+        await expect(p.getByRole('dialog')).toBeVisible()
+      },
+    },
   ]
 
   for (const lang of ['en', 'de'] as const) {
@@ -116,13 +163,14 @@ test('every import step fits the screen in both themes and languages', { tag: '@
       for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme })
         for (const step of steps) {
+          await page.unrouteAll({ behavior: 'ignoreErrors' })
           await page.goto(step.path)
           await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
           await page.waitForLoadState('networkidle')
           await expect(page.getByRole('status').filter({ hasText: /^(Loading…|Wird geladen…)$/ })).toHaveCount(0)
           if (step.act) await step.act(page)
           await expectNoHorizontalOverflow(page)
-          await page.screenshot({ path: `e2e/screenshots/import-${step.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: step.name !== 'undo-conflict' })
+          await page.screenshot({ path: `e2e/screenshots/import-${step.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: step.name !== 'undo-conflict' && step.name !== 'delete' })
         }
       }
     }

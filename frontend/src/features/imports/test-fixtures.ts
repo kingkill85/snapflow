@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 
 import type {
   Category,
+  ImportMapping,
   ImportChange,
   ImportCounts,
   ImportIssue,
@@ -127,15 +128,15 @@ export const run = (over: Partial<ImportRun> = {}): ImportRun => ({
   userName: 'Ada Admin',
   allOrNothing: true,
   createdAt: at,
-  can: { preview: true, apply: false, undo: false },
+  can: { preview: true, apply: false, undo: false, delete: true },
   ...over,
 })
 
 export const previewed = (over: Partial<ImportRun> = {}) =>
-  run({ state: 'previewed', mapping, counts: counts(), previewedAt: at, can: { preview: true, apply: true, undo: false }, ...over })
+  run({ state: 'previewed', mapping, counts: counts(), previewedAt: at, can: { preview: true, apply: true, undo: false, delete: true }, ...over })
 
 export const applied = (over: Partial<ImportRun> = {}) =>
-  run({ state: 'applied', mapping, counts: counts(), applied: counts(), previewedAt: at, appliedAt: at, can: { preview: false, apply: false, undo: true }, ...over })
+  run({ state: 'applied', mapping, counts: counts(), applied: counts(), previewedAt: at, appliedAt: at, can: { preview: false, apply: false, undo: true, delete: false }, ...over })
 
 export const profile = (over: Partial<ImportProfile> = {}): ImportProfile => ({
   id: id(301),
@@ -220,4 +221,54 @@ export function lookups(profiles: ImportProfile[] = [profile()]) {
     http.get('/api/import-targets', () => HttpResponse.json(targets)),
     http.get('/api/import-profiles', () => HttpResponse.json(profiles)),
   )
+}
+
+/**
+ * Serves the run (as `current()` says) and its source preview (`answer` may
+ * answer a source query instead, e.g. for a sheet the file lacks); records
+ * source queries.
+ */
+export function runHandlers(current: () => ImportRun, answer?: (query: URLSearchParams) => Response | undefined) {
+  const sourceQueries: URLSearchParams[] = []
+  server.use(
+    http.get(`/api/imports/${id(1)}`, () => HttpResponse.json(current())),
+    http.get(`/api/imports/${id(1)}/source`, ({ request }) => {
+      const q = new URL(request.url).searchParams
+      sourceQueries.push(q)
+      const answered = answer?.(q)
+      if (answered) return answered
+      const headerRow = Number(q.get('headerRow'))
+      return HttpResponse.json({ ...source, headerRow, sheet: q.get('sheet') || source.sheet })
+    }),
+  )
+  return { sourceQueries }
+}
+
+/** Records preview requests and answers with `answer`. */
+export function previewHandler(answer: (body: { mapping?: ImportMapping; profileId?: string }) => Response | Promise<Response>) {
+  const bodies: { mapping?: ImportMapping; profileId?: string }[] = []
+  server.use(
+    http.post(`/api/imports/${id(1)}/preview`, async ({ request }) => {
+      const body = (await request.json()) as { mapping?: ImportMapping; profileId?: string }
+      bodies.push(body)
+      return answer(body)
+    }),
+  )
+  return bodies
+}
+
+export function previewLists(items = [productItem, variantItem], issues = [issue], total?: number) {
+  const itemQueries: URLSearchParams[] = []
+  const issueQueries: URLSearchParams[] = []
+  server.use(
+    http.get(`/api/imports/${id(1)}/items`, ({ request }) => {
+      itemQueries.push(new URL(request.url).searchParams)
+      return HttpResponse.json({ items, total: total ?? items.length })
+    }),
+    http.get(`/api/imports/${id(1)}/issues`, ({ request }) => {
+      issueQueries.push(new URL(request.url).searchParams)
+      return HttpResponse.json({ items: issues, total: issues.length })
+    }),
+  )
+  return { itemQueries, issueQueries }
 }

@@ -823,6 +823,7 @@ func runOut(r store.ImportRun) (ImportRun, error) {
 			Preview: r.State == StateUploaded || r.State == StatePreviewed || r.State == StateFailed,
 			Apply:   r.State == StatePreviewed,
 			Undo:    r.State == StateApplied,
+			Delete:  r.State != StateApplied,
 		},
 	}
 	if r.ProfileName != nil {

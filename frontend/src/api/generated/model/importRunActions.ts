@@ -7,6 +7,8 @@
 
 export interface ImportRunActions {
   apply: boolean;
+  /** Delete the run (not while applied: undo it first) */
+  delete: boolean;
   /** Preview (again) with a profile or mapping */
   preview: boolean;
   undo: boolean;

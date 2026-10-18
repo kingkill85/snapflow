@@ -70,7 +70,8 @@
     "done": "erledigt"
   },
   "run": {
-    "meta": "Hochgeladen von {{user}} am {{date}} · {{size}}"
+    "meta": "Hochgeladen von {{user}} am {{date}} · {{size}}",
+    "download": "Datei herunterladen"
   },
   "upload": {
     "title": "Datei",
@@ -147,15 +148,28 @@
     "addConstant": "Festen Wert hinzufügen",
     "noConstants": "Keine festen Werte.",
     "chooseTarget": "Feld auswählen",
-    "constantTarget": "Feld des festen Werts {{n}}",
-    "constantValue": "Wert des festen Werts {{n}}",
     "constantValueHint": "Wert",
     "extrasTitle": "Weitere Zuordnungen",
     "extrasDescription": "Zuordnungen des Profils, die zu keiner oben gezeigten Spalte dieser Datei passen: eine Spalte, die dieser Datei fehlt, oder ein zweites Feld aus derselben Spalte.",
     "letter": "(Spalte {{letter}})",
     "optionsTitle": "Optionen",
     "preview": "Vorschau",
-    "previewing": "Datei wird gelesen …"
+    "previewing": "Datei wird gelesen …",
+    "constantN": "Fester Wert {{n}}",
+    "constantField": "Feld",
+    "constantValueLabel": "Wert",
+    "chooseSheet": "Blatt auswählen",
+    "noSheet": "Wählen Sie ein Blatt der Datei, um seine Spalten zu sehen.",
+    "showRows_one": "Erste Zeile zeigen",
+    "showRows_other": "Erste {{count}} Zeilen zeigen",
+    "hideRows": "Zeilen ausblenden",
+    "previewingRows_one": "{{count}} Datenzeile wird mit dem Katalog verglichen …",
+    "previewingRows_other": "{{count}} Datenzeilen werden mit dem Katalog verglichen. Große Dateien brauchen einen Moment.",
+    "previewingHint": "Die Zeilen werden mit dem Katalog verglichen. Große Dateien brauchen einen Moment.",
+    "profileDiffers": "Die Zuordnung weicht vom Profil „{{name}}“ ab. Die Vorschau verwendet die Zuordnung, wie sie hier steht.",
+    "replaceTitle": "Profil laden",
+    "replaceMessage": "Das Profil „{{name}}“ laden? Es ersetzt Ihre Änderungen an der Zuordnung.",
+    "replaceConfirm": "Profil laden"
   },
   "targetGroup": {
     "product": "Produkt",
@@ -241,7 +255,7 @@
   },
   "preview": {
     "title": "Vorschau",
-    "description": "Was der Import von {{rows}} Zeilen ändert. Noch wurde nichts geschrieben.",
+    "description": "Vorschau vom {{date}}: was der Import von {{rows}} Zeilen ändert. Noch wurde nichts geschrieben.",
     "editMapping": "Zuordnung bearbeiten",
     "applyTitle": "Übernehmen",
     "applyDescription": "Schreibt genau die Änderungen oben in einem Schritt. Sie können den Import danach rückgängig machen.",
@@ -251,7 +265,8 @@
     "skipping_other": "{{count}} Zeilen mit Fehlern werden übersprungen.",
     "apply": "Import übernehmen",
     "applying": "Wird übernommen …",
-    "again": "Vorschau erneut erstellen"
+    "again": "Vorschau erneut erstellen",
+    "blockedShort": "Zeilen enthalten Fehler: Mit „Alles oder nichts“ kann nichts übernommen werden."
   },
   "items": {
     "title": "Änderungen",
@@ -259,7 +274,7 @@
     "entity": "Art",
     "allEntities": "Alle Arten",
     "status": "Änderung",
-    "allStatuses": "Alle Änderungen",
+    "allStatuses": "Alle, auch unverändert",
     "onlySkipped": "Nur Zeilen mit Fehlern",
     "empty": "Nichts passt zu diesen Filtern.",
     "skipped": "Zeilenfehler: übersprungen",
@@ -269,11 +284,22 @@
     "field": "Feld",
     "before": "Vorher",
     "after": "Nachher",
-    "value": "Wert"
+    "value": "Wert",
+    "search": "Suche",
+    "searchHint": "Modellnummer, SKU, Name oder Zeile",
+    "changedOnly": "Nur Änderungen",
+    "rowShown": "Nur Zeile {{row}} wird gezeigt.",
+    "allRows": "Alle Zeilen zeigen",
+    "noChanges": "Nichts ändert sich: Jeder Eintrag der Datei ist wie im Katalog.",
+    "showAll": "Unveränderte zeigen"
   },
   "issues": {
     "title": "Fehler und Warnungen",
-    "description": "{{errors}} Fehler, {{warnings}} Warnungen. Zeilen mit Fehlern werden nicht importiert; Warnungen halten eine Zeile nicht auf.",
+    "description": "{{errors}}, {{warnings}}. Zeilen mit Fehlern werden nicht importiert; Warnungen halten eine Zeile nicht auf.",
+    "errors_one": "{{count}} Fehler",
+    "errors_other": "{{count}} Fehler",
+    "warnings_one": "{{count}} Warnung",
+    "warnings_other": "{{count}} Warnungen",
     "none": "Die Datei hat keine Fehler oder Warnungen.",
     "filter": "Anzeigen",
     "all": "Fehler und Warnungen",
@@ -289,7 +315,8 @@
     "row": "Zeile",
     "column": "Spalte",
     "target": "Importiert als",
-    "modelNumber": "Modellnummer"
+    "modelNumber": "Modellnummer",
+    "showRow": "Änderungen der Zeile {{row}}"
   },
   "failed": {
     "title": "Der Import ist fehlgeschlagen und wurde zurückgerollt: Nichts wurde geändert.",
@@ -318,5 +345,10 @@
   "languageName": {
     "en": "Englisch",
     "de": "Deutsch"
+  },
+  "delete": {
+    "title": "Import löschen",
+    "message": "Den Import von „{{name}}“ löschen? Seine Vorschau, Fehler und sein Änderungsprotokoll werden gelöscht; der Katalog ändert sich nicht.",
+    "applied": "Dieser Import ist übernommen: Machen Sie ihn zuerst rückgängig und löschen Sie ihn dann."
   }
 }

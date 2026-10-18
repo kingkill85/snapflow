@@ -1644,6 +1644,10 @@
           "apply": {
             "type": "boolean"
           },
+          "delete": {
+            "description": "Delete the run (not while applied: undo it first)",
+            "type": "boolean"
+          },
           "preview": {
             "description": "Preview (again) with a profile or mapping",
             "type": "boolean"
@@ -1655,7 +1659,8 @@
         "required": [
           "preview",
           "apply",
-          "undo"
+          "undo",
+          "delete"
         ],
         "type": "object"
       },

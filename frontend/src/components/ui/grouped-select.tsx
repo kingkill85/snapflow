@@ -23,6 +23,7 @@ type GroupedSelectProps = {
   id?: string
   disabled?: boolean
   className?: string
+  /** Shown while the value matches no option. */
   placeholder?: string
   ref?: Ref<HTMLButtonElement>
   'aria-label'?: string
@@ -48,7 +49,12 @@ export function GroupedSelect({ value, onValueChange, options = [], groups, clas
     </SelectPrimitive.Item>
   )
   return (
-    <SelectPrimitive.Root value={toRadix(value)} onValueChange={(v) => onValueChange(fromRadix(v))} disabled={disabled}>
+    // A value no option has shows the placeholder (Radix shows it for "" only).
+    <SelectPrimitive.Root
+      value={[...options, ...groups.flatMap((g) => g.options)].some((o) => o.value === value) ? toRadix(value) : ''}
+      onValueChange={(v) => onValueChange(fromRadix(v))}
+      disabled={disabled}
+    >
       <SelectPrimitive.Trigger
         ref={ref}
         className={cn(

@@ -93,7 +93,9 @@
     "uploading": "Wird hochgeladen…",
     "progress": "Wird hochgeladen… {{percent}} %",
     "none": "Kein Bild",
-    "dropFile": "Ziehen Sie eine Datei hierher oder wählen Sie eine aus."
+    "dropFile": "Ziehen Sie eine Datei hierher oder wählen Sie eine aus.",
+    "chooseFor": "{{action}} ({{label}})",
+    "chosen": "Ausgewählt: {{name}}"
   },
   "option": {
     "unknown": "{{value}} (keine Option)"
