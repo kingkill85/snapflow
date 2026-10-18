@@ -72,6 +72,14 @@ func NewService(q store.Querier, storage *Storage) *Service {
 	return &Service{q: q, storage: storage, decoding: semaphore.NewWeighted(DecodeBudget)}
 }
 
+// WithTx returns the service working inside tx, so Exists and foreign keys
+// of the same transaction see the files it stores. It shares the storage
+// and the decode budget. Contents written before a rollback stay on disk,
+// unreferenced, like any unreferenced file.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	return &Service{q: store.New(tx), storage: s.storage, decoding: s.decoding}
+}
+
 // Upload stores an image (JPEG, PNG or WebP, by magic bytes, at most
 // MaxSize and MaxMegapixels). Every image must decode completely. JPEG and
 // PNG are always re-encoded (8 bits per channel, no metadata), turned
@@ -83,6 +91,15 @@ func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MaxSize+1))
 	if err != nil {
+		return File{}, err
+	}
+	return s.UploadBytes(ctx, data)
+}
+
+// UploadBytes is Upload for an image already in memory (e.g. one taken from
+// an imported workbook).
+func (s *Service) UploadBytes(ctx context.Context, data []byte) (File, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return File{}, err
 	}
 	if len(data) > MaxSize {
@@ -111,20 +128,53 @@ func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
 		return File{}, errType() // the header was fine, the image data is not
 	}
 
+	w, h := int32(width), int32(height) //nolint:gosec // bounded by MaxMegapixels
+	return s.put(ctx, data, contentType, &w, &h)
+}
+
+// StoreDocument stores a non-image file as it is (e.g. an import workbook
+// kept with its import run). The caller checks its type and size; the same
+// bytes give the same file.
+func (s *Service) StoreDocument(ctx context.Context, data []byte, contentType string) (File, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return File{}, err
+	}
+	return s.put(ctx, data, contentType, nil, nil)
+}
+
+// put stores contents (first, so a row never points to missing bytes) and
+// their metadata.
+func (s *Service) put(ctx context.Context, data []byte, contentType string, width, height *int32) (File, error) {
 	sum := sha256.Sum256(data)
 	hexSum := hex.EncodeToString(sum[:])
-	// Contents first: a row never points to missing bytes.
 	if err := s.storage.Put(hexSum, data); err != nil {
 		return File{}, fmt.Errorf("files: store: %w", err)
 	}
-	w, h := int32(width), int32(height) //nolint:gosec // bounded by MaxMegapixels
 	row, err := s.q.CreateFile(ctx, store.CreateFileParams{
-		Sha256: hexSum, ContentType: contentType, Size: int64(len(data)), Width: &w, Height: &h,
+		Sha256: hexSum, ContentType: contentType, Size: int64(len(data)), Width: width, Height: height,
 	})
 	if err != nil {
 		return File{}, err
 	}
 	return fromRow(row), nil
+}
+
+// ReadAll returns a file's contents (at most max bytes, else
+// file.too_large), e.g. an import's workbook.
+func (s *Service) ReadAll(ctx context.Context, id uuid.UUID, max int64) (File, []byte, error) {
+	f, contents, err := s.Open(ctx, id)
+	if err != nil {
+		return File{}, nil, err
+	}
+	defer func() { _ = contents.Close() }()
+	data, err := io.ReadAll(io.LimitReader(contents, max+1))
+	if err != nil {
+		return File{}, nil, err
+	}
+	if int64(len(data)) > max {
+		return File{}, nil, ErrTooLarge()
+	}
+	return f, data, nil
 }
 
 // Open returns a file and its contents; any logged-in user may read files.

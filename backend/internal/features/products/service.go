@@ -17,10 +17,10 @@ import (
 	"math/big"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -71,6 +71,13 @@ type Service struct {
 
 func NewService(db DB, types *producttypes.Service, cats *categories.Service, files *files.Service) *Service {
 	return &Service{db: db, q: store.New(db), types: types, cats: cats, files: files}
+}
+
+// WithTx returns the service working inside tx (see database.Nested), with
+// product types, categories and files read and written in tx too. Its transactions
+// become savepoints, so a refused write (a taken SKU, say) leaves tx usable.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	return NewService(database.NewNested(tx), s.types.WithTx(tx), s.cats.WithTx(tx), s.files.WithTx(tx))
 }
 
 // inSnapshot runs the reads of fn in one read-only REPEATABLE READ
@@ -211,9 +218,17 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 	if err != nil {
 		return Product{}, err
 	}
-	in, err = s.validateProduct(ctx, in, nil)
+	row, err := s.createProduct(ctx, in)
 	if err != nil {
 		return Product{}, err
+	}
+	return s.detail(ctx, actor, row)
+}
+
+func (s *Service) createProduct(ctx context.Context, in ProductInput) (store.Product, error) {
+	in, err := s.validateProduct(ctx, in, nil)
+	if err != nil {
+		return store.Product{}, err
 	}
 	var row store.Product
 	err = s.inTx(ctx, func(q *store.Queries) error {
@@ -225,9 +240,9 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 		return err
 	})
 	if err != nil {
-		return Product{}, mapProductErr(err, in.ModelNumber)
+		return store.Product{}, mapProductErr(err, in.ModelNumber)
 	}
-	return s.detail(ctx, actor, row)
+	return row, nil
 }
 
 // Update replaces a product's own fields (not its variants). It fails with
@@ -241,16 +256,28 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 	if err != nil {
 		return Product{}, err
 	}
-	current, err := s.q.GetProduct(ctx, id)
-	if err != nil {
-		return Product{}, notFound(err, "product.not_found")
-	}
-	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
-		return Product{}, errProductStale()
-	}
-	in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current)
+	row, err := s.updateProduct(ctx, id, in, false)
 	if err != nil {
 		return Product{}, err
+	}
+	return s.detail(ctx, actor, row)
+}
+
+// updateProduct validates and writes an update; raw writes in as it is
+// (undoing an import restores a state that existed).
+func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpdate, raw bool) (store.Product, error) {
+	current, err := s.q.GetProduct(ctx, id)
+	if err != nil {
+		return store.Product{}, notFound(err, "product.not_found")
+	}
+	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
+		return store.Product{}, errProductStale()
+	}
+	if !raw {
+		in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current)
+		if err != nil {
+			return store.Product{}, err
+		}
 	}
 	var row store.Product
 	err = s.inTx(ctx, func(q *store.Queries) error {
@@ -263,19 +290,24 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		exists, err := s.q.ProductExists(ctx, id)
-		if err != nil {
-			return Product{}, err
-		}
-		if exists {
-			return Product{}, errProductStale()
-		}
-		return Product{}, apperr.NotFound("product.not_found")
+		return store.Product{}, s.productGoneOrStale(ctx, id)
 	}
 	if err != nil {
-		return Product{}, mapProductErr(err, in.ModelNumber)
+		return store.Product{}, mapProductErr(err, in.ModelNumber)
 	}
-	return s.detail(ctx, actor, row)
+	return row, nil
+}
+
+// productGoneOrStale explains an update that matched no row.
+func (s *Service) productGoneOrStale(ctx context.Context, id uuid.UUID) error {
+	exists, err := s.q.ProductExists(ctx, id)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errProductStale()
+	}
+	return apperr.NotFound("product.not_found")
 }
 
 // Delete removes a product with its variants and their add-on links (in
@@ -298,55 +330,31 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 
 // validateProduct checks a create (current nil) or an update of current.
 func (s *Service) validateProduct(ctx context.Context, in ProductInput, current *store.Product) (ProductInput, error) {
-	var errs []apperr.FieldError
-	var previous attrschema.Values
+	var existing *Existing
 	if current != nil {
-		previous = current.Attributes
+		existing = &Existing{ProductTypeID: current.ProductTypeID, CategoryID: current.CategoryID, Attributes: current.Attributes}
 	}
-	in.ModelNumber = businessKey(in.ModelNumber)
-	switch {
-	case in.ModelNumber == "":
-		errs = append(errs, apperr.Field("body.modelNumber", "validation.required", "model number is required"))
-	case hasControlChars(in.ModelNumber):
-		errs = append(errs, errControlChars("body.modelNumber"))
-	case utf8.RuneCountInString(in.ModelNumber) > MaxModelNumberLength:
-		errs = append(errs, tooLong("body.modelNumber", MaxModelNumberLength))
-	}
-	in.Name = in.Name.Trimmed()
-	errs = append(errs, in.Name.Check("body.name", MaxNameLength)...)
-	if !in.Name.Valid() {
-		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
-	}
-	in.Description = in.Description.Trimmed()
-	errs = append(errs, in.Description.Check("body.description", MaxDescriptionLength)...)
-	if len(in.Description) > 0 && !in.Description.Valid() {
-		errs = append(errs, apperr.Field("body.description.en", "validation.required", "English description is required when a description is set"))
-	}
+	var ptp *producttypes.ProductType
 	pt, err := s.types.Get(ctx, in.ProductTypeID)
 	switch {
 	case hasCode(err, "product_type.not_found"):
-		errs = append(errs, errTypeNotFound())
-	case err != nil:
-		return in, err
-	case !pt.IsActive && (current == nil || current.ProductTypeID != pt.ID):
-		// An inactive type takes no new products; a product keeps its own.
-		errs = append(errs, apperr.Field("body.productTypeId", "product.type_inactive", "the product type is inactive"))
-	}
-	c, err := s.cats.Get(ctx, in.CategoryID)
-	switch {
-	case hasCode(err, "category.not_found"):
-		errs = append(errs, errCategoryNotFound())
 	case err != nil:
 		return in, err
 	default:
-		// An inactive category takes no new products; a product keeps its own.
-		if !c.IsActive && (current == nil || current.CategoryID != c.ID) {
-			errs = append(errs, apperr.Field("body.categoryId", "product.category_inactive", "the category is inactive"))
-		}
-		var attrErrs []apperr.FieldError
-		in.Attributes, attrErrs = saveValues(c.Attributes, attrschema.ScopeProduct, in.Attributes, previous, "body.attributes")
-		errs = append(errs, attrErrs...)
+		ptp = &pt
 	}
+	var cp *categories.Category
+	c, err := s.cats.Get(ctx, in.CategoryID)
+	switch {
+	case hasCode(err, "category.not_found"):
+	case err != nil:
+		return in, err
+	default:
+		cp = &c
+	}
+	// nil reports the type or category as not found (and skips the
+	// attribute checks without a category).
+	in, errs := normalizeProduct(ptp, cp, in, existing, "body")
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
@@ -408,19 +416,27 @@ func (s *Service) CreateVariant(ctx context.Context, productID uuid.UUID, in Var
 	if err != nil {
 		return Variant{}, err
 	}
+	product, row, err := s.createVariant(ctx, productID, in)
+	if err != nil {
+		return Variant{}, err
+	}
+	return s.variantDetail(ctx, actor, product, row)
+}
+
+func (s *Service) createVariant(ctx context.Context, productID uuid.UUID, in VariantInput) (store.Product, store.ProductVariant, error) {
+	var row store.ProductVariant
 	product, err := s.q.GetProduct(ctx, productID)
 	if err != nil {
-		return Variant{}, notFound(err, "product.not_found")
+		return product, row, notFound(err, "product.not_found")
 	}
 	c, err := s.cats.Get(ctx, product.CategoryID)
 	if err != nil {
-		return Variant{}, err
+		return product, row, err
 	}
 	in, err = s.validateVariant(ctx, c, in, nil)
 	if err != nil {
-		return Variant{}, err
+		return product, row, err
 	}
-	var row store.ProductVariant
 	err = s.inTx(ctx, func(q *store.Queries) error {
 		if _, err := q.LockProduct(ctx, productID); err != nil {
 			return err
@@ -432,9 +448,9 @@ func (s *Service) CreateVariant(ctx context.Context, productID uuid.UUID, in Var
 		return err
 	})
 	if err != nil {
-		return Variant{}, mapVariantErr(err, in, "product.not_found")
+		return product, row, mapVariantErr(err, in, "product.not_found")
 	}
-	return s.variantDetail(ctx, actor, product, row)
+	return product, row, nil
 }
 
 // UpdateVariant replaces a variant (not its add-ons). It fails with
@@ -444,26 +460,41 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if err != nil {
 		return Variant{}, err
 	}
+	product, row, err := s.updateVariant(ctx, productID, id, in, false)
+	if err != nil {
+		return Variant{}, err
+	}
+	return s.variantDetail(ctx, actor, product, row)
+}
+
+// updateVariant validates and writes an update; raw writes in as it is
+// (undoing an import restores a state that existed).
+func (s *Service) updateVariant(ctx context.Context, productID, id uuid.UUID, in VariantUpdate, raw bool) (store.Product, store.ProductVariant, error) {
+	var (
+		product store.Product
+		row     store.ProductVariant
+	)
 	current, err := s.q.GetVariant(ctx, store.GetVariantParams{ID: id, ProductID: productID})
 	if err != nil {
-		return Variant{}, notFound(err, "variant.not_found")
+		return product, row, notFound(err, "variant.not_found")
 	}
 	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
-		return Variant{}, errVariantStale()
+		return product, row, errVariantStale()
 	}
-	product, err := s.q.GetProduct(ctx, productID)
+	product, err = s.q.GetProduct(ctx, productID)
 	if err != nil {
-		return Variant{}, notFound(err, "variant.not_found")
+		return product, row, notFound(err, "variant.not_found")
 	}
-	c, err := s.cats.Get(ctx, product.CategoryID)
-	if err != nil {
-		return Variant{}, err
+	if !raw {
+		c, err := s.cats.Get(ctx, product.CategoryID)
+		if err != nil {
+			return product, row, err
+		}
+		in.VariantInput, err = s.validateVariant(ctx, c, in.VariantInput, current.Attributes)
+		if err != nil {
+			return product, row, err
+		}
 	}
-	in.VariantInput, err = s.validateVariant(ctx, c, in.VariantInput, current.Attributes)
-	if err != nil {
-		return Variant{}, err
-	}
-	var row store.ProductVariant
 	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		row, err = q.UpdateVariant(ctx, store.UpdateVariantParams{
@@ -474,19 +505,24 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		exists, err := s.q.VariantExists(ctx, store.VariantExistsParams{ID: id, ProductID: productID})
-		if err != nil {
-			return Variant{}, err
-		}
-		if exists {
-			return Variant{}, errVariantStale()
-		}
-		return Variant{}, apperr.NotFound("variant.not_found")
+		return product, row, s.variantGoneOrStale(ctx, productID, id)
 	}
 	if err != nil {
-		return Variant{}, mapVariantErr(err, in.VariantInput, "variant.not_found")
+		return product, row, mapVariantErr(err, in.VariantInput, "variant.not_found")
 	}
-	return s.variantDetail(ctx, actor, product, row)
+	return product, row, nil
+}
+
+// variantGoneOrStale explains an update that matched no row.
+func (s *Service) variantGoneOrStale(ctx context.Context, productID, id uuid.UUID) error {
+	exists, err := s.q.VariantExists(ctx, store.VariantExistsParams{ID: id, ProductID: productID})
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errVariantStale()
+	}
+	return apperr.NotFound("variant.not_found")
 }
 
 // DeleteVariant removes a variant and its add-on links in both directions.
@@ -541,37 +577,21 @@ func (s *Service) ReorderVariants(ctx context.Context, productID uuid.UUID, ids 
 }
 
 func (s *Service) validateVariant(ctx context.Context, c categories.Category, in VariantInput, previous attrschema.Values) (VariantInput, error) {
-	var errs []apperr.FieldError
-	in.Name = in.Name.Trimmed()
-	errs = append(errs, in.Name.Check("body.name", MaxVariantNameLength)...)
-	if !in.Name.Valid() {
-		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
-	}
-	in.SKU = businessKey(in.SKU)
-	switch {
-	case hasControlChars(in.SKU):
-		errs = append(errs, errControlChars("body.sku"))
-	case utf8.RuneCountInString(in.SKU) > MaxSKULength:
-		errs = append(errs, tooLong("body.sku", MaxSKULength))
-	}
-	if price, ok := parsePrice(in.Price); ok {
-		in.Price = price
-	} else {
-		errs = append(errs, apperr.Field("body.price", "variant.price_format",
-			"price must be a decimal with up to 10 digits and 2 decimals, e.g. 27.00"))
-	}
+	in, errs := NormalizeVariant(c, in, previous, "body")
 	if in.ImageFileID != nil {
 		exists, err := s.files.Exists(ctx, *in.ImageFileID)
 		if err != nil {
 			return in, err
 		}
 		if !exists {
-			errs = append(errs, errFileNotFound())
+			// Before the attribute errors, in the order of the form.
+			i := slices.IndexFunc(errs, func(e apperr.FieldError) bool { return strings.HasPrefix(e.Location, "body.attributes") })
+			if i < 0 {
+				i = len(errs)
+			}
+			errs = slices.Insert(errs, i, errFileNotFound())
 		}
 	}
-	var attrErrs []apperr.FieldError
-	in.Attributes, attrErrs = saveValues(c.Attributes, attrschema.ScopeVariant, in.Attributes, previous, "body.attributes")
-	errs = append(errs, attrErrs...)
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
@@ -675,11 +695,26 @@ func (s *Service) ReplaceAddons(ctx context.Context, productID, variantID uuid.U
 	if err != nil {
 		return Variant{}, err
 	}
+	if err := s.replaceAddons(ctx, productID, variantID, list); err != nil {
+		return Variant{}, err
+	}
+	v, err := s.q.GetVariant(ctx, store.GetVariantParams{ID: variantID, ProductID: productID})
+	if err != nil {
+		return Variant{}, notFound(err, "variant.not_found")
+	}
+	product, err := s.q.GetProduct(ctx, productID)
+	if err != nil {
+		return Variant{}, notFound(err, "variant.not_found")
+	}
+	return s.variantDetail(ctx, actor, product, v)
+}
+
+func (s *Service) replaceAddons(ctx context.Context, productID, variantID uuid.UUID, list []AddonInput) error {
 	if len(list) > MaxAddons {
-		return Variant{}, apperr.Validation(apperr.Field("body.addons", "validation.too_many",
+		return apperr.Validation(apperr.Field("body.addons", "validation.too_many",
 			fmt.Sprintf("at most %d add-ons", MaxAddons)).With("max", MaxAddons))
 	}
-	err = s.inTx(ctx, func(q *store.Queries) error {
+	return s.inTx(ctx, func(q *store.Queries) error {
 		if _, err := q.ShareProduct(ctx, productID); err != nil {
 			return notFound(err, "variant.not_found")
 		}
@@ -721,18 +756,6 @@ func (s *Service) ReplaceAddons(ctx context.Context, productID, variantID uuid.U
 		}
 		return q.InsertAddons(ctx, store.InsertAddonsParams{VariantID: variantID, AddonIds: ids, Required: required})
 	})
-	if err != nil {
-		return Variant{}, err
-	}
-	v, err := s.q.GetVariant(ctx, store.GetVariantParams{ID: variantID, ProductID: productID})
-	if err != nil {
-		return Variant{}, notFound(err, "variant.not_found")
-	}
-	product, err := s.q.GetProduct(ctx, productID)
-	if err != nil {
-		return Variant{}, notFound(err, "variant.not_found")
-	}
-	return s.variantDetail(ctx, actor, product, v)
 }
 
 // addons returns the add-ons of the variants, by variant.

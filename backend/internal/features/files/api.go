@@ -97,7 +97,11 @@ func Register(api huma.API, svc *Service) {
 			}
 			hctx.SetHeader("Content-Type", file.ContentType)
 			hctx.SetHeader("Content-Length", strconv.FormatInt(file.Size, 10))
-			hctx.SetHeader("Content-Disposition", "inline")
+			disposition := "inline"
+			if !strings.HasPrefix(file.ContentType, "image/") {
+				disposition = "attachment" // e.g. an import workbook: never rendered
+			}
+			hctx.SetHeader("Content-Disposition", disposition)
 			hctx.SetStatus(http.StatusOK)
 			if _, err := io.Copy(hctx.BodyWriter(), contents); err != nil {
 				slog.WarnContext(ctx, "files: send", "id", file.ID, "error", err)

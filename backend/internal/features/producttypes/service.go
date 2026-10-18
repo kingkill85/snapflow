@@ -87,6 +87,12 @@ func NewService(db DB) *Service {
 	return &Service{db: db, q: store.New(db)}
 }
 
+// WithTx returns the service working inside tx (see database.Nested): its
+// transactions become savepoints, so a refused write leaves tx usable.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	return NewService(database.NewNested(tx))
+}
+
 // inTx runs fn in one transaction; any error rolls it back. A transaction
 // aborted by a deadlock or serialization failure is run again (at most
 // database.TxAttempts times, then 409 request.conflict_retry), so fn must be
@@ -161,10 +167,15 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 	if err != nil {
 		return ProductType{}, err
 	}
-	row, err := s.q.UpdateProductType(ctx, store.UpdateProductTypeParams{
-		ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
-		IsActive:          in.IsActive,
-		ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+	var row store.ProductType
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		row, err = q.UpdateProductType(ctx, store.UpdateProductTypeParams{
+			ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
+			IsActive:          in.IsActive,
+			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+		})
+		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		exists, err := s.q.ProductTypeExists(ctx, id)
@@ -188,7 +199,12 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return err
 	}
-	n, err := s.q.DeleteProductType(ctx, id)
+	var n int64
+	err := s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		n, err = q.DeleteProductType(ctx, id)
+		return err
+	})
 	if err != nil {
 		return mapErr(err, "")
 	}

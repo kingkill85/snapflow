@@ -14,6 +14,109 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+const catalogAddons = `-- name: CatalogAddons :many
+SELECT variant_id, addon_variant_id, required, sort_order FROM variant_addons ORDER BY variant_id, sort_order
+`
+
+func (q *Queries) CatalogAddons(ctx context.Context) ([]VariantAddon, error) {
+	rows, err := q.db.Query(ctx, catalogAddons)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VariantAddon{}
+	for rows.Next() {
+		var i VariantAddon
+		if err := rows.Scan(
+			&i.VariantID,
+			&i.AddonVariantID,
+			&i.Required,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const catalogProducts = `-- name: CatalogProducts :many
+
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products ORDER BY lower(model_number), id
+`
+
+// Bulk reads and business-key lookups for other features (the import):
+// the whole catalog in a few queries, no page cap, no active filter.
+func (q *Queries) CatalogProducts(ctx context.Context) ([]Product, error) {
+	rows, err := q.db.Query(ctx, catalogProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Product{}
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductTypeID,
+			&i.ModelNumber,
+			&i.Name,
+			&i.Description,
+			&i.Attributes,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CategoryID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const catalogVariants = `-- name: CatalogVariants :many
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants ORDER BY product_id, sort_order, id
+`
+
+func (q *Queries) CatalogVariants(ctx context.Context) ([]ProductVariant, error) {
+	rows, err := q.db.Query(ctx, catalogVariants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProductVariant{}
+	for rows.Next() {
+		var i ProductVariant
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Name,
+			&i.Sku,
+			&i.Price,
+			&i.ImageFileID,
+			&i.Attributes,
+			&i.SortOrder,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countProducts = `-- name: CountProducts :one
 SELECT count(*)
 FROM products p
@@ -236,6 +339,79 @@ func (q *Queries) ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uu
 		return nil, err
 	}
 	return items, nil
+}
+
+const findProductByModelNumber = `-- name: FindProductByModelNumber :one
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products WHERE lower(model_number) = lower($1::text)
+`
+
+func (q *Queries) FindProductByModelNumber(ctx context.Context, modelNumber string) (Product, error) {
+	row := q.db.QueryRow(ctx, findProductByModelNumber, modelNumber)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.ProductTypeID,
+		&i.ModelNumber,
+		&i.Name,
+		&i.Description,
+		&i.Attributes,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CategoryID,
+	)
+	return i, err
+}
+
+const findVariantByName = `-- name: FindVariantByName :one
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE product_id = $1 AND lower(name ->> 'en') = lower($2::text)
+`
+
+type FindVariantByNameParams struct {
+	ProductID uuid.UUID
+	Name      string
+}
+
+func (q *Queries) FindVariantByName(ctx context.Context, arg FindVariantByNameParams) (ProductVariant, error) {
+	row := q.db.QueryRow(ctx, findVariantByName, arg.ProductID, arg.Name)
+	var i ProductVariant
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.Name,
+		&i.Sku,
+		&i.Price,
+		&i.ImageFileID,
+		&i.Attributes,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const findVariantBySKU = `-- name: FindVariantBySKU :one
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE lower(sku) = lower($1::text)
+`
+
+func (q *Queries) FindVariantBySKU(ctx context.Context, sku string) (ProductVariant, error) {
+	row := q.db.QueryRow(ctx, findVariantBySKU, sku)
+	var i ProductVariant
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.Name,
+		&i.Sku,
+		&i.Price,
+		&i.ImageFileID,
+		&i.Attributes,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getProduct = `-- name: GetProduct :one
@@ -698,6 +874,77 @@ func (q *Queries) SearchVariants(ctx context.Context, arg SearchVariantsParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const setProductActive = `-- name: SetProductActive :one
+UPDATE products
+SET is_active = $2, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1 AND updated_at = $3
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
+`
+
+type SetProductActiveParams struct {
+	ID                uuid.UUID
+	IsActive          bool
+	ExpectedUpdatedAt time.Time
+}
+
+// SetProductActive changes only the active flag, if the product is still
+// the version read (expected_updated_at).
+func (q *Queries) SetProductActive(ctx context.Context, arg SetProductActiveParams) (Product, error) {
+	row := q.db.QueryRow(ctx, setProductActive, arg.ID, arg.IsActive, arg.ExpectedUpdatedAt)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.ProductTypeID,
+		&i.ModelNumber,
+		&i.Name,
+		&i.Description,
+		&i.Attributes,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CategoryID,
+	)
+	return i, err
+}
+
+const setVariantActive = `-- name: SetVariantActive :one
+UPDATE product_variants
+SET is_active = $3, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1 AND product_id = $2 AND updated_at = $4
+RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at
+`
+
+type SetVariantActiveParams struct {
+	ID                uuid.UUID
+	ProductID         uuid.UUID
+	IsActive          bool
+	ExpectedUpdatedAt time.Time
+}
+
+func (q *Queries) SetVariantActive(ctx context.Context, arg SetVariantActiveParams) (ProductVariant, error) {
+	row := q.db.QueryRow(ctx, setVariantActive,
+		arg.ID,
+		arg.ProductID,
+		arg.IsActive,
+		arg.ExpectedUpdatedAt,
+	)
+	var i ProductVariant
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.Name,
+		&i.Sku,
+		&i.Price,
+		&i.ImageFileID,
+		&i.Attributes,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const setVariantOrder = `-- name: SetVariantOrder :exec

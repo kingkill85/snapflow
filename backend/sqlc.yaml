@@ -13,6 +13,12 @@ overrides:
           pointer: true
       - db_type: timestamptz
         go_type: time.Time
+      - db_type: timestamptz
+        nullable: true
+        go_type:
+          import: time
+          type: Time
+          pointer: true
       # Translatable columns are listed one by one; other jsonb stays []byte.
       - column: function_types.name
         go_type:
@@ -141,4 +147,11 @@ sql:
       go:
         <<: *go
         out: internal/features/products/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/imports/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/imports/store
   # scaffold:sqlc

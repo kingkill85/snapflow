@@ -44,6 +44,65 @@ type FunctionType struct {
 	UpdatedAt time.Time
 }
 
+type ImportChange struct {
+	RunID    uuid.UUID
+	Seq      int32
+	Entity   string
+	Action   string
+	EntityID uuid.UUID
+	Label    string
+	Before   []byte
+	After    []byte
+}
+
+type ImportIssue struct {
+	RunID    uuid.UUID
+	Seq      int32
+	Severity string
+	Issue    []byte
+}
+
+type ImportItem struct {
+	RunID   uuid.UUID
+	Seq     int32
+	Entity  string
+	Status  string
+	Skipped bool
+	Item    []byte
+	Plan    []byte
+}
+
+type ImportProfile struct {
+	ID        uuid.UUID
+	Name      string
+	Mapping   []byte
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type ImportRun struct {
+	ID           uuid.UUID
+	ProfileID    *uuid.UUID
+	ProfileName  *string
+	FileID       uuid.UUID
+	FileName     string
+	FileSize     int64
+	SourceKind   string
+	UserID       *uuid.UUID
+	UserName     string
+	State        string
+	Mapping      []byte
+	AllOrNothing bool
+	CatalogToken string
+	Counts       []byte
+	Error        []byte
+	CreatedAt    time.Time
+	PreviewedAt  *time.Time
+	AppliedAt    *time.Time
+	UndoneAt     *time.Time
+	UpdatedAt    time.Time
+}
+
 type Product struct {
 	ID            uuid.UUID
 	ProductTypeID uuid.UUID

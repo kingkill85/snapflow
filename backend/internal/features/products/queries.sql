@@ -205,3 +205,39 @@ JOIN product_variants v ON v.id = a.addon_variant_id
 JOIN products p ON p.id = v.product_id
 WHERE a.variant_id = ANY (sqlc.arg(variant_ids)::uuid[])
 ORDER BY a.variant_id, a.sort_order;
+
+
+-- Bulk reads and business-key lookups for other features (the import):
+-- the whole catalog in a few queries, no page cap, no active filter.
+
+-- name: CatalogProducts :many
+SELECT * FROM products ORDER BY lower(model_number), id;
+
+-- name: CatalogVariants :many
+SELECT * FROM product_variants ORDER BY product_id, sort_order, id;
+
+-- name: CatalogAddons :many
+SELECT variant_id, addon_variant_id, required, sort_order FROM variant_addons ORDER BY variant_id, sort_order;
+
+-- name: FindProductByModelNumber :one
+SELECT * FROM products WHERE lower(model_number) = lower(sqlc.arg(model_number)::text);
+
+-- name: FindVariantBySKU :one
+SELECT * FROM product_variants WHERE lower(sku) = lower(sqlc.arg(sku)::text);
+
+-- name: FindVariantByName :one
+SELECT * FROM product_variants WHERE product_id = $1 AND lower(name ->> 'en') = lower(sqlc.arg(name)::text);
+
+-- SetProductActive changes only the active flag, if the product is still
+-- the version read (expected_updated_at).
+-- name: SetProductActive :one
+UPDATE products
+SET is_active = $2, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
+RETURNING *;
+
+-- name: SetVariantActive :one
+UPDATE product_variants
+SET is_active = $3, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1 AND product_id = $2 AND updated_at = sqlc.arg(expected_updated_at)
+RETURNING *;

@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	CatalogAddons(ctx context.Context) ([]VariantAddon, error)
+	// Bulk reads and business-key lookups for other features (the import):
+	// the whole catalog in a few queries, no page cap, no active filter.
+	CatalogProducts(ctx context.Context) ([]Product, error)
+	CatalogVariants(ctx context.Context) ([]ProductVariant, error)
 	// CountProducts counts what ListProducts lists without the page.
 	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
 	// CountVariants counts what SearchVariants lists without the page.
@@ -25,6 +30,9 @@ type Querier interface {
 	// ExistingVariantIDs returns which of ids exist and keeps them from being
 	// deleted until the transaction ends.
 	ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	FindProductByModelNumber(ctx context.Context, modelNumber string) (Product, error)
+	FindVariantByName(ctx context.Context, arg FindVariantByNameParams) (ProductVariant, error)
+	FindVariantBySKU(ctx context.Context, sku string) (ProductVariant, error)
 	// Products, variants and add-ons are one aggregate. Product type and category
 	// facts (catalog order, active flags) come from producttypes.Service and
 	// categories.Service and are passed in as arrays: this feature never reads
@@ -67,6 +75,10 @@ type Querier interface {
 	// ListProducts) or own name or SKU matches. product_type_id and category_id
 	// narrow it to one type or category.
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
+	// SetProductActive changes only the active flag, if the product is still
+	// the version read (expected_updated_at).
+	SetProductActive(ctx context.Context, arg SetProductActiveParams) (Product, error)
+	SetVariantActive(ctx context.Context, arg SetVariantActiveParams) (ProductVariant, error)
 	// SetVariantOrder gives the ids sort orders 1..n in the given order.
 	SetVariantOrder(ctx context.Context, ids []uuid.UUID) error
 	// ShareProduct keeps a product from being deleted, and waits for a running

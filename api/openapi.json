@@ -788,6 +788,1113 @@
         ],
         "type": "object"
       },
+      "ImportAddonCounter": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "description": "Links whose required flag or position changes",
+            "format": "int64",
+            "type": "integer"
+          },
+          "new": {
+            "description": "Links to add",
+            "format": "int64",
+            "type": "integer"
+          },
+          "removed": {
+            "description": "Links of imported variants that the file no longer lists",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unchanged": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unresolved": {
+            "description": "References found neither in the file nor in the catalog",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new",
+          "changed",
+          "unchanged",
+          "removed",
+          "unresolved"
+        ],
+        "type": "object"
+      },
+      "ImportApplyInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportApplyInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allOrNothing": {
+            "description": "Override the mapping's option: true applies nothing while rows have errors, false skips them",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ImportAttributeOfCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/AttributeDefinition"
+          }
+        },
+        "required": [
+          "categoryId",
+          "definition"
+        ],
+        "type": "object"
+      },
+      "ImportAttributeTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ImportAttributeOfCategory"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Label of the first category (in catalog order) that has it",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "categories"
+        ],
+        "type": "object"
+      },
+      "ImportCategoryRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Unset for a category the import creates",
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ImportChange": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update",
+              "deactivate"
+            ],
+            "type": "string"
+          },
+          "after": {
+            "description": "The state the import wrote"
+          },
+          "before": {
+            "description": "The stored state before (none for creates)"
+          },
+          "entity": {
+            "enum": [
+              "category",
+              "product",
+              "variant",
+              "addons"
+            ],
+            "type": "string"
+          },
+          "entityId": {
+            "description": "Category, product or variant (addons: the variant)",
+            "type": "string"
+          },
+          "label": {
+            "description": "Model number, SKU or key",
+            "type": "string"
+          },
+          "seq": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "entity",
+          "action",
+          "entityId",
+          "label",
+          "after"
+        ],
+        "type": "object"
+      },
+      "ImportChangePage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportChangePage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportChange"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ImportCounter": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deactivate": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "new": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unchanged": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new",
+          "changed",
+          "unchanged",
+          "deactivate"
+        ],
+        "type": "object"
+      },
+      "ImportCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "addons": {
+            "$ref": "#/components/schemas/ImportAddonCounter"
+          },
+          "categories": {
+            "$ref": "#/components/schemas/ImportCounter",
+            "description": "Only new: categories to create"
+          },
+          "errors": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "images": {
+            "$ref": "#/components/schemas/ImportImageCounter"
+          },
+          "products": {
+            "$ref": "#/components/schemas/ImportCounter"
+          },
+          "rows": {
+            "description": "Data rows read (blank rows not counted)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "rowsSkipped": {
+            "description": "Rows with errors (skipped, or blocking with all or nothing)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unmapped": {
+            "items": {
+              "$ref": "#/components/schemas/ImportSourceColumn"
+            },
+            "type": "array"
+          },
+          "variants": {
+            "$ref": "#/components/schemas/ImportCounter"
+          },
+          "warnings": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows",
+          "rowsSkipped",
+          "errors",
+          "warnings",
+          "categories",
+          "products",
+          "variants",
+          "addons",
+          "images",
+          "unmapped"
+        ],
+        "type": "object"
+      },
+      "ImportField": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "description": "Header text, matched ignoring case and repeated white space",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "columnLetter": {
+            "description": "Column letter (A, B, ..., AA), used when no header matches or no column is given",
+            "maxLength": 3,
+            "type": "string"
+          },
+          "target": {
+            "description": "product.modelNumber, product.name.\u003clocale\u003e, product.description.\u003clocale\u003e, product.productType, product.category, variant.name.\u003clocale\u003e, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.\u003ckey\u003e (see GET /api/import-targets)",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "value": {
+            "description": "A constant for every row instead of a column (product type, category, names, descriptions, price and attributes); matched like a cell",
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "ImportFieldChange": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {},
+          "before": {},
+          "field": {
+            "description": "modelNumber, productType, category, name.\u003clocale\u003e, description.\u003clocale\u003e, attributes.\u003ckey\u003e, isActive, sku, price, image, addons",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "type": "object"
+      },
+      "ImportImageCounter": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "description": "Variants whose image changes",
+            "format": "int64",
+            "type": "integer"
+          },
+          "files": {
+            "description": "Distinct pictures used (stored as files)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "new": {
+            "description": "Variants that get an image",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unchanged": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new",
+          "changed",
+          "unchanged",
+          "files"
+        ],
+        "type": "object"
+      },
+      "ImportIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Error code, translated like API errors",
+            "type": "string"
+          },
+          "column": {
+            "description": "Column letter",
+            "type": "string"
+          },
+          "header": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "row": {
+            "description": "File row; 0 for the whole file",
+            "format": "int64",
+            "type": "integer"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "description": "Mapping target of the column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "row",
+          "code"
+        ],
+        "type": "object"
+      },
+      "ImportIssuePage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportIssuePage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportIssue"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ImportItem": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ImportCategoryRef",
+            "description": "A product's category"
+          },
+          "changes": {
+            "description": "Fields that change (all set fields for new items)",
+            "items": {
+              "$ref": "#/components/schemas/ImportFieldChange"
+            },
+            "type": "array"
+          },
+          "entity": {
+            "enum": [
+              "category",
+              "product",
+              "variant"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "The existing entity",
+            "type": "string"
+          },
+          "key": {
+            "description": "A new category's key",
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Category, product or variant name",
+            "type": "object"
+          },
+          "productId": {
+            "description": "A variant's existing product",
+            "type": "string"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ImportTypeRef",
+            "description": "A product's product type (system)"
+          },
+          "rows": {
+            "description": "File rows of the item",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "seq": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "skipped": {
+            "description": "Its rows have errors: not applied (or, all or nothing, nothing is)",
+            "type": "boolean"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "changed",
+              "unchanged",
+              "deactivate"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "entity",
+          "status",
+          "skipped",
+          "rows",
+          "changes"
+        ],
+        "type": "object"
+      },
+      "ImportItemPage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportItemPage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportItem"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ImportMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "allOrNothing": {
+            "default": true,
+            "description": "Apply nothing while any row has errors (default on); off skips rows with errors",
+            "type": "boolean"
+          },
+          "categoryId": {
+            "description": "Fixed category of every row, instead of a product.category column or constant",
+            "type": "string"
+          },
+          "createMissingCategories": {
+            "description": "Create categories the file names but the catalog lacks (default off: unknown categories are row errors). Product types are never created",
+            "type": "boolean"
+          },
+          "dataStartRow": {
+            "description": "First data row (1 first), after the header row",
+            "format": "int64",
+            "type": "integer"
+          },
+          "fields": {
+            "description": "Column or constant per target (at most 200)",
+            "items": {
+              "$ref": "#/components/schemas/ImportField"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "headerRow": {
+            "description": "Row number of the column headers (1 first); 0 for a file without a header row (columns by letter only)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "productTypeId": {
+            "description": "Fixed product type (system) of every row, instead of a product.productType column or constant",
+            "type": "string"
+          },
+          "sheet": {
+            "description": "Sheet name; empty for the first sheet",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "sourceKind": {
+            "description": "The file format the profile is made for (informational: any file can be previewed with it)",
+            "enum": [
+              "xlsx",
+              "csv"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceKind",
+          "headerRow",
+          "dataStartRow",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "ImportPreviewInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportPreviewInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping",
+            "description": "An unsaved mapping; or send profileId"
+          },
+          "profileId": {
+            "description": "A saved profile; or send mapping",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ImportProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportProfile.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "mapping",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ImportProfileInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportProfileInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          },
+          "name": {
+            "description": "Unique ignoring case, at most 100 characters",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "mapping"
+        ],
+        "type": "object"
+      },
+      "ImportProfileUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportProfileUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if the profile changed since, the update fails with import_profile.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          },
+          "name": {
+            "description": "Unique ignoring case, at most 100 characters",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "name",
+          "mapping"
+        ],
+        "type": "object"
+      },
+      "ImportRun": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportRun.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allOrNothing": {
+            "type": "boolean"
+          },
+          "applied": {
+            "$ref": "#/components/schemas/ImportCounts",
+            "description": "What the apply wrote (rows with errors skipped)"
+          },
+          "appliedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ImportRunActions"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts",
+            "description": "What the preview found"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ImportRunError",
+            "description": "Why the apply failed (state failed)"
+          },
+          "fileId": {
+            "description": "The uploaded file (GET /api/files/{id})",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "description": "Bytes",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          },
+          "previewedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "profileId": {
+            "description": "The profile the preview used (if it still exists)",
+            "type": "string"
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "enum": [
+              "xlsx",
+              "csv"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "description": "uploaded (no preview yet), previewed, applied, failed (apply rolled back) or undone",
+            "enum": [
+              "uploaded",
+              "previewed",
+              "applied",
+              "failed",
+              "undone"
+            ],
+            "type": "string"
+          },
+          "undoneAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userName": {
+            "description": "Who uploaded the file",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "fileId",
+          "fileName",
+          "fileSize",
+          "sourceKind",
+          "userName",
+          "allOrNothing",
+          "createdAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ImportRunActions": {
+        "additionalProperties": false,
+        "properties": {
+          "apply": {
+            "type": "boolean"
+          },
+          "preview": {
+            "description": "Preview (again) with a profile or mapping",
+            "type": "boolean"
+          },
+          "undo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "preview",
+          "apply",
+          "undo"
+        ],
+        "type": "object"
+      },
+      "ImportRunError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "rows": {
+            "description": "Rows of the item that failed",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "ImportRunPage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportRunPage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRun"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ImportSourceColumn": {
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "examples": [
+              "Model Number"
+            ],
+            "type": "string"
+          },
+          "letter": {
+            "examples": [
+              "G"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "letter",
+          "header"
+        ],
+        "type": "object"
+      },
+      "ImportSourcePreview": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportSourcePreview.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "columns": {
+            "description": "Every column up to the last used one, with its header text",
+            "items": {
+              "$ref": "#/components/schemas/ImportSourceColumn"
+            },
+            "type": "array"
+          },
+          "dataRows": {
+            "description": "Non-blank rows after the header row",
+            "format": "int64",
+            "type": "integer"
+          },
+          "headerRow": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "images": {
+            "description": "Pictures anchored to rows",
+            "format": "int64",
+            "type": "integer"
+          },
+          "rows": {
+            "description": "The first data rows after the header row",
+            "items": {
+              "$ref": "#/components/schemas/ImportSourceRow"
+            },
+            "type": "array"
+          },
+          "sheet": {
+            "type": "string"
+          },
+          "sheets": {
+            "description": "Sheet names (one empty name for CSV)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sheets",
+          "sheet",
+          "headerRow",
+          "columns",
+          "rows",
+          "dataRows",
+          "images"
+        ],
+        "type": "object"
+      },
+      "ImportSourceRow": {
+        "additionalProperties": false,
+        "properties": {
+          "cells": {
+            "description": "Aligned with columns",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "images": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "cells",
+          "images"
+        ],
+        "type": "object"
+      },
+      "ImportTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "attribute": {
+            "$ref": "#/components/schemas/ImportAttributeTarget"
+          },
+          "columnOptional": {
+            "description": "May be mapped without a column (variant.image: pictures over the row in any column)",
+            "type": "boolean"
+          },
+          "constant": {
+            "description": "A constant value may feed it",
+            "type": "boolean"
+          },
+          "group": {
+            "enum": [
+              "product",
+              "variant",
+              "addon",
+              "attribute"
+            ],
+            "type": "string"
+          },
+          "repeatable": {
+            "type": "boolean"
+          },
+          "required": {
+            "description": "Every profile maps it (product.modelNumber; product.productType and product.category unless the profile fixes them)",
+            "type": "boolean"
+          },
+          "target": {
+            "description": "The mapping target, e.g. product.name.de or attribute.width_te",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "group",
+          "repeatable",
+          "constant",
+          "columnOptional",
+          "required"
+        ],
+        "type": "object"
+      },
+      "ImportTypeRef": {
+        "additionalProperties": false,
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
       "InstanceAttributeDefinition": {
         "additionalProperties": false,
         "properties": {
@@ -3100,6 +4207,922 @@
         "summary": "Liveness and database check",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/import-profiles": {
+      "get": {
+        "description": "By name. With no profile at all, the starter profile \"SnapFlow 1 workbook\" is created first.",
+        "operationId": "listImportProfiles",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportProfile"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List import profiles",
+        "tags": [
+          "imports"
+        ]
+      },
+      "post": {
+        "operationId": "createImportProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportProfile"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an import profile",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import-profiles/{id}": {
+      "delete": {
+        "description": "Runs keep their copy of the mapping.",
+        "operationId": "deleteImportProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete an import profile",
+        "tags": [
+          "imports"
+        ]
+      },
+      "get": {
+        "operationId": "getImportProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportProfile"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get an import profile",
+        "tags": [
+          "imports"
+        ]
+      },
+      "put": {
+        "operationId": "updateImportProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportProfile"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update an import profile",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import-targets": {
+      "get": {
+        "description": "The fixed targets, then the attribute keys of the categories with their definitions per category.",
+        "operationId": "listImportTargets",
+        "parameters": [
+          {
+            "description": "Only the attributes of these categories (repeat or comma-separate); all categories when empty",
+            "explode": false,
+            "in": "query",
+            "name": "categoryId",
+            "schema": {
+              "description": "Only the attributes of these categories (repeat or comma-separate); all categories when empty",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportTarget"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List mapping targets",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports": {
+      "get": {
+        "description": "Newest first.",
+        "operationId": "listImports",
+        "parameters": [
+          {
+            "description": "Page size, 1-500",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-500",
+              "format": "int64",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRunPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List import runs",
+        "tags": [
+          "imports"
+        ]
+      },
+      "post": {
+        "description": "Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content (415 import.file_type), at most 50 MB (413 import.too_large), 20 000 rows (422 import.too_many_rows) and 5 000 pictures (422 import.too_many_images). Creates a run in state uploaded; with `profileId` it is previewed at once.",
+        "operationId": "createImport",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                },
+                "profileId": {
+                  "contentType": "text/plain"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "file": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": ".xlsx workbook or UTF-8 .csv (; or , separated), at most 50 MB",
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "profileId": {
+                    "description": "Preview at once with this profile",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Upload a file to import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}": {
+      "get": {
+        "operationId": "getImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get an import run",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/apply": {
+      "post": {
+        "description": "Writes the previewed diff in one transaction. 409 import.stale if the catalog changed since the preview (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. A write that fails rolls everything back: the run comes back in state failed with `error`.",
+        "operationId": "applyImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportApplyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Apply a previewed import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/changes": {
+      "get": {
+        "operationId": "listImportChanges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, 1-500",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-500",
+              "format": "int64",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportChangePage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List an applied run's change log",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/issues": {
+      "get": {
+        "operationId": "listImportIssues",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only errors or only warnings",
+            "explode": false,
+            "in": "query",
+            "name": "severity",
+            "schema": {
+              "description": "Only errors or only warnings",
+              "enum": [
+                "error",
+                "warning",
+                ""
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, 1-500",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-500",
+              "format": "int64",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportIssuePage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List row errors and warnings",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/items": {
+      "get": {
+        "description": "The diff in apply order: categories to create, then each product with its variants, then products to deactivate.",
+        "operationId": "listImportItems",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only items of this entity",
+            "explode": false,
+            "in": "query",
+            "name": "entity",
+            "schema": {
+              "description": "Only items of this entity",
+              "enum": [
+                "category",
+                "product",
+                "variant",
+                ""
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only items with this status",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Only items with this status",
+              "enum": [
+                "new",
+                "changed",
+                "unchanged",
+                "deactivate",
+                ""
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only items of rows with errors",
+            "explode": false,
+            "in": "query",
+            "name": "skipped",
+            "schema": {
+              "description": "Only items of rows with errors",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Page size, 1-500",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-500",
+              "format": "int64",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportItemPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List a preview's changes",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/preview": {
+      "post": {
+        "description": "Computes the diff against the catalog with a profile (`profileId`) or an unsaved `mapping` and stores it; possible until the run is applied. ImportMapping problems are 422 at `mapping.*` (profile) or `body.mapping.*`, e.g. import.column_missing; a file without data rows is 422 import.no_rows.",
+        "operationId": "previewImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Preview an import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/source": {
+      "get": {
+        "description": "For mapping: sheets, the columns with their header texts and the first data rows.",
+        "operationId": "getImportSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sheet name; empty for the first",
+            "explode": false,
+            "in": "query",
+            "name": "sheet",
+            "schema": {
+              "description": "Sheet name; empty for the first",
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Row number of the column headers (0: none)",
+            "explode": false,
+            "in": "query",
+            "name": "headerRow",
+            "schema": {
+              "default": 1,
+              "description": "Row number of the column headers (0: none)",
+              "format": "int64",
+              "maximum": 1000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How many data rows to show",
+            "explode": false,
+            "in": "query",
+            "name": "rows",
+            "schema": {
+              "default": 5,
+              "description": "How many data rows to show",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportSourcePreview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Show the file's columns and first rows",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/imports/{id}/undo": {
+      "post": {
+        "description": "Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, params.entities: [{entity, id, label}]) if anything it touched changed since.",
+        "operationId": "undoImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Undo an applied import",
+        "tags": [
+          "imports"
         ]
       }
     },
