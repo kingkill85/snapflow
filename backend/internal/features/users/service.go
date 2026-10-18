@@ -126,7 +126,7 @@ func (s *Service) Create(ctx context.Context, in UserInput) (User, error) {
 	if in.TenantID != nil {
 		tenantID = *in.TenantID
 	}
-	if err := s.checkAssignment(ctx, actor, in.Role, tenantID); err != nil {
+	if err := s.checkAssignment(ctx, actor, in.Role, tenantID, nil); err != nil {
 		return User{}, err
 	}
 	if in.Password == "" {
@@ -199,7 +199,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UserInput) (User,
 				return apperr.New(http.StatusConflict, "user.own_tenant", "you cannot move yourself to another tenant")
 			}
 		}
-		if err := s.checkAssignment(ctx, actor, in.Role, tenantID); err != nil {
+		if err := s.checkAssignment(ctx, actor, in.Role, tenantID, &current.TenantID); err != nil {
 			return err
 		}
 		if isActiveAdmin(current) && (in.Role != auth.RoleAdmin || !in.IsActive) {
@@ -372,8 +372,10 @@ func checkVisible(actor auth.Actor, row store.User, err error) (store.User, erro
 	return row, nil
 }
 
-// checkAssignment enforces who may give which role in which tenant.
-func (s *Service) checkAssignment(ctx context.Context, actor auth.Actor, role auth.Role, tenantID uuid.UUID) error {
+// checkAssignment enforces who may give which role in which tenant. An
+// archived tenant (D13) takes no new users: it counts as unknown unless the
+// user already belongs to it (currentTenant).
+func (s *Service) checkAssignment(ctx context.Context, actor auth.Actor, role auth.Role, tenantID uuid.UUID, currentTenant *uuid.UUID) error {
 	if !actor.CanAssign(role) {
 		return apperr.New(http.StatusForbidden, "user.role_forbidden", "you cannot assign this role").With("role", string(role))
 	}
@@ -387,6 +389,9 @@ func (s *Service) checkAssignment(ctx context.Context, actor auth.Actor, role au
 			return apperr.Invalid("body.tenantId", "user.tenant_not_found", "tenant does not exist")
 		}
 		return err
+	}
+	if tenant.ArchivedAt != nil && (currentTenant == nil || *currentTenant != tenantID) {
+		return apperr.Invalid("body.tenantId", "user.tenant_not_found", "tenant does not exist")
 	}
 	if role == auth.RoleAdmin && !tenant.IsDistributor {
 		return apperr.Invalid("body.role", "user.admin_requires_distributor", "admins must belong to the distributor tenant")

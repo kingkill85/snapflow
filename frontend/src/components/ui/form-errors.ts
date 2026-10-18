@@ -56,6 +56,8 @@ export const errorParamNames = {
   'import_profile.name_taken': ['name'],
   'product.model_number_taken': ['modelNumber'],
   'product_type.key_taken': ['key'],
+  'project_version.name_taken': ['name'],
+  'tenant.has_projects': ['count'],
   'tenant.name_taken': ['name'],
   'user.email_taken': ['email'],
   'variant.name_taken': ['name'],

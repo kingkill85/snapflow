@@ -46,7 +46,7 @@ func Register(api huma.API, svc *Service) {
 		OperationID: "uploadFile",
 		Method:      http.MethodPost,
 		Path:        "/api/files",
-		Summary:     "Upload an image",
+		Summary:     "Upload a catalog image",
 		Description: "Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), " +
 			"at most 10 MB (413 file.too_large, also for a chunked body) and 25 megapixels (422 file.too_many_pixels). " +
 			"Other or damaged content is 415 file.type. JPEG and PNG are re-encoded in the same format without metadata, " +
@@ -61,7 +61,7 @@ func Register(api huma.API, svc *Service) {
 		if f.Size > MaxSize {
 			return nil, ErrTooLarge()
 		}
-		file, err := svc.Upload(ctx, f)
+		file, err := svc.Upload(ctx, Catalog, f)
 		if err != nil {
 			return nil, err
 		}

@@ -9,6 +9,7 @@ import type { SelectOption } from './select'
 
 type CheckboxGroupFieldProps = {
   label: string
+  /** `content` (e.g. a TypeBadge) replaces an option's label text when given. */
   options: SelectOption[]
   /**
    * The checked values, in option order. Values that are not options (e.g.
@@ -47,8 +48,11 @@ export function CheckboxGroupField({ label, options, value, onChange, unknownLab
   return (
     <fieldset className="group/field min-w-0 space-y-1.5" disabled={disabled} aria-describedby={describedBy}>
       <legend className="mb-1.5 text-sm font-medium">
-        {label}
-        {required && <RequiredMark />}
+        {/* The same gap before the mark as FieldLabel. */}
+        <span className="inline-flex items-baseline gap-0.5">
+          {label}
+          {required && <RequiredMark />}
+        </span>
       </legend>
       {required && (
         <span id={requiredId} className="sr-only">
@@ -59,7 +63,7 @@ export function CheckboxGroupField({ label, options, value, onChange, unknownLab
         {options.map((o) => (
           <CheckboxField
             key={o.value}
-            label={o.label}
+            label={o.content ?? o.label}
             checked={checked.has(o.value)}
             onChange={(e) => toggle(o.value, e.target.checked)}
             aria-invalid={error ? true : undefined}

@@ -34,11 +34,13 @@ type File struct {
 	Width       *int32
 	Height      *int32
 	CreatedAt   time.Time
+	TenantID    *uuid.UUID
 }
 
 type FileSource struct {
 	SourceSha256 string
 	FileID       uuid.UUID
+	TenantID     *uuid.UUID
 }
 
 type FunctionType struct {
@@ -155,6 +157,49 @@ type ProductVariant struct {
 	AddonsUpdatedAt time.Time
 }
 
+type Project struct {
+	ID              uuid.UUID
+	TenantID        uuid.UUID
+	Number          string
+	Name            string
+	Status          string
+	Language        string
+	Currency        string
+	ExchangeRate    string
+	CustomerName    string
+	CustomerCompany string
+	CustomerEmail   string
+	CustomerPhone   string
+	CustomerAddress string
+	Notes           string
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type ProjectNumberCounter struct {
+	TenantID   uuid.UUID
+	Year       int32
+	LastNumber int32
+}
+
+type ProjectProductType struct {
+	TenantID      uuid.UUID
+	ProjectID     uuid.UUID
+	ProductTypeID uuid.UUID
+}
+
+type ProjectVersion struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	ProjectID uuid.UUID
+	Name      string
+	Position  int32
+	Notes     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Session struct {
 	ID         uuid.UUID
 	TokenHash  []byte
@@ -171,6 +216,7 @@ type Tenant struct {
 	IsActive      bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	ArchivedAt    *time.Time
 }
 
 type User struct {

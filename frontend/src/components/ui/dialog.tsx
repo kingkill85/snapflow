@@ -88,6 +88,8 @@ type ConfirmDialogProps = {
   title: string
   message: string
   confirmLabel: string
+  /** The confirm button: `danger` (default) for what cannot be undone, `primary` for a reversible step such as archiving (D184). */
+  confirmVariant?: 'danger' | 'primary'
   /** Defaults to "Cancel". */
   cancelLabel?: string
   pending: boolean
@@ -96,7 +98,7 @@ type ConfirmDialogProps = {
 }
 
 /** The one delete/confirm pattern. */
-export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel, cancelLabel, pending, onConfirm, error }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel, confirmVariant = 'danger', cancelLabel, pending, onConfirm, error }: ConfirmDialogProps) {
   const { t } = useTranslation()
   return (
     <Dialog
@@ -109,7 +111,7 @@ export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             {cancelLabel ?? t('action.cancel')}
           </Button>
-          <Button variant="danger" disabled={pending} onClick={onConfirm}>
+          <Button variant={confirmVariant} disabled={pending} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

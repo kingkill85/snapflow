@@ -332,7 +332,7 @@ func (s *Service) Upload(ctx context.Context, name string, data []byte) (ImportR
 	if src.Kind() == importsrc.KindXLSX {
 		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 	}
-	file, err := s.files.StoreDocument(ctx, data, contentType)
+	file, err := s.files.StoreDocument(ctx, files.Catalog, data, contentType)
 	if err != nil {
 		return ImportRun{}, err
 	}
@@ -551,7 +551,7 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 			if err != nil {
 				return uuid.Nil, err
 			}
-			f, err := s.files.UploadBytes(ctx, data)
+			f, err := s.files.UploadBytes(ctx, files.Catalog, data)
 			return f.ID, err
 		},
 	}, loc)

@@ -12,6 +12,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
+	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
@@ -45,5 +46,8 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc)
 	products.Register(api, productSvc)
 	imports.Register(api, imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users))
+	projectSvc := projects.NewService(deps.DB, productTypes, c.tenants)
+	c.tenants.UseProjects(projectSvc)
+	projects.Register(api, projectSvc)
 	// scaffold:features
 }

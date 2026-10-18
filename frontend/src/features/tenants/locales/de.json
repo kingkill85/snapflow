@@ -5,7 +5,7 @@
   "new": "Neuer Mandant",
   "edit": "Mandant bearbeiten",
   "deleteTitle": "Mandant löschen",
-  "deleteMessage": "\"{{name}}\" mit allen Benutzern löschen? Das kann nicht rückgängig gemacht werden.",
+  "deleteMessage": "„{{name}}“ mit allen Benutzern löschen? Das kann nicht rückgängig gemacht werden.",
   "distributor": "Distributor",
   "partner": "Partner",
   "field": {
@@ -14,6 +14,15 @@
     "status": "Status",
     "active": "Aktiv",
     "activeHint": "Benutzer eines inaktiven Mandanten können sich nicht anmelden.",
-    "distributorHint": "Der Distributor-Mandant bleibt immer aktiv."
-  }
+    "archivedHint": "Ein archivierter Mandant bleibt inaktiv. Stellen Sie ihn zuerst wieder her, um ihn zu aktivieren.",
+    "distributorHint": "Der Distributor-Mandant bleibt immer aktiv.",
+    "projects": "Projekte"
+  },
+  "showArchived": "Archivierte anzeigen",
+  "archived": "Archiviert",
+  "restore": "Wiederherstellen",
+  "archiveTitle": "Mandant archivieren",
+  "archiveMessage_one": "„{{name}}“ hat {{count}} Projekt und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archiveMessage_other": "„{{name}}“ hat {{count}} Projekte und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archive": "Archivieren"
 }

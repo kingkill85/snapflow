@@ -1,6 +1,8 @@
 package tenants_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
+	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
+	"github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
+	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
@@ -183,5 +188,111 @@ func assertContains(t *testing.T, body string, want ...string) {
 		if !strings.Contains(body, w) {
 			t.Errorf("response %s does not contain %s", body, w)
 		}
+	}
+}
+
+// D13: a tenant with projects is archived instead of deleted.
+func TestArchive(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	if resp := api.Post("/api/product-types", admin, map[string]any{"key": "zigbee", "name": map[string]string{"en": "Zigbee"}, "isActive": true}); resp.Code != http.StatusCreated {
+		t.Fatalf("type: %d %s", resp.Code, resp.Body)
+	}
+	acme := api.NewTenant("Acme")
+	empty := api.NewTenant("Empty")
+	user := api.NewUser(acme, auth.RoleUser)
+	if resp := api.Post("/api/projects", user.Cookie, map[string]any{"name": "Villa"}); resp.Code != http.StatusCreated {
+		t.Fatalf("project: %d %s", resp.Code, resp.Body)
+	}
+	assertContains(t, api.Get("/api/tenants/"+acme.String(), admin).Body.String(), `"projectCount":1`)
+	assertContains(t, api.Get("/api/tenants/"+empty.String(), admin).Body.String(), `"projectCount":0`)
+
+	// Without projects: deleted.
+	if resp := api.Delete("/api/tenants/"+empty.String(), admin); resp.Code != http.StatusNoContent {
+		t.Fatalf("delete empty: %d %s", resp.Code, resp.Body)
+	}
+	if resp := api.Get("/api/tenants/"+empty.String(), admin); resp.Code != http.StatusNotFound {
+		t.Fatalf("empty tenant still there: %d", resp.Code)
+	}
+
+	// With projects: archived and deactivated, users and projects kept.
+	if resp := api.Delete("/api/tenants/"+acme.String(), admin); resp.Code != http.StatusNoContent {
+		t.Fatalf("archive: %d %s", resp.Code, resp.Body)
+	}
+	body := api.Get("/api/tenants/"+acme.String(), admin).Body.String()
+	assertContains(t, body, `"archivedAt":"`, `"isActive":false`, `"projectCount":1`)
+	if strings.Contains(api.Get("/api/tenants", admin).Body.String(), `"Acme"`) {
+		t.Error("archived tenant listed without includeArchived")
+	}
+	assertContains(t, api.Get("/api/tenants?includeArchived=true", admin).Body.String(), `"Acme"`)
+	if resp := api.Get("/api/users?tenantId="+acme.String(), admin); !strings.Contains(resp.Body.String(), user.Email) {
+		t.Errorf("users kept: %s", resp.Body)
+	}
+
+	// Archived: not assignable, not activatable, not deletable again.
+	resp := api.Post("/api/users", admin, map[string]any{
+		"email": "new@snapflow.test", "fullName": "New", "role": "user", "tenantId": acme, "isActive": true, "password": apptest.Password,
+	})
+	if resp.Code != http.StatusUnprocessableEntity || !strings.Contains(resp.Body.String(), "user.tenant_not_found") {
+		t.Errorf("user in archived tenant: %d %s", resp.Code, resp.Body)
+	}
+	resp = api.Post("/api/projects", admin, map[string]any{"name": "x", "tenantId": acme})
+	if resp.Code != http.StatusUnprocessableEntity || !strings.Contains(resp.Body.String(), "project.tenant_not_found") {
+		t.Errorf("project in archived tenant: %d %s", resp.Code, resp.Body)
+	}
+	resp = api.Put("/api/tenants/"+acme.String(), admin, tenant("Acme", true))
+	if resp.Code != http.StatusConflict || !strings.Contains(resp.Body.String(), "tenant.archived") {
+		t.Errorf("activate archived: %d %s", resp.Code, resp.Body)
+	}
+	resp = api.Delete("/api/tenants/"+acme.String(), admin)
+	if resp.Code != http.StatusConflict || !strings.Contains(resp.Body.String(), "tenant.has_projects") {
+		t.Errorf("delete archived: %d %s", resp.Code, resp.Body)
+	}
+
+	// Restore: unarchived, still inactive until activated.
+	resp = api.Post("/api/tenants/"+acme.String()+"/restore", admin, map[string]any{})
+	if resp.Code != http.StatusOK || strings.Contains(resp.Body.String(), "archivedAt") || !strings.Contains(resp.Body.String(), `"isActive":false`) {
+		t.Fatalf("restore: %d %s", resp.Code, resp.Body)
+	}
+	if resp := api.Put("/api/tenants/"+acme.String(), admin, tenant("Acme", true)); resp.Code != http.StatusOK {
+		t.Errorf("activate restored: %d %s", resp.Code, resp.Body)
+	}
+	if resp := api.Post("/api/tenants/"+acme.String()+"/restore", admin, map[string]any{}); resp.Code != http.StatusOK {
+		t.Errorf("restore again: %d", resp.Code)
+	}
+	if resp := api.Post("/api/tenants/"+uuid.NewString()+"/restore", admin, map[string]any{}); resp.Code != http.StatusNotFound {
+		t.Errorf("restore unknown: %d", resp.Code)
+	}
+}
+
+// archiveBeforeUpdate archives the tenant right before the update, as a
+// concurrent delete would between the service's read and its write.
+type archiveBeforeUpdate struct{ store.Querier }
+
+func (a archiveBeforeUpdate) UpdateTenant(ctx context.Context, arg store.UpdateTenantParams) (store.Tenant, error) {
+	if _, err := a.ArchiveTenant(ctx, arg.ID); err != nil {
+		return store.Tenant{}, err
+	}
+	return a.Querier.UpdateTenant(ctx, arg)
+}
+
+// An update cannot activate a tenant archived after it was read.
+func TestActivateArchivedConcurrently(t *testing.T) {
+	api := apptest.New(t)
+	acme := api.NewTenant("Acme")
+	svc := tenants.NewService(archiveBeforeUpdate{store.New(api.DB)})
+	ctx := auth.WithActor(t.Context(), auth.Actor{UserID: api.Admin.UserID, TenantID: api.Distributor, Role: auth.RoleAdmin})
+	_, err := svc.Update(ctx, acme, tenants.TenantInput{Name: "Acme", IsActive: true})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Code != "tenant.archived" {
+		t.Fatalf("want tenant.archived, got %v", err)
+	}
+	var active bool
+	if err := api.DB.QueryRow(ctx, "SELECT is_active FROM tenants WHERE id = $1", acme).Scan(&active); err != nil || active {
+		t.Errorf("archived tenant activated: %v %v", active, err)
+	}
+	// Deactivating (or renaming) an archived tenant is still fine.
+	if _, err := svc.Update(ctx, acme, tenants.TenantInput{Name: "Acme 2", IsActive: false}); err != nil {
+		t.Errorf("rename archived: %v", err)
 	}
 }

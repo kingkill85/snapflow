@@ -358,7 +358,7 @@ describe('ProductTypesPage', () => {
     let dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Delete "Zigbee"?')
     await u.click(within(dialog).getByRole('button', { name: 'Delete' }))
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('This product type is still used by products. Deactivate it instead.')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('This product type is still used by products or projects. Deactivate it instead.')
     await u.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     await u.click(within(row('HDL Buspro')).getByRole('button', { name: 'Delete' }))

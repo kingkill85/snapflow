@@ -87,7 +87,15 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
       {item?.isDistributor ? (
         <p className="text-sm text-muted">{t('field.distributorHint')}</p>
       ) : (
-        <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
+        <>
+          {/* An archived tenant cannot be activated: restore it first (D182); the hint says so, at the switch (D183). */}
+          <SwitchField
+            label={t('field.active')}
+            hint={item?.archivedAt ? t('field.archivedHint') : t('field.activeHint')}
+            disabled={!!item?.archivedAt}
+            {...form.register('isActive')}
+          />
+        </>
       )}
     </FormDialog>
   )

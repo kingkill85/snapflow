@@ -13,6 +13,7 @@ import { expect, test, unique, uniqueKey } from '../fixtures'
 // combination is tagged @visual and runs with `make e2e-visual` (the "visual"
 // project), which also saves screenshots to e2e/screenshots/ for a look by eye.
 const pages = [
+  { name: 'projects', path: '/projects', heading: 'Projects' },
   { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
   { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
   { name: 'categories', path: '/catalog/categories', heading: 'Categories' },
@@ -44,6 +45,7 @@ async function screenshot(page: Page, testInfo: TestInfo, file: string, fullPage
 // longer German: all columns incl. the row actions fit, the table box does not
 // scroll (D95).
 const listPages = [
+  { name: 'projects', path: '/projects', heading: { en: 'Projects', de: 'Projekte' } },
   { name: 'products', path: '/catalog/products', heading: { en: 'Products', de: 'Produkte' } },
   { name: 'categories', path: '/catalog/categories', heading: { en: 'Categories', de: 'Kategorien' } },
   { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Product types', de: 'Produkttypen' } },
@@ -106,6 +108,11 @@ for (const width of [1280, 1440, 1920]) {
           modelNumber: unique('M485/GW-ZB.10').replace(/\s+/g, '-'),
           name: { en: 'Universal dimmer actuator, 4-fold, with manual operation and status LEDs', de: 'Universal-Dimmaktor, 4-fach, mit Handbedienung und Status-LEDs' },
         })
+        await api.createProject({
+          name: unique('Villa Mustermann-Schmidt, Erweiterung Nebengebäude'),
+          tenantId: (await api.createTenant(unique('Elektrotechnik Mustermann-Schmidt GmbH & Co. KG'))).id,
+          customer: { name: 'Maximilian Alexander Mustermann-Schmidt', company: 'Mustermann-Schmidt Immobilienverwaltung GmbH' },
+        })
         // Required afterwards: the product misses the value, a problem badge in the status cell.
         await api.updateCategory(category.id, { attributes: [{ ...attribute, required: true }] })
         await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
@@ -140,7 +147,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       test('app pages fit the screen', async ({ page, api }, testInfo) => {
         // Something to delete, and a long name in the table.
         await api.createUser({ fullName: 'Maximilian Alexander Mustermann-Schmidt' })
-        for (const p of pages) {
+        await api.createProductType()
+        const project = await api.createProject({
+          name: unique('Villa Mustermann-Schmidt, Erweiterung Nebengebäude'),
+          customer: { name: 'Maximilian Alexander Mustermann-Schmidt', company: 'Mustermann-Schmidt Immobilienverwaltung GmbH' },
+        })
+        for (const p of [...pages, { name: 'project', path: `/projects/${project.id}`, heading: `${project.number} ${project.name}` }]) {
           await page.goto(p.path)
           await expect(page.getByRole('heading', { name: p.heading, level: 1 })).toBeVisible()
           await expect(page.getByText('Loading…')).toHaveCount(0)
@@ -177,6 +189,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByRole('button', { name: 'Delete' }).first().click()
         await expect(page.getByRole('dialog', { name: 'Delete user' })).toBeVisible()
         await screenshot(page, testInfo, `delete-dialog-${viewport.name}-${colorScheme}`)
+        await page.keyboard.press('Escape')
+
+        // The project dialogs.
+        await page.goto(`/projects/${project.id}`)
+        await page.getByRole('button', { name: 'Edit project' }).click()
+        await expect(page.getByRole('dialog', { name: 'Edit project' })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await screenshot(page, testInfo, `project-dialog-${viewport.name}-${colorScheme}`)
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: 'New version' }).click()
+        await expect(page.getByRole('dialog', { name: 'New version' })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await screenshot(page, testInfo, `version-dialog-${viewport.name}-${colorScheme}`)
       })
 
       test('the category editor and the product type dialog fit the screen', async ({ page, api }, testInfo) => {

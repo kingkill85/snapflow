@@ -17,6 +17,8 @@ export interface File {
   sha256: string;
   /** Bytes as stored (after downscaling) */
   size: number;
+  /** The tenant the file belongs to; absent for catalog files */
+  tenantId?: string;
   /** Download path (needs a login) */
   url: string;
   /** Pixels, for images */

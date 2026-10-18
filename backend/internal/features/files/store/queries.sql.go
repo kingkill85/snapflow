@@ -12,27 +12,30 @@ import (
 )
 
 const addFileSource = `-- name: AddFileSource :exec
-INSERT INTO file_sources (source_sha256, file_id) VALUES ($1, $2) ON CONFLICT (source_sha256) DO NOTHING
+INSERT INTO file_sources (tenant_id, source_sha256, file_id) VALUES ($1, $2, $3)
+ON CONFLICT (tenant_id, source_sha256) DO NOTHING
 `
 
 type AddFileSourceParams struct {
+	TenantID     *uuid.UUID
 	SourceSha256 string
 	FileID       uuid.UUID
 }
 
 func (q *Queries) AddFileSource(ctx context.Context, arg AddFileSourceParams) error {
-	_, err := q.db.Exec(ctx, addFileSource, arg.SourceSha256, arg.FileID)
+	_, err := q.db.Exec(ctx, addFileSource, arg.TenantID, arg.SourceSha256, arg.FileID)
 	return err
 }
 
 const createFile = `-- name: CreateFile :one
-INSERT INTO files (sha256, content_type, size, width, height)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (sha256) DO UPDATE SET sha256 = EXCLUDED.sha256
-RETURNING id, sha256, content_type, size, width, height, created_at
+INSERT INTO files (tenant_id, sha256, content_type, size, width, height)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (tenant_id, sha256) DO UPDATE SET sha256 = EXCLUDED.sha256
+RETURNING id, sha256, content_type, size, width, height, created_at, tenant_id
 `
 
 type CreateFileParams struct {
+	TenantID    *uuid.UUID
 	Sha256      string
 	ContentType string
 	Size        int64
@@ -40,10 +43,12 @@ type CreateFileParams struct {
 	Height      *int32
 }
 
-// CreateFile stores a file's metadata, or returns the existing row when the
-// same bytes were stored before (the no-op update makes RETURNING see it).
+// CreateFile stores a file's metadata in its scope (tenant_id NULL: the
+// catalog), or returns the existing row when the same bytes were stored in
+// that scope before (the no-op update makes RETURNING see it).
 func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, error) {
 	row := q.db.QueryRow(ctx, createFile,
+		arg.TenantID,
 		arg.Sha256,
 		arg.ContentType,
 		arg.Size,
@@ -59,18 +64,25 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, e
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
+		&i.TenantID,
 	)
 	return i, err
 }
 
 const fileBySource = `-- name: FileBySource :one
-SELECT f.id, f.sha256, f.content_type, f.size, f.width, f.height, f.created_at FROM file_sources s JOIN files f ON f.id = s.file_id WHERE s.source_sha256 = $1
+SELECT f.id, f.sha256, f.content_type, f.size, f.width, f.height, f.created_at, f.tenant_id FROM file_sources s JOIN files f ON f.id = s.file_id
+WHERE s.source_sha256 = $1 AND s.tenant_id IS NOT DISTINCT FROM $2::uuid
 `
 
-// FileBySource returns the file an uploaded image became (file_sources),
-// by the SHA-256 of the uploaded bytes.
-func (q *Queries) FileBySource(ctx context.Context, sourceSha256 string) (File, error) {
-	row := q.db.QueryRow(ctx, fileBySource, sourceSha256)
+type FileBySourceParams struct {
+	SourceSha256 string
+	TenantID     *uuid.UUID
+}
+
+// FileBySource returns the file an uploaded image became (file_sources) in
+// a scope, by the SHA-256 of the uploaded bytes.
+func (q *Queries) FileBySource(ctx context.Context, arg FileBySourceParams) (File, error) {
+	row := q.db.QueryRow(ctx, fileBySource, arg.SourceSha256, arg.TenantID)
 	var i File
 	err := row.Scan(
 		&i.ID,
@@ -80,23 +92,31 @@ func (q *Queries) FileBySource(ctx context.Context, sourceSha256 string) (File, 
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
+		&i.TenantID,
 	)
 	return i, err
 }
 
 const fileExists = `-- name: FileExists :one
-SELECT EXISTS (SELECT 1 FROM files WHERE id = $1)
+SELECT EXISTS (SELECT 1 FROM files WHERE id = $1 AND tenant_id IS NOT DISTINCT FROM $2::uuid)
 `
 
-func (q *Queries) FileExists(ctx context.Context, id uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, fileExists, id)
+type FileExistsParams struct {
+	ID       uuid.UUID
+	TenantID *uuid.UUID
+}
+
+// FileExists reports whether a file exists in a scope (tenant_id NULL: the
+// catalog).
+func (q *Queries) FileExists(ctx context.Context, arg FileExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, fileExists, arg.ID, arg.TenantID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
 const getFile = `-- name: GetFile :one
-SELECT id, sha256, content_type, size, width, height, created_at FROM files WHERE id = $1
+SELECT id, sha256, content_type, size, width, height, created_at, tenant_id FROM files WHERE id = $1
 `
 
 func (q *Queries) GetFile(ctx context.Context, id uuid.UUID) (File, error) {
@@ -110,6 +130,7 @@ func (q *Queries) GetFile(ctx context.Context, id uuid.UUID) (File, error) {
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
+		&i.TenantID,
 	)
 	return i, err
 }

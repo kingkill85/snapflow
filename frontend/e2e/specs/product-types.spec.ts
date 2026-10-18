@@ -120,7 +120,7 @@ test('reorder and delete on the list; a type in use cannot be deleted', async ({
   const confirm = page.getByRole('dialog', { name: 'Delete product type' })
   await expect(confirm).toContainText(`Delete "${a.name.en}"?`)
   await confirm.getByRole('button', { name: 'Delete' }).click()
-  await expect(confirm.getByRole('alert')).toHaveText('This product type is still used by products. Deactivate it instead.')
+  await expect(confirm.getByRole('alert')).toHaveText('This product type is still used by products or projects. Deactivate it instead.')
   await confirm.getByRole('button', { name: 'Cancel' }).click()
 
   await row(page, c.key).getByRole('button', { name: 'Delete' }).click()

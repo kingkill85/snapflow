@@ -9,6 +9,8 @@ import type { Actions } from './actions';
 export interface Tenant {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Set while the tenant is archived: deleted, but kept for its projects */
+  archivedAt?: string;
   can: Actions;
   createdAt: string;
   id: string;
@@ -17,5 +19,7 @@ export interface Tenant {
   /** The one tenant that runs SnapFlow; home of the admins */
   isDistributor: boolean;
   name: string;
+  /** Projects of the tenant: deleting a tenant with projects archives it */
+  projectCount: number;
   updatedAt: string;
 }

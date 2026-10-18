@@ -1,0 +1,90 @@
+{
+  "title": "Projekte",
+  "description": "Kundenprojekte mit ihren Versionen.",
+  "empty": "Noch keine Projekte.",
+  "emptyFiltered": "Keine Projekte passen zu den Filtern.",
+  "new": "Neues Projekt",
+  "edit": "Projekt bearbeiten",
+  "search": "Suche",
+  "searchHint": "Nummer, Name oder Kunde",
+  "statusFilter": "Status",
+  "tenantFilter": "Mandant",
+  "archivedTenant": "{{name}} (archiviert)",
+  "tenantArchived": "Archiviert",
+  "allTenants": "Alle Mandanten",
+  "deleteTitle": "Projekt löschen",
+  "deleteMessage": "Projekt {{name}} mit allen Versionen löschen? Das kann nicht rückgängig gemacht werden.",
+  "status": {
+    "active": "Aktiv",
+    "completed": "Abgeschlossen",
+    "cancelled": "Storniert",
+    "all": "Alle"
+  },
+  "column": {
+    "number": "Nummer",
+    "name": "Name",
+    "customer": "Kunde",
+    "tenant": "Mandant",
+    "status": "Status",
+    "versions": "Versionen",
+    "updated": "Geändert"
+  },
+  "section": {
+    "project": "Projekt",
+    "customer": "Kunde",
+    "pricing": "Sprache und Währung"
+  },
+  "field": {
+    "name": "Name",
+    "nameHint": "Wie das Projekt heißt, z. B. „Villa Müller“",
+    "tenant": "Mandant",
+    "status": "Status",
+    "productTypes": "Produkttypen",
+    "productTypesHint": "Die Systeme, die das Projekt verwendet",
+    "inactiveType": "{{name}} (inaktiv)",
+    "language": "Sprache",
+    "languageHint": "Die Sprache der Angebote",
+    "currency": "Währung",
+    "currencyHint": "Dreistelliger Code, z. B. EUR",
+    "exchangeRate": "Wechselkurs",
+    "exchangeRateHint": "{{currency}} je 1 USD",
+    "exchangeRateUsd": "Katalogpreise sind in USD: der Kurs ist 1",
+    "customerName": "Name",
+    "customerCompany": "Firma",
+    "customerEmail": "E-Mail",
+    "customerPhone": "Telefon",
+    "customerAddress": "Adresse",
+    "notes": "Notizen"
+  },
+  "page": {
+    "noCustomer": "Noch kein Kunde",
+    "versionSelect": "Version",
+    "newVersion": "Neue Version",
+    "renameVersion": "Umbenennen",
+    "deleteVersion": "Version löschen",
+    "lastVersionHint": "Die letzte Version kann nicht gelöscht werden. Löschen Sie stattdessen das Projekt.",
+    "noPlans": "Noch keine Pläne.",
+    "readOnly": {
+      "completed": "Dieses Projekt ist abgeschlossen. Öffnen Sie es wieder, um es zu ändern.",
+      "cancelled": "Dieses Projekt ist storniert. Öffnen Sie es wieder, um es zu ändern."
+    },
+    "reopen": "Wieder öffnen",
+    "notFound": "Dieses Projekt gibt es nicht oder Sie können es nicht sehen.",
+    "backToList": "Alle Projekte",
+    "projectNotes": "Projektnotizen",
+    "versionNotes": "Versionsnotizen"
+  },
+  "version": {
+    "newTitle": "Neue Version",
+    "renameTitle": "Version umbenennen",
+    "name": "Name",
+    "notes": "Notizen",
+    "start": "Beginnen mit",
+    "deleteTitle": "Version löschen",
+    "deleteMessage": "Version {{name}} mit allem Inhalt löschen? Das kann nicht rückgängig gemacht werden.",
+    "copyOf": "Kopie von {{name}}",
+    "emptyOption": "Leere Version",
+    "emptyHint": "Beginnt ohne Pläne.",
+    "copyHint": "Kopiert alles aus {{name}}."
+  }
+}

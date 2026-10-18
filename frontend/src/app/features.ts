@@ -7,6 +7,7 @@ import { categoriesFeature } from '@/features/categories'
 import { productTypesFeature } from '@/features/product-types'
 import { productsFeature } from '@/features/products'
 import { importsFeature } from '@/features/imports'
+import { projectsFeature } from '@/features/projects'
 // scaffold:imports
 
 import type { FeatureModule } from './feature'
@@ -14,6 +15,8 @@ import type { FeatureModule } from './feature'
 // The one place where feature modules are wired into the shell.
 // `make feature` adds new features above the marker.
 export const features: FeatureModule[] = [
+  // First: the home page sends everybody to the first page they may see.
+  projectsFeature,
   functionTypesFeature,
   usersFeature,
   tenantsFeature,
