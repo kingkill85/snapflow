@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { cn } from '@/lib/cn'
+
 import type { ApiFieldMap } from './form-errors'
 import { useErrorMessage } from './use-error-message'
 
@@ -64,10 +66,19 @@ export function ErrorMessage({ error, fields, action }: { error: unknown; fields
   )
 }
 
-/** A short confirmation shown after an action succeeded. */
-export function Notice({ children }: { children: ReactNode }) {
+/**
+ * A short message: a confirmation after an action succeeded (default), or a
+ * warning about what an input will do (`tone="warning"`).
+ */
+export function Notice({ tone = 'success', children }: { tone?: 'success' | 'warning'; children: ReactNode }) {
   return (
-    <p role="status" className="rounded-control border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+    <p
+      role="status"
+      className={cn(
+        'rounded-control border px-3 py-2 text-sm',
+        tone === 'success' ? 'border-success/40 bg-success/10 text-success' : 'border-warning/50 bg-warning/10 text-ink',
+      )}
+    >
       {children}
     </p>
   )

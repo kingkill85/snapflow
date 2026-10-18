@@ -1,6 +1,6 @@
 import type { ParseKeys } from 'i18next'
 import i18next from 'i18next'
-import type { FieldValues, Path, UseFormSetError } from 'react-hook-form'
+import type { FieldErrors, FieldValues, Path, UseFormSetError } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '@/api/client'
@@ -133,6 +133,23 @@ export function setApiFieldErrors<T extends FieldValues>(error: unknown, setErro
   shown.sort((a, b) => Number(a.name.endsWith('.root')) - Number(b.name.endsWith('.root')))
   for (const { name, message } of shown) setError(name as Path<T>, { type: 'server', message }, { shouldFocus: false })
   return shown.length
+}
+
+/**
+ * An API error's per-field errors as react-hook-form errors (see
+ * setApiFieldErrors), e.g. for useForm's `errors` option to show the problems
+ * of loaded data from the start. Keep the result reference-stable.
+ */
+export function toFieldErrors<T extends FieldValues>(error: unknown, fields: ApiFieldMap): FieldErrors<T> {
+  const result: Record<string, unknown> = {}
+  const set = (name: string, value: object) => {
+    const parts = name.split('.')
+    let node = result
+    for (const part of parts.slice(0, -1)) node = (node[part] ??= {}) as Record<string, unknown>
+    node[parts[parts.length - 1]] = value
+  }
+  setApiFieldErrors(error, ((name: string, value: object) => set(name, value)) as UseFormSetError<T>, fields)
+  return result as FieldErrors<T>
 }
 
 /**

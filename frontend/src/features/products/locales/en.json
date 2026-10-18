@@ -1,0 +1,124 @@
+{
+  "title": "Products",
+  "description": "Orderable device models with their variants, prices and add-ons.",
+  "empty": "No products yet.",
+  "emptyFiltered": "No products match these filters.",
+  "new": "New product",
+  "edit": "Edit product",
+  "readOnly": "You can view this product but not change it.",
+  "created": "Product created. Add its variants below.",
+  "showInactive": "Show inactive",
+  "search": "Search",
+  "searchHint": "Model number, name or SKU",
+  "typeFilter": "Product type",
+  "allTypes": "All product types",
+  "deleteTitle": "Delete product",
+  "deleteMessage": "Delete \"{{name}}\" with all its variants and add-on links? This cannot be undone.",
+  "column": {
+    "image": "Image",
+    "modelNumber": "Model number",
+    "name": "Name",
+    "type": "Product type",
+    "variants": "Variants",
+    "price": "Price",
+    "status": "Status",
+    "problems": "Problems"
+  },
+  "problems_one": "{{count}} attribute value needs attention",
+  "problems_other": "{{count}} attribute values need attention",
+  "unavailableHint": "Active, but its product type is inactive.",
+  "noPrice": "–",
+  "section": {
+    "basics": "Basics",
+    "attributes": "Attributes",
+    "attributesHint": "Values of the product type's attributes that are set per product.",
+    "variants": "Variants",
+    "variantsHint": "The sellable versions of this product, each with its own price, image and add-ons."
+  },
+  "field": {
+    "productType": "Product type",
+    "chooseType": "Choose a product type",
+    "inactiveType": "{{name}} (inactive)",
+    "modelNumber": "Model number",
+    "modelNumberHint": "e.g. M485/GW-ZB.10; unique in the catalog",
+    "nameEn": "Name (English)",
+    "nameDe": "Name (German)",
+    "descriptionEn": "Description (English)",
+    "descriptionDe": "Description (German)",
+    "active": "Active",
+    "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting."
+  },
+  "typeChange": "You changed the product type. When you save, the values of this product and its variants are checked against the new type's attributes; values it does not have stay stored as values no longer in the schema.",
+  "chooseTypeFirst": "Choose a product type to fill in its attributes.",
+  "storedErrors": "Some stored values do not match the product type's current attributes. They are marked below; correct them before saving.",
+  "notFound": {
+    "title": "Product not found",
+    "message": "This product does not exist (anymore)."
+  },
+  "variants": {
+    "empty": "No variants yet. Add at least one, e.g. \"Standard\".",
+    "add": "Add variant",
+    "column": {
+      "image": "Image",
+      "name": "Name",
+      "sku": "SKU",
+      "price": "Price",
+      "status": "Status",
+      "addons": "Add-ons"
+    },
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "deleteTitle": "Delete variant",
+    "deleteMessage": "Delete the variant \"{{name}}\" with its add-on links? This cannot be undone."
+  },
+  "variant": {
+    "new": "New variant",
+    "edit": "Edit variant",
+    "readOnly": "You can view this variant but not change it.",
+    "created": "Variant created. You can now add its add-ons.",
+    "of": "Variant of {{product}}",
+    "backToProduct": "Back to product",
+    "section": {
+      "basics": "Basics",
+      "attributes": "Attributes",
+      "attributesHint": "Values of the product type's attributes that are set per variant."
+    },
+    "field": {
+      "nameEn": "Name (English)",
+      "nameHint": "e.g. Ivory White; \"Standard\" when the product has only one variant",
+      "nameDe": "Name (German)",
+      "sku": "SKU",
+      "skuHint": "Optional; unique in the catalog",
+      "price": "Price",
+      "priceHint": "List price in USD, e.g. 27.50",
+      "image": "Image",
+      "imageHint": "JPEG, PNG or WebP, at most 10 MB. Large images are scaled down.",
+      "active": "Active",
+      "activeHint": "Inactive variants cannot be added to projects."
+    },
+    "productInactive": "This variant is not available because its product or product type is inactive.",
+    "notFound": {
+      "title": "Variant not found",
+      "message": "This variant does not exist (anymore)."
+    }
+  },
+  "addons": {
+    "title": "Add-ons",
+    "description": "Other variants offered with this one (e.g. frames or power supplies). Required add-ons are added to the bill of materials automatically.",
+    "afterCreate": "Add-ons can be added once the variant is created.",
+    "empty": "No add-ons yet.",
+    "search": "Find a variant to add",
+    "searchHint": "Model number, name or SKU",
+    "results": "Search results",
+    "noResults": "No matching variants.",
+    "more": "{{shown}} of {{total}} shown; refine the search to find more.",
+    "add": "Add {{name}}",
+    "addShort": "Add",
+    "linked": "Linked add-ons",
+    "required": "Required",
+    "requiredFor": "{{name}} is required",
+    "save": "Save add-ons",
+    "saved": "Add-ons saved.",
+    "unsaved": "The add-ons have unsaved changes."
+  }
+}

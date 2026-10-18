@@ -1,0 +1,124 @@
+{
+  "title": "Produkte",
+  "description": "Bestellbare Gerätemodelle mit ihren Varianten, Preisen und Zubehör.",
+  "empty": "Noch keine Produkte.",
+  "emptyFiltered": "Keine Produkte passen zu diesen Filtern.",
+  "new": "Neues Produkt",
+  "edit": "Produkt bearbeiten",
+  "readOnly": "Sie können dieses Produkt ansehen, aber nicht ändern.",
+  "created": "Produkt erstellt. Fügen Sie unten seine Varianten hinzu.",
+  "showInactive": "Inaktive anzeigen",
+  "search": "Suche",
+  "searchHint": "Modellnummer, Name oder SKU",
+  "typeFilter": "Produkttyp",
+  "allTypes": "Alle Produkttypen",
+  "deleteTitle": "Produkt löschen",
+  "deleteMessage": "„{{name}}“ mit allen Varianten und Zubehör-Verknüpfungen löschen? Das kann nicht rückgängig gemacht werden.",
+  "column": {
+    "image": "Bild",
+    "modelNumber": "Modellnummer",
+    "name": "Name",
+    "type": "Produkttyp",
+    "variants": "Varianten",
+    "price": "Preis",
+    "status": "Status",
+    "problems": "Probleme"
+  },
+  "problems_one": "{{count}} Attributwert muss geprüft werden",
+  "problems_other": "{{count}} Attributwerte müssen geprüft werden",
+  "unavailableHint": "Aktiv, aber sein Produkttyp ist inaktiv.",
+  "noPrice": "–",
+  "section": {
+    "basics": "Grunddaten",
+    "attributes": "Attribute",
+    "attributesHint": "Werte der Attribute des Produkttyps, die pro Produkt gesetzt werden.",
+    "variants": "Varianten",
+    "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör."
+  },
+  "field": {
+    "productType": "Produkttyp",
+    "chooseType": "Produkttyp auswählen",
+    "inactiveType": "{{name}} (inaktiv)",
+    "modelNumber": "Modellnummer",
+    "modelNumberHint": "z. B. M485/GW-ZB.10; eindeutig im Katalog",
+    "nameEn": "Name (Englisch)",
+    "nameDe": "Name (Deutsch)",
+    "descriptionEn": "Beschreibung (Englisch)",
+    "descriptionDe": "Beschreibung (Deutsch)",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung."
+  },
+  "typeChange": "Sie haben den Produkttyp geändert. Beim Speichern werden die Werte dieses Produkts und seiner Varianten gegen die Attribute des neuen Typs geprüft; Werte, die er nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind.",
+  "chooseTypeFirst": "Wählen Sie einen Produkttyp, um seine Attribute auszufüllen.",
+  "storedErrors": "Einige gespeicherte Werte passen nicht zu den aktuellen Attributen des Produkttyps. Sie sind unten markiert; korrigieren Sie sie vor dem Speichern.",
+  "notFound": {
+    "title": "Produkt nicht gefunden",
+    "message": "Dieses Produkt gibt es nicht (mehr)."
+  },
+  "variants": {
+    "empty": "Noch keine Varianten. Fügen Sie mindestens eine hinzu, z. B. „Standard“.",
+    "add": "Variante hinzufügen",
+    "column": {
+      "image": "Bild",
+      "name": "Name",
+      "sku": "SKU",
+      "price": "Preis",
+      "status": "Status",
+      "addons": "Zubehör"
+    },
+    "moveUp": "{{name}} nach oben verschieben",
+    "moveDown": "{{name}} nach unten verschieben",
+    "deleteTitle": "Variante löschen",
+    "deleteMessage": "Die Variante „{{name}}“ mit ihren Zubehör-Verknüpfungen löschen? Das kann nicht rückgängig gemacht werden."
+  },
+  "variant": {
+    "new": "Neue Variante",
+    "edit": "Variante bearbeiten",
+    "readOnly": "Sie können diese Variante ansehen, aber nicht ändern.",
+    "created": "Variante erstellt. Sie können jetzt ihr Zubehör hinzufügen.",
+    "of": "Variante von {{product}}",
+    "backToProduct": "Zurück zum Produkt",
+    "section": {
+      "basics": "Grunddaten",
+      "attributes": "Attribute",
+      "attributesHint": "Werte der Attribute des Produkttyps, die pro Variante gesetzt werden."
+    },
+    "field": {
+      "nameEn": "Name (Englisch)",
+      "nameHint": "z. B. Ivory White; „Standard“, wenn das Produkt nur eine Variante hat",
+      "nameDe": "Name (Deutsch)",
+      "sku": "SKU",
+      "skuHint": "Optional; eindeutig im Katalog",
+      "price": "Preis",
+      "priceHint": "Listenpreis in USD, z. B. 27.50",
+      "image": "Bild",
+      "imageHint": "JPEG, PNG oder WebP, höchstens 10 MB. Große Bilder werden verkleinert.",
+      "active": "Aktiv",
+      "activeHint": "Inaktive Varianten können nicht zu Projekten hinzugefügt werden."
+    },
+    "productInactive": "Diese Variante ist nicht verfügbar, weil ihr Produkt oder Produkttyp inaktiv ist.",
+    "notFound": {
+      "title": "Variante nicht gefunden",
+      "message": "Diese Variante gibt es nicht (mehr)."
+    }
+  },
+  "addons": {
+    "title": "Zubehör",
+    "description": "Andere Varianten, die mit dieser angeboten werden (z. B. Rahmen oder Netzteile). Erforderliches Zubehör wird automatisch in die Stückliste übernommen.",
+    "afterCreate": "Zubehör kann hinzugefügt werden, sobald die Variante erstellt ist.",
+    "empty": "Noch kein Zubehör.",
+    "search": "Variante zum Hinzufügen suchen",
+    "searchHint": "Modellnummer, Name oder SKU",
+    "results": "Suchergebnisse",
+    "noResults": "Keine passenden Varianten.",
+    "more": "{{shown}} von {{total}} angezeigt; verfeinern Sie die Suche, um weitere zu finden.",
+    "add": "{{name}} hinzufügen",
+    "addShort": "Hinzufügen",
+    "linked": "Verknüpftes Zubehör",
+    "required": "Erforderlich",
+    "requiredFor": "{{name}} ist erforderlich",
+    "save": "Zubehör speichern",
+    "saved": "Zubehör gespeichert.",
+    "unsaved": "Das Zubehör hat ungespeicherte Änderungen."
+  }
+}

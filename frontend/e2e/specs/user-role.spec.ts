@@ -10,7 +10,7 @@ test('a user sees the catalog read-only and the roles, nothing to manage', async
   const page = await sessionFor(user)
   await page.goto('/')
   await expect(page).toHaveURL(/\/catalog\/function-types$/)
-  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Product types', 'Roles'])
+  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Product types', 'Products', 'Roles'])
 
   await expect(row(page, key)).toContainText(name)
   await expect(page.getByRole('button', { name: 'New function type' })).toHaveCount(0)

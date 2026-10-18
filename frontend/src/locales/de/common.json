@@ -1,6 +1,10 @@
 {
-  "app": { "name": "SnapFlow" },
-  "nav": { "catalog": "Katalog" },
+  "app": {
+    "name": "SnapFlow"
+  },
+  "nav": {
+    "catalog": "Katalog"
+  },
   "action": {
     "create": "Erstellen",
     "update": "Aktualisieren",
@@ -25,7 +29,11 @@
     "pickColor": "Farbe auswählen",
     "reload": "Neu laden",
     "leave": "Seite verlassen",
-    "stay": "Bleiben"
+    "stay": "Bleiben",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "keep": "Behalten",
+    "undo": "Rückgängig"
   },
   "state": {
     "loading": "Wird geladen…",
@@ -36,14 +44,44 @@
     "notFound": "Diese Seite gibt es nicht (mehr).",
     "errorTitle": "Etwas ist schiefgelaufen",
     "error": "Diese Seite konnte nicht angezeigt werden. Bitte laden Sie sie neu oder gehen Sie zur Startseite.",
-    "hasErrors": "Enthält Fehler"
+    "hasErrors": "Enthält Fehler",
+    "none": "Keine"
   },
-  "account": { "profile": "Profil" },
-  "role": { "admin": "Admin", "tenant_admin": "Mandanten-Admin", "user": "Benutzer" },
-  "status": { "active": "Aktiv", "inactive": "Inaktiv" },
-  "language": { "label": "Sprache", "en": "English", "de": "Deutsch" },
+  "account": {
+    "profile": "Profil"
+  },
+  "role": {
+    "admin": "Admin",
+    "tenant_admin": "Mandanten-Admin",
+    "user": "Benutzer"
+  },
+  "status": {
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "unavailable": "Nicht verfügbar"
+  },
+  "language": {
+    "label": "Sprache",
+    "en": "English",
+    "de": "Deutsch"
+  },
   "unsaved": {
     "title": "Ungespeicherte Änderungen verwerfen?",
     "message": "Sie haben Änderungen, die noch nicht gespeichert sind. Wenn Sie die Seite verlassen, gehen sie verloren."
+  },
+  "pagination": {
+    "label": "Seiten",
+    "range": "{{from}}–{{to}} von {{total}}",
+    "previous": "Zurück",
+    "next": "Weiter"
+  },
+  "upload": {
+    "drop": "Ziehen Sie ein Bild hierher oder wählen Sie eine Datei.",
+    "choose": "Datei auswählen",
+    "replace": "Ersetzen",
+    "remove": "Bild entfernen",
+    "uploading": "Wird hochgeladen…",
+    "progress": "Wird hochgeladen… {{percent}} %",
+    "none": "Kein Bild"
   }
 }

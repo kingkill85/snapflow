@@ -63,6 +63,7 @@ The top priority is that new features, importers and exporters are easy to add i
 - **Lists**: `GET /api/products` (filters `productTypeId`, `search`, `includeInactive`; `limit` 1–200, default 50, and `offset` validated with 422, never capped) is sorted by product type order, then model number; rows carry the type (`productType` with colour for the badge), variant count, price range and preview image of the active variants, and the attribute problem counts. `GET /api/variants` searches variants across the catalog for the add-on picker. Search is a case-insensitive substring match in which `%`, `_` and `\` are literal (D61). Product type facts (order, active flag, schema) come from `producttypes.Service`; this feature never reads `product_types` (D60).
 - **Files** (`features/files`): uploads (`POST /api/files`, multipart `file`, `catalog.write` for now) are JPEG, PNG or WebP by magic bytes (`file.type`, 415), at most 10 MB (`file.too_large`, 413) and 40 megapixels (`file.too_many_pixels`); JPEG and PNG are decoded completely, turned upright by their EXIF orientation and scaled down to 1600 px wide in the same format; WebP is stored as uploaded. Contents live on disk under `STORAGE_DIR` (default `./data/files`), content-addressed by SHA-256 (`ab/cd/abcd…`), so the same bytes are stored once and get the same file id. `GET /api/files/{id}` needs a login (the cookie works for `<img>`) and sends `ETag` (the SHA-256), `Cache-Control: private, max-age=31536000, immutable` and `X-Content-Type-Options: nosniff`. Unreferenced files are kept until a cleanup job exists (D58). Other features check file ids through `files.Service.Exists`.
 - **Delete** hard-deletes a product with its variants and their add-on links (both directions); deleting a variant removes its links both ways; images stay (D59).
+- **Frontend** (`frontend/src/features/products`): the product list (`catalog/products`, filters in the URL, paged, D70), the product page (`catalog/products/new`, `:id`: basics, attribute values, the variants below, D64, D74) and the variant page (`:id/variants/new`, `:id/variants/:variantId`: basics, image, variant attributes, add-ons with their own save, D63, D72). Both editors follow the product type editor's pattern (fresh load, `expectedUpdatedAt` with Reload, unsaved-changes prompt). Attribute values are edited with the shared inputs of `frontend/src/catalog` (D65–D68), which the import (1d) and instances reuse; the rules stay in `attrschema`.
 
 ## Extension points
 
@@ -83,7 +84,7 @@ All 16 recommendations were accepted, including: smart sizing (resize all instan
 ## Phases
 
 0. Foundation: inventory, skeleton, CI, design system, i18n ← **done with this repo's first commit**
-1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types and attribute schemas ← **done**; products, variants, add-ons and images ← **done (backend)**; schema-driven import
+1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types and attribute schemas ← **done**; products, variants, add-ons and images ← **done**; schema-driven import
 2. Projects & floorplan: editor, zones, placements, BOM, proposals (DOCX)
 3. Distribution board: board editor, bus load, loads and channel assignment
 4. MCP & cutover: MCP server, data migration from SnapFlow 1, go-live

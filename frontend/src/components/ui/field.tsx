@@ -19,10 +19,12 @@ type FieldProps = ComponentProps<'input'> & {
   label: string
   error?: string
   hint?: string
+  /** Shown inside the input at the end, e.g. a unit ("mA") or currency. */
+  suffix?: string
 }
 
 /** Label + input + hint/error, wired for accessibility. */
-export function Field({ label, error, hint, id, ...props }: FieldProps) {
+export function Field({ label, error, hint, suffix, id, ...props }: FieldProps) {
   const generated = useId()
   const inputId = id ?? generated
   const messageId = `${inputId}-message`
@@ -32,7 +34,22 @@ export function Field({ label, error, hint, id, ...props }: FieldProps) {
       <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
-      <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
+      {suffix ? (
+        <div className="relative">
+          <Input
+            id={inputId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={message ? messageId : undefined}
+            className="pr-12"
+            {...props}
+          />
+          <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted">
+            {suffix}
+          </span>
+        </div>
+      ) : (
+        <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
+      )}
       {message && (
         <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
           {message}

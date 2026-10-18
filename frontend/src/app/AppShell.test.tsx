@@ -44,6 +44,6 @@ describe('AppShell', () => {
   it('groups the navigation by section: catalog first, admin last', async () => {
     renderWithProviders(routes)
     const links = within(await screen.findByRole('navigation')).getAllByRole('link')
-    expect(links.map((l) => l.textContent)).toEqual(['Function types', 'Product types', 'Users', 'Tenants', 'Roles'])
+    expect(links.map((l) => l.textContent)).toEqual(['Function types', 'Product types', 'Products', 'Users', 'Tenants', 'Roles'])
   })
 })

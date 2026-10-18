@@ -1,6 +1,10 @@
 {
-  "app": { "name": "SnapFlow" },
-  "nav": { "catalog": "Catalog" },
+  "app": {
+    "name": "SnapFlow"
+  },
+  "nav": {
+    "catalog": "Catalog"
+  },
   "action": {
     "create": "Create",
     "update": "Update",
@@ -25,7 +29,11 @@
     "pickColor": "Pick a colour",
     "reload": "Reload",
     "leave": "Leave page",
-    "stay": "Stay"
+    "stay": "Stay",
+    "add": "Add",
+    "remove": "Remove",
+    "keep": "Keep",
+    "undo": "Undo"
   },
   "state": {
     "loading": "Loading…",
@@ -36,14 +44,44 @@
     "notFound": "This page does not exist (anymore).",
     "errorTitle": "Something went wrong",
     "error": "This page could not be shown. Please reload it or go to the start page.",
-    "hasErrors": "Contains errors"
+    "hasErrors": "Contains errors",
+    "none": "None"
   },
-  "account": { "profile": "Profile" },
-  "role": { "admin": "Admin", "tenant_admin": "Tenant admin", "user": "User" },
-  "status": { "active": "Active", "inactive": "Inactive" },
-  "language": { "label": "Language", "en": "English", "de": "Deutsch" },
+  "account": {
+    "profile": "Profile"
+  },
+  "role": {
+    "admin": "Admin",
+    "tenant_admin": "Tenant admin",
+    "user": "User"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "unavailable": "Unavailable"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "de": "Deutsch"
+  },
   "unsaved": {
     "title": "Discard unsaved changes?",
     "message": "You have changes that are not saved yet. If you leave this page, they are lost."
+  },
+  "pagination": {
+    "label": "Pages",
+    "range": "{{from}}–{{to}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "upload": {
+    "drop": "Drop an image here or choose a file.",
+    "choose": "Choose file",
+    "replace": "Replace",
+    "remove": "Remove image",
+    "uploading": "Uploading…",
+    "progress": "Uploading… {{percent}} %",
+    "none": "No image"
   }
 }

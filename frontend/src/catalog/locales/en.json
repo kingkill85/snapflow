@@ -1,0 +1,32 @@
+{
+  "empty": "This product type defines no attributes here.",
+  "notSet": "Not set",
+  "yes": "Yes",
+  "no": "No",
+  "hint": {
+    "required": "Required",
+    "length": "{{min}} to {{max}} characters",
+    "lengthMin": "At least {{min}} characters",
+    "lengthMax": "At most {{max}} characters",
+    "range": "{{min}} to {{max}}",
+    "rangeMin": "At least {{min}}",
+    "rangeMax": "At most {{max}}",
+    "count": "{{min}} to {{max}} items",
+    "countMin": "At least {{min}} items",
+    "countMax": "At most {{max}} items",
+    "whole": "Whole number",
+    "wholeItems": "Whole numbers"
+  },
+  "extra": {
+    "title": "Values no longer in the schema",
+    "description": "These values are stored, but the product type no longer has them here (renamed, removed, or now set per product or per variant). They are kept unchanged until you remove them.",
+    "removed": "Removed on save",
+    "remove": "Remove {{key}}",
+    "removeShort": "Remove",
+    "keep": "Keep {{key}}",
+    "keepShort": "Keep"
+  },
+  "price": {
+    "range": "{{min}} – {{max}}"
+  }
+}
