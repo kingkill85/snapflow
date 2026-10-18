@@ -86,12 +86,12 @@ test('a completed project is read-only until reopened', async ({ page, api }) =>
   await page.goto('/projects?status=completed')
   await row(page, project.name).getByRole('link', { name: project.name }).click()
 
-  await expect(page.getByText('This project is completed and can no longer be changed.')).toBeVisible()
+  await expect(page.getByText('This project is completed. Reopen it to change it.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Edit project' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'New version' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Reopen' }).click()
-  await expect(page.getByText('This project is completed and can no longer be changed.')).toBeHidden()
+  await expect(page.getByText('This project is completed. Reopen it to change it.')).toBeHidden()
   await expect(page.getByRole('button', { name: 'New version' })).toBeVisible()
   await expect(page.getByText('Active', { exact: true })).toBeVisible()
 })
