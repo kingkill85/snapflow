@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -9,8 +9,9 @@ import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
 
+import { ProductEditorPage } from './ProductEditorPage'
 import { ProductsPage } from './ProductsPage'
-import { dimmer, dimmerType, gatewayType, ids, listItem, types } from './test-fixtures'
+import { dimmer, dimmerType, gatewayType, ids, inactiveType, listItem, types } from './test-fixtures'
 
 const routes = [
   { path: '/catalog/products', element: <ProductsPage /> },
@@ -106,7 +107,10 @@ describe('ProductsPage', () => {
     const before = requests.length
     await u.type(screen.getByLabelText('Search'), 'dim 4')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', limit: '50', offset: '0' }))
+    // Nothing more arrives once typing stopped.
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(requests.length).toBe(before + 1)
+    expect(screen.getByLabelText('Search')).toHaveAttribute('maxlength', '200')
 
     // Inactive types are offered too.
     const typeSelect = screen.getByLabelText('Product type')
@@ -149,6 +153,112 @@ describe('ProductsPage', () => {
 
     await u.click(screen.getByRole('button', { name: /Previous/ }))
     expect(await screen.findByText('51–100 of 120')).toBeInTheDocument()
+  })
+
+  it('moves to the last page when the URL points past the end', async () => {
+    const { last, requests } = listHandlers(
+      () => [listItem()],
+      () => 120,
+    )
+    const { router } = renderRoutes(routes, { me: adminMe, route: '/catalog/products?offset=500' })
+
+    expect(await screen.findByText('101–120 of 120')).toBeInTheDocument()
+    await waitFor(() => expect(last()).toEqual({ limit: '50', offset: '100' }))
+    expect(router.state.location.search).toBe('?offset=100')
+    // Replaced, so Back does not return to the empty page.
+    expect(router.state.historyAction).toBe('REPLACE')
+    // The page past the end never showed a range.
+    expect(requests.map((r) => r.get('offset'))).toEqual(['500', '100'])
+  })
+
+  it('moves to the previous page after deleting the last row of the last page', async () => {
+    let total = 51
+    listHandlers(
+      () => [listItem()],
+      () => total,
+    )
+    server.use(
+      http.delete('/api/products/:id', () => {
+        total = 50
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: '/catalog/products?offset=50' })
+
+    expect(await screen.findByText('51–51 of 51')).toBeInTheDocument()
+    await u.click(within(row('M485/DIM.4')).getByRole('button', { name: 'Delete' }))
+    await u.click(within(await screen.findByRole('dialog', { name: 'Delete product' })).getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('1–50 of 50')).toBeInTheDocument()
+    expect(screen.queryByText(/51–50/)).not.toBeInTheDocument()
+  })
+
+  it('shows the search of the URL when it changes from outside, e.g. the navigation link to the bare list', async () => {
+    listHandlers()
+    const u = userEvent.setup()
+    const { router } = renderRoutes(routes, { me: adminMe, route: '/catalog/products?search=dim' })
+
+    expect(await screen.findByLabelText('Search')).toHaveValue('dim')
+    await u.type(screen.getByLabelText('Search'), 'mer')
+    await waitFor(() => expect(router.state.location.search).toBe('?search=dimmer'))
+
+    await act(() => router.navigate('/catalog/products'))
+    await waitFor(() => expect(screen.getByLabelText('Search')).toHaveValue(''))
+    // And it stays cleared: the old text is not searched again.
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(router.state.location.search).toBe('')
+
+    await act(() => router.navigate('/catalog/products?search=gw'))
+    await waitFor(() => expect(screen.getByLabelText('Search')).toHaveValue('gw'))
+  })
+
+  it('shows inactive products when an inactive type is chosen', async () => {
+    const { last } = listHandlers()
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: '/catalog/products' })
+
+    await screen.findByRole('link', { name: 'M485/DIM.4' })
+    expect(screen.getByLabelText('Show inactive')).not.toBeChecked()
+    await u.selectOptions(screen.getByLabelText('Product type'), inactiveType.id)
+
+    await waitFor(() => expect(last()).toEqual({ productTypeId: inactiveType.id, includeInactive: 'true', limit: '50', offset: '0' }))
+    expect(screen.getByLabelText('Show inactive')).toBeChecked()
+
+    // An active type leaves the checkbox as it is.
+    await u.selectOptions(screen.getByLabelText('Product type'), dimmerType.id)
+    await waitFor(() => expect(last()).toEqual({ productTypeId: dimmerType.id, includeInactive: 'true', limit: '50', offset: '0' }))
+  })
+
+  it('returns to the filtered list from a product, with Back to list and with Cancel', async () => {
+    const { last } = listHandlers(
+      () => [listItem()],
+      () => 120,
+    )
+    server.use(http.get('/api/products/:id', () => HttpResponse.json(dimmer)))
+    const u = userEvent.setup()
+    const editorRoutes = [
+      { path: '/catalog/products', element: <ProductsPage /> },
+      { path: '/catalog/products/:id', element: <ProductEditorPage /> },
+    ]
+    const filters = `?search=dim&type=${dimmerType.id}&offset=50`
+    const { router } = renderRoutes(editorRoutes, { me: adminMe, route: `/catalog/products${filters}` })
+
+    await u.click(await screen.findByRole('link', { name: 'M485/DIM.4' }))
+    await u.click(await screen.findByRole('link', { name: 'Back to list' }))
+
+    expect(await screen.findByText('51–100 of 120')).toBeInTheDocument()
+    expect(router.state.location.search).toBe(filters)
+    expect(screen.getByLabelText('Search')).toHaveValue('dim')
+    expect(last()).toEqual({ search: 'dim', productTypeId: dimmerType.id, limit: '50', offset: '50' })
+
+    await u.click(screen.getByRole('link', { name: 'M485/DIM.4' }))
+    await u.type(await screen.findByLabelText('Name (German)'), ' neu')
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+    await u.click(within(await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })).getByRole('button', { name: 'Leave page' }))
+
+    expect(await screen.findByText('51–100 of 120')).toBeInTheDocument()
+    expect(router.state.location.search).toBe(filters)
   })
 
   it('opens a product from its model number', async () => {

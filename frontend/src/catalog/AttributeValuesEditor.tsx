@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge, Button, CheckboxField, CheckboxGroupField, Field, SelectField, TagsField } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { type AttributeFormValue, type AttributeFormValues, type Definition, formValueOf } from './attribute-values'
+import { type AttributeFormValue, type AttributeFormValues, type Definition, formValueOf, isRaw, rawItems } from './attribute-values'
 
 /** The hint under an attribute's input: required, its bounds, its description. */
 function useHint() {
@@ -46,14 +46,33 @@ type AttributeInputProps = {
  * choice as a select, a list of choices as checkboxes, other lists as items
  * added one by one.
  */
-export function AttributeInput({ definition: d, value, onChange, error, disabled }: AttributeInputProps) {
+export function AttributeInput(props: AttributeInputProps) {
   const { t } = useTranslation('catalog')
+  const valueText = useValueText()
+  const { value } = props
+  if (!isRaw(value)) return <AttributeControl {...props} />
+  // A stored value the input cannot hold unchanged: shown next to the input
+  // and sent back as it is until the input is changed (D85).
+  return (
+    <div className="space-y-1">
+      <AttributeControl {...props} />
+      <p className="text-xs text-muted">{t('storedValue', { value: valueText(value.raw) })}</p>
+    </div>
+  )
+}
+
+function AttributeControl({ definition: d, value, onChange, error, disabled }: AttributeInputProps) {
+  const { t } = useTranslation('catalog')
+  const { t: tCommon } = useTranslation()
   const localized = useLocalized()
   const hint = useHint()(d)
   const label = localized(d.label) || d.key
   const options = (d.options ?? []).map((o) => ({ value: o.key, label: localized(o.label) || o.key }))
-  const text = typeof value === 'string' ? value : ''
-  const list = Array.isArray(value) ? value : []
+  const raw = isRaw(value) ? rawItems(value) : undefined
+  const text = typeof value === 'string' ? value : raw ? raw.join(', ') : ''
+  const list = Array.isArray(value) ? value : (raw ?? [])
+  // A stored choice that is not an option (any more) stays visible and can be cleared (D85).
+  const unknownOption = (v: string) => tCommon('option.unknown', { value: v })
 
   switch (d.type) {
     case 'boolean':
@@ -78,12 +97,27 @@ export function AttributeInput({ definition: d, value, onChange, error, disabled
           disabled={disabled}
           aria-required={d.required || undefined}
           onChange={(e) => onChange(e.target.value)}
-          options={[{ value: '', label: t('notSet') }, ...options]}
+          options={[
+            { value: '', label: t('notSet') },
+            ...options,
+            ...(text !== '' && !options.some((o) => o.value === text) ? [{ value: text, label: unknownOption(text) }] : []),
+          ]}
         />
       )
     case 'list':
       if (d.itemType === 'enum') {
-        return <CheckboxGroupField label={label} hint={hint} error={error} options={options} value={list} disabled={disabled} onChange={onChange} />
+        return (
+          <CheckboxGroupField
+            label={label}
+            hint={hint}
+            error={error}
+            options={options}
+            value={list}
+            unknownLabel={unknownOption}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        )
       }
       return (
         <TagsField

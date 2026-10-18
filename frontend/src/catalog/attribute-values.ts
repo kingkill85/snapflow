@@ -2,6 +2,8 @@ import { ApiError } from '@/api/client'
 import type { AttributeDefinition, FieldError, InstanceAttributeDefinition, ProductType } from '@/api/generated/model'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
 
+import { parseDecimal } from './decimal'
+
 // Attribute values as a form edits them, and back to what the API takes.
 // Shared by the product and variant editors, later the import mapping (1d) and
 // instances (phase 2). The server validates every value (attrschema); this
@@ -11,10 +13,21 @@ import { type ApiFieldMap, errorKey } from '@/components/ui'
 export type Definition = AttributeDefinition | InstanceAttributeDefinition
 
 /**
- * An attribute value in a form: text, number, integer and enum as text ("" =
- * not set), boolean as true/false (null = not set), lists as text items.
+ * A stored value the definition's input cannot show without changing it (a
+ * yes/no holding text, list items that are objects, an object as text): kept
+ * as stored and sent back unchanged until the input is changed, so the
+ * server's error stays visible and nothing is dropped silently (D67, D85).
  */
-export type AttributeFormValue = string | boolean | null | string[]
+export type RawValue = { raw: unknown }
+
+/**
+ * An attribute value in a form: text, number, integer and enum as text ("" =
+ * not set), boolean as true/false (null = not set), lists as text items, or a
+ * stored value kept as it is (RawValue).
+ */
+export type AttributeFormValue = string | boolean | null | string[] | RawValue
+
+export const isRaw = (v: unknown): v is RawValue => typeof v === 'object' && v !== null && !Array.isArray(v) && 'raw' in v
 
 /** Attribute values by key, as a form edits them. */
 export type AttributeFormValues = Record<string, AttributeFormValue>
@@ -27,30 +40,41 @@ export const definitionsFor = (type: ProductType | undefined, scope: 'product' |
 export const emptyValue = (d: Definition): AttributeFormValue =>
   d.type === 'list' ? [] : d.type === 'boolean' ? (d.required ? false : null) : ''
 
-const scalarText = (v: unknown) => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v))
+const isObject = (v: unknown) => typeof v === 'object' && v !== null
+/** Text of a scalar; also used to show raw values. */
+export const scalarText = (v: unknown) => (isObject(v) ? JSON.stringify(v) : String(v))
 
 /**
  * A value in the shape a definition's input edits. Values stored for another
  * type (e.g. after the schema changed) are converted as well as possible, so
- * nothing is hidden; the server reports what does not fit.
+ * nothing is hidden; the server reports what does not fit. What the input
+ * cannot hold without changing it is kept raw (RawValue).
  */
 export function toFormValue(d: Definition, v: unknown): AttributeFormValue {
   if (v === undefined || v === null || v === '') return emptyValue(d)
-  if (d.type === 'boolean') return typeof v === 'boolean' ? v : emptyValue(d)
-  if (d.type === 'list') return Array.isArray(v) ? v.map(scalarText) : [scalarText(v)]
-  if (Array.isArray(v)) return v.map(scalarText).join(', ')
-  return scalarText(v)
+  if (d.type === 'boolean') return typeof v === 'boolean' ? v : { raw: v }
+  if (d.type === 'list') {
+    if (!Array.isArray(v)) return isObject(v) ? { raw: v } : [scalarText(v)]
+    return v.some(isObject) ? { raw: v } : v.map(scalarText)
+  }
+  if (Array.isArray(v)) return v.some(isObject) ? { raw: v } : v.map(scalarText).join(', ')
+  return isObject(v) ? { raw: v } : scalarText(v)
 }
 
 /** The form value of a definition: the edited one, or the empty one for a key not edited yet. */
 export function formValueOf(d: Definition, values: AttributeFormValues): AttributeFormValue {
   const v = values[d.key]
   if (v === undefined) return emptyValue(d)
+  // Kept as stored, whatever the definition (until the input changes it).
+  if (isRaw(v)) return v
   // A key edited under another definition (e.g. before the product type changed).
   if (d.type === 'list') return Array.isArray(v) ? v : v === null || v === '' ? [] : [String(v)]
   if (d.type === 'boolean') return typeof v === 'boolean' ? v : emptyValue(d)
   return Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : ''
 }
+
+/** What an input shows for a raw value: list items as text, other values as one text. */
+export const rawItems = (v: RawValue): string[] => (Array.isArray(v.raw) ? v.raw.map(scalarText) : [scalarText(v.raw)])
 
 /** The form values for stored values: one per definition. */
 export function toFormValues(defs: Definition[], stored: Record<string, unknown> | undefined): AttributeFormValues {
@@ -63,7 +87,9 @@ function scalarValue(type: Definition['type'], text: string): Converted {
   const v = text.trim()
   if (v === '') return {}
   if (type !== 'number' && type !== 'integer') return { value: v }
-  const n = Number(v)
+  // "27,5" and "27.5" alike; no exponents, hex or binary forms (D71).
+  const decimal = parseDecimal(v)
+  const n = decimal === undefined ? Number.NaN : Number(decimal)
   if (!Number.isFinite(n)) return { error: errorKey('validation.number') }
   if (type === 'integer' && !Number.isInteger(n)) return { error: errorKey('attribute.type', { expected: 'integer' }) }
   return { value: n }
@@ -71,6 +97,7 @@ function scalarValue(type: Definition['type'], text: string): Converted {
 
 /** A form value as the API takes it: nothing when not set, or the error of input that is not a number. */
 export function toApiValue(d: Definition, v: AttributeFormValue): Converted {
+  if (isRaw(v)) return { value: v.raw }
   if (d.type === 'boolean') return typeof v === 'boolean' ? { value: v } : {}
   if (d.type === 'list') {
     const items: unknown[] = []
@@ -127,7 +154,7 @@ export function attributeFieldMap(
     map[`${location}.${d.key}`] = `${valuesField}.${d.key}`
     if (d.type !== 'list') continue
     const v = formValueOf(d, values)
-    const count = Array.isArray(v) ? v.length : 0
+    const count = Array.isArray(v) ? v.length : isRaw(v) && Array.isArray(v.raw) ? v.raw.length : 0
     for (let i = 0; i < count; i++) map[`${location}.${d.key}[${i}]`] = `${valuesField}.${d.key}`
   }
   for (const k of extras) map[`${location}.${k}`] = `${extraField}.${k}`

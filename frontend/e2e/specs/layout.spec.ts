@@ -84,7 +84,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
         const attrs = page.getByRole('region', { name: 'Attributes', exact: true })
         await attrs.getByRole('button', { name: 'Expand all' }).click()
         // Errors at the fields, the cards marked.
-        await attrs.getByLabel('Minimum', { exact: true }).fill('12,5')
+        // An exponent is not a number here (a decimal comma is, D71).
+        await attrs.getByLabel('Minimum', { exact: true }).fill('1e3')
         await page.getByRole('button', { name: 'Update' }).click()
         await expect(attrs.getByLabel('Minimum', { exact: true })).toHaveAccessibleDescription('Enter a number.')
         await expectNoHorizontalOverflow(page)

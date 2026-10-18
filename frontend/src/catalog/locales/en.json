@@ -28,5 +28,6 @@
   },
   "price": {
     "range": "{{min}} – {{max}}"
-  }
+  },
+  "storedValue": "Stored value: {{value}}"
 }

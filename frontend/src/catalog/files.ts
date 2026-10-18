@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { ApiError, apiClient } from '@/api/client'
 import type { File as StoredFile } from '@/api/generated/model'
@@ -21,24 +21,33 @@ export function checkImage(file: Blob): ApiError | undefined {
  * Uploads an image (POST /api/files). Through the shared API client rather than
  * the generated uploadFile, which offers no upload progress (D69).
  */
-export function uploadImage(file: Blob, onProgress?: (fraction: number) => void) {
+export function uploadImage(file: Blob, onProgress?: (fraction: number) => void, signal?: AbortSignal) {
   const data = new FormData()
   data.append('file', file)
   return apiClient<StoredFile>({
     url: '/api/files',
     method: 'POST',
     data,
+    signal,
     onUploadProgress: (e) => {
       if (e.total) onProgress?.(e.loaded / e.total)
     },
   })
 }
 
-/** Upload state for an ImageUpload: `upload` resolves to the new file id, or undefined if it failed (see `error`). */
+/**
+ * Upload state for an ImageUpload: `upload` resolves to the new file id, or
+ * undefined if it failed (see `error`) or was cancelled. An upload still
+ * running when the component unmounts (e.g. the form restarts on Reload) is
+ * aborted and its result ignored.
+ */
 export function useImageUpload() {
   const [pending, setPending] = useState(false)
   const [progress, setProgress] = useState<number>()
   const [error, setError] = useState<unknown>(null)
+  const running = useRef<AbortController | null>(null)
+  useEffect(() => () => running.current?.abort(), [])
+
   const upload = async (file: File): Promise<string | undefined> => {
     setError(null)
     const invalid = checkImage(file)
@@ -46,16 +55,29 @@ export function useImageUpload() {
       setError(invalid)
       return undefined
     }
+    running.current?.abort()
+    const controller = new AbortController()
+    running.current = controller
     setPending(true)
     setProgress(undefined)
     try {
-      return (await uploadImage(file, setProgress)).id
+      const stored = await uploadImage(file, setProgress, controller.signal)
+      return controller.signal.aborted ? undefined : stored.id
     } catch (e) {
-      setError(e)
+      if (!controller.signal.aborted) setError(e)
       return undefined
     } finally {
-      setPending(false)
+      if (running.current === controller) {
+        running.current = null
+        setPending(false)
+      }
     }
   }
-  return { upload, pending, progress, error, reset: () => setError(null) }
+  /** Stops a running upload; the image stays as it was. */
+  const cancel = () => {
+    running.current?.abort()
+    running.current = null
+    setPending(false)
+  }
+  return { upload, cancel, pending, progress, error, reset: () => setError(null) }
 }

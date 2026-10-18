@@ -31,6 +31,7 @@ export function TagsField({ label, value, onChange, error, hint, disabled, suffi
   const { t } = useTranslation()
   const inputId = useId()
   const messageId = `${inputId}-message`
+  const labelId = `${inputId}-label`
   const message = error || hint
   const [draft, setDraft] = useState('')
 
@@ -48,11 +49,18 @@ export function TagsField({ label, value, onChange, error, hint, disabled, suffi
 
   return (
     <div className="group/field space-y-1.5">
-      <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
-        {label}
-      </LabelPrimitive.Root>
+      {disabled ? (
+        // No input to label: the label names the list instead.
+        <p id={labelId} className="text-sm font-medium">
+          {label}
+        </p>
+      ) : (
+        <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
+          {label}
+        </LabelPrimitive.Root>
+      )}
       {value.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul aria-labelledby={disabled ? labelId : undefined} className="flex flex-wrap gap-1.5">
           {value.map((item, i) => (
             <li key={`${i}:${item}`} className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas py-0.5 pr-0.5 pl-2.5 text-sm">
               {suffix ? `${item} ${suffix}` : item}

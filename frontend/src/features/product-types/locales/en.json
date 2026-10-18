@@ -5,6 +5,7 @@
   "new": "New product type",
   "edit": "Edit product type",
   "readOnly": "You can view this product type but not change it.",
+  "created": "Product type created.",
   "showInactive": "Show inactive",
   "moveUp": "Move {{name}} up",
   "moveDown": "Move {{name}} down",

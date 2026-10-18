@@ -48,7 +48,7 @@
     "active": "Active",
     "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting."
   },
-  "typeChange": "You changed the product type. When you save, the values of this product and its variants are checked against the new type's attributes; values it does not have stay stored as values no longer in the schema.",
+  "typeChange": "You changed the product type. When you save, this product's values are checked against the new type's attributes; values the new type does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new type are flagged on the variants.",
   "chooseTypeFirst": "Choose a product type to fill in its attributes.",
   "storedErrors": "Some stored values do not match the product type's current attributes. They are marked below; correct them before saving.",
   "notFound": {
@@ -69,7 +69,10 @@
     "moveUp": "Move {{name}} up",
     "moveDown": "Move {{name}} down",
     "deleteTitle": "Delete variant",
-    "deleteMessage": "Delete the variant \"{{name}}\" with its add-on links? This cannot be undone."
+    "deleteMessage": "Delete the variant \"{{name}}\" with its add-on links? This cannot be undone.",
+    "saveFirst": "Save the product first to open or add variants.",
+    "problems_one": "{{count}} variant has values that no longer match the schema:",
+    "problems_other": "{{count}} variants have values that no longer match the schema:"
   },
   "variant": {
     "new": "New variant",
@@ -111,7 +114,6 @@
     "searchHint": "Model number, name or SKU",
     "results": "Search results",
     "noResults": "No matching variants.",
-    "more": "{{shown}} of {{total}} shown; refine the search to find more.",
     "add": "Add {{name}}",
     "addShort": "Add",
     "linked": "Linked add-ons",
@@ -119,6 +121,11 @@
     "requiredFor": "{{name}} is required",
     "save": "Save add-ons",
     "saved": "Add-ons saved.",
-    "unsaved": "The add-ons have unsaved changes."
+    "unsaved": "The add-ons have unsaved changes.",
+    "typeFilter": "Product type",
+    "sku": "SKU {{sku}}",
+    "shown_one": "{{count}} variant shown",
+    "shown_other": "{{count}} variants shown",
+    "showMore": "Show more"
   }
 }

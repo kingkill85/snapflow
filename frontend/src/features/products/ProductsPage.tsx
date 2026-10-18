@@ -2,11 +2,17 @@ import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 
 import type { ProductListItem } from '@/api/generated/model'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
-import { getGetProductQueryKey, getListProductsQueryKey, useDeleteProduct, useListProducts } from '@/api/generated/products/products'
+import {
+  getGetProductQueryKey,
+  getListProductsQueryKey,
+  getSearchVariantsQueryKey,
+  useDeleteProduct,
+  useListProducts,
+} from '@/api/generated/products/products'
 import { useCan } from '@/app/session'
 import { fileUrl } from '@/catalog/files'
 import { useFormatPrice } from '@/catalog/money'
@@ -19,6 +25,7 @@ import {
   EmptyState,
   ErrorMessage,
   Field,
+  lastPageOffset,
   Loading,
   Page,
   Pagination,
@@ -29,13 +36,15 @@ import {
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { listPath, productPath } from './paths'
+import { type EditorState, listPath, productPath } from './paths'
 import { ProblemsBadge, StatusBadge } from './StatusBadge'
 
 /** Rows per page. */
 export const pageSize = 50
 /** How long typing pauses before the search runs. */
 const searchDelayMs = 300
+/** The API's limit of the search text. */
+const searchMaxLength = 200
 
 /** catalog/products: the filtered, paged product list. Filters live in the URL, so Back returns to them. */
 export function ProductsPage() {
@@ -46,6 +55,9 @@ export function ProductsPage() {
   const canWrite = useCan()('catalog.write')
   const queryClient = useQueryClient()
 
+  const location = useLocation()
+  // Opening a product passes the filters along, so its Cancel and Back return to them (D86).
+  const linkState: EditorState = { listSearch: location.search }
   const [params, setParams] = useSearchParams()
   const search = params.get('search') ?? ''
   const productTypeId = params.get('type') ?? ''
@@ -72,6 +84,13 @@ export function ProductsPage() {
 
   // The search runs once typing pauses.
   const [draft, setDraft] = useState(search)
+  // The URL changed from outside (e.g. the navigation link to the bare list):
+  // the box shows what is searched.
+  const [searched, setSearched] = useState(search)
+  if (searched !== search) {
+    setSearched(search)
+    if (draft.trim() !== search) setDraft(search)
+  }
   useEffect(() => {
     if (draft.trim() === search) return
     const timer = setTimeout(() => setFilters({ search: draft.trim() }), searchDelayMs)
@@ -89,6 +108,13 @@ export function ProductsPage() {
     },
     { query: { placeholderData: keepPreviousData } },
   )
+  // An offset past the end (the last row of the last page was deleted, or
+  // the URL says so) moves to the last page.
+  const total = list.data?.total
+  useEffect(() => {
+    if (total !== undefined && total > 0 && offset >= total) setFilters({ offset: String(lastPageOffset(total, pageSize)) })
+  }, [total, offset, setFilters])
+
   const remove = useDeleteProduct()
   const [deleting, setDeleting] = useState<ProductListItem | null>(null)
 
@@ -105,8 +131,18 @@ export function ProductsPage() {
       return // shown by ErrorMessage via remove.error
     }
     queryClient.removeQueries({ queryKey: getGetProductQueryKey(deleting.id) })
-    await queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getSearchVariantsQueryKey() }),
+    ])
     setDeleting(null)
+  }
+
+  // Products of an inactive type are unavailable, which the list hides unless
+  // inactive ones are shown: choosing such a type shows them (D87).
+  const chooseType = (id: string) => {
+    const inactive = types.data?.items.some((pt) => pt.id === id && !pt.isActive)
+    setFilters(inactive ? { type: id, inactive: '1' } : { type: id })
   }
 
   const typeOptions = [
@@ -121,7 +157,11 @@ export function ProductsPage() {
     { header: t('column.image'), cell: (p) => <Thumbnail src={fileUrl(p.previewImageFileId)} />, className: 'w-px' },
     {
       header: t('column.modelNumber'),
-      cell: (p) => <TextLink to={productPath(p.id)}>{p.modelNumber}</TextLink>,
+      cell: (p) => (
+        <TextLink to={productPath(p.id)} state={linkState}>
+          {p.modelNumber}
+        </TextLink>
+      ),
       className: 'whitespace-nowrap',
     },
     { header: t('column.name'), cell: (p) => localized(p.name) },
@@ -146,7 +186,7 @@ export function ProductsPage() {
     <>
       {p.can.update && (
         <Button asChild size="sm" variant="secondary">
-          <Link to={productPath(p.id)}>
+          <Link to={productPath(p.id)} state={linkState}>
             <Pencil /> {tCommon('action.edit')}
           </Link>
         </Button>
@@ -162,7 +202,7 @@ export function ProductsPage() {
   // Without catalog.write the page is read-only.
   const createButton = canWrite ? (
     <Button asChild>
-      <Link to={`${listPath}/new`}>
+      <Link to={`${listPath}/new`} state={linkState}>
         <Plus /> {t('new')}
       </Link>
     </Button>
@@ -172,13 +212,15 @@ export function ProductsPage() {
   return (
     <Page title={t('title')} description={t('description')} actions={createButton}>
       <div className="grid items-end gap-4 sm:grid-cols-3">
-        <Field type="search" label={t('search')} placeholder={t('searchHint')} value={draft} onChange={(e) => setDraft(e.target.value)} />
-        <SelectField
-          label={t('typeFilter')}
-          value={productTypeId}
-          options={typeOptions}
-          onChange={(e) => setFilters({ type: e.target.value })}
+        <Field
+          type="search"
+          label={t('search')}
+          placeholder={t('searchHint')}
+          maxLength={searchMaxLength}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
         />
+        <SelectField label={t('typeFilter')} value={productTypeId} options={typeOptions} onChange={(e) => chooseType(e.target.value)} />
         <div className="sm:pb-2">
           <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setFilters({ inactive: e.target.checked ? '1' : '' })} />
         </div>

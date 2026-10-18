@@ -132,7 +132,7 @@
   "variant": {
     "name_taken": "This product already has a variant named \"{{name}}\".",
     "not_found": "This variant no longer exists.",
-    "order_mismatch": "The variants have changed in the meantime. Please reload and try again.",
+    "order_mismatch": "The variants have changed in the meantime. The list was reloaded — please try again.",
     "price_format": "Enter a price such as 27 or 27.50 (up to 10 digits and 2 decimals).",
     "sku_taken": "The SKU \"{{sku}}\" is already used.",
     "stale": "Someone else changed this variant in the meantime. Reload it and make your changes again."

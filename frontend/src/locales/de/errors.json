@@ -123,7 +123,7 @@
     "invalid": "Dieser Wert ist ungültig.",
     "locale": "Diese Sprache wird nicht unterstützt.",
     "min_above_max": "Das Maximum darf nicht unter dem Minimum liegen.",
-    "number": "Bitte eine Zahl eingeben.",
+    "number": "Bitte eine Zahl eingeben, z. B. 27,50 oder 27.50.",
     "password_mismatch": "Die Passwörter stimmen nicht überein.",
     "required": "Dieses Feld ist erforderlich.",
     "too_long": "Dieser Wert ist zu lang (höchstens {{max}} Zeichen).",
@@ -132,8 +132,8 @@
   "variant": {
     "name_taken": "Dieses Produkt hat bereits eine Variante namens \"{{name}}\".",
     "not_found": "Diese Variante existiert nicht mehr.",
-    "order_mismatch": "Die Varianten wurden inzwischen geändert. Bitte laden Sie neu und versuchen Sie es erneut.",
-    "price_format": "Geben Sie einen Preis wie 27 oder 27.50 ein (bis zu 10 Stellen und 2 Nachkommastellen).",
+    "order_mismatch": "Die Varianten wurden inzwischen geändert. Die Liste wurde neu geladen – bitte versuchen Sie es erneut.",
+    "price_format": "Geben Sie einen Preis wie 27,50 oder 27.50 ein (bis zu 10 Stellen und 2 Nachkommastellen).",
     "sku_taken": "Die SKU \"{{sku}}\" ist bereits vergeben.",
     "stale": "Jemand anderes hat diese Variante inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   }

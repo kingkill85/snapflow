@@ -48,7 +48,7 @@
     "active": "Aktiv",
     "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung."
   },
-  "typeChange": "Sie haben den Produkttyp geändert. Beim Speichern werden die Werte dieses Produkts und seiner Varianten gegen die Attribute des neuen Typs geprüft; Werte, die er nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind.",
+  "typeChange": "Sie haben den Produkttyp geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute des neuen Typs geprüft; Werte, die der neue Typ nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zum neuen Typ passen, werden an den Varianten markiert.",
   "chooseTypeFirst": "Wählen Sie einen Produkttyp, um seine Attribute auszufüllen.",
   "storedErrors": "Einige gespeicherte Werte passen nicht zu den aktuellen Attributen des Produkttyps. Sie sind unten markiert; korrigieren Sie sie vor dem Speichern.",
   "notFound": {
@@ -69,7 +69,10 @@
     "moveUp": "{{name}} nach oben verschieben",
     "moveDown": "{{name}} nach unten verschieben",
     "deleteTitle": "Variante löschen",
-    "deleteMessage": "Die Variante „{{name}}“ mit ihren Zubehör-Verknüpfungen löschen? Das kann nicht rückgängig gemacht werden."
+    "deleteMessage": "Die Variante „{{name}}“ mit ihren Zubehör-Verknüpfungen löschen? Das kann nicht rückgängig gemacht werden.",
+    "saveFirst": "Speichern Sie zuerst das Produkt, um Varianten zu öffnen oder hinzuzufügen.",
+    "problems_one": "{{count}} Variante hat Werte, die nicht mehr zum Schema passen:",
+    "problems_other": "{{count}} Varianten haben Werte, die nicht mehr zum Schema passen:"
   },
   "variant": {
     "new": "Neue Variante",
@@ -90,7 +93,7 @@
       "sku": "SKU",
       "skuHint": "Optional; eindeutig im Katalog",
       "price": "Preis",
-      "priceHint": "Listenpreis in USD, z. B. 27.50",
+      "priceHint": "Listenpreis in USD, z. B. 27,50 oder 27.50",
       "image": "Bild",
       "imageHint": "JPEG, PNG oder WebP, höchstens 10 MB. Große Bilder werden verkleinert.",
       "active": "Aktiv",
@@ -111,7 +114,6 @@
     "searchHint": "Modellnummer, Name oder SKU",
     "results": "Suchergebnisse",
     "noResults": "Keine passenden Varianten.",
-    "more": "{{shown}} von {{total}} angezeigt; verfeinern Sie die Suche, um weitere zu finden.",
     "add": "{{name}} hinzufügen",
     "addShort": "Hinzufügen",
     "linked": "Verknüpftes Zubehör",
@@ -119,6 +121,11 @@
     "requiredFor": "{{name}} ist erforderlich",
     "save": "Zubehör speichern",
     "saved": "Zubehör gespeichert.",
-    "unsaved": "Das Zubehör hat ungespeicherte Änderungen."
+    "unsaved": "Das Zubehör hat ungespeicherte Änderungen.",
+    "typeFilter": "Produkttyp",
+    "sku": "SKU {{sku}}",
+    "shown_one": "{{count}} Variante angezeigt",
+    "shown_other": "{{count}} Varianten angezeigt",
+    "showMore": "Mehr anzeigen"
   }
 }

@@ -18,5 +18,26 @@ export const isNotFound = (error: unknown) =>
 
 /** Messages an editor shows after a save that stays on the page. */
 export type SaveNotice = 'created' | 'saved'
-export const noticeFrom = (state: unknown): SaveNotice | null =>
-  typeof state === 'object' && state !== null && 'notice' in state && (state.notice === 'created' || state.notice === 'saved') ? state.notice : null
+
+/**
+ * Navigation state of the product and variant pages: the product list's
+ * query string ("?search=…&type=…") to return to (D86), and a notice after a
+ * save that continues on another page.
+ */
+export type EditorState = { listSearch?: string; notice?: SaveNotice }
+
+const stateOf = (state: unknown): Record<string, unknown> => (typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {})
+
+export const noticeFrom = (state: unknown): SaveNotice | null => {
+  const { notice } = stateOf(state)
+  return notice === 'created' || notice === 'saved' ? notice : null
+}
+
+/** The list's query string passed along in the navigation state, or "" for the bare list. */
+export const listSearchFrom = (state: unknown): string => {
+  const { listSearch } = stateOf(state)
+  return typeof listSearch === 'string' && listSearch.startsWith('?') ? listSearch : ''
+}
+
+/** The product list with the filters it was left with. */
+export const listHref = (listSearch: string) => `${listPath}${listSearch}`

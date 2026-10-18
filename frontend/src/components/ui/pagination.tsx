@@ -13,11 +13,15 @@ type PaginationProps = {
   onChange: (offset: number) => void
 }
 
-/** "1–50 of 120" with Previous / Next, below a paged list. */
+/**
+ * "1–50 of 120" with Previous / Next, below a paged list. Nothing for an empty
+ * list or an offset past the end (the page should move to the last page, see
+ * lastPageOffset), so the range never reads "from" after "to".
+ */
 export function Pagination({ offset, limit, total, onChange }: PaginationProps) {
   const { t } = useTranslation()
-  if (total === 0) return null
-  const from = Math.min(offset + 1, total)
+  if (total <= 0 || offset < 0 || offset >= total) return null
+  const from = offset + 1
   const to = Math.min(offset + limit, total)
   return (
     <nav aria-label={t('pagination.label')} className="flex flex-wrap items-center justify-end gap-3">

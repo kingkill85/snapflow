@@ -1,16 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RotateCw } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { Product, ProductType } from '@/api/generated/model'
 import {
   getGetProductQueryKey,
   getListProductsQueryKey,
+  getSearchVariantsQueryKey,
   useCreateProduct,
   useGetProduct,
   useUpdateProduct,
@@ -29,6 +30,7 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  LeaveLink,
   Loading,
   Notice,
   Page,
@@ -38,6 +40,7 @@ import {
   TextareaField,
   toFieldErrors,
   useFieldError,
+  useUnsavedChanges,
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
@@ -50,8 +53,18 @@ import {
   toProductFormValues,
   toProductInput,
 } from './form'
-import { fresh, isNotFound, listPath, noticeFrom, productPath, type SaveNotice, useFreshProductTypes } from './paths'
-import { useUnsavedChanges } from './unsaved'
+import {
+  type EditorState,
+  fresh,
+  isNotFound,
+  listHref,
+  listPath,
+  listSearchFrom,
+  noticeFrom,
+  productPath,
+  type SaveNotice,
+  useFreshProductTypes,
+} from './paths'
 import { VariantsSection } from './VariantsSection'
 
 /** catalog/products/new and catalog/products/:id */
@@ -62,14 +75,7 @@ export function ProductEditorPage() {
 }
 
 function BackToList() {
-  const { t } = useTranslation()
-  return (
-    <Button asChild variant="secondary">
-      <Link to={listPath}>
-        <ArrowLeft /> {t('action.backToList')}
-      </Link>
-    </Button>
-  )
+  return <LeaveLink to={listPath} dirty={false} />
 }
 
 /** A failed load: not found, or the error with a way back. */
@@ -93,6 +99,7 @@ function LoadFailed({ error }: { error: unknown }) {
 
 function NewProduct() {
   const { t } = useTranslation('products')
+  const listSearch = listSearchFrom(useLocation().state)
   const types = useFreshProductTypes()
   const [dirty, setDirty] = useState(false)
   const unsaved = useUnsavedChanges(dirty)
@@ -100,7 +107,13 @@ function NewProduct() {
   if (!types.isFetchedAfterMount || !types.data) return <Loading />
   return (
     <Page title={t('new')}>
-      <ProductForm item={null} types={types.data.items} onDirtyChange={setDirty} onLeave={unsaved.allow} />
+      <ProductForm
+        item={null}
+        types={types.data.items}
+        listSearch={listSearch}
+        onDirtyChange={setDirty}
+        onLeave={unsaved.allow}
+      />
       {unsaved.dialog}
     </Page>
   )
@@ -112,6 +125,7 @@ function ExistingProduct({ id }: { id: string }) {
   const localized = useLocalized()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const listSearch = listSearchFrom(location.state)
   // The product and the schemas are fetched on every visit; the form edits
   // the version loaded then (D44), the variants below always show the
   // current one.
@@ -150,6 +164,7 @@ function ExistingProduct({ id }: { id: string }) {
         key={`${product.id}:${generation}`}
         item={product}
         types={types.data.items}
+        listSearch={listSearch}
         onReload={reload}
         onSaved={saved}
         onDirtyChange={(changed) => {
@@ -159,7 +174,7 @@ function ExistingProduct({ id }: { id: string }) {
         }}
         onLeave={unsaved.allow}
       />
-      <VariantsSection product={product} />
+      <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
       {unsaved.dialog}
     </Page>
   )
@@ -168,6 +183,8 @@ function ExistingProduct({ id }: { id: string }) {
 type ProductFormProps = {
   item: Product | null
   types: ProductType[]
+  /** The product list's filters to return to. */
+  listSearch: string
   onReload?: () => Promise<void>
   /** After an update: restart from the saved version. */
   onSaved?: (product: Product) => void
@@ -177,7 +194,7 @@ type ProductFormProps = {
 }
 
 /** The product's own fields and attribute values; read-only for users who may not change it. */
-function ProductForm({ item, types, onReload, onSaved, onDirtyChange, onLeave }: ProductFormProps) {
+function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange, onLeave }: ProductFormProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
@@ -265,15 +282,19 @@ function ProductForm({ item, types, onReload, onSaved, onDirtyChange, onLeave }:
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getSearchVariantsQueryKey() }),
+    ])
     if (loaded) {
       onSaved?.(result)
       return
     }
-    // A new product continues on its page, where its variants are added.
+    // A new product continues on its page, where its variants are added (D84).
     onLeave()
     queryClient.setQueryData(getGetProductQueryKey(result.id), result)
-    void navigate(productPath(result.id), { replace: true, state: { notice: 'created' } })
+    const state: EditorState = { notice: 'created', listSearch }
+    void navigate(productPath(result.id), { replace: true, state })
   }
 
   const submit = async (e: FormEvent) => {
@@ -369,17 +390,11 @@ function ProductForm({ item, types, onReload, onSaved, onDirtyChange, onLeave }:
           />
         }
       >
-        {readOnly ? (
-          <BackToList />
-        ) : (
-          <>
-            <Button asChild variant="secondary">
-              <Link to={listPath}>{tCommon('action.cancel')}</Link>
-            </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {loaded ? tCommon('action.update') : tCommon('action.create')}
-            </Button>
-          </>
+        <LeaveLink to={listHref(listSearch)} dirty={isDirty && !readOnly} />
+        {!readOnly && (
+          <Button type="submit" disabled={mutation.isPending}>
+            {loaded ? tCommon('action.update') : tCommon('action.create')}
+          </Button>
         )}
       </FormActions>
     </form>

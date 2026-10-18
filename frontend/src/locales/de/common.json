@@ -83,5 +83,8 @@
     "uploading": "Wird hochgeladen…",
     "progress": "Wird hochgeladen… {{percent}} %",
     "none": "Kein Bild"
+  },
+  "option": {
+    "unknown": "{{value}} (keine Option)"
   }
 }

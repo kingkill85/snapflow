@@ -1,16 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RotateCw } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { Product, ProductType, Variant } from '@/api/generated/model'
 import {
   getGetProductQueryKey,
   getListProductsQueryKey,
+  getSearchVariantsQueryKey,
   useCreateVariant,
   useGetProduct,
   useUpdateVariant,
@@ -18,6 +19,7 @@ import {
 import { definitionsFor, extraKeys, storedValueErrors } from '@/catalog/attribute-values'
 import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEditor'
 import { fileUrl, imageTypes, useImageUpload } from '@/catalog/files'
+import { catalogCurrency } from '@/catalog/money'
 import {
   type ApiFieldMap,
   Button,
@@ -30,6 +32,7 @@ import {
   focusFirstError,
   FormActions,
   ImageUpload,
+  LeaveLink,
   Loading,
   Notice,
   Page,
@@ -38,13 +41,24 @@ import {
   toFieldErrors,
   useErrorMessage,
   useFieldError,
+  useUnsavedChanges,
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { AddonsEditor } from './AddonsEditor'
 import { editorFields, storedValues, toAttributes, toVariantFormValues, toVariantInput, type VariantFormValues, variantSchema } from './form'
-import { fresh, isNotFound, listPath, noticeFrom, productPath, type SaveNotice, useFreshProductTypes, variantPath } from './paths'
-import { useUnsavedChanges } from './unsaved'
+import {
+  type EditorState,
+  fresh,
+  isNotFound,
+  listPath,
+  listSearchFrom,
+  noticeFrom,
+  productPath,
+  type SaveNotice,
+  useFreshProductTypes,
+  variantPath,
+} from './paths'
 
 /** catalog/products/:id/variants/new and catalog/products/:id/variants/:variantId */
 export function VariantEditorPage() {
@@ -52,14 +66,8 @@ export function VariantEditorPage() {
   return <VariantPage key={variantId ?? 'new'} productId={id} variantId={variantId} />
 }
 
-function BackTo({ to, label }: { to: string; label: string }) {
-  return (
-    <Button asChild variant="secondary">
-      <Link to={to}>
-        <ArrowLeft /> {label}
-      </Link>
-    </Button>
-  )
+function BackTo({ to, label, state }: { to: string; label: string; state?: EditorState }) {
+  return <LeaveLink to={to} state={state} dirty={false} backLabel={label} />
 }
 
 function VariantPage({ productId, variantId }: { productId: string; variantId?: string }) {
@@ -68,6 +76,8 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
   const localized = useLocalized()
   const queryClient = useQueryClient()
   const location = useLocation()
+  // The product list's filters, passed along to return to them (D86).
+  const listState: EditorState = { listSearch: listSearchFrom(location.state) }
   // Fetched on every visit; the form edits the version loaded then (D44).
   const query = useGetProduct(productId, { query: fresh })
   const types = useFreshProductTypes()
@@ -100,7 +110,10 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
   if (variant === undefined) {
     return (
       <Page title={t('variant.notFound.title')}>
-        <EmptyState title={t('variant.notFound.message')} action={<BackTo to={productPath(product.id)} label={t('variant.backToProduct')} />} />
+        <EmptyState
+          title={t('variant.notFound.message')}
+          action={<BackTo to={productPath(product.id)} state={listState} label={t('variant.backToProduct')} />}
+        />
       </Page>
     )
   }
@@ -123,6 +136,8 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
   return (
     <Page title={title} description={t('variant.of', { product: `${product.modelNumber} · ${localized(product.name)}` })}>
       {notice && <Notice>{notice === 'created' ? t('variant.created') : tCommon('state.saved')}</Notice>}
+      {/* An update saves the variant only: unsaved add-ons stay as edited (D89). */}
+      {notice === 'saved' && addonsDirty && <Notice tone="warning">{t('addons.unsaved')}</Notice>}
       {readOnly && variant && <p className="text-sm text-muted">{t('variant.readOnly')}</p>}
       <VariantForm
         key={`${variant?.id ?? 'new'}:${generation}`}
@@ -130,6 +145,8 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
         item={variant}
         type={types.data.items.find((pt) => pt.id === product.productTypeId)}
         readOnly={readOnly}
+        dirty={formDirty || addonsDirty}
+        listState={listState}
         onReload={reload}
         onSaved={saved}
         onDirtyChange={(changed) => {
@@ -139,7 +156,14 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
         onLeave={unsaved.allow}
       />
       {variant ? (
-        <AddonsEditor product={product} variant={variant} readOnly={readOnly} onDirtyChange={setAddonsDirty} />
+        <AddonsEditor
+          product={product}
+          variant={variant}
+          types={types.data.items}
+          readOnly={readOnly}
+          linkState={listState}
+          onDirtyChange={setAddonsDirty}
+        />
       ) : (
         <Section title={t('addons.title')} description={t('addons.description')}>
           <p className="text-sm text-muted">{t('addons.afterCreate')}</p>
@@ -155,6 +179,10 @@ type VariantFormProps = {
   item: Variant | null
   type: ProductType | undefined
   readOnly: boolean
+  /** Whether the page (form or add-ons) has unsaved changes: Cancel instead of Back to product. */
+  dirty: boolean
+  /** Navigation state passed back to the product page (the list's filters). */
+  listState: EditorState
   onReload: () => Promise<void>
   onSaved: (variant: Variant) => void
   onDirtyChange: (dirty: boolean) => void
@@ -162,7 +190,7 @@ type VariantFormProps = {
 }
 
 /** A variant's own fields, image and attribute values (add-ons are saved separately). */
-function VariantForm({ product, item, type, readOnly, onReload, onSaved, onDirtyChange, onLeave }: VariantFormProps) {
+function VariantForm({ product, item, type, readOnly, dirty, listState, onReload, onSaved, onDirtyChange, onLeave }: VariantFormProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
@@ -256,15 +284,19 @@ function VariantForm({ product, item, type, readOnly, onReload, onSaved, onDirty
       failed()
       return
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getSearchVariantsQueryKey() }),
+    ])
     if (loaded) {
       onSaved(result)
       return
     }
-    // A new variant continues on its page, where its add-ons are added.
+    // A new variant continues on its page, where its add-ons are added (D84).
     onLeave()
     await queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(product.id) })
-    void navigate(variantPath(product.id, result.id), { replace: true, state: { notice: 'created' } })
+    const state: EditorState = { ...listState, notice: 'created' }
+    void navigate(variantPath(product.id, result.id), { replace: true, state })
   }
 
   const submit = async (e: FormEvent) => {
@@ -301,7 +333,7 @@ function VariantForm({ product, item, type, readOnly, onReload, onSaved, onDirty
             <Field
               label={t('variant.field.price')}
               hint={t('variant.field.priceHint')}
-              suffix="USD"
+              suffix={catalogCurrency}
               inputMode="decimal"
               autoComplete="off"
               error={fieldError(errors.price?.message)}
@@ -345,7 +377,15 @@ function VariantForm({ product, item, type, readOnly, onReload, onSaved, onDirty
             fields={errorFields}
             action={
               stale && (
-                <Button size="sm" variant="secondary" onClick={() => void onReload()}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    // The form restarts: an upload still running is dropped.
+                    image.cancel()
+                    void onReload()
+                  }}
+                >
                   <RotateCw /> {tCommon('action.reload')}
                 </Button>
               )
@@ -353,17 +393,11 @@ function VariantForm({ product, item, type, readOnly, onReload, onSaved, onDirty
           />
         }
       >
-        {readOnly ? (
-          <BackTo to={productPath(product.id)} label={t('variant.backToProduct')} />
-        ) : (
-          <>
-            <Button asChild variant="secondary">
-              <Link to={productPath(product.id)}>{tCommon('action.cancel')}</Link>
-            </Button>
-            <Button type="submit" disabled={mutation.isPending || image.pending}>
-              {loaded ? tCommon('action.update') : tCommon('action.create')}
-            </Button>
-          </>
+        <LeaveLink to={productPath(product.id)} state={listState} dirty={dirty && !readOnly} backLabel={t('variant.backToProduct')} />
+        {!readOnly && (
+          <Button type="submit" disabled={mutation.isPending || image.pending}>
+            {loaded ? tCommon('action.update') : tCommon('action.create')}
+          </Button>
         )}
       </FormActions>
     </form>

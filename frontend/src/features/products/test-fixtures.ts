@@ -76,6 +76,7 @@ export const gatewayType: ProductType = {
   attributes: [
     { key: 'series', label: { en: 'Series' }, type: 'text', scope: 'product' },
     { key: 'ports', label: { en: 'Ports' }, type: 'integer', scope: 'product' },
+    { key: 'managed', label: { en: 'Managed' }, type: 'boolean', required: true, scope: 'product' },
   ],
 }
 

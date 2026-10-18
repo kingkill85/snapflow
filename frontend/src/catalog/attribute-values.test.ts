@@ -42,7 +42,7 @@ describe('attribute values', () => {
   it('shows values stored for another type as well as possible', () => {
     expect(toFormValue(numbers, 3)).toEqual(['3'])
     expect(toFormValue(text, ['a', 'b'])).toBe('a, b')
-    expect(toFormValue(flag, 'yes')).toBeNull()
+    expect(toFormValue(flag, 'yes')).toEqual({ raw: 'yes' })
     // A key edited under another definition, e.g. before the type changed.
     expect(formValueOf(numbers, { currents: '4' })).toEqual(['4'])
     expect(formValueOf(text, { series: ['a'] })).toBe('a')
@@ -59,5 +59,36 @@ describe('attribute values', () => {
       'attributes.currents[1]': 'values.currents',
       'attributes.old': 'keep.old',
     })
+  })
+
+  it('keeps stored values the input cannot hold raw and sends them back unchanged', () => {
+    const objects = def({ key: 'channels', type: 'list', itemType: 'text' })
+    const stored = { dali: 'yes', channels: [{ n: 1 }, 'b'], series: { a: 1 } }
+    const values = toFormValues([flag, objects, text], stored)
+    expect(values).toEqual({ dali: { raw: 'yes' }, channels: { raw: [{ n: 1 }, 'b'] }, series: { raw: { a: 1 } } })
+    expect(toApiValues([flag, objects, text], values)).toEqual({ attributes: stored, errors: {} })
+    // Once the input is changed, the new value is sent.
+    expect(toApiValues([flag, objects], { ...values, dali: true, channels: ['x'] }).attributes).toEqual({ dali: true, channels: ['x'] })
+    // Item errors of a raw list map to the list.
+    expect(attributeFieldMap([objects], values, [])).toEqual({
+      'attributes.channels': 'values.channels',
+      'attributes.channels[0]': 'values.channels',
+      'attributes.channels[1]': 'values.channels',
+    })
+  })
+
+  it('takes a decimal comma and refuses hex and exponent forms', () => {
+    expect(toApiValue(number, '12,5')).toEqual({ value: 12.5 })
+    expect(toApiValue(integer, '4,0')).toEqual({ value: 4 })
+    expect(toApiValue(numbers, ['1,5', '2'])).toEqual({ value: [1.5, 2] })
+    expect(toApiValue(number, '0x10')).toEqual({ error: 'validation.number' })
+    expect(toApiValue(number, '1e3')).toEqual({ error: 'validation.number' })
+    expect(toApiValue(integer, '0b11')).toEqual({ error: 'validation.number' })
+  })
+
+  it('round-trips stored 0 and false', () => {
+    const defs = [number, integer, flag]
+    const stored = { power: 0, width: 0, dali: false }
+    expect(toApiValues(defs, toFormValues(defs, stored)).attributes).toEqual(stored)
   })
 })

@@ -34,8 +34,11 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
   const messageId = `${inputId}-message`
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
+  // The preview URL that failed to load: the placeholder shows instead.
+  const [broken, setBroken] = useState<string>()
   const message = error || hint
   const enabled = !disabled && !pending
+  const preview = src && broken !== src ? src : undefined
 
   const choose = () => input.current?.click()
   const drop = (e: DragEvent) => {
@@ -59,7 +62,6 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
         tabIndex={-1}
         className="sr-only"
         disabled={!enabled}
-        aria-invalid={error ? true : undefined}
         aria-describedby={message ? messageId : undefined}
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -80,8 +82,13 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
           dragging ? 'border-primary bg-primary/5' : error ? 'border-danger' : 'border-line',
         )}
       >
-        {src ? (
-          <img src={src} alt={label} className="size-32 shrink-0 rounded-control border border-line bg-canvas object-contain" />
+        {preview ? (
+          <img
+            src={preview}
+            alt={label}
+            className="size-32 shrink-0 rounded-control border border-line bg-canvas object-contain"
+            onError={() => setBroken(preview)}
+          />
         ) : (
           <span aria-hidden="true" className="flex size-32 shrink-0 items-center justify-center rounded-control bg-canvas text-muted [&_svg]:size-8">
             <ImagePlus />
@@ -91,15 +98,21 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
           {pending ? (
             <div className="space-y-1">
               <p className="text-sm text-muted">{percent === undefined ? t('upload.uploading') : t('upload.progress', { percent })}</p>
+              {/* Without a known percentage the bar is indeterminate: no value, a pulsing segment. */}
               <div
                 role="progressbar"
                 aria-label={t('upload.uploading')}
-                aria-valuemin={0}
-                aria-valuemax={100}
+                aria-valuemin={percent === undefined ? undefined : 0}
+                aria-valuemax={percent === undefined ? undefined : 100}
                 aria-valuenow={percent}
+                data-indeterminate={percent === undefined ? true : undefined}
                 className="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-line"
               >
-                <div className="h-full bg-primary transition-all" style={{ width: `${percent ?? 100}%` }} />
+                {percent === undefined ? (
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+                ) : (
+                  <div className="h-full bg-primary transition-all" style={{ width: `${percent}%` }} />
+                )}
               </div>
             </div>
           ) : (
@@ -107,7 +120,14 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
               <>
                 {!src && <p className="text-sm text-muted">{t('upload.drop')}</p>}
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={choose}>
+                  {/* The visible control carries the error (the file input is hidden). */}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={choose}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={message ? messageId : undefined}
+                  >
                     <Upload /> {src ? t('upload.replace') : t('upload.choose')}
                   </Button>
                   {src && (
@@ -123,7 +143,13 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
         </div>
       </div>
       {message && (
-        <p id={messageId} role={error ? 'alert' : undefined} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
+        <p
+          id={messageId}
+          role={error ? 'alert' : undefined}
+          // Without a button to focus (uploading, read-only), the error itself takes the focus.
+          data-field-error={error && !enabled ? true : undefined}
+          tabIndex={error && !enabled ? -1 : undefined}
+          className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
           {message}
         </p>
       )}

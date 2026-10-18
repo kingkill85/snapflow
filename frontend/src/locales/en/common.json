@@ -81,7 +81,10 @@
     "replace": "Replace",
     "remove": "Remove image",
     "uploading": "Uploading…",
-    "progress": "Uploading… {{percent}} %",
+    "progress": "Uploading… {{percent}}%",
     "none": "No image"
+  },
+  "option": {
+    "unknown": "{{value}} (not an option)"
   }
 }

@@ -1,11 +1,11 @@
-import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
-import { Plus, Save } from 'lucide-react'
+import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, Plus, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '@/api/client'
-import type { Addon, Product, Variant, VariantSearchItem } from '@/api/generated/model'
-import { getGetProductQueryKey, useReplaceVariantAddons, useSearchVariants } from '@/api/generated/products/products'
+import type { Addon, Product, ProductType, SearchVariantsParams, Variant, VariantSearchItem } from '@/api/generated/model'
+import { getGetProductQueryKey, getSearchVariantsQueryKey, searchVariants, useReplaceVariantAddons } from '@/api/generated/products/products'
 import { fileUrl } from '@/catalog/files'
 import { useFormatPrice } from '@/catalog/money'
 import {
@@ -20,6 +20,8 @@ import {
   RepeaterControls,
   RepeaterItem,
   Section,
+  SelectField,
+  TextLink,
   Thumbnail,
   TypeBadge,
   useErrorMessage,
@@ -27,9 +29,13 @@ import {
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-/** Results shown per search; refining the search finds the rest. */
-const searchLimit = 20
+import { type EditorState, productPath } from './paths'
+
+/** Variants loaded per page of the picker ("Show more" loads the next). */
+export const pickerPageSize = 20
 const searchDelayMs = 300
+/** The API's limit of the search text. */
+const searchMaxLength = 200
 
 /** One linked add-on as the editor shows it. */
 type Item = Omit<Addon, 'sortOrder'> & { id: string }
@@ -52,15 +58,20 @@ const signature = (items: { addonVariantId: string; required: boolean }[]) => JS
 type AddonsEditorProps = {
   product: Product
   variant: Variant
+  /** The product types, for the picker's type filter. */
+  types: ProductType[]
   readOnly: boolean
+  /** Navigation state for the links to the add-ons' products. */
+  linkState?: EditorState
   onDirtyChange: (dirty: boolean) => void
 }
 
 /**
- * A variant's add-ons: find variants across the catalog, mark them required,
- * order and remove them, then save the whole list at once (D53).
+ * A variant's add-ons: browse or search variants across the catalog, mark
+ * them required, order and remove them, then save the whole list at once
+ * (D53, D83).
  */
-export function AddonsEditor({ product, variant, readOnly, onDirtyChange }: AddonsEditorProps) {
+export function AddonsEditor({ product, variant, types, readOnly, linkState, onDirtyChange }: AddonsEditorProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
@@ -80,19 +91,35 @@ export function AddonsEditor({ product, variant, readOnly, onDirtyChange }: Addo
   const dirty = signature(items) !== signature(baseline)
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
+  // The picker lists variants in catalog order before anything is typed;
+  // typing and the type filter narrow it; "Show more" loads the next page (D83).
   const [draft, setDraft] = useState('')
   const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setSearch(draft.trim()), searchDelayMs)
     return () => clearTimeout(timer)
   }, [draft])
-  const results = useSearchVariants(
-    { search, limit: searchLimit },
-    { query: { enabled: !readOnly && search !== '', placeholderData: keepPreviousData } },
-  )
-  // For convenience only: the server rejects self and duplicates anyway.
+  const params: SearchVariantsParams = { ...(search ? { search } : {}), ...(typeFilter ? { productTypeId: typeFilter } : {}) }
+  const results = useInfiniteQuery({
+    queryKey: [...getSearchVariantsQueryKey(params), 'pages'],
+    queryFn: ({ pageParam, signal }) => searchVariants({ ...params, limit: pickerPageSize, offset: pageParam }, signal),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, page) => n + page.items.length, 0)
+      return last.items.length > 0 && loaded < last.total ? loaded : undefined
+    },
+    enabled: !readOnly,
+    placeholderData: keepPreviousData,
+  })
+  // For convenience only: the server rejects self and duplicates anyway. The
+  // count names the rows shown, not the server's total, which includes them.
   const linked = new Set(items.map((i) => i.addonVariantId))
-  const offered = (results.data?.items ?? []).filter((r) => r.id !== variant.id && !linked.has(r.id))
+  const offered = (results.data?.pages ?? []).flatMap((page) => page.items).filter((r) => r.id !== variant.id && !linked.has(r.id))
+  const typeOptions = [
+    { value: '', label: t('allTypes') },
+    ...types.map((pt) => ({ value: pt.id, label: pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) }) })),
+  ]
 
   const change = (next: Item[]) => {
     setItems(next)
@@ -153,38 +180,71 @@ export function AddonsEditor({ product, variant, readOnly, onDirtyChange }: Addo
     <Section title={t('addons.title')} description={t('addons.description')}>
       {!readOnly && (
         <div className="space-y-2">
-          <Field type="search" label={t('addons.search')} placeholder={t('addons.searchHint')} value={draft} onChange={(e) => setDraft(e.target.value)} />
-          {search !== '' && results.data && (
-            <div role="region" aria-label={t('addons.results')} className="space-y-1">
-              {offered.length === 0 ? (
-                <p className="text-sm text-muted">{t('addons.noResults')}</p>
-              ) : (
-                <ul className="divide-y divide-line rounded-control border border-line">
-                  {offered.map((r) => (
-                    <li key={r.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                      <Thumbnail src={fileUrl(r.imageFileId)} />
-                      <div className="min-w-0 flex-1 text-sm">
-                        <p className="font-medium">
-                          {r.modelNumber} · {localized(r.name)}
-                        </p>
-                        <p className="text-muted">
-                          <TypeBadge color={r.productType.color}>{localized(r.productName)}</TypeBadge>
-                        </p>
-                      </div>
-                      <span className="text-sm tabular-nums">{price(r.price)}</span>
-                      {!r.available && <Badge>{tCommon('status.unavailable')}</Badge>}
-                      <Button size="sm" variant="secondary" aria-label={t('addons.add', { name: `${r.modelNumber} ${localized(r.name)}` })} onClick={() => add(r)}>
-                        <Plus /> {t('addons.addShort')}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {results.data.total > results.data.items.length && (
-                <p className="text-xs text-muted">{t('addons.more', { shown: results.data.items.length, total: results.data.total })}</p>
-              )}
-            </div>
-          )}
+          <div className="grid items-end gap-4 sm:grid-cols-2">
+            <Field
+              type="search"
+              label={t('addons.search')}
+              placeholder={t('addons.searchHint')}
+              maxLength={searchMaxLength}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <SelectField label={t('addons.typeFilter')} value={typeFilter} options={typeOptions} onChange={(e) => setTypeFilter(e.target.value)} />
+          </div>
+          <div role="region" aria-label={t('addons.results')} className="space-y-2">
+            {results.isError ? (
+              <ErrorMessage error={results.error} />
+            ) : results.isPending ? (
+              <p className="text-sm text-muted">{tCommon('state.loading')}</p>
+            ) : (
+              <>
+                {offered.length === 0 && !results.hasNextPage ? (
+                  <p className="text-sm text-muted">{t('addons.noResults')}</p>
+                ) : (
+                  offered.length > 0 && (
+                    <ul className="max-h-96 divide-y divide-line overflow-y-auto rounded-control border border-line">
+                      {offered.map((r) => (
+                        <li key={r.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                          <Thumbnail src={fileUrl(r.imageFileId)} />
+                          <div className="min-w-0 flex-1 space-y-0.5 text-sm">
+                            <p className="font-medium">
+                              {r.modelNumber} · {localized(r.name)}
+                            </p>
+                            {r.sku && <p className="text-xs text-muted">{t('addons.sku', { sku: r.sku })}</p>}
+                            <p className="text-muted">
+                              <TypeBadge color={r.productType.color}>{localized(r.productName)}</TypeBadge>
+                            </p>
+                          </div>
+                          <span className="text-sm tabular-nums">{price(r.price)}</span>
+                          {!r.available && <Badge>{tCommon('status.unavailable')}</Badge>}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-label={t('addons.add', { name: `${r.modelNumber} ${localized(r.name)}` })}
+                            onClick={() => add(r)}
+                          >
+                            <Plus /> {t('addons.addShort')}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {offered.length > 0 && (
+                    <p className="text-xs text-muted" aria-live="polite">
+                      {t('addons.shown', { count: offered.length })}
+                    </p>
+                  )}
+                  {results.hasNextPage && (
+                    <Button size="sm" variant="secondary" disabled={results.isFetchingNextPage} onClick={() => void results.fetchNextPage()}>
+                      <ChevronDown /> {t('addons.showMore')}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -206,7 +266,11 @@ export function AddonsEditor({ product, variant, readOnly, onDirtyChange }: Addo
             >
               <div className="flex flex-wrap items-center gap-3">
                 <Thumbnail src={fileUrl(item.imageFileId)} />
-                <p className="min-w-0 flex-1 text-sm text-muted">{localized(item.productName)}</p>
+                <p className="min-w-0 flex-1 text-sm text-muted">
+                  <TextLink to={productPath(item.productId)} state={linkState}>
+                    {localized(item.productName)}
+                  </TextLink>
+                </p>
                 {!item.available && <Badge>{tCommon('status.unavailable')}</Badge>}
                 <CheckboxField
                   label={t('addons.required')}
@@ -231,6 +295,7 @@ export function AddonsEditor({ product, variant, readOnly, onDirtyChange }: Addo
           <div className="min-w-0 flex-1">
             <ErrorMessage error={replace.error} fields={errorFields} />
             {saved && !replace.error && <Notice>{t('addons.saved')}</Notice>}
+            {dirty && <Notice tone="warning">{t('addons.unsaved')}</Notice>}
           </div>
           <Button disabled={!dirty || replace.isPending} onClick={() => void save()}>
             <Save /> {t('addons.save')}

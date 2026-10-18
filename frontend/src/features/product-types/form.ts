@@ -9,6 +9,7 @@ import {
   type ProductType,
   type ProductTypeInput,
 } from '@/api/generated/model'
+import { parseDecimal } from '@/catalog/decimal'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
 
 // The editor's form mirrors the API body (name.en, attributes.2.options.0.key, ...),
@@ -43,7 +44,12 @@ export const hasOptions = (type: AttributeDefinitionType, itemType: AttributeDef
 export const wholeBounds = (type: AttributeDefinitionType) => type !== 'number'
 const nonNegativeBounds = (type: AttributeDefinitionType) => type === 'text' || type === 'list'
 
-const isNumber = (v: string) => v.trim() !== '' && Number.isFinite(Number(v))
+/** A bound as typed ("2,5" or "2.5", D71) as a number; NaN if it is not one. */
+const boundNumber = (v: string) => {
+  const decimal = parseDecimal(v)
+  return decimal === undefined ? Number.NaN : Number(decimal)
+}
+const isNumber = (v: string) => Number.isFinite(boundNumber(v))
 
 type Ctx = z.RefinementCtx
 const requireEnglish = (t: { en: string; de: string }, path: (string | number)[], ctx: Ctx) => {
@@ -91,7 +97,7 @@ function checkBounds(a: AttributeShape, ctx: Ctx) {
       return null
     }
     if (!isNumber(v)) return issue(errorKey('validation.number'))
-    const n = Number(v)
+    const n = boundNumber(v)
     if (whole && !Number.isInteger(n)) return issue(errorKey('attribute.bound_whole'))
     if (nonNegative && n < 0) return issue(errorKey('attribute.bound_negative'))
     if (whole && Math.abs(n) > maxSafeInteger) {
@@ -257,8 +263,8 @@ const toInstanceDefinition = (a: AttributeValues): InstanceAttributeDefinition =
     type: a.type,
     required: a.required,
     ...(a.unit.trim() ? { unit: a.unit } : {}),
-    ...(hasBounds(a.type) && a.min.trim() ? { min: Number(a.min) } : {}),
-    ...(hasBounds(a.type) && a.max.trim() ? { max: Number(a.max) } : {}),
+    ...(hasBounds(a.type) && a.min.trim() ? { min: boundNumber(a.min) } : {}),
+    ...(hasBounds(a.type) && a.max.trim() ? { max: boundNumber(a.max) } : {}),
     ...(a.type === 'list' ? { itemType: a.itemType } : {}),
     ...(hasOptions(a.type, a.itemType) ? { options: a.options.map((o) => ({ key: o.key, label: localized(o.label) })) } : {}),
   }

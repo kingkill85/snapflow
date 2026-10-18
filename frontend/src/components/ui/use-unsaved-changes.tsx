@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useBlocker } from 'react-router'
 
-import { ConfirmDialog } from '@/components/ui'
+import { ConfirmDialog } from './dialog'
 
 /**
  * Asks before unsaved changes are lost (D28): leaving the page in the app

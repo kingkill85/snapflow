@@ -10,7 +10,7 @@ import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ProductEditorPage } from './ProductEditorPage'
-import { black, dimmer, dimmerType, gatewayType, ids, ivory, problem, types } from './test-fixtures'
+import { black, dimmer, dimmerType, gatewayType, ids, inactiveType, ivory, problem, types } from './test-fixtures'
 
 const routes = [
   { path: '/catalog/products', element: <p>list page</p> },
@@ -278,9 +278,15 @@ describe('ProductEditorPage', () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
 
+    await u.clear(inAttributes('Power'))
+    await u.type(inAttributes('Power'), '250')
     await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
 
-    expect(screen.getByText(/You changed the product type/)).toBeInTheDocument()
+    expect(screen.getByText(/You changed the product type/)).toHaveTextContent(
+      "Its variants' values are never refused or removed by the change: values that do not match the new type are flagged on the variants.",
+    )
+    // A required yes/no of the new type starts as "no".
+    expect(inAttributes('Managed')).not.toBeChecked()
     expect(within(attributes()).queryByLabelText('Power')).not.toBeInTheDocument()
     expect(inAttributes('Series')).toHaveValue('Pro')
     await u.type(inAttributes('Ports'), '8')
@@ -298,14 +304,16 @@ describe('ProductEditorPage', () => {
 
     // Back to the old type: its inputs again, with the values as edited.
     await u.selectOptions(screen.getByLabelText('Product type'), dimmerType.id)
-    expect(inAttributes('Power')).toHaveValue('300')
+    expect(inAttributes('Power')).toHaveValue('250')
+    expect(inAttributes('DALI')).toBeChecked()
     await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     await waitFor(() => expect(puts).toHaveLength(1))
     const { dali: _removed, series: _series, ...stale } = dimmer.attributes as Record<string, unknown>
     expect(puts[0].productTypeId).toBe(gatewayType.id)
-    expect(puts[0].attributes).toEqual({ series: 'Pro', ports: 8, ...stale })
+    // Stale values are sent back as stored (the edited power was an input of the old type only).
+    expect(puts[0].attributes).toEqual({ series: 'Pro', ports: 8, managed: false, ...stale })
   })
 
   it('reloads after someone else changed the product', async () => {
@@ -337,13 +345,21 @@ describe('ProductEditorPage', () => {
     ])
   })
 
-  it('asks before leaving with unsaved changes, also for a variant', async () => {
+  it('asks before leaving with unsaved changes; variants open only once the product is saved', async () => {
     const u = userEvent.setup()
     await openEditor()
+    const variants = region('Variants')
+    expect(within(variants).getByRole('link', { name: 'Add variant' })).toBeInTheDocument()
 
     await u.type(screen.getByLabelText('Name (German)'), ' neu')
-    await u.click(within(region('Variants')).getByRole('link', { name: 'Ivory White' }))
 
+    // While the product form is dirty, the variant links and buttons are off.
+    expect(variants).toHaveTextContent('Save the product first to open or add variants.')
+    expect(within(variants).queryByRole('link', { name: 'Ivory White' })).not.toBeInTheDocument()
+    expect(within(variants).getByRole('button', { name: 'Add variant' })).toBeDisabled()
+    expect(within(variants).getAllByRole('button', { name: 'Edit' })[0]).toBeDisabled()
+
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
     let dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
     await u.click(within(dialog).getByRole('button', { name: 'Stay' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -355,13 +371,226 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByText('list page')).toBeInTheDocument()
   })
 
-  it('leaves without asking when nothing changed', async () => {
+  it('reads "Back to list" while nothing is unsaved, "Cancel" while it is, and stays after an update', async () => {
     const u = userEvent.setup()
-    await openEditor()
+    const { puts } = await openEditor(undefined, () =>
+      HttpResponse.json({ ...dimmer, name: { ...dimmer.name, de: 'Dimmer 4-fach neu' }, updatedAt: '2026-03-01T00:00:00Z' }),
+    )
 
-    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/products')
+    expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
+    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    expect(screen.getByRole('link', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Back to list' })).not.toBeInTheDocument()
 
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    // Stays on the page, restarted from the saved version.
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Name (German)')).toHaveValue('Dimmer 4-fach neu')
+    expect(screen.getByRole('link', { name: 'Back to list' })).toBeInTheDocument()
+    expect(within(region('Variants')).getByRole('link', { name: 'Ivory White' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(2))
+    expect(puts[1].expectedUpdatedAt).toBe('2026-03-01T00:00:00Z')
+
+    await u.click(screen.getByRole('link', { name: 'Back to list' }))
     expect(await screen.findByText('list page')).toBeInTheDocument()
+  })
+
+  it('shows a stored choice that is no option any more, and lets it be cleared', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor(() => ({ ...dimmer, attributes: { ...dimmer.attributes, bus_system: 'can', loads: ['led', 'dimmer2'] } }))
+
+    const bus = inAttributes('Bus system')
+    expect(bus).toHaveValue('can')
+    expect(within(bus).getAllByRole('option').map((o) => o.textContent)).toEqual(['Not set', 'Zigbee', 'KNX', 'can (not an option)'])
+    const loads = within(attributes()).getByRole('group', { name: 'Loads' })
+    expect(within(loads).getByLabelText('dimmer2 (not an option)')).toBeChecked()
+
+    // Unchanged, they are sent back as stored (the server reports them).
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toMatchObject({ bus_system: 'can', loads: ['led', 'dimmer2'] })
+
+    // The form restarted from the saved version.
+    await screen.findByText('Saved.')
+    const reloaded = within(attributes()).getByRole('group', { name: 'Loads' })
+    await u.selectOptions(inAttributes('Bus system'), '')
+    await u.click(within(reloaded).getByLabelText('dimmer2 (not an option)'))
+    expect(within(reloaded).queryByLabelText('dimmer2 (not an option)')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(2))
+    expect(puts[1].attributes).not.toHaveProperty('bus_system')
+    expect(puts[1].attributes).toMatchObject({ loads: ['led'] })
+  })
+
+  it('keeps stored values the input cannot hold, shows them and sends them back until changed', async () => {
+    const odd: Product = {
+      ...dimmer,
+      attributes: { ...dimmer.attributes, dali: 'yes', currents: [{ channel: 1, amps: 2 }] },
+      attributeErrors: [
+        { location: 'attributes.dali', code: 'attribute.type', params: { expected: 'boolean' } },
+        { location: 'attributes.currents[0]', code: 'attribute.type', params: { expected: 'number' } },
+      ],
+    }
+    const u = userEvent.setup()
+    const { puts } = await openEditor(() => odd)
+
+    expect(inAttributes('DALI')).not.toBeChecked()
+    expect(attributes()).toHaveTextContent('Stored value: yes')
+    expect(attributes()).toHaveTextContent('Stored value: {"channel":1,"amps":2}')
+    // The server's error stays visible at the input.
+    expect(inAttributes('DALI')).toHaveAttribute('aria-invalid', 'true')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toMatchObject({ dali: 'yes', currents: [{ channel: 1, amps: 2 }] })
+
+    // Once changed, the input's value is sent.
+    await u.click(inAttributes('DALI'))
+    expect(attributes()).not.toHaveTextContent('Stored value: yes')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(2))
+    expect(puts[1].attributes).toMatchObject({ dali: true, currents: [{ channel: 1, amps: 2 }] })
+  })
+
+  it('takes a decimal comma in numbers and refuses other number forms', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+
+    await u.clear(inAttributes('Power'))
+    await u.type(inAttributes('Power'), '0x10')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(await within(attributes()).findByText('Enter a number.')).toBeInTheDocument()
+    expect(puts).toEqual([])
+
+    await u.clear(inAttributes('Power'))
+    await u.type(inAttributes('Power'), '12,5')
+    await add(u, 'Channel currents', '0,75')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toMatchObject({ power: 12.5, currents: [1.5, 2, 0.75] })
+  })
+
+  it('sends stored zero and "no" back as they are', async () => {
+    const u = userEvent.setup()
+    const zero = { ...dimmer, attributes: { power: 0, width_te: 4, dali: false, currents: [0] } }
+    const { puts } = await openEditor(() => zero)
+
+    expect(inAttributes('Power')).toHaveValue('0')
+    expect(inAttributes('DALI')).not.toBeChecked()
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toEqual(zero.attributes)
+  })
+
+  it('offers the current inactive type to an existing product only', async () => {
+    await openEditor(() => ({ ...dimmer, productTypeId: inactiveType.id, attributes: {} }))
+
+    expect(within(screen.getByLabelText('Product type')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Dimmer actuator',
+      'Gateway',
+      'Legacy (inactive)',
+    ])
+    expect(screen.getByLabelText('Product type')).toHaveValue(inactiveType.id)
+  })
+
+  it('shows errors of the type, model number and conflicts at their place', async () => {
+    let respond = () =>
+      problem(422, {
+        code: 'validation.failed',
+        fields: [
+          { location: 'body.productTypeId', code: 'product.type_inactive' },
+          { location: 'body.modelNumber', code: 'validation.control_chars' },
+        ],
+      })
+    const u = userEvent.setup()
+    await openEditor(undefined, () => respond())
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(screen.getByLabelText('Product type')).toHaveAccessibleDescription('This product type is inactive. Choose an active product type.'))
+    expect(screen.getByLabelText('Model number')).toHaveAccessibleDescription(
+      'Control characters (such as tabs, line breaks or invisible characters) are not allowed.',
+    )
+
+    respond = () => problem(409, { code: 'request.conflict_retry' })
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Someone else changed this at the same time. Please try again.')
+  })
+
+  it('names the variants whose values no longer match, after a type change too', async () => {
+    const flagged: Product = {
+      ...dimmer,
+      productTypeId: gatewayType.id,
+      variantsWithProblems: 2,
+      variants: [
+        { ...ivory, staleAttributes: { colour: 'white' } },
+        { ...black, attributeErrors: [{ location: 'attributes.gloss', code: 'attribute.type', params: { expected: 'boolean' } }] },
+      ],
+    }
+    let product = dimmer
+    const u = userEvent.setup()
+    await openEditor(
+      () => product,
+      () => {
+        product = flagged
+        return HttpResponse.json(flagged)
+      },
+    )
+    expect(region('Variants')).not.toHaveTextContent('no longer match')
+
+    await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    const variants = region('Variants')
+    expect(variants).toHaveTextContent('2 variants have values that no longer match the schema: Ivory White, Black')
+    const links = within(variants).getAllByRole('link', { name: 'Ivory White' })
+    expect(links[0]).toHaveAttribute('href', `/catalog/products/${dimmer.id}/variants/${ivory.id}`)
+  })
+
+  it('reloads the variants when the order changed meanwhile, and clears the error on the next move', async () => {
+    let product = dimmer
+    let gets = 0
+    server.use(
+      http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+      http.get('/api/products/:id', () => {
+        gets++
+        return HttpResponse.json(product)
+      }),
+    )
+    let mismatch = true
+    server.use(
+      http.put('/api/products/:id/variants/order', async ({ request }) => {
+        if (mismatch) {
+          mismatch = false
+          const third = { ...black, id: ids.id(303), name: { en: 'Grey' } }
+          product = { ...dimmer, variants: [ivory, black, third] }
+          return problem(409, { code: 'variant.order_mismatch' })
+        }
+        const { ids: order } = (await request.json()) as { ids: string[] }
+        product = { ...product, variants: order.map((id) => product.variants.find((v) => v.id === id)!) }
+        return HttpResponse.json(product)
+      }),
+    )
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: editRoute })
+
+    const variants = await screen.findByRole('region', { name: 'Variants' })
+    const before = gets
+    await u.click(within(variants).getByRole('button', { name: 'Move Black up' }))
+
+    expect(await within(variants).findByRole('alert')).toHaveTextContent('The list was reloaded — please try again.')
+    await waitFor(() => expect(within(variants).getByRole('link', { name: 'Grey' })).toBeInTheDocument())
+    expect(gets).toBeGreaterThan(before)
+
+    await u.click(within(variants).getByRole('button', { name: 'Move Grey up' }))
+    await waitFor(() => expect(within(variants).queryByRole('alert')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(within(variants).getAllByRole('link', { name: /Ivory White|Black|Grey/ }).map((l) => l.textContent)).toEqual(['Ivory White', 'Grey', 'Black']),
+    )
   })
 
   it('lists the variants with image, price, status and add-ons, and reorders them at once', async () => {

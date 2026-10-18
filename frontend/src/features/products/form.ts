@@ -10,6 +10,7 @@ import {
   toApiValues,
   toFormValues,
 } from '@/catalog/attribute-values'
+import { parseDecimal } from '@/catalog/decimal'
 import { pricePattern } from '@/catalog/money'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
 
@@ -56,13 +57,19 @@ export const productSchema = z
   })
 export type ProductFormValues = z.infer<typeof productSchema>
 
+/** A typed price ("27,50" or "27.50") in the API's format, or undefined if it is not one (D52, D71). */
+export function apiPrice(text: string): string | undefined {
+  const decimal = parseDecimal(text)
+  return decimal !== undefined && pricePattern.test(decimal) ? decimal : undefined
+}
+
 export const variantSchema = z.object({
   name: requiredText(limits.variantName),
   sku: z.string().refine((v) => v.trim().length <= limits.sku, tooLong(limits.sku)),
   price: z
     .string()
     .refine((v) => v.trim() !== '', errorKey('validation.required'))
-    .refine((v) => v.trim() === '' || pricePattern.test(v.trim()), errorKey('variant.price_format')),
+    .refine((v) => v.trim() === '' || apiPrice(v) !== undefined, errorKey('variant.price_format')),
   imageFileId: z.string(),
   isActive: z.boolean(),
   values: attributeValues,
@@ -134,7 +141,8 @@ export function toVariantInput(v: VariantFormValues, attributes: Record<string, 
   return {
     name: localized(v.name),
     ...(sku ? { sku } : {}),
-    price: v.price.trim(),
+    // Checked by the schema; the text as typed only if it is not a price (the server then says so).
+    price: apiPrice(v.price) ?? v.price.trim(),
     // Leaving it out clears the image.
     ...(v.imageFileId ? { imageFileId: v.imageFileId } : {}),
     attributes,
