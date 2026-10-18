@@ -492,7 +492,15 @@ func TestUndo(t *testing.T) {
 	p := assertError(t, api.Post("/api/imports/"+first.ID.String()+"/undo", api.Admin.Cookie, map[string]any{}), http.StatusConflict, "import.undo_conflict")
 	labels := []string{}
 	for _, e := range p.Params["entities"].([]any) {
-		labels = append(labels, e.(map[string]any)["entity"].(string)+" "+e.(map[string]any)["label"].(string))
+		m := e.(map[string]any)
+		labels = append(labels, m["entity"].(string)+" "+m["label"].(string))
+		// Variants and add-on lists name their product, for a link.
+		if m["entity"] == "addons" && m["productId"] != x.ID {
+			t.Errorf("conflict %v: productId, want %s", m, x.ID)
+		}
+		if m["entity"] == "product" && m["productId"] != nil {
+			t.Errorf("conflict %v: a product has no productId", m)
+		}
 	}
 	sort.Strings(labels)
 	if !reflect.DeepEqual(labels, []string{"addons X-1 X", "product GW-1"}) || p.Params["count"] != 2.0 {
@@ -1040,5 +1048,28 @@ func TestRealWorkbook(t *testing.T) {
 	t.Logf("re-import: %+v", *c)
 	if c.Products.Unchanged != 79 || c.Variants.Unchanged != 205 || c.Addons.Unchanged != 380 || c.Images.Unchanged != 201 || c.Products.New+c.Products.Changed+c.Variants.New+c.Variants.Changed != 0 {
 		t.Errorf("re-import counts %+v", *c)
+	}
+}
+
+// "All or nothing" sent as false in a mapping stays false (the default on
+// applies only when it is left out).
+func TestAllOrNothingOff(t *testing.T) {
+	api := apptest.New(t)
+	pt := newProductType(t, api, "knx", "KNX")
+	run := upload(t, api, "a.csv", csvFile("Model;Name", "X-1;Thing"), "")
+	mapping := map[string]any{
+		"sourceKind": "csv", "headerRow": 1, "dataStartRow": 2, "productTypeId": pt.ID, "createMissingCategories": true,
+		"fields": []any{
+			map[string]any{"target": "product.modelNumber", "column": "Model"},
+			map[string]any{"target": "product.name.en", "column": "Name"},
+			map[string]any{"target": "product.category", "value": "Things"},
+		},
+	}
+	if got := preview(t, api, run.ID.String(), map[string]any{"mapping": mapping}); !got.AllOrNothing || !got.Mapping.AllOrNothing {
+		t.Errorf("left out: %v %v, want on", got.AllOrNothing, got.Mapping.AllOrNothing)
+	}
+	mapping["allOrNothing"] = false
+	if got := preview(t, api, run.ID.String(), map[string]any{"mapping": mapping}); got.AllOrNothing || got.Mapping.AllOrNothing {
+		t.Errorf("sent false: %v %v, want off", got.AllOrNothing, got.Mapping.AllOrNothing)
 	}
 }

@@ -1343,8 +1343,7 @@
         "additionalProperties": false,
         "properties": {
           "allOrNothing": {
-            "default": true,
-            "description": "Apply nothing while any row has errors (default on); off skips rows with errors",
+            "description": "Apply nothing while any row has errors (default on when left out); off skips rows with errors",
             "type": "boolean"
           },
           "categoryId": {
@@ -5085,7 +5084,7 @@
     },
     "/api/imports/{id}/undo": {
       "post": {
-        "description": "Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, params.entities: [{entity, id, label}]) if anything it touched changed since.",
+        "description": "Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, params.entities: [{entity, id, label, productId}]) if anything it touched changed since.",
         "operationId": "undoImport",
         "parameters": [
           {

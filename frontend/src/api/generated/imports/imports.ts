@@ -1376,7 +1376,7 @@ export function useGetImportSource<TData = Awaited<ReturnType<typeof getImportSo
 
 
 /**
- * Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, params.entities: [{entity, id, label}]) if anything it touched changed since.
+ * Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, params.entities: [{entity, id, label, productId}]) if anything it touched changed since.
  * @summary Undo an applied import
  */
 export const undoImport = (

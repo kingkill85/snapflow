@@ -8,7 +8,7 @@ import type { ImportField } from './importField';
 import type { ImportMappingSourceKind } from './importMappingSourceKind';
 
 export interface ImportMapping {
-  /** Apply nothing while any row has errors (default on); off skips rows with errors */
+  /** Apply nothing while any row has errors (default on when left out); off skips rows with errors */
   allOrNothing?: boolean;
   /** Fixed category of every row, instead of a product.category column or constant */
   categoryId?: string;

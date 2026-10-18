@@ -639,6 +639,8 @@ type ImportConflict struct {
 	Entity string    `json:"entity"`
 	ID     uuid.UUID `json:"id"`
 	Label  string    `json:"label"`
+	// ProductID is a variant's (or add-on list's) product, for a link.
+	ProductID *uuid.UUID `json:"productId,omitempty"`
 }
 
 // Undo reverts an applied run in one transaction, if nothing it touched
@@ -768,10 +770,18 @@ func newUndo(ctx context.Context, cats *categories.Service, prods *products.Serv
 func (u *undo) conflicts() []ImportConflict {
 	out := []ImportConflict{}
 	seen := map[uuid.UUID]bool{}
-	conflict := func(entity string, id uuid.UUID, label string) {
+	conflict := func(entity string, id uuid.UUID, label string, productID ...uuid.UUID) {
 		if !seen[id] {
 			seen[id] = true
-			out = append(out, ImportConflict{Entity: entity, ID: id, Label: label})
+			c := ImportConflict{Entity: entity, ID: id, Label: label}
+			if v, ok := u.variants[id]; ok && entity != "product" && entity != "category" {
+				pid := v.ProductID
+				c.ProductID = &pid
+			} else if len(productID) > 0 && productID[0] != uuid.Nil {
+				pid := productID[0]
+				c.ProductID = &pid
+			}
+			out = append(out, c)
 		}
 	}
 	for _, c := range u.changes {
@@ -803,12 +813,12 @@ func (u *undo) conflicts() []ImportConflict {
 		case "variant":
 			v, ok := u.variants[c.EntityID]
 			if !ok || !sameVariant(*v, c.variant) {
-				conflict("variant", c.EntityID, c.Label)
+				conflict("variant", c.EntityID, c.Label, c.variant.ProductID)
 			}
 		case "addons":
 			v, ok := u.variants[c.EntityID]
 			if !ok || !sameJSON(nonNil(v.Addons), nonNil(c.addons.Addons)) {
-				conflict("addons", c.EntityID, c.Label)
+				conflict("addons", c.EntityID, c.Label, c.addons.ProductID)
 				continue
 			}
 			var before addonState

@@ -308,7 +308,7 @@ func Register(api huma.API, svc *Service) {
 		OperationID: "undoImport", Method: http.MethodPost, Path: "/api/imports/{id}/undo",
 		Summary: "Undo an applied import",
 		Description: "Reverts everything the run changed, in one transaction. 409 import.undo_conflict (params.count, " +
-			"params.entities: [{entity, id, label}]) if anything it touched changed since.",
+			"params.entities: [{entity, id, label, productId}]) if anything it touched changed since.",
 		Tags: []string{tag},
 	}, func(ctx context.Context, in *idParam) (*runOutput, error) {
 		run, err := svc.Undo(ctx, in.ID)

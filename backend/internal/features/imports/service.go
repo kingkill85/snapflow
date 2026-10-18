@@ -1,4 +1,4 @@
-// Package imports is the catalog import (D119): a file (XLSX or CSV, read by
+// Package imports is the catalog import (D132): a file (XLSX or CSV, read by
 // platform/importsrc) is mapped by a saved profile to products, variants,
 // add-ons and images; a preview computes the diff against the catalog with
 // row errors and warnings; apply writes exactly that diff in one
@@ -36,7 +36,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/importsrc"
 )
 
-// Limits of an import (D124).
+// Limits of an import (D137).
 const (
 	MaxFileSize   = 50 << 20
 	MaxRows       = 20_000
@@ -78,7 +78,7 @@ func (s *Service) inTx(ctx context.Context, opts pgx.TxOptions, fn func(tx pgx.T
 // ---------------------------------------------------------------- profiles
 
 // Profiles lists the saved profiles by name. When there are none, the
-// starter profile for SnapFlow 1 workbooks is created first (D121).
+// starter profile for SnapFlow 1 workbooks is created first (D134).
 func (s *Service) Profiles(ctx context.Context) ([]ImportProfile, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
@@ -785,7 +785,7 @@ func issueRows(runID uuid.UUID, issues []ImportIssue, first int) ([]store.Insert
 // catalogToken identifies the catalog state a preview was computed on:
 // every product type, category, product and variant with its version, and
 // every add-on link (which have no version of their own, D56). Any change
-// to the catalog changes the token (D125).
+// to the catalog changes the token (D138).
 func catalogToken(types []producttypes.ProductType, cats []categories.Category, catalog []products.CatalogProduct) (string, error) {
 	type version struct {
 		ID        uuid.UUID `json:"i"`

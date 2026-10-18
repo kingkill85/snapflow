@@ -93,7 +93,7 @@
     "too_large": "Die Datei ist zu groß (höchstens {{maxMb}} MB).",
     "too_many_images": "Das Blatt hat zu viele Bilder (höchstens {{max}}).",
     "too_many_rows": "Das Blatt hat zu viele Zeilen (höchstens {{max}}).",
-    "undo_conflict": "Der Import kann nicht rückgängig gemacht werden: {{count}} der geänderten Einträge wurden seitdem geändert.",
+    "undo_conflict": "Der Import kann nicht rückgängig gemacht werden: Einträge, die er geändert hat, wurden seitdem geändert ({{count}}).",
     "unreadable": "Die Datei kann nicht gelesen werden."
   },
   "import_profile": {

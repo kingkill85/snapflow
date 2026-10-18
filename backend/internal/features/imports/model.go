@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,8 +31,20 @@ type ImportMapping struct {
 	CreateMissingCategories bool `json:"createMissingCategories" required:"false" doc:"Create categories the file names but the catalog lacks (default off: unknown categories are row errors). Product types are never created"`
 	// AllOrNothing refuses to apply a preview with row errors; off, rows
 	// with errors are skipped. The apply request can override it.
-	AllOrNothing bool          `json:"allOrNothing" required:"false" default:"true" doc:"Apply nothing while any row has errors (default on); off skips rows with errors"`
+	AllOrNothing bool          `json:"allOrNothing" required:"false" doc:"Apply nothing while any row has errors (default on when left out); off skips rows with errors"`
 	Fields       []ImportField `json:"fields" maxItems:"1000" doc:"Column or constant per target (at most 200)"`
+}
+
+// UnmarshalJSON turns "all or nothing" on when it is left out. (A huma
+// default would also turn an explicit false on: it fills zero values.)
+func (m *ImportMapping) UnmarshalJSON(data []byte) error {
+	type plain ImportMapping
+	p := plain{AllOrNothing: true}
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	*m = ImportMapping(p)
+	return nil
 }
 
 // ImportField feeds one target from a column (by header text, else by

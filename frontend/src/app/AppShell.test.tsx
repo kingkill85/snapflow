@@ -95,7 +95,7 @@ describe('AppShell', () => {
       'Catalog',
       'Administration',
     ])
-    expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories', 'Product types', 'Function types'])
+    expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories', 'Product types', 'Function types', 'Import'])
     expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Tenants', 'Roles'])
   })
 

@@ -93,7 +93,7 @@
     "too_large": "The file is too large (at most {{maxMb}} MB).",
     "too_many_images": "The sheet has too many pictures (at most {{max}}).",
     "too_many_rows": "The sheet has too many rows (at most {{max}}).",
-    "undo_conflict": "The import cannot be undone: {{count}} of the items it changed were changed since.",
+    "undo_conflict": "The import cannot be undone: items it changed were changed since ({{count}}).",
     "unreadable": "The file cannot be read."
   },
   "import_profile": {

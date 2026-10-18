@@ -92,7 +92,8 @@
     "remove": "Remove image",
     "uploading": "Uploading…",
     "progress": "Uploading… {{percent}}%",
-    "none": "No image"
+    "none": "No image",
+    "dropFile": "Drop a file here or choose one."
   },
   "option": {
     "unknown": "{{value}} (not an option)"

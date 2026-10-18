@@ -965,7 +965,7 @@ func (p *planner) ownImage(r *rowData, report bool) *uuid.UUID {
 }
 
 // planDeactivations deactivates the products of the import's scope that
-// the file does not list (D123): the pairs of product type and category the
+// the file does not list (D136): the pairs of product type and category the
 // file's rows have (also rows with errors, as far as both resolved), or the
 // profile's fixed pair. Products of other systems or other categories are
 // never touched.
@@ -1003,7 +1003,7 @@ func (p *planner) planDeactivations(groups []*group) {
 // planAddons resolves each row's add-on references, by variant SKU (or
 // model number and variant name), ignoring case and repeated white space:
 // first among the file's variants, then in the catalog. Unresolved
-// references are warnings (D128).
+// references are warnings (D141).
 func (p *planner) planAddons() {
 	if len(p.idx.addons) == 0 {
 		return
@@ -1203,7 +1203,7 @@ func status(exists bool, changes int) string {
 
 // productChanges lists the fields that differ between the stored product
 // (nil for a new one) and its state after the import, comparing normalised
-// values (D122: re-importing the same file changes nothing).
+// values (D135: re-importing the same file changes nothing).
 func (p *planner) productChanges(before *products.CatalogProduct, after products.ProductInput, pt producttypes.ProductType, cat categories.Category, catSeq int) []ImportFieldChange {
 	var b products.CatalogProduct
 	if before != nil {

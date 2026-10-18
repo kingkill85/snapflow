@@ -1,6 +1,6 @@
 // Package importsrc reads import files into tables: sheets of rows of text
 // cells, with the pictures anchored to each row. It is the extension point
-// for import sources (D119): an adapter turns its format into a Table; the
+// for import sources (D132): an adapter turns its format into a Table; the
 // import pipeline (features/imports) maps the table to the catalog. XLSX
 // and CSV exist; supplier APIs or JSON feeds would be further adapters.
 //
