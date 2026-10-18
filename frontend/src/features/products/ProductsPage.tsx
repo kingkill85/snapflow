@@ -168,7 +168,8 @@ export function ProductsPage() {
           {p.modelNumber}
         </TextLink>
       ),
-      className: 'whitespace-nowrap',
+      // Long model numbers wrap after a hyphen rather than widen the table (D95).
+      className: 'min-w-32',
     },
     // On narrow screens the table scrolls instead of breaking names word by word.
     { header: t('column.name'), cell: (p) => localized(p.name), className: 'min-w-48' },

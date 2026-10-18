@@ -36,6 +36,23 @@ const listPages = [
   { name: 'roles', path: '/admin/roles', heading: { en: 'Roles', de: 'Rollen' } },
 ]
 
+/**
+ * How much room each table box has left over its table's narrowest layout
+ * (every wrapping column at its minimum): the margin for fonts that render a
+ * little wider elsewhere, e.g. on the CI runner.
+ */
+async function tableSlack(page: Page): Promise<number[]> {
+  return page.locator('div:has(> table)').evaluateAll((boxes) =>
+    boxes.map((box) => {
+      const table = box.querySelector('table')!
+      table.style.width = '1px'
+      const narrowest = table.scrollWidth
+      table.style.width = ''
+      return box.clientWidth - narrowest
+    }),
+  )
+}
+
 /** How far each table box on the page scrolls horizontally (0 = everything fits). */
 async function tableOverflows(page: Page): Promise<number[]> {
   return page.locator('div:has(> table)').evaluateAll((boxes) => boxes.map((box) => box.scrollWidth - box.clientWidth))
@@ -90,6 +107,7 @@ for (const width of [1280, 1440, 1920]) {
             await page.screenshot({ path: `e2e/screenshots/list-${p.name}-${width}-${lang}-${colorScheme}.png`, fullPage: true })
           }
           expect(await tableOverflows(page), `${p.name}: the table scrolls`).toEqual([0])
+          for (const slack of await tableSlack(page)) expect(slack, `${p.name}: less than 40 px to spare`).toBeGreaterThanOrEqual(40)
         }
       })
     })
