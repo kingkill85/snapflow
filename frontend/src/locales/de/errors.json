@@ -1,4 +1,9 @@
 {
+  "addon": {
+    "duplicate": "Dieses Zubehör ist bereits in der Liste.",
+    "self": "Eine Variante kann nicht ihr eigenes Zubehör sein.",
+    "variant_not_found": "Diese Variante existiert nicht mehr."
+  },
   "attribute": {
     "bound_negative": "Längen und Anzahlen können nicht negativ sein.",
     "bound_range": "Diese Grenze muss zwischen {{min}} und {{max}} liegen.",
@@ -48,6 +53,12 @@
     "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
   },
+  "file": {
+    "not_found": "Diese Datei existiert nicht mehr.",
+    "too_large": "Die Datei ist zu groß (höchstens {{maxMb}} MB).",
+    "too_many_pixels": "Das Bild ist zu groß (höchstens {{megapixels}} Megapixel).",
+    "type": "Nur JPEG-, PNG- und WebP-Bilder werden akzeptiert."
+  },
   "function_type": {
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
@@ -55,6 +66,13 @@
   },
   "network": {
     "unavailable": "Keine Verbindung zum Server."
+  },
+  "product": {
+    "model_number_taken": "Die Modellnummer \"{{modelNumber}}\" ist bereits vergeben.",
+    "not_found": "Dieses Produkt existiert nicht mehr.",
+    "stale": "Jemand anderes hat dieses Produkt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
+    "type_not_found": "Der gewählte Produkttyp existiert nicht mehr."
   },
   "product_type": {
     "color_format": "Geben Sie eine Farbe als #rrggbb ein, z. B. #1f6feb.",
@@ -68,6 +86,7 @@
   "request": {
     "bad": "Die Anfrage war ungültig.",
     "conflict": "Das widerspricht vorhandenen Daten.",
+    "conflict_retry": "Jemand anderes hat dies gleichzeitig geändert. Bitte versuchen Sie es erneut.",
     "failed": "Die Anfrage ist fehlgeschlagen.",
     "not_found": "Nicht gefunden."
   },
@@ -98,15 +117,24 @@
     "tenant_not_found": "Der gewählte Mandant existiert nicht."
   },
   "validation": {
+    "control_chars": "Steuerzeichen (z. B. Tabulatoren, Zeilenumbrüche oder unsichtbare Zeichen) sind nicht erlaubt.",
     "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
     "failed": "Bitte die markierten Felder prüfen.",
     "invalid": "Dieser Wert ist ungültig.",
     "locale": "Diese Sprache wird nicht unterstützt.",
     "min_above_max": "Das Maximum darf nicht unter dem Minimum liegen.",
-    "number": "Bitte eine Zahl eingeben.",
+    "number": "Bitte eine Zahl eingeben, z. B. 27,50 oder 27.50.",
     "password_mismatch": "Die Passwörter stimmen nicht überein.",
     "required": "Dieses Feld ist erforderlich.",
     "too_long": "Dieser Wert ist zu lang (höchstens {{max}} Zeichen).",
     "too_many": "Es sind zu viele Einträge (höchstens {{max}})."
+  },
+  "variant": {
+    "name_taken": "Dieses Produkt hat bereits eine Variante namens \"{{name}}\".",
+    "not_found": "Diese Variante existiert nicht mehr.",
+    "order_mismatch": "Die Varianten wurden inzwischen geändert. Die Liste wurde neu geladen – bitte versuchen Sie es erneut.",
+    "price_format": "Geben Sie einen Preis wie 27,50 oder 27.50 ein (bis zu 10 Stellen und 2 Nachkommastellen).",
+    "sku_taken": "Die SKU \"{{sku}}\" ist bereits vergeben.",
+    "stale": "Jemand anderes hat diese Variante inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   }
 }

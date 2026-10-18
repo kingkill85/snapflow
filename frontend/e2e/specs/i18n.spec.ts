@@ -6,7 +6,7 @@ test('switching to Deutsch translates the UI and survives a reload', async ({ pa
   await page.getByLabel('Language').selectOption({ label: 'Deutsch' })
 
   await expect(page.getByRole('heading', { name: 'Mandanten' })).toBeVisible()
-  await expect(nav(page).getByRole('link')).toHaveText(['Funktionstypen', 'Produkttypen', 'Benutzer', 'Mandanten', 'Rollen'])
+  await expect(nav(page).getByRole('link')).toHaveText(['Funktionstypen', 'Produkttypen', 'Produkte', 'Benutzer', 'Mandanten', 'Rollen'])
   await expect(page.getByRole('button', { name: 'Neuer Mandant' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'de')

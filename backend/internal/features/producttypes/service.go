@@ -20,6 +20,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
@@ -75,7 +76,7 @@ var (
 // DB is the database the service runs on; *pgxpool.Pool implements it.
 type DB interface {
 	store.DBTX
-	Begin(ctx context.Context) (pgx.Tx, error)
+	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
 }
 
 type Service struct {
@@ -87,9 +88,12 @@ func NewService(db DB) *Service {
 	return &Service{db: db, q: store.New(db)}
 }
 
-// inTx runs fn in one transaction; any error rolls it back.
+// inTx runs fn in one transaction; any error rolls it back. A transaction
+// aborted by a deadlock or serialization failure is run again (at most
+// database.TxAttempts times, then 409 request.conflict_retry), so fn must be
+// safe to repeat.
 func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) error {
-	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
+	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
 }
 
 // List returns the product types in catalog order; inactive ones only with

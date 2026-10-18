@@ -3,15 +3,22 @@
 // Every error carries a stable Code that the frontend uses as an i18n key, plus
 // optional Params for interpolation. Detail is an English fallback for logs and
 // API clients; the UI never shows it directly.
+//
+// Server errors (status 500 and above) never carry error text to the client:
+// the cause is logged with the request id and the response has a fixed
+// detail (Install, Internal).
 package apperr
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Error struct {
@@ -117,27 +124,88 @@ func Validation(fields ...FieldError) *Error {
 	}
 }
 
-// Install replaces huma's error constructor so that framework errors
-// (validation, unknown routes, panics) use the same format and codes.
+// internalDetail is the only detail a server error response carries.
+const internalDetail = "internal server error"
+
+// Internal logs err as a server error (with the request id) and returns a
+// 500 that reveals nothing about it. msg says what failed, for the log.
+func Internal(ctx context.Context, msg string, err error) *Error {
+	slog.ErrorContext(ctx, msg, "request_id", RequestID(ctx), "error", err)
+	return New(http.StatusInternalServerError, "server.error", internalDetail)
+}
+
+// ConflictRetry reports a transaction that kept conflicting with concurrent
+// ones (deadlock or serialization failure); trying again later works.
+func ConflictRetry() *Error {
+	return Conflict("request.conflict_retry", "a concurrent change conflicted with this request; try again")
+}
+
+// IsRetryable reports whether err is a Postgres deadlock (40P01) or
+// serialization failure (40001): the transaction was aborted only because
+// of a concurrent one and succeeds when run again.
+func IsRetryable(err error) bool {
+	var pg interface{ SQLState() string }
+	if !errors.As(err, &pg) {
+		return false
+	}
+	code := pg.SQLState()
+	return code == "40P01" || code == "40001"
+}
+
+// RequestID returns the id chi's RequestID middleware gave the request ctx
+// belongs to ("" outside a request).
+func RequestID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	return middleware.GetReqID(ctx)
+}
+
+// Install replaces huma's error constructors so that framework errors
+// (validation, unknown routes) and unexpected handler errors use the same
+// format and codes. Server errors are logged and answered with a fixed
+// detail; a deadlock or serialization failure that reached the handler
+// becomes 409 request.conflict_retry instead of a 500.
 func Install() {
+	huma.NewErrorWithContext = func(hctx huma.Context, status int, msg string, errs ...error) huma.StatusError {
+		ctx := context.Background()
+		if hctx != nil {
+			ctx = hctx.Context()
+		}
+		return newError(ctx, status, msg, errs...)
+	}
 	huma.NewError = func(status int, msg string, errs ...error) huma.StatusError {
-		e := &Error{Status: status, Code: codeForStatus(status), Detail: msg}
+		return newError(context.Background(), status, msg, errs...)
+	}
+}
+
+func newError(ctx context.Context, status int, msg string, errs ...error) *Error {
+	if status >= http.StatusInternalServerError {
 		for _, err := range errs {
-			var detail *huma.ErrorDetail
-			if errors.As(err, &detail) {
-				e.Fields = append(e.Fields, FieldError{
-					Location: detail.Location,
-					Code:     "validation.invalid",
-					Detail:   detail.Message,
-				})
-				continue
-			}
-			if err != nil {
-				e.Fields = append(e.Fields, FieldError{Code: "validation.invalid", Detail: err.Error()})
+			if IsRetryable(err) {
+				return ConflictRetry()
 			}
 		}
-		return e
+		slog.ErrorContext(ctx, "server error", "request_id", RequestID(ctx), "status", status,
+			"message", msg, "error", errors.Join(errs...))
+		return &Error{Status: status, Code: codeForStatus(status), Detail: internalDetail}
 	}
+	e := &Error{Status: status, Code: codeForStatus(status), Detail: msg}
+	for _, err := range errs {
+		var detail *huma.ErrorDetail
+		if errors.As(err, &detail) {
+			e.Fields = append(e.Fields, FieldError{
+				Location: detail.Location,
+				Code:     "validation.invalid",
+				Detail:   detail.Message,
+			})
+			continue
+		}
+		if err != nil {
+			e.Fields = append(e.Fields, FieldError{Code: "validation.invalid", Detail: err.Error()})
+		}
+	}
+	return e
 }
 
 func codeForStatus(status int) string {

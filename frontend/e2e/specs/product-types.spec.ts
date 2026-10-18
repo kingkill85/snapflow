@@ -101,6 +101,10 @@ test('an admin creates a product type with every kind of attribute, reopens and 
   await a.getByLabel('Maximum length').fill('17')
 
   await page.getByRole('button', { name: 'Create' }).click()
+  // A new type continues on its edit page (D84); the list is one click away.
+  await expect(page).toHaveURL(/\/catalog\/product-types\/[0-9a-f-]{36}$/)
+  await expect(page.getByText('Product type created.')).toBeVisible()
+  await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(/\/catalog\/product-types$/)
   const listed = row(page, key)
   await expect(listed).toContainText(name)
@@ -171,8 +175,14 @@ test('an admin creates a product type with every kind of attribute, reopens and 
   await card(attrs, 2).getByRole('button', { name: 'Collapse attribute 2' }).click()
   const renamed = unique('Switch actuator')
   await basics(page).getByLabel('Name (English)').fill(renamed)
+  await expect(page.getByRole('link', { name: 'Cancel' })).toBeVisible()
   await page.getByRole('button', { name: 'Update' }).click()
-  await expect(page).toHaveURL(/\/catalog\/product-types$/)
+  // An update stays in the editor, restarted from the saved version.
+  await expect(page.getByText('Saved.')).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/catalog/product-types/${id}$`))
+  await expect(basics(page).getByLabel('Name (English)')).toHaveValue(renamed)
+  await page.getByRole('link', { name: 'Back to list' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(row(page, key)).toContainText(renamed)
   const updated = await api.productType(id)
   expect(updated.attributes[1]).toMatchObject({ key: 'power', min: 0, max: 15 })
@@ -189,7 +199,8 @@ test('the editor shows each mistake at its field and opens the cards with errors
   await a.getByLabel('Minimum length').fill('5')
   await a.getByLabel('Maximum length').fill('2')
   a = await addAttribute(attrs, 2, { key: 'power', en: 'Power', type: 'Number' })
-  await a.getByLabel('Minimum', { exact: true }).fill('12,5')
+  // A decimal comma is fine (D71), an exponent is not.
+  await a.getByLabel('Minimum', { exact: true }).fill('1e3')
   await addAttribute(attrs, 3, { key: 'colour', en: 'Colour', type: 'Choice' })
   // A duplicate keeps "_copy" in its key until it is changed.
   await card(attrs, 2).getByRole('button', { name: 'Duplicate attribute 2' }).click()
@@ -225,7 +236,7 @@ test('the editor shows each mistake at its field and opens the cards with errors
   await basics(page).getByLabel('Name (English)').fill(unique('Taken'))
   await card(attrs, 1).getByLabel('Label (English)').fill('Label')
   await card(attrs, 1).getByLabel('Maximum length').fill('20')
-  await card(attrs, 2).getByLabel('Minimum', { exact: true }).fill('12.5')
+  await card(attrs, 2).getByLabel('Minimum', { exact: true }).fill('12,5')
   await keyOf(card(attrs, 3)).fill('power_max')
   await card(attrs, 3).getByLabel('Minimum', { exact: true }).fill('')
   await addOption(card(attrs, 4), 1, 'white', 'White')
@@ -238,7 +249,11 @@ test('the editor shows each mistake at its field and opens the cards with errors
   const key = uniqueKey('fixed')
   await basics(page).getByLabel('Key').fill(key)
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page).toHaveURL(/\/catalog\/product-types$/)
+  await expect(page.getByText('Product type created.')).toBeVisible()
+  const created = await api.productType((await api.productTypes()).find((t) => t.key === key)!.id)
+  expect(created.attributes).toHaveLength(5)
+  expect(created.attributes[1]).toMatchObject({ key: 'power', min: 12.5 })
+  await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(row(page, key).getByRole('cell').nth(3)).toHaveText('5')
 })
 
@@ -299,7 +314,7 @@ test('long schemas: collapse, expand, move, insert, duplicate and remove with se
   await card(attrs, 3).getByRole('button', { name: 'Remove attribute 3' }).click() // the empty inserted one
 
   await page.getByRole('button', { name: 'Update' }).click()
-  await expect(page).toHaveURL(/\/catalog\/product-types$/)
+  await expect(page.getByText('Saved.')).toBeVisible()
   expect((await api.productType(type.id)).attributes.map((x) => x.key)).toEqual(['a0', 'a1', 'a2', 'a3', 'a5'])
 })
 
@@ -333,7 +348,8 @@ test('leaving the editor with unsaved changes asks first', async ({ page, api })
   // Back in the editor: the stored version, and leaving it asks nothing.
   await row(page, type.key).getByRole('link', { name: type.name.en }).click()
   await expect(basics(page).getByLabel('Name (English)')).toHaveValue(type.name.en)
-  await page.getByRole('link', { name: 'Cancel' }).click()
+  await expect(page.getByRole('link', { name: 'Cancel' })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(/\/catalog\/product-types$/)
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
@@ -349,7 +365,7 @@ test('a save over a newer version is refused, and Reload shows that version', as
   const first = unique('First')
   await basics(page).getByLabel('Name (English)').fill(first)
   await page.getByRole('button', { name: 'Update' }).click()
-  await expect(page).toHaveURL(/\/catalog\/product-types$/)
+  await expect(page.getByText('Saved.')).toBeVisible()
 
   await basics(other).getByLabel('Name (English)').fill(unique('Second'))
   await other.getByRole('button', { name: 'Update' }).click()
@@ -364,7 +380,7 @@ test('a save over a newer version is refused, and Reload shows that version', as
   // The reloaded version saves.
   await basics(other).getByLabel('Description (English)').fill('Second try')
   await other.getByRole('button', { name: 'Update' }).click()
-  await expect(other).toHaveURL(/\/catalog\/product-types$/)
+  await expect(other.getByText('Saved.')).toBeVisible()
   expect(await api.productType(type.id)).toMatchObject({ name: { en: first }, description: { en: 'Second try' } })
 })
 
@@ -403,6 +419,8 @@ test('reorder, deactivate and delete on the list', async ({ page, api }) => {
   await row(page, c.key).getByRole('link', { name: 'Edit' }).click()
   await page.getByLabel('Active', { exact: true }).uncheck()
   await page.getByRole('button', { name: 'Update' }).click()
+  await expect(page.getByText('Saved.')).toBeVisible()
+  await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(/\/catalog\/product-types$/)
   await expect(row(page, a.key)).toBeVisible()
   await expect(row(page, c.key)).toHaveCount(0)
@@ -500,9 +518,10 @@ test('the editor in German', async ({ page, api }) => {
   await expect(first.getByLabel('Typ', { exact: true }).locator('option')).toHaveText(['Text', 'Zahl', 'Ganzzahl', 'Ja/Nein', 'Auswahl', 'Liste'])
   await expect(first.getByRole('button', { name: 'Attribut 1 ganz nach unten verschieben' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Aktualisieren' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Abbrechen' })).toBeVisible()
+  // Nothing changed: the way out is "Back to list" (D84).
+  await expect(page.getByRole('link', { name: 'Zurück zur Liste' })).toBeVisible()
 
-  await page.getByRole('link', { name: 'Abbrechen' }).click()
+  await page.getByRole('link', { name: 'Zurück zur Liste' }).click()
   await expect(page.getByRole('heading', { name: 'Produkttypen', level: 1 })).toBeVisible()
   await expect(row(page, type.key)).toContainText(type.name.de!)
   await expect(page.getByRole('columnheader')).toContainText(['Position', 'Name', 'Schlüssel', 'Attribute', 'Status'])

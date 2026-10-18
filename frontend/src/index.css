@@ -12,9 +12,14 @@
   --color-line: oklch(0.92 0.005 260);
   --color-primary: oklch(0.55 0.2 262);
   --color-primary-ink: oklch(0.99 0 0);
-  --color-danger: oklch(0.58 0.22 27);
+  /*
+   * Danger, success and warning are dark enough for small text on their own
+   * 10 % tint over the canvas (badges, notices): contrast at least 4.5:1.
+   */
+  --color-danger: oklch(0.52 0.2 27);
   --color-danger-ink: oklch(0.99 0 0);
-  --color-success: oklch(0.55 0.13 150);
+  --color-success: oklch(0.5 0.12 150);
+  --color-warning: oklch(0.5 0.12 70);
   --color-focus: oklch(0.7 0.15 262);
   --radius-control: 0.5rem;
 }
@@ -40,6 +45,7 @@
       --color-line: oklch(0.3 0.01 260);
       --color-primary: oklch(0.68 0.17 262);
       --color-success: oklch(0.72 0.14 150);
+      --color-warning: oklch(0.8 0.14 80);
       /* Light accents need dark text on them (WCAG AA contrast). */
       --color-primary-ink: oklch(0.16 0.01 260);
       --color-danger: oklch(0.7 0.19 25);
@@ -54,6 +60,7 @@
     --color-line: oklch(0.3 0.01 260);
     --color-primary: oklch(0.68 0.17 262);
     --color-success: oklch(0.72 0.14 150);
+    --color-warning: oklch(0.8 0.14 80);
     --color-primary-ink: oklch(0.16 0.01 260);
     --color-danger: oklch(0.7 0.19 25);
     --color-danger-ink: oklch(0.16 0.01 260);

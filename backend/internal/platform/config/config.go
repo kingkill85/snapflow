@@ -28,6 +28,9 @@ type Config struct {
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
 	// believed when determining the client address (login rate limits).
 	TrustedProxies []netip.Prefix
+	// StorageDir holds uploaded files (content-addressed). Keep it outside
+	// the repository and back it up with the database.
+	StorageDir string
 }
 
 func Load() (Config, error) {
@@ -43,6 +46,7 @@ func Load() (Config, error) {
 		DistributorName: getenv("DISTRIBUTOR_NAME", "Distributor"),
 		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
+		StorageDir:      getenv("STORAGE_DIR", "./data/files"),
 	}
 	if c.TrustedProxies, err = clientip.ParseProxies(os.Getenv("TRUSTED_PROXIES")); err != nil {
 		return c, fmt.Errorf("TRUSTED_PROXIES: %w", err)

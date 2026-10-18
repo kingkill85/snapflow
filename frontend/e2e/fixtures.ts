@@ -32,6 +32,42 @@ export type ProductTypeInput = {
   instanceAttributes: Omit<Attribute, 'scope'>[]
 }
 export type ProductType = ProductTypeInput & { id: string; sortOrder: number; updatedAt: string }
+export type ProductInput = {
+  productTypeId: string
+  modelNumber: string
+  name: Localized
+  description?: Localized
+  attributes?: Record<string, unknown>
+  isActive?: boolean
+}
+export type VariantInput = {
+  name: Localized
+  sku?: string
+  price: string
+  imageFileId?: string
+  attributes?: Record<string, unknown>
+  isActive?: boolean
+}
+export type Addon = { addonVariantId: string; productId: string; required: boolean; sortOrder: number }
+export type Variant = Required<Pick<VariantInput, 'name' | 'price' | 'attributes' | 'isActive'>> &
+  Pick<VariantInput, 'sku' | 'imageFileId'> & {
+    id: string
+    productId: string
+    staleAttributes: Record<string, unknown>
+    available: boolean
+    addons: Addon[]
+    updatedAt: string
+  }
+export type Product = Required<Pick<ProductInput, 'productTypeId' | 'modelNumber' | 'name' | 'attributes' | 'isActive'>> &
+  Pick<ProductInput, 'description'> & {
+    id: string
+    staleAttributes: Record<string, unknown>
+    available: boolean
+    variants: Variant[]
+    variantsWithProblems: number
+    updatedAt: string
+  }
+export type StoredFile = { id: string; contentType: string; size: number; width: number; height: number; sha256: string }
 /** A user created by a spec, with the password it signs in with. */
 export type Account = User & { password: string }
 
@@ -140,6 +176,63 @@ export class Api {
       // Another spec created or deleted a type meanwhile: try again.
       if (res.status() !== 422 || attempt >= 5) expect(res.ok(), `${res.url()}: ${res.status()} ${await res.text()}`).toBe(true)
     }
+  }
+
+  /** Replaces a product type with `changes` applied (activation, schema), as the editor would. */
+  async updateProductType(id: string, changes: Partial<ProductTypeInput>): Promise<ProductType> {
+    const t = await this.productType(id)
+    const current: ProductTypeInput = {
+      key: t.key,
+      name: t.name,
+      ...(t.description ? { description: t.description } : {}),
+      ...(t.color ? { color: t.color } : {}),
+      isActive: t.isActive,
+      attributes: t.attributes,
+      instanceAttributes: t.instanceAttributes,
+    }
+    const data = { ...current, ...changes, expectedUpdatedAt: t.updatedAt }
+    return this.json<ProductType>(await this.ctx.put(`/api/product-types/${id}`, { data }))
+  }
+
+  /** Creates a product; unset fields get defaults (a unique model number, active). */
+  async createProduct(input: Partial<ProductInput> & { productTypeId: string }): Promise<Product> {
+    const data = { modelNumber: unique('M').replace(/\s+/g, '-'), name: { en: unique('Product') }, isActive: true, attributes: {}, ...input }
+    return this.json<Product>(await this.ctx.post('/api/products', { data }))
+  }
+
+  async product(id: string): Promise<Product> {
+    return this.json<Product>(await this.ctx.get(`/api/products/${id}`))
+  }
+
+  /** Replaces a product with `changes` applied. */
+  async updateProduct(id: string, changes: Partial<ProductInput>): Promise<Product> {
+    const p = await this.product(id)
+    const data = {
+      productTypeId: p.productTypeId,
+      modelNumber: p.modelNumber,
+      name: p.name,
+      ...(p.description ? { description: p.description } : {}),
+      attributes: { ...p.attributes, ...p.staleAttributes },
+      isActive: p.isActive,
+      ...changes,
+      expectedUpdatedAt: p.updatedAt,
+    }
+    return this.json<Product>(await this.ctx.put(`/api/products/${id}`, { data }))
+  }
+
+  /** Creates a variant; unset fields get defaults (price 10.00, active). */
+  async createVariant(productId: string, input: Partial<VariantInput> = {}): Promise<Variant> {
+    const data = { name: { en: unique('Variant') }, price: '10.00', isActive: true, attributes: {}, ...input }
+    return this.json<Variant>(await this.ctx.post(`/api/products/${productId}/variants`, { data }))
+  }
+
+  async replaceAddons(productId: string, variantId: string, addons: { addonVariantId: string; required?: boolean }[]): Promise<Variant> {
+    return this.json<Variant>(await this.ctx.put(`/api/products/${productId}/variants/${variantId}/addons`, { data: { addons } }))
+  }
+
+  /** Uploads an image file (bytes) as the catalog would. */
+  async uploadFile(name: string, mimeType: string, buffer: Buffer): Promise<StoredFile> {
+    return this.json<StoredFile>(await this.ctx.post('/api/files', { multipart: { file: { name, mimeType, buffer } } }))
   }
 
   async dispose() {

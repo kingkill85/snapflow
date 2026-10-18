@@ -1,7 +1,6 @@
 package producttypes_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -410,19 +409,29 @@ func TestReorder(t *testing.T) {
 func TestDeleteInUse(t *testing.T) {
 	api := apptest.New(t)
 	pt := create(t, api, body("gateway"))
-	// Products arrive in step 1c with a RESTRICT foreign key; simulate one.
-	ctx := context.Background()
-	if _, err := api.DB.Exec(ctx, `CREATE TABLE fk_test (product_type_id uuid NOT NULL REFERENCES product_types (id) ON DELETE RESTRICT)`); err != nil {
-		t.Fatal(err)
+	resp := api.Post("/api/products", api.Admin.Cookie, map[string]any{
+		"productTypeId": pt.ID, "modelNumber": "GW-1", "name": map[string]string{"en": "Gateway"}, "isActive": false,
+	})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("create product: got %d: %s", resp.Code, resp.Body)
 	}
-	t.Cleanup(func() { _, _ = api.DB.Exec(context.Background(), `DROP TABLE fk_test`) })
-	if _, err := api.DB.Exec(ctx, `INSERT INTO fk_test VALUES ($1)`, pt.ID); err != nil {
-		t.Fatal(err)
-	}
+	product := decode[struct{ ID string }](t, resp)
 
-	resp := api.Delete("/api/product-types/"+pt.ID, api.Admin.Cookie)
+	// Any product, active or not, keeps its type (FK RESTRICT).
+	resp = api.Delete("/api/product-types/"+pt.ID, api.Admin.Cookie)
 	if resp.Code != http.StatusConflict || decode[problem](t, resp).Code != "product_type.in_use" {
 		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+	if resp := api.Get("/api/product-types/"+pt.ID, api.Admin.Cookie); resp.Code != http.StatusOK {
+		t.Errorf("type gone: got %d", resp.Code)
+	}
+
+	// Without products it can be deleted.
+	if resp := api.Delete("/api/products/"+product.ID, api.Admin.Cookie); resp.Code != http.StatusNoContent {
+		t.Fatalf("delete product: got %d: %s", resp.Code, resp.Body)
+	}
+	if resp := api.Delete("/api/product-types/"+pt.ID, api.Admin.Cookie); resp.Code != http.StatusNoContent {
+		t.Errorf("delete type: got %d: %s", resp.Code, resp.Body)
 	}
 }
 

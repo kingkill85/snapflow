@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kingkill85/snapflow/backend/internal/app"
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
@@ -47,6 +48,9 @@ type API struct {
 	// DB is the test database, for setting up states the API cannot create
 	// (e.g. expired sessions).
 	DB *pgxpool.Pool
+	// StorageDir holds the uploaded files of this test (a temporary
+	// directory).
+	StorageDir string
 }
 
 // Session is a logged-in user. Pass Cookie as a request argument.
@@ -68,8 +72,13 @@ func New(t *testing.T) *API {
 	}); err != nil {
 		t.Fatalf("apptest: bootstrap: %v", err)
 	}
-	_, api := app.New(app.Deps{DB: pool, TrustedProxies: []netip.Prefix{TrustedProxy}})
-	a := &API{TestAPI: humatest.Wrap(t, api), t: t, DB: pool}
+	storageDir := t.TempDir()
+	storage, err := files.NewStorage(storageDir)
+	if err != nil {
+		t.Fatalf("apptest: storage: %v", err)
+	}
+	_, api := app.New(app.Deps{DB: pool, TrustedProxies: []netip.Prefix{TrustedProxy}, Storage: storage})
+	a := &API{TestAPI: humatest.Wrap(t, api), t: t, DB: pool, StorageDir: storageDir}
 	a.Admin = a.Login(AdminEmail, Password)
 	a.Distributor = a.Admin.TenantID
 	return a

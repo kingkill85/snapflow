@@ -175,6 +175,34 @@ describe('ProductTypesPage', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Wall switch' })).not.toBeInTheDocument())
   })
 
+  it('applies the move again when a type was added between the fetch and the save', async () => {
+    const delta = productType({ id: '6f1c2b8e-0000-4000-8000-000000000004', key: 'delta', name: { en: 'Delta' }, sortOrder: 4 })
+    let all = [alpha, gamma]
+    const sent: unknown[] = []
+    server.use(
+      listHandler(() => all),
+      http.put('/api/product-types/order', async ({ request }) => {
+        const body = (await request.json()) as { ids: string[] }
+        sent.push(body)
+        // Someone else created delta after the first fetch.
+        if (sent.length === 1) {
+          all = [alpha, gamma, delta]
+          return problem(422, { code: 'product_type.order_mismatch' })
+        }
+        all = body.ids.map((id, i) => ({ ...all.find((p) => p.id === id)!, sortOrder: i + 1 }))
+        return HttpResponse.json({ items: all })
+      }),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+
+    await u.click(await screen.findByRole('button', { name: 'Move Wall switch up' }))
+
+    await waitFor(() => expect(sent).toEqual([{ ids: [gamma.id, alpha.id] }, { ids: [gamma.id, alpha.id, delta.id] }]))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move Wall switch up' })).toBeDisabled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('shows reorder errors', async () => {
     server.use(
       listHandler(() => [alpha, gamma]),

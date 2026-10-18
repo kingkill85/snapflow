@@ -1,0 +1,33 @@
+{
+  "empty": "Dieser Produkttyp definiert hier keine Attribute.",
+  "notSet": "Nicht gesetzt",
+  "yes": "Ja",
+  "no": "Nein",
+  "hint": {
+    "required": "Pflichtfeld",
+    "length": "{{min}} bis {{max}} Zeichen",
+    "lengthMin": "Mindestens {{min}} Zeichen",
+    "lengthMax": "Höchstens {{max}} Zeichen",
+    "range": "{{min}} bis {{max}}",
+    "rangeMin": "Mindestens {{min}}",
+    "rangeMax": "Höchstens {{max}}",
+    "count": "{{min}} bis {{max}} Einträge",
+    "countMin": "Mindestens {{min}} Einträge",
+    "countMax": "Höchstens {{max}} Einträge",
+    "whole": "Ganze Zahl",
+    "wholeItems": "Ganze Zahlen"
+  },
+  "extra": {
+    "title": "Werte, die nicht mehr im Schema sind",
+    "description": "Diese Werte sind gespeichert, aber der Produkttyp hat sie hier nicht mehr (umbenannt, entfernt oder jetzt pro Produkt bzw. pro Variante gesetzt). Sie bleiben unverändert erhalten, bis Sie sie entfernen.",
+    "removed": "Wird beim Speichern entfernt",
+    "remove": "{{key}} entfernen",
+    "removeShort": "Entfernen",
+    "keep": "{{key}} behalten",
+    "keepShort": "Behalten"
+  },
+  "price": {
+    "range": "{{min}} – {{max}}"
+  },
+  "storedValue": "Gespeicherter Wert: {{value}}"
+}

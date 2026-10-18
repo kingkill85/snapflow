@@ -34,6 +34,9 @@ import { useLocalized } from '@/i18n/localized'
 
 import { listPath } from './ProductTypeEditorPage'
 
+/** Tries of a move whose save meets a list changed meanwhile (see move). */
+const moveAttempts = 3
+
 export function ProductTypesPage() {
   const { t } = useTranslation('productTypes')
   const { t: tCommon } = useTranslation()
@@ -68,21 +71,31 @@ export function ProductTypesPage() {
 
   // Moves a type past its visible neighbour. The order covers inactive types
   // too and the API wants all ids, so the move is applied to the full list,
-  // fetched fresh (D29). If the list changed meanwhile, nothing is sent.
+  // fetched fresh (D29). If the item or its neighbour is gone, nothing is
+  // sent. If another type was created or deleted between the fetch and the
+  // save (order_mismatch), the move is still well defined: it is applied to
+  // the list fetched again, a few times at most.
   const move = async (item: ProductType, neighbour: ProductType, direction: 'up' | 'down') => {
     setMoving(true)
     setMoveError(null)
-    try {
-      const all = await queryClient.fetchQuery({ ...getListProductTypesQueryOptions({ includeInactive: true }), staleTime: 0 })
-      const ids = all.items.map((i) => i.id).filter((id) => id !== item.id)
-      const at = ids.indexOf(neighbour.id)
-      if (at < 0 || ids.length === all.items.length) {
-        throw new ApiError({ status: 422, code: 'product_type.order_mismatch' })
+    for (let attempt = 1; ; attempt++) {
+      let gone = false
+      try {
+        const all = await queryClient.fetchQuery({ ...getListProductTypesQueryOptions({ includeInactive: true }), staleTime: 0 })
+        const ids = all.items.map((i) => i.id).filter((id) => id !== item.id)
+        const at = ids.indexOf(neighbour.id)
+        if (at < 0 || ids.length === all.items.length) {
+          gone = true
+          throw new ApiError({ status: 422, code: 'product_type.order_mismatch' })
+        }
+        ids.splice(direction === 'up' ? at : at + 1, 0, item.id)
+        await reorder.mutateAsync({ data: { ids } })
+        break
+      } catch (error) {
+        if (!gone && attempt < moveAttempts && error instanceof ApiError && error.code === 'product_type.order_mismatch') continue
+        setMoveError(error) // and reload below, in case the list changed meanwhile
+        break
       }
-      ids.splice(direction === 'up' ? at : at + 1, 0, item.id)
-      await reorder.mutateAsync({ data: { ids } })
-    } catch (error) {
-      setMoveError(error) // and reload below, in case the list changed meanwhile
     }
     await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
     setMoving(false)

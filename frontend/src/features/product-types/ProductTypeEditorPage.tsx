@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RotateCw } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Link, useBlocker, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { ProductType } from '@/api/generated/model'
@@ -21,7 +21,6 @@ import {
   Button,
   CheckboxField,
   ColorField,
-  ConfirmDialog,
   EmptyState,
   ErrorMessage,
   errorKey,
@@ -29,12 +28,15 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  LeaveLink,
   Loading,
+  Notice,
   Page,
   Section,
   setApiFieldErrors,
   TextareaField,
   useFieldError,
+  useUnsavedChanges,
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
@@ -47,22 +49,20 @@ export const listPath = '/catalog/product-types'
 export function ProductTypeEditorPage() {
   const { id } = useParams()
   if (id === undefined) return <ProductTypeEditor item={null} />
-  return <ExistingProductType id={id} />
+  return <ExistingProductType key={id} id={id} />
 }
+
+/** Shown after a save that stays in the editor (D84). */
+type SaveNotice = 'created' | 'saved'
+const noticeFrom = (state: unknown): SaveNotice | null =>
+  typeof state === 'object' && state !== null && 'notice' in state && (state.notice === 'created' || state.notice === 'saved') ? state.notice : null
 
 /** A missing product type, or an id that is not one (422 at path.id). */
 const isNotFound = (error: unknown) =>
   error instanceof ApiError && (error.status === 404 || (error.status === 422 && error.fields.some((f) => f.location.startsWith('path.'))))
 
 function BackToList() {
-  const { t } = useTranslation()
-  return (
-    <Button asChild variant="secondary">
-      <Link to={listPath}>
-        <ArrowLeft /> {t('action.backToList')}
-      </Link>
-    </Button>
-  )
+  return <LeaveLink to={listPath} dirty={false} />
 }
 
 function ExistingProductType({ id }: { id: string }) {
@@ -72,8 +72,11 @@ function ExistingProductType({ id }: { id: string }) {
   // and the form shows only once that fetch is done (D44). With
   // expectedUpdatedAt (D37) no one overwrites a newer version unknowingly.
   const query = useGetProductType(id, { query: { staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false } })
-  // Increased by "Reload" to restart the form from the reloaded version.
+  const queryClient = useQueryClient()
+  // Increased to restart the form from a newer version (Reload, or after a save).
   const [generation, setGeneration] = useState(0)
+  const location = useLocation()
+  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
 
   if (query.isError) {
     if (isNotFound(query.error)) {
@@ -94,13 +97,40 @@ function ExistingProductType({ id }: { id: string }) {
 
   const reload = async () => {
     await query.refetch()
+    setNotice(null)
     setGeneration((g) => g + 1)
   }
-  return <ProductTypeEditor key={`${query.data.id}:${generation}`} item={query.data} onReload={reload} />
+  // An update stays in the editor and restarts it from the saved version (D84).
+  const saved = (updated: ProductType) => {
+    queryClient.setQueryData(getGetProductTypeQueryKey(id), updated)
+    setNotice('saved')
+    setGeneration((g) => g + 1)
+  }
+  return (
+    <ProductTypeEditor
+      key={`${query.data.id}:${generation}`}
+      item={query.data}
+      notice={notice}
+      onReload={reload}
+      onSaved={saved}
+      onChanged={() => setNotice(null)}
+    />
+  )
+}
+
+type ProductTypeEditorProps = {
+  item: ProductType | null
+  /** The message about the last save. */
+  notice?: SaveNotice | null
+  onReload?: () => Promise<void>
+  /** After an update: restart from the saved version. */
+  onSaved?: (updated: ProductType) => void
+  /** Something was changed after the last save (its notice is over). */
+  onChanged?: () => void
 }
 
 /** The editor itself; read-only for users who may not change product types. */
-function ProductTypeEditor({ item, onReload }: { item: ProductType | null; onReload?: () => Promise<void> }) {
+function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: ProductTypeEditorProps) {
   const { t } = useTranslation('productTypes')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
@@ -141,23 +171,19 @@ function ProductTypeEditor({ item, onReload }: { item: ProductType | null; onRel
 
   // Unsaved changes: ask before leaving the page in the app, and let the
   // browser ask before closing or reloading the tab (D28).
-  const saved = useRef(false)
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) => isDirty && !saved.current && currentLocation.pathname !== nextLocation.pathname,
-  )
+  const unsaved = useUnsavedChanges(isDirty)
   useEffect(() => {
-    if (!isDirty) return
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [isDirty])
+    if (isDirty) onChanged?.()
+  }, [isDirty, onChanged])
 
   const save = async (values: FormValues) => {
     const data = toInput(values)
     const fields = editorFields(values)
+    let result: ProductType
     try {
-      if (loaded) await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
-      else await create.mutateAsync({ data })
+      result = loaded
+        ? await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
+        : await create.mutateAsync({ data })
     } catch (error) {
       setErrorFields(fields)
       setApiFieldErrors(error, form.setError, fields)
@@ -168,10 +194,15 @@ function ProductTypeEditor({ item, onReload }: { item: ProductType | null; onRel
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
     }
-    saved.current = true
     await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
-    if (loaded) await queryClient.invalidateQueries({ queryKey: getGetProductTypeQueryKey(loaded.id) })
-    void navigate(listPath)
+    if (loaded) {
+      onSaved?.(result)
+      return
+    }
+    // A new type continues on its edit page (D84).
+    unsaved.allow()
+    queryClient.setQueryData(getGetProductTypeQueryKey(result.id), result)
+    void navigate(`${listPath}/${result.id}`, { replace: true, state: { notice: 'created' } })
   }
 
   const submit = async (e: FormEvent) => {
@@ -188,6 +219,7 @@ function ProductTypeEditor({ item, onReload }: { item: ProductType | null; onRel
 
   return (
     <Page title={title} description={readOnly ? t('readOnly') : undefined}>
+      {notice && <Notice>{notice === 'created' ? t('created') : tCommon('state.saved')}</Notice>}
       <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
         <Fieldset disabled={readOnly}>
           <Section title={t('section.basics')}>
@@ -259,31 +291,16 @@ function ProductTypeEditor({ item, onReload }: { item: ProductType | null; onRel
             />
           }
         >
-          {readOnly ? (
-            <BackToList />
-          ) : (
-            <>
-              <Button asChild variant="secondary">
-                <Link to={listPath}>{tCommon('action.cancel')}</Link>
-              </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {loaded ? tCommon('action.update') : tCommon('action.create')}
-              </Button>
-            </>
+          <LeaveLink to={listPath} dirty={isDirty && !readOnly} />
+          {!readOnly && (
+            <Button type="submit" disabled={mutation.isPending}>
+              {loaded ? tCommon('action.update') : tCommon('action.create')}
+            </Button>
           )}
         </FormActions>
       </form>
 
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        onOpenChange={(open) => !open && blocker.reset?.()}
-        title={tCommon('unsaved.title')}
-        message={tCommon('unsaved.message')}
-        confirmLabel={tCommon('action.leave')}
-        cancelLabel={tCommon('action.stay')}
-        pending={false}
-        onConfirm={() => blocker.proceed?.()}
-      />
+      {unsaved.dialog}
     </Page>
   )
 }

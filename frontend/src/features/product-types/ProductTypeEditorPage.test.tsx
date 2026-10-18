@@ -88,11 +88,13 @@ async function openEditor(item?: () => ProductType, respond?: () => Response) {
 describe('ProductTypeEditorPage', () => {
   it('creates a product type with an enum attribute, sending exactly what applies', async () => {
     let posted: unknown
+    const created: ProductType = { ...existing, id: '6f1c2b8e-0000-4000-8000-000000000099', key: 'gateway', name: { en: 'Gateway', de: 'Gateway' } }
     server.use(
       http.post('/api/product-types', async ({ request }) => {
         posted = await request.json()
-        return HttpResponse.json({ ...existing, id: 'new' }, { status: 201 })
+        return HttpResponse.json(created, { status: 201 })
       }),
+      http.get('/api/product-types/:id', () => HttpResponse.json(created)),
     )
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/new' })
@@ -129,7 +131,11 @@ describe('ProductTypeEditorPage', () => {
 
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
-    expect(await screen.findByText('list page')).toBeInTheDocument()
+    // The new type continues on its edit page (D84).
+    expect(await screen.findByText('Product type created.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit product type' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Key')).toHaveValue('gateway')
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
     expect(posted).toEqual({
       key: 'gateway',
       name: { en: 'Gateway', de: 'Gateway' },
@@ -192,7 +198,9 @@ describe('ProductTypeEditorPage', () => {
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
-    expect(await screen.findByText('list page')).toBeInTheDocument()
+    // An update stays in the editor (D84).
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(screen.queryByText('list page')).not.toBeInTheDocument()
     expect(puts).toEqual([
       {
         key: existing.key,
@@ -416,6 +424,33 @@ describe('ProductTypeEditorPage', () => {
     expect(puts).toHaveLength(0)
   })
 
+  it('takes bounds with a decimal comma and refuses hex and exponent forms', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor(() => ({
+      ...existing,
+      attributes: [{ key: 'power', label: { en: 'Power' }, type: 'number', scope: 'product' }],
+    }))
+    const attributes = attributesRegion()
+    await expandAll(u, attributes)
+    const power = group('Attribute 1', attributes)
+
+    await u.type(within(power).getByLabelText('Minimum'), '0x10')
+    await u.type(within(power).getByLabelText('Maximum'), '1e3')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(within(power).getByLabelText('Minimum')).toHaveAccessibleDescription('Enter a number.')
+    expect(within(power).getByLabelText('Maximum')).toHaveAccessibleDescription('Enter a number.')
+    expect(puts).toHaveLength(0)
+
+    await u.clear(within(power).getByLabelText('Minimum'))
+    await u.type(within(power).getByLabelText('Minimum'), '2,5')
+    await u.clear(within(power).getByLabelText('Maximum'))
+    await u.type(within(power).getByLabelText('Maximum'), '10.5')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes[0]).toMatchObject({ min: 2.5, max: 10.5 })
+  })
+
   it('requires the English text when only a German description is given', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
@@ -585,7 +620,7 @@ describe('ProductTypeEditorPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
-    expect(await screen.findByText('list page')).toBeInTheDocument()
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(puts.map((p) => [p.name.en, p.expectedUpdatedAt])).toEqual([
       ['My dimmer', existing.updatedAt],
       ['Their dimmer', '2026-02-01T00:00:00Z'],
@@ -636,8 +671,61 @@ describe('ProductTypeEditorPage', () => {
     const u = userEvent.setup()
     await openEditor()
 
-    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+    expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
+    await u.click(screen.getByRole('link', { name: 'Back to list' }))
 
+    expect(await screen.findByText('list page')).toBeInTheDocument()
+  })
+
+  it('stays after an update and restarts from the saved version', async () => {
+    let version = existing
+    const { puts } = editHandlers(
+      () => version,
+      () => {
+        version = { ...existing, name: { en: puts[puts.length - 1].name.en }, updatedAt: `2026-0${puts.length + 1}-01T00:00:00Z` }
+        return HttpResponse.json(version)
+      },
+    )
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: editRoute })
+
+    await u.clear(await screen.findByLabelText('Name (English)'))
+    await u.type(screen.getByLabelText('Name (English)'), 'Saved name')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Name (English)')).toHaveValue('Saved name')
+    // The saved version is clean: no prompt, Back to list.
+    expect(screen.getByRole('link', { name: 'Back to list' })).toBeInTheDocument()
+
+    // The notice is over once something changes; the next update sends the saved version.
+    await u.type(screen.getByLabelText('Name (English)'), ' 2')
+    expect(screen.queryByText('Saved.')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(puts.map((p) => [p.name.en, p.expectedUpdatedAt])).toEqual([
+      ['Saved name', existing.updatedAt],
+      ['Saved name 2', '2026-02-01T00:00:00Z'],
+    ])
+  })
+
+  it('reads "Back to list" while nothing is unsaved and "Cancel" while something is', async () => {
+    const u = userEvent.setup()
+    await openEditor()
+
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    expect(screen.queryByRole('link', { name: 'Back to list' })).not.toBeInTheDocument()
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
+    await u.click(within(dialog).getByRole('button', { name: 'Stay' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to list' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
+    await u.click(screen.getByRole('link', { name: 'Back to list' }))
     expect(await screen.findByText('list page')).toBeInTheDocument()
   })
 
