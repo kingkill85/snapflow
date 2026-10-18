@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-SnapFlow 2: smart home planning and proposals (floorplans, distribution boards, BOM, export). Rewrite of `kingkill85/snap-flow`. Architecture and decisions: `docs/architecture.md`. Behaviour the old system had: `docs/inventory/`.
+SnapFlow 2: smart home planning and proposals (floorplans, distribution boards, BOM, export). Rewrite of `kingkill85/snap-flow`. Architecture: `docs/architecture.md`. Decision log (every product/design decision, with reason): `docs/decisions.md`. Behaviour the old system had: `docs/inventory/`.
 
 ## Stack
 
