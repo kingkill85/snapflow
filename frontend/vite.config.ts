@@ -11,10 +11,12 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    proxy: { '/api': 'http://localhost:8000' },
+    // The end-to-end tests point the proxy at their own backend.
+    proxy: { '/api': process.env.API_PROXY_TARGET || 'http://localhost:8000' },
   },
   test: {
     environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
     css: false,
   },

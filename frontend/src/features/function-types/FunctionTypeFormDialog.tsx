@@ -11,14 +11,16 @@ import {
   useUpdateFunctionType,
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
-import { ErrorMessage, Field, FormDialog } from '@/components/ui'
+import { apiFields, errorKey, ErrorMessage, Field, FormDialog, setApiFieldErrors, useFieldError } from '@/components/ui'
 
 const schema = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9_]*$/, 'function_type.key_format'),
-  nameEn: z.string().trim().min(1, 'validation.required'),
+  key: z.string().regex(/^[a-z][a-z0-9_]*$/, errorKey('function_type.key_format')).max(64, errorKey('validation.too_long')),
+  nameEn: z.string().trim().min(1, errorKey('validation.required')),
   nameDe: z.string().trim(),
 })
 type FormValues = z.infer<typeof schema>
+
+const fields = apiFields<FormValues>(['key'], { 'name.en': 'nameEn', 'name.de': 'nameDe' })
 
 type Props = {
   open: boolean
@@ -30,7 +32,7 @@ type Props = {
 export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Props) {
   const { t } = useTranslation('functionTypes')
   const { t: tCommon } = useTranslation()
-  const { t: tError } = useTranslation('errors')
+  const fieldError = useFieldError()
   const queryClient = useQueryClient()
   const create = useCreateFunctionType()
   const update = useUpdateFunctionType()
@@ -59,14 +61,13 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
     try {
       if (functionType) await update.mutateAsync({ id: functionType.id, data })
       else await create.mutateAsync({ data })
-    } catch {
+    } catch (error) {
+      setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
     }
     await queryClient.invalidateQueries({ queryKey: getListFunctionTypesQueryKey() })
     onOpenChange(false)
   })
-
-  const fieldError = (message?: string) => (message ? tError(message as never) : undefined)
 
   return (
     <FormDialog
@@ -76,11 +77,11 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       submitLabel={functionType ? tCommon('action.update') : tCommon('action.create')}
       submitting={mutation.isPending}
       onSubmit={() => void submit()}
-      error={<ErrorMessage error={mutation.error} />}
+      error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
       <Field label={t('field.key')} hint={t('field.keyHint')} error={fieldError(errors.key?.message)} {...form.register('key')} />
       <Field label={t('field.nameEn')} error={fieldError(errors.nameEn?.message)} {...form.register('nameEn')} />
-      <Field label={t('field.nameDe')} {...form.register('nameDe')} />
+      <Field label={t('field.nameDe')} error={fieldError(errors.nameDe?.message)} {...form.register('nameDe')} />
     </FormDialog>
   )
 }

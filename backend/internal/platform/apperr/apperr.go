@@ -8,6 +8,8 @@ package apperr
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -18,6 +20,8 @@ type Error struct {
 	Detail string         `json:"detail,omitempty" doc:"English fallback message"`
 	Params map[string]any `json:"params,omitempty" doc:"Values for the translated message"`
 	Fields []FieldError   `json:"fields,omitempty" doc:"Per-field validation errors"`
+
+	headers http.Header
 }
 
 type FieldError struct {
@@ -28,6 +32,18 @@ type FieldError struct {
 
 func (e *Error) Error() string  { return e.Detail }
 func (e *Error) GetStatus() int { return e.Status }
+
+// GetHeaders lets huma send extra response headers with the error.
+func (e *Error) GetHeaders() http.Header { return e.headers }
+
+// WithHeader adds a response header to the error.
+func (e *Error) WithHeader(key, value string) *Error {
+	if e.headers == nil {
+		e.headers = http.Header{}
+	}
+	e.headers.Add(key, value)
+	return e
+}
 
 // ContentType makes huma send errors as RFC 9457 problem documents.
 func (e *Error) ContentType(ct string) string {
@@ -52,6 +68,15 @@ func (e *Error) With(key string, value any) *Error {
 func NotFound(code string) *Error { return New(http.StatusNotFound, code, "not found") }
 func Conflict(code, detail string) *Error {
 	return New(http.StatusConflict, code, detail)
+}
+
+// TooManyRequests reports a rate limit. The client learns the wait both as
+// params.seconds (for the message) and as the Retry-After header.
+func TooManyRequests(code, detail string, wait time.Duration) *Error {
+	seconds := int(wait.Seconds()) + 1
+	return New(http.StatusTooManyRequests, code, detail).
+		With("seconds", seconds).
+		WithHeader("Retry-After", strconv.Itoa(seconds))
 }
 
 // Invalid reports a single field validation error.

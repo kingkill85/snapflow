@@ -20,6 +20,12 @@
             nodejs_22
             gnumake
           ];
+          # Browsers for the Playwright end-to-end tests (`make e2e`). The
+          # @playwright/test version in frontend/package.json must equal
+          # playwright-driver's version, or the browser revisions do not match.
+          PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers-chromium;
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+          PLAYWRIGHT_DRIVER_VERSION = pkgs.playwright-driver.version;
         };
       });
     };

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { ApiFieldMap } from './form-errors'
 import { useErrorMessage } from './use-error-message'
 
 type PageProps = {
@@ -44,12 +45,22 @@ export function Loading() {
   )
 }
 
-export function ErrorMessage({ error }: { error: unknown }) {
+/** A translated API error. `fields`: the form fields that show per-field errors (see setApiFieldErrors). */
+export function ErrorMessage({ error, fields }: { error: unknown; fields?: ApiFieldMap }) {
   const message = useErrorMessage()
   if (!error) return null
   return (
     <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-      {message(error)}
+      {message(error, fields)}
+    </p>
+  )
+}
+
+/** A short confirmation shown after an action succeeded. */
+export function Notice({ children }: { children: ReactNode }) {
+  return (
+    <p role="status" className="rounded-control border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+      {children}
     </p>
   )
 }

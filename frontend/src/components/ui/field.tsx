@@ -26,15 +26,16 @@ export function Field({ label, error, hint, id, ...props }: FieldProps) {
   const generated = useId()
   const inputId = id ?? generated
   const messageId = `${inputId}-message`
+  const message = error || hint
   return (
     <div className="space-y-1.5">
       <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
-      <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={messageId} {...props} />
-      {(error || hint) && (
+      <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
+      {message && (
         <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
-          {error ?? hint}
+          {message}
         </p>
       )}
     </div>

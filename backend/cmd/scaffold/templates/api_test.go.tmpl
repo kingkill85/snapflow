@@ -6,57 +6,61 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2/humatest"
-
-	"github.com/kingkill85/snapflow/backend/internal/features/[[.Pkg]]"
-	"github.com/kingkill85/snapflow/backend/internal/features/[[.Pkg]]/store"
-	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
 
 func TestMain(m *testing.M) { os.Exit(testdb.Run(m)) }
-
-func newAPI(t *testing.T) humatest.TestAPI {
-	t.Helper()
-	apperr.Install()
-	_, api := humatest.New(t)
-	[[.Pkg]].Register(api, [[.Pkg]].NewService(store.New(testdb.Pool(t))))
-	return api
-}
 
 func sample() map[string]any {
 	return map[string]any{"name": map[string]string{"en": "Sample", "de": "Beispiel"}}
 }
 
 func TestCreateAndList(t *testing.T) {
-	api := newAPI(t)
+	api := apptest.New(t)
 
-	if resp := api.Post("/api/[[.URL]]", sample()); resp.Code != http.StatusCreated {
+	if resp := api.Post("/api/[[.URL]]", api.Admin.Cookie, sample()); resp.Code != http.StatusCreated {
 		t.Fatalf("create: got %d: %s", resp.Code, resp.Body)
 	}
-	resp := api.Get("/api/[[.URL]]")
+	resp := api.Get("/api/[[.URL]]", api.Admin.Cookie)
 	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"en":"Sample"`) {
 		t.Fatalf("list: got %d: %s", resp.Code, resp.Body)
 	}
 }
 
-func TestEnglishNameRequired(t *testing.T) {
-	api := newAPI(t)
+func TestPermissions(t *testing.T) {
+	api := apptest.New(t)
+	user := api.NewUser(api.NewTenant("Partner"), auth.RoleUser)
 
-	resp := api.Post("/api/[[.URL]]", map[string]any{"name": map[string]string{"de": "Beispiel"}})
+	if resp := api.Get("/api/[[.URL]]"); resp.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous read: got %d", resp.Code)
+	}
+	if resp := api.Get("/api/[[.URL]]", user.Cookie); resp.Code != http.StatusOK {
+		t.Errorf("user read: got %d", resp.Code)
+	}
+	if resp := api.Post("/api/[[.URL]]", user.Cookie, sample()); resp.Code != http.StatusForbidden {
+		t.Errorf("user write: got %d", resp.Code)
+	}
+}
+
+func TestEnglishNameRequired(t *testing.T) {
+	api := apptest.New(t)
+
+	resp := api.Post("/api/[[.URL]]", api.Admin.Cookie, map[string]any{"name": map[string]string{"de": "Beispiel"}})
 	if resp.Code != http.StatusUnprocessableEntity || !strings.Contains(resp.Body.String(), "validation.required") {
 		t.Fatalf("got %d: %s", resp.Code, resp.Body)
 	}
 }
 
 func TestNotFound(t *testing.T) {
-	api := newAPI(t)
+	api := apptest.New(t)
 	const missing = "/api/[[.URL]]/00000000-0000-0000-0000-000000000001"
 
 	codes := map[string]int{
-		"get":    api.Get(missing).Code,
-		"update": api.Put(missing, sample()).Code,
-		"delete": api.Delete(missing).Code,
+		"get":    api.Get(missing, api.Admin.Cookie).Code,
+		"update": api.Put(missing, api.Admin.Cookie, sample()).Code,
+		"delete": api.Delete(missing, api.Admin.Cookie).Code,
 	}
 	for name, code := range codes {
 		if code != http.StatusNotFound {

@@ -1,12 +1,47 @@
 {
-  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar." },
+  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar.", "busy": "Der Server ist ausgelastet. Bitte versuchen Sie es gleich noch einmal." },
   "network": { "unavailable": "Keine Verbindung zum Server." },
   "request": { "not_found": "Nicht gefunden.", "conflict": "Das widerspricht vorhandenen Daten.", "bad": "Die Anfrage war ungültig.", "failed": "Die Anfrage ist fehlgeschlagen." },
-  "auth": { "required": "Bitte anmelden.", "forbidden": "Dafür fehlt die Berechtigung." },
-  "validation": { "failed": "Bitte die markierten Felder prüfen.", "required": "Dieses Feld ist erforderlich.", "invalid": "Dieser Wert ist ungültig." },
+  "auth": {
+    "required": "Bitte anmelden.",
+    "forbidden": "Dafür fehlt die Berechtigung.",
+    "invalid_credentials": "E-Mail oder Passwort ist falsch.",
+    "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
+    "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
+    "wrong_password": "Das aktuelle Passwort ist falsch."
+  },
+  "validation": {
+    "failed": "Bitte die markierten Felder prüfen.",
+    "required": "Dieses Feld ist erforderlich.",
+    "invalid": "Dieser Wert ist ungültig.",
+    "too_long": "Dieser Wert ist zu lang.",
+    "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
+    "password_mismatch": "Die Passwörter stimmen nicht überein."
+  },
   "function_type": {
     "not_found": "Dieser Funktionstyp existiert nicht mehr.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben."
+  },
+  "tenant": {
+    "not_found": "Dieser Mandant existiert nicht mehr.",
+    "name_taken": "Ein Mandant namens \"{{name}}\" existiert bereits.",
+    "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden."
+  },
+  "user": {
+    "not_found": "Dieser Benutzer existiert nicht mehr.",
+    "email_taken": "Die E-Mail-Adresse {{email}} wird bereits verwendet.",
+    "password_too_short": "Das Passwort braucht mindestens 8 Zeichen.",
+    "role_forbidden": "Diese Rolle können Sie nicht vergeben.",
+    "target_forbidden": "Benutzer mit einer höheren Rolle als Ihrer können Sie nicht ändern.",
+    "tenant_forbidden": "Benutzer anderer Mandanten können Sie nicht verwalten.",
+    "tenant_not_found": "Der gewählte Mandant existiert nicht.",
+    "admin_requires_distributor": "Admins müssen zum Distributor-Mandanten gehören.",
+    "own_role": "Ihre eigene Rolle können Sie nicht ändern.",
+    "own_deactivation": "Sie können sich nicht selbst deaktivieren.",
+    "own_tenant": "Sie können sich nicht selbst in einen anderen Mandanten verschieben.",
+    "own_delete": "Sie können sich nicht selbst löschen.",
+    "last_admin": "Mindestens ein aktiver Admin muss erhalten bleiben.",
+    "own_password": "Ihr eigenes Passwort ändern Sie in Ihrem Profil."
   }
 }

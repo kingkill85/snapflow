@@ -4,6 +4,12 @@ import { initReactI18next } from 'react-i18next'
 
 import { languages, resources } from './resources'
 
+// Screen readers, hyphenation and spell checking follow the document's
+// language, so keep <html lang> in step with the UI language.
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.lang = i18n.resolvedLanguage ?? lng
+})
+
 void i18n
   .use(LanguageDetector)
   .use(initReactI18next)

@@ -1,8 +1,16 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
+  "ignorePatterns": ["e2e/.dist/**", "e2e/playwright-report/**", "e2e/test-results/**"],
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      // Playwright fixtures: `use` is not a React hook and `{}` means "no fixtures".
+      "files": ["e2e/**"],
+      "rules": { "react/rules-of-hooks": "off", "no-empty-pattern": "off" }
+    }
+  ]
 }

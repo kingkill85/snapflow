@@ -2,14 +2,30 @@ import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '@/api/client'
 
-/** Translates an API error code into the user's language. */
+import { type ApiFieldMap, apiFieldFor, type ErrorKey } from './form-errors'
+
+/**
+ * Translates an API error code into the user's language. `fields` are the
+ * form fields that show per-field errors themselves (see setApiFieldErrors);
+ * per-field errors without such a field are spelled out in the message.
+ */
 export function useErrorMessage() {
   const { t, i18n } = useTranslation('errors')
-  return (error: unknown): string => {
+  const translate = (code: string, params?: Record<string, unknown>) =>
+    i18n.exists(code, { ns: 'errors' }) ? String(t(code as ErrorKey, params as never)) : undefined
+
+  return (error: unknown, fields?: ApiFieldMap): string => {
     if (!(error instanceof ApiError)) return t('server.error')
-    if (i18n.exists(error.code, { ns: 'errors' })) {
-      return String(t(error.code as never, error.params as never))
+    if (error.fields.length > 0) {
+      const elsewhere = error.fields.filter((f) => !apiFieldFor(f.location, fields))
+      // Every error is shown at its field.
+      if (elsewhere.length === 0) return t('validation.failed')
+      const messages = new Set(elsewhere.map((f) => translate(f.code) ?? t('validation.invalid')))
+      if (elsewhere.length < error.fields.length) messages.add(t('validation.failed'))
+      return [...messages].join(' ')
     }
-    return t('server.error')
+    // "Check the highlighted fields" would be wrong with nothing highlighted.
+    if (error.code === 'validation.failed') return t('request.bad')
+    return translate(error.code, error.params) ?? t('server.error')
   }
 }

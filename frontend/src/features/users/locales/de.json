@@ -1,0 +1,25 @@
+{
+  "title": "Benutzer",
+  "description": "Wer sich anmelden kann, mit welcher Rolle und in welchem Mandanten.",
+  "empty": "Noch keine Benutzer.",
+  "new": "Neuer Benutzer",
+  "edit": "Benutzer bearbeiten",
+  "deleteTitle": "Benutzer löschen",
+  "deleteMessage": "{{name}} löschen? Das kann nicht rückgängig gemacht werden.",
+  "allTenants": "Alle Mandanten",
+  "field": {
+    "name": "Name",
+    "fullName": "Vollständiger Name",
+    "email": "E-Mail",
+    "role": "Rolle",
+    "tenant": "Mandant",
+    "status": "Status",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Benutzer können sich nicht anmelden.",
+    "password": "Passwort",
+    "passwordHint": "Mindestens 8 Zeichen",
+    "passwordResetHint": "Leer lassen, um das Passwort zu behalten. Ein neues Passwort meldet den Benutzer ab.",
+    "ownPasswordHint": "Ihr eigenes Passwort ändern Sie in Ihrem Profil.",
+    "openProfile": "Profil öffnen"
+  }
+}

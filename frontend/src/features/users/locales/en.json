@@ -1,0 +1,25 @@
+{
+  "title": "Users",
+  "description": "Who can sign in, with which role and in which tenant.",
+  "empty": "No users yet.",
+  "new": "New user",
+  "edit": "Edit user",
+  "deleteTitle": "Delete user",
+  "deleteMessage": "Delete {{name}}? This cannot be undone.",
+  "allTenants": "All tenants",
+  "field": {
+    "name": "Name",
+    "fullName": "Full name",
+    "email": "Email",
+    "role": "Role",
+    "tenant": "Tenant",
+    "status": "Status",
+    "active": "Active",
+    "activeHint": "Inactive users cannot sign in.",
+    "password": "Password",
+    "passwordHint": "At least 8 characters",
+    "passwordResetHint": "Leave empty to keep the current password. Setting one signs the user out.",
+    "ownPasswordHint": "You change your own password on your profile.",
+    "openProfile": "Open profile"
+  }
+}

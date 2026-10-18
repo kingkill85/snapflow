@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kingkill85/snapflow/backend/internal/app"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/config"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/httpserver"
@@ -72,7 +73,15 @@ func serve(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	router, _ := app.New(app.Deps{DB: pool})
+	if err := app.Bootstrap(ctx, pool, app.BootstrapConfig{
+		DistributorName: cfg.DistributorName, AdminEmail: cfg.AdminEmail, AdminPassword: cfg.AdminPassword,
+	}); err != nil {
+		return fmt.Errorf("bootstrap: %w", err)
+	}
+
+	router, _ := app.New(app.Deps{
+		DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}, TrustedProxies: cfg.TrustedProxies,
+	})
 	if cfg.StaticDir != "" {
 		httpserver.MountSPA(router, cfg.StaticDir)
 	}

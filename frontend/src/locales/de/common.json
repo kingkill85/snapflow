@@ -6,8 +6,23 @@
     "update": "Aktualisieren",
     "cancel": "Abbrechen",
     "delete": "Löschen",
-    "edit": "Bearbeiten"
+    "edit": "Bearbeiten",
+    "save": "Speichern",
+    "signOut": "Abmelden",
+    "home": "Zur Startseite"
   },
-  "state": { "loading": "Wird geladen…" },
+  "state": {
+    "loading": "Wird geladen…",
+    "saved": "Gespeichert.",
+    "forbiddenTitle": "Kein Zugriff",
+    "forbidden": "Ihnen fehlt die Berechtigung für diese Seite.",
+    "notFoundTitle": "Seite nicht gefunden",
+    "notFound": "Diese Seite gibt es nicht (mehr).",
+    "errorTitle": "Etwas ist schiefgelaufen",
+    "error": "Diese Seite konnte nicht angezeigt werden. Bitte laden Sie sie neu oder gehen Sie zur Startseite."
+  },
+  "account": { "profile": "Profil" },
+  "role": { "admin": "Admin", "tenant_admin": "Mandanten-Admin", "user": "Benutzer" },
+  "status": { "active": "Aktiv", "inactive": "Inaktiv" },
   "language": { "label": "Sprache", "en": "English", "de": "Deutsch" }
 }

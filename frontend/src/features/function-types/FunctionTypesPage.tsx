@@ -9,6 +9,7 @@ import {
   useListFunctionTypes,
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
+import { useCan } from '@/app/session'
 import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
@@ -18,6 +19,7 @@ export function FunctionTypesPage() {
   const { t } = useTranslation('functionTypes')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
+  const canWrite = useCan()('catalog.write')
   const queryClient = useQueryClient()
   const list = useListFunctionTypes()
   const remove = useDeleteFunctionType()
@@ -31,6 +33,12 @@ export function FunctionTypesPage() {
     setFormOpen(true)
   }
 
+  // Each delete starts without the previous attempt's error.
+  const openDelete = (item: FunctionType | null) => {
+    remove.reset()
+    setDeleting(item)
+  }
+
   const confirmDelete = async () => {
     if (!deleting) return
     try {
@@ -42,10 +50,22 @@ export function FunctionTypesPage() {
     setDeleting(null)
   }
 
-  const createButton = (
+  // Without catalog.write the page is read-only.
+  const createButton = canWrite ? (
     <Button onClick={() => openForm(null)}>
       <Plus /> {t('new')}
     </Button>
+  ) : undefined
+
+  const rowActions = (ft: FunctionType) => (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => openForm(ft)}>
+        <Pencil /> {tCommon('action.edit')}
+      </Button>
+      <Button size="sm" variant="danger" onClick={() => openDelete(ft)}>
+        <Trash2 /> {tCommon('action.delete')}
+      </Button>
+    </>
   )
 
   return (
@@ -62,16 +82,7 @@ export function FunctionTypesPage() {
             { header: t('field.key'), cell: (ft) => <code className="text-xs">{ft.key}</code> },
             { header: t('field.name'), cell: (ft) => localized(ft.name) },
           ]}
-          actions={(ft) => (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => openForm(ft)}>
-                <Pencil /> {tCommon('action.edit')}
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => setDeleting(ft)}>
-                <Trash2 /> {tCommon('action.delete')}
-              </Button>
-            </>
-          )}
+          actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}
         />
       )}
@@ -80,7 +91,7 @@ export function FunctionTypesPage() {
 
       <ConfirmDialog
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && openDelete(null)}
         title={t('deleteTitle')}
         message={t('deleteMessage', { name: localized(deleting?.name) })}
         confirmLabel={tCommon('action.delete')}

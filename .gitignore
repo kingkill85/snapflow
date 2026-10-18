@@ -4,3 +4,6 @@ frontend/dist/
 *.local
 .env
 coverage/
+
+# Agent worktrees
+.claude/worktrees/

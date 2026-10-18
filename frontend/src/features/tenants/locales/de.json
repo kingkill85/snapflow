@@ -1,0 +1,19 @@
+{
+  "title": "Mandanten",
+  "description": "Der Distributor und die Partnerfirmen, die Projekte planen.",
+  "empty": "Noch keine Mandanten.",
+  "new": "Neuer Mandant",
+  "edit": "Mandant bearbeiten",
+  "deleteTitle": "Mandant löschen",
+  "deleteMessage": "\"{{name}}\" mit allen Benutzern löschen? Das kann nicht rückgängig gemacht werden.",
+  "distributor": "Distributor",
+  "partner": "Partner",
+  "field": {
+    "name": "Name",
+    "type": "Typ",
+    "status": "Status",
+    "active": "Aktiv",
+    "activeHint": "Benutzer eines inaktiven Mandanten können sich nicht anmelden.",
+    "distributorHint": "Der Distributor-Mandant bleibt immer aktiv."
+  }
+}
