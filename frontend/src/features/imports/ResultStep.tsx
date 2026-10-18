@@ -10,13 +10,13 @@ import { getGetImportQueryKey, useListImportChanges, useListImportTargets, useUn
 import type { ImportRun } from '@/api/generated/model'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
 import { invalidateProductQueries } from '@/catalog/invalidate'
-import { Badge, Button, ConfirmDialog, EmptyState, ErrorMessage, FormActions, Loading, Notice, Pagination, Section, TextLink } from '@/components/ui'
+import { Badge, Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Pagination, Section, SectionActions, TextLink } from '@/components/ui'
 
 import { Counters } from './Counters'
 import { changedFields, isObject } from './diff'
 import { attributeLabels, useFieldLabel } from './labels'
 import { DiffList } from './values'
-import { categoryHref, invalidateRunDetails, listPath, newPath, pageSize, productHref, useFormatDateTime, variantHref } from './paths'
+import { categoryHref, invalidateRunDetails, newPath, pageSize, productHref, useFormatDateTime, variantHref } from './paths'
 
 type Conflict = { entity: string; id: string; label: string; productId?: string }
 
@@ -64,27 +64,25 @@ export function ResultStep({ run }: { run: ImportRun }) {
       )}
       <Section title={t('result.title')} description={run.state === 'undone' ? t('result.undoneDescription') : t('result.description')}>
         <Counters counts={run.applied ?? run.counts!} applied />
+        {/* Not a form: the actions close the result (the page header leads back to the list). */}
+        <SectionActions>
+          <Button asChild variant="secondary">
+            <Link to={newPath}>{t('result.another')}</Link>
+          </Button>
+          {run.can.undo && (
+            <Button
+              variant="danger-quiet"
+              onClick={() => {
+                undo.reset()
+                setConfirm(true)
+              }}
+            >
+              <Undo2 /> {t('result.undo')}
+            </Button>
+          )}
+        </SectionActions>
       </Section>
       <ChangeLog run={run} />
-      <FormActions>
-        <Button asChild variant="secondary">
-          <Link to={listPath}>{t('backToList')}</Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link to={newPath}>{t('result.another')}</Link>
-        </Button>
-        {run.can.undo && (
-          <Button
-            variant="danger"
-            onClick={() => {
-              undo.reset()
-              setConfirm(true)
-            }}
-          >
-            <Undo2 /> {t('result.undo')}
-          </Button>
-        )}
-      </FormActions>
       <ConfirmDialog
         open={confirm}
         onOpenChange={setConfirm}

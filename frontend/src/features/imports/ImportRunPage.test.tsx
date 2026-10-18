@@ -29,6 +29,13 @@ import {
   zigbee,
 } from './test-fixtures'
 
+/** The field rows of a diff in an entry: field, before and after (or value) as text. */
+const fieldRows = (entry: HTMLElement) =>
+  within(entry)
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+
 const routes = [
   { path: '/catalog/imports', element: <p>runs</p> },
   { path: '/catalog/imports/new', element: <NewImportPage /> },
@@ -289,8 +296,7 @@ describe('ImportRunPage: preview', () => {
     const product = (await screen.findByRole('link', { name: 'GW-1 · Gateway' })).closest('li')!
     expect(screen.getByRole('link', { name: 'GW-1 · Gateway' })).toHaveAttribute('href', `/catalog/products/${id(501)}`)
     expect(product).toHaveTextContent('Rows 2–4, 7')
-    expect(product).toHaveTextContent('Name (English)Before: Old gatewayAfter: Gateway')
-    expect(product).toHaveTextContent('WidthBefore: 2After: 4')
+    expect(fieldRows(product)).toEqual(expect.arrayContaining([['Name (English)', 'Old gateway', 'Gateway'], ['Width', '2', '4']]))
 
     const variant = screen.getByText('GW-1 · Black · SKU GW-1 Black').closest('li')!
     expect(variant).toHaveTextContent('Row errors: skipped')
@@ -298,9 +304,16 @@ describe('ImportRunPage: preview', () => {
     expect(within(variant).getByRole('img', { name: 'Image' })).toHaveAttribute('src', `/api/files/${id(902)}`)
     expect(variant).toHaveTextContent('PSU-1required')
 
-    const issueRow = (await screen.findByText('The SKU "GW-1 Black" appears more than once in the file.')).closest('li')!
-    expect(issueRow).toHaveTextContent('Error')
-    expect(issueRow).toHaveTextContent('Row 5 · D · Price · Price (USD) · GW-1')
+    const issues = await screen.findByRole('table', { name: 'Errors and warnings' })
+    const issueRow = within(issues).getByRole('row', { name: /appears more than once/ })
+    expect(within(issueRow).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+      'Error',
+      'The SKU "GW-1 Black" appears more than once in the file.',
+      '5',
+      'D · Price',
+      'Price (USD)',
+      'GW-1',
+    ])
     expect(screen.getByText(/1 row has errors: with "All or nothing"/)).toBeInTheDocument()
   })
 
@@ -410,7 +423,7 @@ describe('ImportRunPage: result', () => {
     expect(await screen.findByText('Every change the import wrote (642), in the order it wrote them.')).toBeInTheDocument()
     const product = screen.getByRole('link', { name: 'GW-1' }).closest('li')!
     expect(product).toHaveTextContent('UpdatedProduct')
-    expect(product).toHaveTextContent('Name (English)Before: Old gatewayAfter: Gateway')
+    expect(fieldRows(product)).toContainEqual(['Name (English)', 'Old gateway', 'Gateway'])
     expect(product).not.toHaveTextContent('Model number')
     expect(screen.getByRole('link', { name: 'GW-1 Black' })).toHaveAttribute('href', `/catalog/products/${id(501)}/variants/${id(601)}`)
     expect(screen.getByText('1–50 of 642')).toBeInTheDocument()

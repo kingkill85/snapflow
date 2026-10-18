@@ -65,7 +65,7 @@ export function Counters({ counts, filterHref, issuesHref, applied, extra }: Cou
         <Card
           title={t('counts.addons')}
           lines={[
-            { label: t('counts.addonsNew'), value: counts.addons.new },
+            { label: t(applied ? 'counts.done.addonsNew' : 'counts.addonsNew'), value: counts.addons.new },
             { label: t('counts.addonsChanged'), value: counts.addons.changed },
             { label: t('counts.unchanged'), value: counts.addons.unchanged },
             { label: t('counts.addonsRemoved'), value: counts.addons.removed, tone: 'warning' },

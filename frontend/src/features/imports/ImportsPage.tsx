@@ -81,7 +81,7 @@ export function ImportsPage() {
     {
       header: t('column.date'),
       cell: (r) => (
-        <div className="space-y-0.5 whitespace-nowrap">
+        <div className="space-y-0.5 md:whitespace-nowrap">
           <p>{formatDate(r.createdAt)}</p>
           {r.appliedAt && <p className="text-muted">{t('appliedAt', { date: formatDate(r.appliedAt) })}</p>}
           {r.undoneAt && <p className="text-muted">{t('undoneAt', { date: formatDate(r.undoneAt) })}</p>}

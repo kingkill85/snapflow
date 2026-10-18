@@ -24,7 +24,6 @@ import { useListProductTypes } from '@/api/generated/product-types/product-types
 import {
   Badge,
   Button,
-  CheckboxField,
   type Column,
   ConfirmDialog,
   DataTable,
@@ -43,6 +42,7 @@ import {
   SelectField,
   type SelectOption,
   setApiFieldErrors,
+  SwitchField,
   TypeBadge,
   useFieldError,
 } from '@/components/ui'
@@ -380,51 +380,77 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
       .filter((c) => c.trim() !== '')
       .slice(0, 2)
 
-  /** One column of the file: its header, examples from the first rows, and what it is imported as. */
-  const columnRow = (c: ImportSourceColumn, index: number) => {
-    const value = values.targets[c.letter] ?? ''
-    const error = fieldError(errors.targets?.[c.letter]?.message)
-    const errorId = `target-${c.letter}-error`
-    const examples = sample(index)
-    return (
-      <li key={c.letter} className="grid gap-2 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(14rem,20rem)] sm:items-start sm:gap-4">
-        <span className="flex items-baseline gap-2 sm:pt-2">
+  /** The file's columns: header, examples from the first rows, and what each is imported as (a card per column on phones). */
+  const mappingColumns: Column<ImportSourceColumn>[] = [
+    {
+      header: t('mapping.column'),
+      mobile: 'title',
+      cell: (c) => (
+        <span className="flex items-baseline gap-2">
           <Badge>{c.letter}</Badge>
           <span className="font-medium break-words">{c.header || <span className="font-normal text-muted">{t('mapping.noHeader')}</span>}</span>
         </span>
-        <span className="line-clamp-2 text-sm break-words text-muted sm:pt-2">
-          <span className="sr-only">{t('mapping.example')}: </span>
-          {examples.length > 0 ? examples.join(' · ') : '–'}
-        </span>
-        <div className="space-y-1.5">
-          <GroupedSelect
-            aria-label={t('mapping.targetOf', { column: c.header || c.letter })}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-            value={value}
-            onValueChange={(v) => chooseTarget(c.letter, v)}
-            options={[{ value: '', label: t('mapping.notImported') }]}
-            groups={columnGroups(c.letter, value)}
-          />
-          {value === customAttribute && (
-            <Input
-              aria-label={t('mapping.customKey', { column: c.header || c.letter })}
-              placeholder={t('mapping.customKeyHint')}
-              {...form.register(`customKeys.${c.letter}`)}
+      ),
+      className: 'md:min-w-40 md:max-w-56',
+    },
+    {
+      header: t('mapping.example'),
+      cell: (c) => {
+        const examples = sample(columns.indexOf(c))
+        return <span className="line-clamp-2 break-words text-muted">{examples.length > 0 ? examples.join(' · ') : '–'}</span>
+      },
+      className: 'md:min-w-40',
+    },
+    {
+      header: t('mapping.target'),
+      mobile: 'block',
+      cell: (c) => {
+        const value = values.targets[c.letter] ?? ''
+        const error = fieldError(errors.targets?.[c.letter]?.message)
+        const errorId = `target-${c.letter}-error`
+        return (
+          <div className="space-y-1.5">
+            <GroupedSelect
+              aria-label={t('mapping.targetOf', { column: c.header || c.letter })}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+              value={value}
+              onValueChange={(v) => chooseTarget(c.letter, v)}
+              options={[{ value: '', label: t('mapping.notImported') }]}
+              groups={columnGroups(c.letter, value)}
             />
-          )}
-          {error && (
-            <p id={errorId} className="text-xs text-danger">
-              {error}
-            </p>
-          )}
-        </div>
-      </li>
-    )
-  }
+            {value === customAttribute && (
+              <Input
+                aria-label={t('mapping.customKey', { column: c.header || c.letter })}
+                placeholder={t('mapping.customKeyHint')}
+                {...form.register(`customKeys.${c.letter}`)}
+              />
+            )}
+            {error && (
+              <p id={errorId} className="text-xs text-danger">
+                {error}
+              </p>
+            )}
+          </div>
+        )
+      },
+      className: 'md:w-80 md:min-w-64',
+    },
+  ]
 
   const sourceColumns: Column<{ number: number; cells: string[]; images: number }>[] = [
-    { header: t('mapping.row'), cell: (r) => <span className="text-muted tabular-nums">{r.number}</span>, className: 'w-px' },
+    {
+      header: t('mapping.row'),
+      mobile: 'title',
+      cell: (r) => (
+        <>
+          {/* A phone's card is titled "Row 3"; the table has the column header. */}
+          <span className="md:hidden">{t('issues.atRow', { row: r.number })}</span>
+          <span className="text-muted tabular-nums max-md:hidden">{r.number}</span>
+        </>
+      ),
+      className: 'md:w-px',
+    },
     {
       header: t('mapping.pictures'),
       cell: (r) =>
@@ -432,13 +458,16 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           <Badge variant="primary" title={t('mapping.picturesInRow', { count: r.images })}>
             <ImageIcon /> {r.images}
           </Badge>
-        ) : null,
+        ) : (
+          // An empty line would look like a missing value in a phone's card.
+          <span className="text-muted md:hidden">0</span>
+        ),
       className: 'w-px',
     },
     ...columns.map((c, i) => ({
       header: c.header ? `${c.letter} · ${c.header}` : c.letter,
       cell: (r: { cells: string[] }) => <span className="line-clamp-3 max-w-64 break-words">{r.cells[i]}</span>,
-      className: 'min-w-28',
+      className: 'md:min-w-28',
     })),
   ]
 
@@ -480,7 +509,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           </Button>
           {profile && (
             <Button
-              variant="danger"
+              variant="danger-quiet"
               onClick={() => {
                 deleteProfile.reset()
                 setDeleteOpen(true)
@@ -512,6 +541,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           {sheetOptions.length > 0 && (
             <SelectField
               label={t('mapping.sheet')}
+              required
               value={values.sheet || source.data?.sheet || ''}
               onValueChange={(v) => form.setValue('sheet', v, { shouldDirty: true })}
               options={sheetOptions}
@@ -520,6 +550,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           )}
           <Field
             label={t('mapping.headerRow')}
+            required
             hint={t('mapping.headerRowHint')}
             type="number"
             min={0}
@@ -529,6 +560,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           />
           <Field
             label={t('mapping.dataStartRow')}
+            required
             type="number"
             min={1}
             inputMode="numeric"
@@ -560,6 +592,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           <div className="space-y-3">
             <SelectField
               label={t('mapping.productType')}
+              required
               hint={t('mapping.productTypeHint')}
               value={values.productType}
               onValueChange={(v) => chooseMode('productType', v)}
@@ -569,6 +602,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
             {values.productType === fromConstant && (
               <Field
                 label={t('mapping.productTypeValue')}
+                required
                 hint={t('mapping.productTypeValueHint')}
                 error={fieldError(errors.productTypeValue?.message)}
                 {...form.register('productTypeValue')}
@@ -578,6 +612,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           <div className="space-y-3">
             <SelectField
               label={t('mapping.category')}
+              required
               hint={t('mapping.categoryHint')}
               value={values.category}
               onValueChange={(v) => chooseMode('category', v)}
@@ -587,6 +622,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
             {values.category === fromConstant && (
               <Field
                 label={t('mapping.categoryValue')}
+                required
                 hint={t('mapping.categoryValueHint')}
                 error={fieldError(errors.categoryValue?.message)}
                 {...form.register('categoryValue')}
@@ -594,7 +630,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
             )}
           </div>
         </div>
-        <CheckboxField
+        <SwitchField
           label={t('mapping.createMissingCategories')}
           hint={t('mapping.createMissingCategoriesHint')}
           {...form.register('createMissingCategories')}
@@ -608,28 +644,25 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
           </p>
         )}
         {targets.isError && <ErrorMessage error={targets.error} />}
-        {columns.length === 0 ? (
-          <p className="text-sm text-muted">{t('mapping.noColumns')}</p>
-        ) : (
-          <div>
-            <div aria-hidden="true" className="hidden gap-4 border-b border-line pb-2 text-sm font-medium text-muted sm:grid sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(14rem,20rem)]">
-              <span>{t('mapping.column')}</span>
-              <span>{t('mapping.example')}</span>
-              <span>{t('mapping.target')}</span>
-            </div>
-            <ul aria-label={t('mapping.columnsTitle')} className="divide-y divide-line">
-              {columns.map(columnRow)}
-            </ul>
-          </div>
-        )}
-        <CheckboxField
-          label={t('mapping.imageAnyColumn')}
-          hint={imageColumn ? t('mapping.imageColumnChosen') : t('mapping.imageAnyColumnHint')}
-          disabled={imageColumn}
-          checked={values.imageAnyColumn && !imageColumn}
-          error={fieldError(errors.imageAnyColumn?.message)}
-          onChange={(e) => form.setValue('imageAnyColumn', e.target.checked, { shouldDirty: true })}
+        <DataTable
+          label={t('mapping.columnsTitle')}
+          rows={columns}
+          rowKey={(c) => c.letter}
+          columns={mappingColumns}
+          empty={<p className="text-sm text-muted">{t('mapping.noColumns')}</p>}
         />
+        {imageColumn ? (
+          // A disabled switch hides its hint, which is all there is to say while a column feeds the picture.
+          <p className="border-t border-line pt-4 text-sm text-muted">{t('mapping.imageColumnChosen')}</p>
+        ) : (
+          <SwitchField
+            label={t('mapping.imageAnyColumn')}
+            hint={t('mapping.imageAnyColumnHint')}
+            checked={values.imageAnyColumn}
+            error={fieldError(errors.imageAnyColumn?.message)}
+            onChange={(e) => form.setValue('imageAnyColumn', e.target.checked, { shouldDirty: true })}
+          />
+        )}
       </Section>
 
       <Section
@@ -665,7 +698,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
                       {...form.register(`constants.${i}.value`)}
                     />
                     <RowAction
-                      variant="danger"
+                      variant="danger-quiet"
                       icon={<Trash2 />}
                       label={tCommon('action.remove')}
                       onClick={() =>
@@ -697,7 +730,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
                     <span className="text-muted">←</span>
                     <span>{[row.column, row.columnLetter && t('mapping.letter', { letter: row.columnLetter })].filter(Boolean).join(' ')}</span>
                     <RowAction
-                      variant="danger"
+                      variant="danger-quiet"
                       icon={<Trash2 />}
                       label={tCommon('action.remove')}
                       onClick={() =>
@@ -722,7 +755,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
       )}
 
       <Section title={t('mapping.optionsTitle')}>
-        <CheckboxField label={t('allOrNothing')} hint={t('allOrNothingHint')} {...form.register('allOrNothing')} />
+        <SwitchField className="border-t-0 pt-0" label={t('allOrNothing')} hint={t('allOrNothingHint')} {...form.register('allOrNothing')} />
       </Section>
 
       <FormActions error={previewError && <ErrorMessage error={previewError.error} fields={previewError.fields} />}>
@@ -751,6 +784,7 @@ export function MappingStep({ run, autoProfileId, onPreviewed, onCancel }: Props
       >
         <Field
           label={t('mapping.profileName')}
+          required
           value={profileName}
           maxLength={100}
           onChange={(e) => setProfileName(e.target.value)}

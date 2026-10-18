@@ -42,6 +42,26 @@ async function ensureZigbee(api: Api) {
 }
 
 /** Uploads a file on the new-import page, with a profile or without. */
+/**
+ * Applies the previewed run. Specs running alongside change the catalog,
+ * which makes the preview stale (import.stale, the token covers the whole
+ * catalog): preview again, as a user would, and apply once more, until the
+ * catalog held still between the two.
+ */
+async function applyImport(page: Page) {
+  const applied = page.getByText(/The import was applied on/)
+  const again = page.getByRole('button', { name: 'Preview again' })
+  await expect(async () => {
+    if (await again.isVisible()) {
+      await again.click()
+      await expect(again).toBeHidden()
+    }
+    await page.getByRole('button', { name: 'Apply import' }).click()
+    await expect(applied.or(again)).toBeVisible()
+    await expect(applied).toBeVisible({ timeout: 100 })
+  }).toPass({ timeout: 60_000 })
+}
+
 async function upload(page: Page, file: string, profile?: string) {
   await page.goto('/catalog/imports/new')
   const chooser = page.waitForEvent('filechooser')
@@ -60,6 +80,8 @@ const target = (page: Page, column: string): Locator => page.getByRole('combobox
 test.describe.configure({ mode: 'serial' })
 
 test('a SnapFlow 1 workbook imports with the starter profile; importing it again changes nothing; undo removes it', async ({ page, api }) => {
+  // Applying may need a few rounds while other specs change the catalog (applyImport).
+  test.setTimeout(120_000)
   await ensureZigbee(api)
   await page.goto('/')
   await navigate(page, 'Catalog', 'Import')
@@ -73,14 +95,13 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
   await expect(counter(page, 'Images', 'Pictures in the file')).toHaveText('2')
   // The unknown add-on is a warning, not an error.
   await expect(
-    page.getByRole('list', { name: 'Errors and warnings' }).getByRole('listitem').filter({ hasText: 'The add-on "E2E-PSU-9" was found neither in the file nor in the catalog.' }),
+    page.getByRole('table', { name: 'Errors and warnings' }).getByRole('row').filter({ hasText: 'The add-on "E2E-PSU-9" was found neither in the file nor in the catalog.' }),
   ).toContainText('Warning')
   const changes = region(page, 'Changes')
   await expect(changes.getByText('E2E-GW-1 · White · SKU E2E-GW-1 White')).toBeVisible()
   await expect(changes.getByRole('img', { name: 'Image' }).first()).toBeVisible()
 
-  await page.getByRole('button', { name: 'Apply import' }).click()
-  await expect(page.getByText(/The import was applied on/)).toBeVisible()
+  await applyImport(page)
   const firstRun = page.url()
   await expect(region(page, 'Change log').getByRole('link', { name: 'E2E-DIM-2' }).first()).toBeVisible()
 
@@ -115,6 +136,8 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
 })
 
 test('a CSV is mapped by hand, saved as a profile and imported into a fixed product type and category', async ({ page, api }) => {
+  // Applying may need a few rounds while other specs change the catalog (applyImport).
+  test.setTimeout(120_000)
   const { type, category } = await api.createKind(
     { name: { en: unique('CSV dimmers') }, attributes: [{ key: 'width_te', label: { en: 'Width' }, type: 'integer', scope: 'product' }] },
     { name: { en: unique('CSV system') } },
@@ -147,8 +170,7 @@ test('a CSV is mapped by hand, saved as a profile and imported into a fixed prod
   await expect(page.getByText('The file has no errors or warnings.')).toBeVisible()
   await expect(counter(page, 'Products', 'New')).toHaveText('1')
   await expect(counter(page, 'Variants', 'New')).toHaveText('2')
-  await page.getByRole('button', { name: 'Apply import' }).click()
-  await expect(page.getByText(/The import was applied on/)).toBeVisible()
+  await applyImport(page)
 
   const product = await productByModel(api, model)
   expect(product?.variants.map((v) => v.name.en).sort()).toEqual(['Black', 'White'])

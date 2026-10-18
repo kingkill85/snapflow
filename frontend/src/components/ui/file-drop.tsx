@@ -1,4 +1,3 @@
-import * as LabelPrimitive from '@radix-ui/react-label'
 import { FileSpreadsheet, Upload } from 'lucide-react'
 import { type DragEvent, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 
 import { Button } from './button'
+import { FieldLabel } from './label'
 
 type FileDropProps = {
   label: string
@@ -14,6 +14,8 @@ type FileDropProps = {
   onSelect: (file: File) => void
   /** File types offered by the picker, e.g. ".xlsx,.csv". */
   accept?: string
+  /** Marks the label with an asterisk and the file input with aria-required. */
+  required?: boolean
   /** What may be dropped, e.g. "Excel workbooks (.xlsx) or CSV files up to 50 MB". */
   hint?: string
   error?: string
@@ -38,7 +40,7 @@ function useFormatSize() {
  * picker, the chosen file's name and size, and an upload's progress.
  * Uploading is up to the caller.
  */
-export function FileDrop({ label, file, onSelect, accept, hint, error, disabled, pending, progress }: FileDropProps) {
+export function FileDrop({ label, file, onSelect, accept, required, hint, error, disabled, pending, progress }: FileDropProps) {
   const { t } = useTranslation()
   const size = useFormatSize()
   const inputId = useId()
@@ -58,9 +60,9 @@ export function FileDrop({ label, file, onSelect, accept, hint, error, disabled,
 
   return (
     <div className="group/field space-y-1.5">
-      <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
+      <FieldLabel htmlFor={inputId} required={required}>
         {label}
-      </LabelPrimitive.Root>
+      </FieldLabel>
       <input
         ref={input}
         id={inputId}
@@ -70,6 +72,7 @@ export function FileDrop({ label, file, onSelect, accept, hint, error, disabled,
         className="sr-only"
         disabled={!enabled}
         aria-describedby={message ? messageId : undefined}
+        aria-required={required || undefined}
         onChange={(e) => {
           const chosen = e.target.files?.[0]
           e.target.value = ''
@@ -86,7 +89,7 @@ export function FileDrop({ label, file, onSelect, accept, hint, error, disabled,
         onDrop={drop}
         className={cn(
           'flex flex-col items-center gap-3 rounded-control border border-dashed px-4 py-8 text-center sm:py-10',
-          dragging ? 'border-primary bg-primary/5' : error ? 'border-danger' : file ? 'border-primary/50 bg-primary/5' : 'border-line',
+          dragging ? 'border-primary bg-primary/5' : error ? 'border-danger' : file ? 'border-primary/50 bg-primary/5' : 'border-edge',
         )}
       >
         <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-full bg-canvas text-muted [&_svg]:size-6">

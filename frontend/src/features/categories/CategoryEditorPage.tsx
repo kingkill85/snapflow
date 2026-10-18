@@ -16,6 +16,7 @@ import {
   useUpdateCategory,
 } from '@/api/generated/categories/categories'
 import { useCan } from '@/app/session'
+import { useDecimalSeparator } from '@/catalog/decimal'
 import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   type ApiFieldMap,
@@ -145,10 +146,11 @@ function CategoryEditor({ item, notice, onReload, onSaved, onChanged }: Category
   const create = useCreateCategory()
   const update = useUpdateCategory()
   const mutation = loaded ? update : create
+  const separator = useDecimalSeparator()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(loaded),
+    defaultValues: toFormValues(loaded, separator),
     // Focus goes to the first error in page order, after rows with errors opened.
     shouldFocusError: false,
   })

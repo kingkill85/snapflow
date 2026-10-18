@@ -10,9 +10,10 @@ export type Column<T> = {
    * The column's place in the stacked card of a phone (below 768 px, D117):
    * `title` heads the card (default: the first column that is not `media`),
    * `media` (an image) sits left of the title, every other column is a label
-   * and value line below them.
+   * and value line below them; `block` puts the label above the value at the
+   * card's full width (e.g. a dropdown to choose in each row).
    */
-  mobile?: 'title' | 'media'
+  mobile?: 'title' | 'media' | 'block'
 }
 
 type DataTableProps<T> = {
@@ -22,6 +23,13 @@ type DataTableProps<T> = {
   /** Action buttons per row, shown right-aligned in the last column (at the bottom of a phone's card). */
   actions?: (row: T) => ReactNode
   empty: ReactNode
+  /** The table's accessible name, when no heading right above it names it. */
+  label?: string
+  /**
+   * Without a box of its own, for a table inside a card (e.g. the fields of a
+   * diff): rows are separated by lines, also on phones instead of cards.
+   */
+  flat?: boolean
 }
 
 /**
@@ -31,7 +39,7 @@ type DataTableProps<T> = {
  * explicitly (table, rowgroup, row, columnheader, cell), because browsers drop
  * table semantics from elements whose display changes (D117).
  */
-export function DataTable<T>({ rows, columns, rowKey, actions, empty }: DataTableProps<T>) {
+export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat }: DataTableProps<T>) {
   if (rows.length === 0) return <>{empty}</>
   const hasMedia = columns.some((c) => c.mobile === 'media')
   const titleIndex = Math.max(
@@ -40,36 +48,49 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty }: DataTabl
   )
   const cellClass = (c: Column<T>, i: number) => {
     if (c.mobile === 'media') return 'max-md:col-start-1 max-md:row-start-1 max-md:block max-md:w-auto max-md:self-center'
+    if (c.mobile === 'block') return 'max-md:col-span-2 max-md:block max-md:text-left'
     if (i === titleIndex) {
       return cn(
-        'max-md:row-start-1 max-md:block max-md:self-center max-md:text-left max-md:text-base max-md:font-medium',
+        'max-md:row-start-1 max-md:block max-md:self-center max-md:text-left max-md:font-medium',
+        flat ? 'max-md:text-sm' : 'max-md:text-base',
         hasMedia ? 'max-md:col-start-2' : 'max-md:col-span-2',
       )
     }
     return 'max-md:col-span-2 max-md:grid max-md:grid-cols-[minmax(6rem,2fr)_minmax(0,3fr)] max-md:items-baseline max-md:gap-3 max-md:text-left'
   }
   return (
-    <div className="relative overflow-x-auto rounded-control border border-line bg-surface max-md:overflow-visible max-md:border-0 max-md:bg-transparent">
-      <table role="table" className="w-full text-sm max-md:block">
-        <thead role="rowgroup" className="border-b border-line text-left text-muted max-md:sr-only">
+    <div
+      className={cn(
+        'relative overflow-x-auto max-md:overflow-visible',
+        !flat && 'rounded-control border border-line bg-surface max-md:border-0 max-md:bg-transparent',
+      )}
+    >
+      <table role="table" aria-label={label} className="w-full text-sm max-md:block">
+        <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs')}>
           <tr role="row">
             {columns.map((c) => (
-              <th key={c.header} role="columnheader" scope="col" className={cn('px-3 py-2.5 font-medium first:pl-4 last:pr-4', c.className)}>
+              <th key={c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
                 {c.header}
               </th>
             ))}
             {actions && <th role="columnheader" scope="col" className="w-px" />}
           </tr>
         </thead>
-        <tbody role="rowgroup" className="max-md:block max-md:space-y-3">
+        <tbody role="rowgroup" className={cn('max-md:block', flat ? 'max-md:space-y-2' : 'max-md:space-y-3')}>
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
               role="row"
-              className="border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3 max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border"
+              className={cn(
+                'border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3',
+                flat
+                  ? 'max-md:gap-y-1 max-md:pb-2 max-md:last:pb-0'
+                  : 'max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border',
+              )}
             >
               {columns.map((c, i) => {
                 const line = c.mobile !== 'media' && i !== titleIndex
+                const block = c.mobile === 'block'
                 return (
                   <td
                     key={c.header}
@@ -77,8 +98,10 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty }: DataTabl
                     // On a phone a line's label is the header, as CSS content with empty alternative text
                     // (index.css): not part of the cell's text, not read twice by screen readers.
                     data-label={line ? c.header : undefined}
+                    data-mobile={block ? 'block' : undefined}
                     className={cn(
-                      'px-3 py-2.5 first:pl-4 last:pr-4 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
+                      'px-3 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
+                      flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
                       c.className,
                       cellClass(c, i),
                     )}

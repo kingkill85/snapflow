@@ -215,6 +215,7 @@
     "unchanged": "Unverändert",
     "deactivate": "Zu deaktivieren",
     "done": {
+      "addonsNew": "Hinzugefügt",
       "new": "Angelegt",
       "changed": "Geändert",
       "unchanged": "Unverändert",
@@ -282,7 +283,13 @@
     "error": "Fehler",
     "warning": "Warnung",
     "atRow": "Zeile {{row}}",
-    "file": "Datei"
+    "file": "Datei",
+    "severity": "Art",
+    "message": "Meldung",
+    "row": "Zeile",
+    "column": "Spalte",
+    "target": "Importiert als",
+    "modelNumber": "Modellnummer"
   },
   "failed": {
     "title": "Der Import ist fehlgeschlagen und wurde zurückgerollt: Nichts wurde geändert.",

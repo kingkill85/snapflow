@@ -28,6 +28,7 @@ type GroupedSelectProps = {
   'aria-label'?: string
   'aria-invalid'?: boolean
   'aria-describedby'?: string
+  'aria-required'?: boolean
 }
 
 const itemClass =
@@ -68,7 +69,7 @@ export function GroupedSelect({ value, onValueChange, options = [], groups, clas
           position="popper"
           sideOffset={4}
           collisionPadding={8}
-          className="z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-line bg-surface text-ink shadow-lg"
+          className="z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-edge bg-raised text-ink shadow-lg"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-6 items-center justify-center text-muted">
             <ChevronUp className="size-4" />

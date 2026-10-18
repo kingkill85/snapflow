@@ -20,6 +20,8 @@ import {
   Badge,
   Button,
   CheckboxField,
+  type Column,
+  DataTable,
   EmptyState,
   ErrorMessage,
   FormActions,
@@ -28,6 +30,7 @@ import {
   Pagination,
   Section,
   SelectField,
+  SwitchField,
   TextLink,
   TypeBadge,
 } from '@/components/ui'
@@ -143,7 +146,8 @@ export function PreviewStep({ run, onEditMapping, onApplied }: Props) {
       <IssuesSection run={run} params={params} setFilters={setFilters} />
 
       <Section title={t('preview.applyTitle')} description={t('preview.applyDescription')}>
-        <CheckboxField
+        <SwitchField
+          className="border-t-0 pt-0"
           label={t('allOrNothing')}
           hint={t('allOrNothingHint')}
           checked={allOrNothing}
@@ -334,16 +338,27 @@ function IssuesSection({ run, params, setFilters }: ListProps) {
     const params = i.params && typeof i.params.field === 'string' ? { ...i.params, field: fieldLabel(i.params.field) } : i.params
     return message(i.code, params)
   }
-  /** Where: "Row 5 · D · Price (Price (USD)) · GW-1". */
-  const where = (i: ImportIssue) =>
-    [
-      i.row > 0 ? t('issues.atRow', { row: i.row }) : t('issues.file'),
-      [i.column, i.header].filter(Boolean).join(' · '),
-      i.target && !(i.header && targetLabel(i.target) === i.header) ? targetLabel(i.target) : '',
-      i.modelNumber ?? '',
-    ]
-      .filter(Boolean)
-      .join(' · ')
+  const none = <span className="text-muted">–</span>
+  const issueColumns: Column<ImportIssue>[] = [
+    {
+      header: t('issues.severity'),
+      cell: (i) => <Badge variant={i.severity === 'error' ? 'danger' : 'warning'}>{t(`issues.${i.severity}`)}</Badge>,
+      className: 'w-px whitespace-nowrap',
+    },
+    { header: t('issues.message'), mobile: 'title', cell: (i) => <span className="break-words">{text(i)}</span>, className: 'md:min-w-64' },
+    {
+      header: t('issues.row'),
+      cell: (i) => (i.row > 0 ? <span className="tabular-nums">{i.row}</span> : <span className="text-muted">{t('issues.file')}</span>),
+      className: 'whitespace-nowrap',
+    },
+    {
+      header: t('issues.column'),
+      cell: (i) => (i.column || i.header ? <span className="break-words">{[i.column, i.header].filter(Boolean).join(' · ')}</span> : none),
+      className: 'md:min-w-32',
+    },
+    { header: t('issues.target'), cell: (i) => (i.target ? targetLabel(i.target) : none), className: 'md:min-w-32' },
+    { header: t('issues.modelNumber'), cell: (i) => (i.modelNumber ? <span className="break-all">{i.modelNumber}</span> : none), className: 'md:min-w-32' },
+  ]
 
   return (
     <section id="issues" aria-labelledby="issues-title" className="space-y-4 rounded-control border border-line bg-surface p-4 sm:p-6">
@@ -374,19 +389,13 @@ function IssuesSection({ run, params, setFilters }: ListProps) {
           {issues.data.items.length === 0 ? (
             <EmptyState title={t('issues.empty')} />
           ) : (
-            <ul aria-label={t('issues.title')} className="divide-y divide-line rounded-control border border-line">
-              {issues.data.items.map((i, n) => (
-                <li key={offset + n} className="flex flex-col gap-1 px-3 py-2.5 text-sm sm:flex-row sm:items-baseline sm:gap-3">
-                  <span className="shrink-0">
-                    <Badge variant={i.severity === 'error' ? 'danger' : 'warning'}>{t(`issues.${i.severity}`)}</Badge>
-                  </span>
-                  <span className="min-w-0 flex-1 space-y-0.5">
-                    <span className="block">{text(i)}</span>
-                    <span className="block text-xs break-words text-muted">{where(i)}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <DataTable
+              label={t('issues.title')}
+              rows={issues.data.items.map((issue, n) => ({ ...issue, n: offset + n }))}
+              rowKey={(i) => String(i.n)}
+              columns={issueColumns}
+              empty={null}
+            />
           )}
           <Pagination offset={offset} limit={pageSize} total={issues.data.total} onChange={(o) => setFilters({ issues: String(o) }, '')} />
         </>

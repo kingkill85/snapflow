@@ -215,6 +215,7 @@
     "unchanged": "Unchanged",
     "deactivate": "To deactivate",
     "done": {
+      "addonsNew": "Added",
       "new": "Created",
       "changed": "Updated",
       "unchanged": "Unchanged",
@@ -282,7 +283,13 @@
     "error": "Error",
     "warning": "Warning",
     "atRow": "Row {{row}}",
-    "file": "File"
+    "file": "File",
+    "severity": "Kind",
+    "message": "Message",
+    "row": "Row",
+    "column": "Column",
+    "target": "Imported as",
+    "modelNumber": "Model number"
   },
   "failed": {
     "title": "The import failed and was rolled back: nothing was changed.",

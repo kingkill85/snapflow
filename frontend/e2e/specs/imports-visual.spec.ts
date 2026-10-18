@@ -6,6 +6,7 @@ import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
 // dark, English and German: nothing overflows the viewport. Screenshots land
 // in e2e/screenshots/import-*.png for a look by eye. The runs are seeded
 // through the API (the flows themselves are tested in imports.spec.ts).
+// Tagged @visual: it runs with `make e2e-visual`, not in the default run (D107).
 
 const viewports = [
   { name: 'phone', size: { width: 390, height: 844 } },
@@ -31,7 +32,7 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow, 'page is wider than the viewport').toBeLessThanOrEqual(0)
 }
 
-test('every import step fits the screen in both themes and languages', async ({ page, api }) => {
+test('every import step fits the screen in both themes and languages', { tag: '@visual' }, async ({ page, api }) => {
   test.setTimeout(240_000)
   const { ids } = await api.createKind(
     { name: { en: unique('Visual dimmers'), de: unique('Visuelle Dimmer') }, attributes: [{ key: 'width_te', label: { en: 'Width', de: 'Breite' }, type: 'integer', unit: 'TE', scope: 'product' }] },

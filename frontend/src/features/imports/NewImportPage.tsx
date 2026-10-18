@@ -90,6 +90,7 @@ export function NewImportPage() {
           file={file}
           onSelect={choose}
           accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+          required
           hint={t('upload.hint', { maxMb: maxFileMb })}
           error={fileError ? message(fileError) : undefined}
           pending={pending}

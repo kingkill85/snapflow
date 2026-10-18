@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next'
 import type { ImportItemStatus, ImportRunState } from '@/api/generated/model'
 import { fileUrl } from '@/catalog/files'
 import { useFormatPrice } from '@/catalog/money'
-import { Badge, Thumbnail, TypeBadge } from '@/components/ui'
+import { Badge, type Column, DataTable, Thumbnail, TypeBadge } from '@/components/ui'
 import { type LocalizedText, useLocalized } from '@/i18n/localized'
-import { cn } from '@/lib/cn'
 
 // States and the values of the diff and the change log, in the UI language.
 const runStateVariant = {
@@ -90,38 +89,48 @@ export function FieldValue({ field, value }: { field: string; value: unknown }) 
 
 export type DiffRow = { key: string; label: string; before: { field: string; value: unknown }; after: { field: string; value: unknown } }
 
-/** Fields before and after (or only the values of something new), side by side from small tablets up. */
+/**
+ * Fields before and after (or only the values of something new): a table
+ * inside the entry's card. On phones a changed field is a title with its
+ * before and after lines; a new value sits on one line beside its field.
+ */
 export function DiffList({ rows, showBefore }: { rows: DiffRow[]; showBefore: boolean }) {
   const { t } = useTranslation('imports')
-  return (
-    <dl
-      className={cn(
-        'grid grid-cols-1 gap-x-4 gap-y-1 border-t border-line pt-2 text-sm',
-        showBefore ? 'sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)_minmax(0,1fr)]' : 'sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)]',
-      )}
-    >
-      <div className="hidden text-xs font-medium text-muted sm:contents">
-        <span>{t('items.field')}</span>
-        {showBefore && <span>{t('items.before')}</span>}
-        <span>{showBefore ? t('items.after') : t('items.value')}</span>
-      </div>
-      {rows.map((r) => (
-        <div key={r.key} className="contents">
-          <dt className="pt-1 font-medium sm:pt-0 sm:font-normal sm:text-muted">{r.label}</dt>
-          {showBefore && (
-            <dd className="min-w-0">
-              <span className="text-xs text-muted sm:hidden">{t('items.before')}: </span>
+  const field: Column<DiffRow> = showBefore
+    ? { header: t('items.field'), mobile: 'title', cell: (r) => <span className="font-medium md:font-normal md:text-muted">{r.label}</span>, className: 'md:w-48' }
+    : {
+        header: t('items.field'),
+        // Beside the value on phones, as wide as the labels of the other cards' lines.
+        mobile: 'media',
+        cell: (r) => <span className="text-muted max-md:inline-block max-md:w-28 max-md:break-words">{r.label}</span>,
+        className: 'md:w-48',
+      }
+  const columns: Column<DiffRow>[] = [
+    field,
+    ...(showBefore
+      ? [
+          {
+            header: t('items.before'),
+            cell: (r: DiffRow) => (
               <span className="text-muted line-through decoration-muted/50 [&_img]:opacity-60">
                 <FieldValue field={r.before.field} value={r.before.value} />
               </span>
-            </dd>
-          )}
-          <dd className="min-w-0">
-            {showBefore && <span className="text-xs text-muted sm:hidden">{t('items.after')}: </span>}
-            <FieldValue field={r.after.field} value={r.after.value} />
-          </dd>
-        </div>
-      ))}
-    </dl>
+            ),
+          },
+        ]
+      : []),
+    {
+      header: showBefore ? t('items.after') : t('items.value'),
+      cell: (r) => (
+        <span className="font-normal">
+          <FieldValue field={r.after.field} value={r.after.value} />
+        </span>
+      ),
+    },
+  ]
+  return (
+    <div className="border-t border-line pt-1">
+      <DataTable flat rows={rows} rowKey={(r) => r.key} columns={columns} empty={null} />
+    </div>
   )
 }
