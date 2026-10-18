@@ -121,6 +121,24 @@
   "network": {
     "unavailable": "Keine Verbindung zum Server."
   },
+  "plan": {
+    "not_found": "Dieser Plan existiert nicht mehr.",
+    "name_taken": "Diese Version hat bereits einen Plan namens „{{name}}“.",
+    "stale": "Jemand anderes hat diesen Plan inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "locked": "{{name}} bearbeitet diesen Plan (bis {{expiresAt}}).",
+    "lock_required": "Sie bearbeiten diesen Plan nicht mehr. Öffnen Sie ihn erneut zum Bearbeiten.",
+    "order_mismatch": "Die Pläne dieser Version haben sich geändert. Laden Sie neu und versuchen Sie es erneut.",
+    "duplicate_id": "Diese ID wird doppelt verwendet.",
+    "outside_image": "Diese Position liegt außerhalb des Planbilds.",
+    "placement_size": "Die Größe muss über 0 und höchstens {{max}} px sein.",
+    "zone_points": "Eine Zone braucht {{min}} bis {{max}} Punkte.",
+    "zone_degenerate": "Diese Zone hat keine Fläche.",
+    "zone_color": "Geben Sie eine Farbe wie #4f7cff ein.",
+    "zone_opacity": "Die Deckkraft muss zwischen 0 und 1 liegen.",
+    "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
+    "variant_required": "Wählen Sie ein Produkt.",
+    "addon_not_linked": "Dies ist kein Zubehör der gewählten Variante."
+  },
   "product": {
     "category_inactive": "Diese Kategorie ist inaktiv. Wählen Sie eine aktive Kategorie.",
     "category_not_found": "Die gewählte Kategorie existiert nicht mehr.",

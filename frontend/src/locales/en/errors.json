@@ -121,6 +121,24 @@
   "network": {
     "unavailable": "No connection to the server."
   },
+  "plan": {
+    "not_found": "This plan no longer exists.",
+    "name_taken": "This version already has a plan named \"{{name}}\".",
+    "stale": "Someone else changed this plan in the meantime. Reload it and make your changes again.",
+    "locked": "{{name}} is editing this plan (until {{expiresAt}}).",
+    "lock_required": "You are no longer editing this plan. Open it for editing again.",
+    "order_mismatch": "The plans of this version have changed. Reload and try again.",
+    "duplicate_id": "This id is used twice.",
+    "outside_image": "This position is outside the plan image.",
+    "placement_size": "The size must be above 0 and at most {{max}} px.",
+    "zone_points": "A zone needs {{min}} to {{max}} points.",
+    "zone_degenerate": "This zone has no area.",
+    "zone_color": "Enter a colour such as #4f7cff.",
+    "zone_opacity": "The opacity must be between 0 and 1.",
+    "variant_not_found": "This product variant no longer exists.",
+    "variant_required": "Choose a product.",
+    "addon_not_linked": "This is not an add-on of the chosen variant."
+  },
   "product": {
     "category_inactive": "This category is inactive. Choose an active category.",
     "category_not_found": "The selected category no longer exists.",

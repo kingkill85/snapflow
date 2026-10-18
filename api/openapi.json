@@ -2114,6 +2114,549 @@
         ],
         "type": "string"
       },
+      "Plan": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Plan.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/PlanActions"
+          },
+          "contentUpdatedAt": {
+            "description": "The version of the content",
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/PlanImage"
+          },
+          "kind": {
+            "enum": [
+              "floorplan"
+            ],
+            "type": "string"
+          },
+          "lock": {
+            "$ref": "#/components/schemas/PlanLock",
+            "description": "The live edit lock, null when nobody holds it"
+          },
+          "name": {
+            "type": "string"
+          },
+          "placementCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "position": {
+            "description": "Order within the version, 1 first",
+            "format": "int32",
+            "type": "integer"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "scale": {
+            "description": "Metres per image pixel (calibration); absent when not calibrated",
+            "format": "double",
+            "type": "number"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when renaming or replacing the image",
+            "format": "date-time",
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "zoneCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "projectId",
+          "kind",
+          "name",
+          "position",
+          "image",
+          "zoneCount",
+          "placementCount",
+          "createdAt",
+          "updatedAt",
+          "contentUpdatedAt",
+          "lock",
+          "can"
+        ],
+        "type": "object"
+      },
+      "PlanActions": {
+        "additionalProperties": false,
+        "properties": {
+          "breakLock": {
+            "description": "Take the edit lock from another user (projects.delete, project active)",
+            "type": "boolean"
+          },
+          "update": {
+            "description": "Rename, replace the image, reorder, delete, edit the content (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update",
+          "breakLock"
+        ],
+        "type": "object"
+      },
+      "PlanContent": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PlanContent.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "contentUpdatedAt": {
+            "description": "Send it back as expectedContentUpdatedAt",
+            "format": "date-time",
+            "type": "string"
+          },
+          "placements": {
+            "description": "In draw order",
+            "items": {
+              "$ref": "#/components/schemas/PlanPlacement"
+            },
+            "type": "array"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "scale": {
+            "description": "Metres per image pixel; null when not calibrated",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/PlanWarning"
+            },
+            "type": "array"
+          },
+          "zones": {
+            "description": "In draw order",
+            "items": {
+              "$ref": "#/components/schemas/PlanZone"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "planId",
+          "contentUpdatedAt",
+          "scale",
+          "zones",
+          "placements",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "PlanContentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PlanContentInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedContentUpdatedAt": {
+            "description": "contentUpdatedAt as last read; plan.stale otherwise",
+            "format": "date-time",
+            "type": "string"
+          },
+          "placements": {
+            "description": "In draw order (the array order is stored); at most 2000",
+            "items": {
+              "$ref": "#/components/schemas/PlanPlacementInput"
+            },
+            "type": "array"
+          },
+          "scale": {
+            "description": "Metres per image pixel, above 0; null for none",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "zones": {
+            "description": "In draw order (the array order is stored); at most 200",
+            "items": {
+              "$ref": "#/components/schemas/PlanZone"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "expectedContentUpdatedAt",
+          "scale",
+          "zones",
+          "placements"
+        ],
+        "type": "object"
+      },
+      "PlanImage": {
+        "additionalProperties": false,
+        "properties": {
+          "fileId": {
+            "type": "string"
+          },
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "url": {
+            "description": "Download path: the plan's image endpoint (works also after the project moved to another tenant)",
+            "examples": [
+              "/api/plans/3f2c…/image"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Natural pixels of the stored image; all coordinates are image pixels",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fileId",
+          "url",
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "PlanLock": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PlanLock.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Without a renewal the lock ends then",
+            "format": "date-time",
+            "type": "string"
+          },
+          "mine": {
+            "description": "The caller holds the lock",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The holder's full name, or their email if they have none",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "expiresAt",
+          "mine"
+        ],
+        "type": "object"
+      },
+      "PlanOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PlanOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every plan of the version exactly once, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "PlanPlacement": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantIds": {
+            "description": "Chosen optional add-ons (add-on links of the variant); required add-ons are implied and need not be sent",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "existing": {
+            "description": "The customer already has it: counts technically, never in BOM, prices or proposals",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "Above 0, at most the image height",
+            "format": "double",
+            "type": "number"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the plan",
+            "type": "string"
+          },
+          "instanceValues": {
+            "additionalProperties": {},
+            "description": "Values of the category's instanceAttributes",
+            "type": "object"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "rotation": {
+            "description": "Degrees clockwise; normalised to [0, 360)",
+            "format": "double",
+            "type": "number"
+          },
+          "variantId": {
+            "description": "null only for a stored placement whose variant was deleted from the catalog",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "width": {
+            "description": "Above 0, at most the image width; the box may overhang the edge",
+            "format": "double",
+            "type": "number"
+          },
+          "x": {
+            "description": "Centre in image pixels, inside the image",
+            "format": "double",
+            "type": "number"
+          },
+          "y": {
+            "format": "double",
+            "type": "number"
+          },
+          "zoneId": {
+            "description": "The smallest zone containing the centre (computed on every save); null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "zoneId",
+          "id",
+          "variantId",
+          "x",
+          "y",
+          "width",
+          "height",
+          "rotation",
+          "label",
+          "existing",
+          "addonVariantIds",
+          "instanceValues"
+        ],
+        "type": "object"
+      },
+      "PlanPlacementInput": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantIds": {
+            "description": "Chosen optional add-ons (add-on links of the variant); required add-ons are implied and need not be sent",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "existing": {
+            "description": "The customer already has it: counts technically, never in BOM, prices or proposals",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "Above 0, at most the image height",
+            "format": "double",
+            "type": "number"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the plan",
+            "type": "string"
+          },
+          "instanceValues": {
+            "additionalProperties": {},
+            "description": "Values of the category's instanceAttributes",
+            "type": "object"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "rotation": {
+            "description": "Degrees clockwise; normalised to [0, 360)",
+            "format": "double",
+            "type": "number"
+          },
+          "variantId": {
+            "description": "null only for a stored placement whose variant was deleted from the catalog",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "width": {
+            "description": "Above 0, at most the image width; the box may overhang the edge",
+            "format": "double",
+            "type": "number"
+          },
+          "x": {
+            "description": "Centre in image pixels, inside the image",
+            "format": "double",
+            "type": "number"
+          },
+          "y": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "variantId",
+          "x",
+          "y",
+          "width",
+          "height",
+          "rotation",
+          "label",
+          "existing",
+          "addonVariantIds",
+          "instanceValues"
+        ],
+        "type": "object"
+      },
+      "PlanWarning": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantId": {
+            "description": "The add-on of required_addon_unavailable, addon_unavailable and addon_not_linked",
+            "type": "string"
+          },
+          "code": {
+            "enum": [
+              "variant_deleted",
+              "variant_inactive",
+              "product_inactive",
+              "category_inactive",
+              "product_type_inactive",
+              "product_type_not_in_project",
+              "required_addon_unavailable",
+              "addon_unavailable",
+              "addon_not_linked"
+            ],
+            "type": "string"
+          },
+          "placementId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "placementId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "PlanZone": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "description": "#rrggbb",
+            "examples": [
+              "#4f7cff"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the plan",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters",
+            "type": "string"
+          },
+          "opacity": {
+            "description": "0-1",
+            "format": "double",
+            "type": "number"
+          },
+          "points": {
+            "description": "Polygon corners [x, y] in image pixels, 3-200 points, inside the image",
+            "items": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "opacity",
+          "points"
+        ],
+        "type": "object"
+      },
       "Product": {
         "additionalProperties": false,
         "properties": {
@@ -5782,6 +6325,396 @@
         ]
       }
     },
+    "/api/plans/{id}": {
+      "delete": {
+        "description": "Refused while another user holds the edit lock (409 plan.locked).",
+        "operationId": "deletePlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a plan with its content",
+        "tags": [
+          "plans"
+        ]
+      },
+      "get": {
+        "operationId": "getPlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a plan with its edit lock",
+        "tags": [
+          "plans"
+        ]
+      },
+      "put": {
+        "description": "Multipart fields `name`, `expectedUpdatedAt` and optionally `image` (limits as for create). A new image of another size scales zones and placements to it and moves contentUpdatedAt on; it is refused while another user holds the edit lock (409 plan.locked).",
+        "operationId": "updatePlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "expectedUpdatedAt": {
+                  "contentType": "text/plain"
+                },
+                "image": {
+                  "contentType": "application/octet-stream"
+                },
+                "name": {
+                  "contentType": "text/plain"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "expectedUpdatedAt": {
+                    "description": "updatedAt as last read (RFC 3339); plan.stale otherwise",
+                    "type": "string"
+                  },
+                  "image": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": "A new image (JPEG, PNG or WebP, at most 20 MB and 40 megapixels); left out keeps the current one",
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "1-100 characters, unique in the version ignoring case",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "expectedUpdatedAt"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename a plan or replace its image",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
+    "/api/plans/{id}/content": {
+      "get": {
+        "operationId": "getPlanContent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanContent"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a plan's zones and placements",
+        "tags": [
+          "plans"
+        ]
+      },
+      "put": {
+        "description": "Saves the whole content in one transaction and returns it with the computed zone of every placement and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+        "operationId": "savePlanContent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanContentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanContent"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace a plan's zones and placements",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
+    "/api/plans/{id}/image": {
+      "get": {
+        "description": "As GET /api/files/{id}, for whoever may read the plan.",
+        "operationId": "getPlanImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The image"
+          },
+          "304": {
+            "description": "Not modified"
+          }
+        },
+        "summary": "Download a plan's image",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
+    "/api/plans/{id}/lock": {
+      "delete": {
+        "description": "Releases the caller's lock; another user's lock stays.",
+        "operationId": "unlockPlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Release the edit lock",
+        "tags": [
+          "plans"
+        ]
+      },
+      "post": {
+        "description": "The editor calls it when it opens and every 30 s; the lock ends 2 minutes after the last call. Held by another user: 409 plan.locked (params name, expiresAt), unless force=true by a user with projects.delete.",
+        "operationId": "lockPlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Take the lock from another user (needs projects.delete)",
+            "explode": false,
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "description": "Take the lock from another user (needs projects.delete)",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLock"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Take or renew the edit lock",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
     "/api/product-types": {
       "get": {
         "description": "In catalog order (sortOrder, then key).",
@@ -7581,6 +8514,183 @@
         "summary": "List or search variants across the catalog",
         "tags": [
           "products"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/plans": {
+      "get": {
+        "description": "In their order, without content.",
+        "operationId": "listPlans",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Plan"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the plans of a version",
+        "tags": [
+          "plans"
+        ]
+      },
+      "post": {
+        "description": "Multipart fields `name` and `image`: a JPEG, PNG or WebP image (recognised by its content), at most 20 MB (413 file.too_large) and 40 megapixels (422 file.too_many_pixels), stored re-encoded without metadata at most 4096 px on the long side (WebP as PNG). The plan goes after the version's last plan.",
+        "operationId": "createPlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "image": {
+                  "contentType": "application/octet-stream"
+                },
+                "name": {
+                  "contentType": "text/plain"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "image": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": "JPEG, PNG or WebP image, at most 20 MB and 40 megapixels",
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "1-100 characters, unique in the version ignoring case",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "image"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a plan",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/plans/order": {
+      "put": {
+        "description": "ids must list every plan of the version exactly once (422 plan.order_mismatch).",
+        "operationId": "reorderPlans",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Plan"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Reorder the plans of a version",
+        "tags": [
+          "plans"
         ]
       }
     }

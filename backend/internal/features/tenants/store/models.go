@@ -117,6 +117,53 @@ type ImportRun struct {
 	Images       []byte
 }
 
+type Plan struct {
+	ID               uuid.UUID
+	TenantID         uuid.UUID
+	VersionID        uuid.UUID
+	Kind             string
+	Name             string
+	Position         int32
+	ImageFileID      uuid.UUID
+	ImageWidth       int32
+	ImageHeight      int32
+	Scale            *float64
+	LockUserID       *uuid.UUID
+	LockExpiresAt    *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ContentUpdatedAt time.Time
+}
+
+type PlanPlacement struct {
+	PlanID          uuid.UUID
+	ID              uuid.UUID
+	TenantID        uuid.UUID
+	VariantID       *uuid.UUID
+	X               float64
+	Y               float64
+	Width           float64
+	Height          float64
+	Rotation        float64
+	Label           string
+	Existing        bool
+	AddonVariantIds []uuid.UUID
+	InstanceValues  attrschema.Values
+	ZoneID          *uuid.UUID
+	Position        int32
+}
+
+type PlanZone struct {
+	PlanID   uuid.UUID
+	ID       uuid.UUID
+	TenantID uuid.UUID
+	Name     string
+	Color    string
+	Opacity  float64
+	Points   []byte
+	Position int32
+}
+
 type Product struct {
 	ID            uuid.UUID
 	ProductTypeID uuid.UUID
