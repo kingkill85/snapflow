@@ -46,7 +46,7 @@ test('an admin creates a category with every kind of attribute, reopens and edit
   const key = uniqueKey('actuator')
   const name = unique('Dimmer actuator')
   await page.goto(listPath)
-  await page.getByRole('link', { name: 'New category' }).click()
+  await page.getByRole('link', { name: 'New category' }).first().click()
   await expect(page.getByRole('heading', { name: 'New category', level: 1 })).toBeVisible()
 
   await basics(page).getByLabel('Key').fill(key)
