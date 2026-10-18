@@ -1,4 +1,4 @@
-import { type APIRequestContext, type Browser, type BrowserContext, expect, type Page, request, test as base } from '@playwright/test'
+import { type APIRequestContext, type Browser, type BrowserContext, expect, type Locator, type Page, request, test as base } from '@playwright/test'
 
 import { admin, backendURL, frontendURL } from './env'
 
@@ -297,8 +297,74 @@ export const test = base.extend<Fixtures>({
   },
 })
 
-/** The main navigation in the app header. */
-export const nav = (page: Page) => page.getByRole('navigation')
+/** The main navigation in the app header (desktop; on phones it sits in the menu sheet). */
+export const nav = (page: Page) => page.getByRole('navigation', { name: /^(Main navigation|Hauptnavigation)$/ })
+
+/**
+ * Opens a page through the grouped navigation (D97): a section with several
+ * pages is a menu, a section with one page a plain link.
+ */
+export async function navigate(page: Page, section: string, item: string) {
+  const link = nav(page).getByRole('link', { name: item, exact: true })
+  if ((await link.count()) > 0) return link.click()
+  await nav(page).getByRole('button', { name: section, exact: true }).click()
+  await page.getByRole('menu', { name: section }).getByRole('menuitem', { name: item, exact: true }).click()
+}
+
+/** What the navigation offers: per section menu its pages, per plain link its own name. */
+export async function navEntries(page: Page): Promise<Record<string, string[]>> {
+  await expect(nav(page)).toBeVisible()
+  const entries: Record<string, string[]> = {}
+  for (const entry of await nav(page).locator(':scope > *').all()) {
+    const name = (await entry.textContent())?.trim() ?? ''
+    if ((await entry.getAttribute('aria-haspopup')) === 'menu') {
+      await entry.click()
+      const menu = page.getByRole('menu', { name })
+      entries[name] = (await menu.getByRole('menuitem').allTextContents()).map((t) => t.trim())
+      await page.keyboard.press('Escape')
+      await expect(menu).toBeHidden()
+    } else {
+      entries[name] = [name]
+    }
+  }
+  return entries
+}
+
+/** The user menu button in the header ("Account: name"). */
+export const accountButton = (page: Page) => page.getByRole('banner').getByRole('button', { name: /^(Account|Konto): / })
+
+/** Opens the user menu and returns it. */
+export async function userMenu(page: Page) {
+  await accountButton(page).click()
+  return page.getByRole('menu')
+}
+
+export async function signOut(page: Page) {
+  await (await userMenu(page)).getByRole('menuitem', { name: /^(Sign out|Abmelden)$/ }).click()
+}
+
+/** Switches the UI language in the user menu, e.g. to "Deutsch". */
+export async function chooseLanguage(page: Page, language: string) {
+  await (await userMenu(page)).getByRole('menuitemradio', { name: language }).click()
+  await page.keyboard.press('Escape')
+}
+
+/** The option texts a design-system Select offers; opens it and closes it again. */
+export async function optionTexts(select: Locator): Promise<string[]> {
+  await select.click()
+  const listbox = select.page().getByRole('listbox')
+  await expect(listbox).toBeVisible()
+  const texts = (await listbox.getByRole('option').allTextContents()).map((t) => t.trim())
+  await select.page().keyboard.press('Escape')
+  await expect(listbox).toBeHidden()
+  return texts
+}
+
+/** Picks an option of a design-system Select (a combobox button, not a native select). */
+export async function chooseOption(select: Locator, label: string) {
+  await select.click()
+  await select.page().getByRole('option', { name: label, exact: true }).click()
+}
 
 /** A table row containing the given text. */
 export const row = (page: Page, text: string) => page.getByRole('row').filter({ hasText: text })

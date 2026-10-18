@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import type { Tenant } from '@/api/generated/model'
 import { getListTenantsQueryKey, useDeleteTenant, useListTenants } from '@/api/generated/tenants/tenants'
 import { getListUsersQueryKey } from '@/api/generated/users/users'
-import { Badge, Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
+import { Badge, Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 
 import { TenantFormDialog } from './TenantFormDialog'
 
@@ -52,7 +52,7 @@ export function TenantsPage() {
   )
 
   return (
-    <Page title={t('title')} description={t('description')} actions={createButton}>
+    <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (
@@ -79,14 +79,10 @@ export function TenantsPage() {
           actions={(tenant) => (
             <>
               {tenant.can.update && (
-                <Button size="sm" variant="secondary" onClick={() => openForm(tenant)}>
-                  <Pencil /> {tCommon('action.edit')}
-                </Button>
+                <RowAction onClick={() => openForm(tenant)} icon={<Pencil />} label={tCommon('action.edit')} />
               )}
               {tenant.can.delete && (
-                <Button size="sm" variant="danger" onClick={() => openDelete(tenant)}>
-                  <Trash2 /> {tCommon('action.delete')}
-                </Button>
+                <RowAction variant="danger" onClick={() => openDelete(tenant)} icon={<Trash2 />} label={tCommon('action.delete')} />
               )}
             </>
           )}

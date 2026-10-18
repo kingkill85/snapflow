@@ -1,7 +1,7 @@
 import { type Locator, type Page } from '@playwright/test'
 
 import { admin } from '../env'
-import { type Attribute, expect, nav, row, test, unique, uniqueKey } from '../fixtures'
+import { chooseLanguage, chooseOption, expect, navigate, optionTexts, row, test, type Attribute, unique, uniqueKey } from '../fixtures'
 
 // Product types and their attribute schemas (step 1b): the list, the schema
 // editor and who may do what. Product types are global and other specs run in
@@ -26,7 +26,7 @@ async function addAttribute(section: Locator, n: number, fields: { key: string; 
   await keyOf(attribute).fill(fields.key)
   await attribute.getByLabel('Label (English)').fill(fields.en)
   if (fields.de) await attribute.getByLabel('Label (German)').fill(fields.de)
-  if (fields.type) await attribute.getByLabel('Type', { exact: true }).selectOption({ label: fields.type })
+  if (fields.type) await chooseOption(attribute.getByLabel('Type', { exact: true }), fields.type)
   return attribute
 }
 
@@ -67,7 +67,7 @@ test('an admin creates a product type with every kind of attribute, reopens and 
   await a.getByLabel('Minimum', { exact: true }).fill('0')
   await a.getByLabel('Maximum', { exact: true }).fill('12.5')
   await a.getByLabel('Unit').fill('W')
-  await a.getByLabel('Set per').selectOption({ label: 'Variant' })
+  await chooseOption(a.getByLabel('Set per'), 'Variant')
   // Whole number.
   a = await addAttribute(attrs, 3, { key: 'width_te', en: 'Width', type: 'Whole number' })
   await a.getByLabel('Minimum', { exact: true }).fill('1')
@@ -78,17 +78,17 @@ test('an admin creates a product type with every kind of attribute, reopens and 
   await expect(card(attrs, 4).getByLabel('Minimum', { exact: true })).toHaveCount(0)
   // Choice with options, per variant.
   a = await addAttribute(attrs, 5, { key: 'colour', en: 'Colour', type: 'Choice' })
-  await a.getByLabel('Set per').selectOption({ label: 'Variant' })
+  await chooseOption(a.getByLabel('Set per'), 'Variant')
   await addOption(a, 1, 'white', 'White', 'Weiß')
   await addOption(a, 2, 'black', 'Black')
   // List of choices.
   a = await addAttribute(attrs, 6, { key: 'protocols', en: 'Protocols', type: 'List' })
-  await a.getByLabel('Item type').selectOption({ label: 'Choice' })
+  await chooseOption(a.getByLabel('Item type'), 'Choice')
   await addOption(a, 1, 'knx', 'KNX')
   await addOption(a, 2, 'zigbee', 'Zigbee')
   // List of texts.
   a = await addAttribute(attrs, 7, { key: 'tags', en: 'Tags', type: 'List' })
-  await expect(a.getByLabel('Item type')).toHaveValue('text')
+  await expect(a.getByLabel('Item type')).toHaveText('Text')
   await a.getByLabel('Maximum items').fill('5')
   await expect(a.getByRole('group', { name: 'Options' })).toHaveCount(0)
 
@@ -324,13 +324,13 @@ test('leaving the editor with unsaved changes asks first', async ({ page, api })
   // Nothing changed: no question.
   await page.goto(`${listPath}/${type.id}`)
   await expect(basics(page).getByLabel('Key')).toHaveValue(type.key)
-  await nav(page).getByRole('link', { name: 'Function types' }).click()
+  await navigate(page, 'Catalog', 'Function types')
   await expect(page.getByRole('heading', { name: 'Function types', level: 1 })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.goto(`${listPath}/${type.id}`)
   await basics(page).getByLabel('Name (English)').fill('Unsaved name')
-  await nav(page).getByRole('link', { name: 'Function types' }).click()
+  await navigate(page, 'Catalog', 'Function types')
   const confirm = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
   await expect(confirm).toBeVisible()
   await confirm.getByRole('button', { name: 'Stay' }).click()
@@ -452,7 +452,7 @@ for (const role of ['user', 'tenant_admin'] as const) {
     const page = await sessionFor(account)
 
     await page.goto('/')
-    await nav(page).getByRole('link', { name: 'Product types' }).click()
+    await navigate(page, 'Catalog', 'Product types')
     await expect(page.getByRole('heading', { name: 'Product types', level: 1 })).toBeVisible()
     await expect(row(page, type.key)).toContainText(type.name.en)
     await expect(page.getByRole('link', { name: 'New product type' })).toHaveCount(0)
@@ -506,7 +506,7 @@ test('the editor in German', async ({ page, api }) => {
   })
   await page.goto(`${listPath}/${type.id}`)
   await expect(basics(page).getByLabel('Key')).toHaveValue(type.key)
-  await page.getByLabel('Language').selectOption({ label: 'Deutsch' })
+  await chooseLanguage(page, 'Deutsch')
 
   await expect(page.getByRole('heading', { name: 'Produkttyp bearbeiten', level: 1 })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Grunddaten' }).getByLabel('Schlüssel')).toHaveValue(type.key)
@@ -515,7 +515,7 @@ test('the editor in German', async ({ page, api }) => {
   await expect(first).toContainText('Reichweite · Ganzzahl · m · Pflichtfeld · Variante')
   await expect(attrs.getByRole('button', { name: 'Alle aufklappen' })).toBeVisible()
   await first.getByRole('button', { name: 'Attribut 1 aufklappen' }).click()
-  await expect(first.getByLabel('Typ', { exact: true }).locator('option')).toHaveText(['Text', 'Zahl', 'Ganzzahl', 'Ja/Nein', 'Auswahl', 'Liste'])
+  expect(await optionTexts(first.getByLabel('Typ', { exact: true }))).toEqual(['Text', 'Zahl', 'Ganzzahl', 'Ja/Nein', 'Auswahl', 'Liste'])
   await expect(first.getByRole('button', { name: 'Attribut 1 ganz nach unten verschieben' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Aktualisieren' })).toBeVisible()
   // Nothing changed: the way out is "Back to list" (D84).

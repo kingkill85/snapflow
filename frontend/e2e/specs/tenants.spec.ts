@@ -1,5 +1,5 @@
 import { distributorName } from '../env'
-import { expect, row, signIn, test, unique } from '../fixtures'
+import { expect, navigate, row, signIn, test, unique } from '../fixtures'
 
 // Admin: tenant management.
 test.beforeEach(async ({ page }) => {
@@ -87,7 +87,7 @@ test('deleting a partner tenant deletes its users', async ({ page, api }) => {
   await expect(dialog).toBeHidden()
   await expect(row(page, tenant.name)).toHaveCount(0)
 
-  await page.getByRole('navigation').getByRole('link', { name: 'Users' }).click()
+  await navigate(page, 'Administration', 'Users')
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
   await expect(page.getByRole('row').nth(1)).toBeVisible()
   for (const user of users) await expect(row(page, user.email)).toHaveCount(0)

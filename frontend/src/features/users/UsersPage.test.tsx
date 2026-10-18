@@ -7,6 +7,7 @@ import type { Tenant, User } from '@/api/generated/model'
 import { adminMe, tenantAdminMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
+import { chooseOption, optionTexts } from '@/test/select'
 
 import { UsersPage } from './UsersPage'
 
@@ -88,7 +89,7 @@ describe('UsersPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByLabelText('Tenant')).not.toBeInTheDocument()
     const role = within(dialog).getByLabelText('Role')
-    expect(within(role).getAllByRole('option').map((o) => o.textContent)).toEqual(['Tenant admin', 'User'])
+    expect(await optionTexts(u, role)).toEqual(['Tenant admin', 'User'])
 
     await u.type(within(dialog).getByLabelText('Email'), 'new@acme.example')
     await u.type(within(dialog).getByLabelText('Password'), 'a-long-password')
@@ -171,13 +172,12 @@ describe('UsersPage', () => {
     renderWithProviders(<UsersPage />, { me: adminMe })
 
     const filter = await screen.findByRole('combobox', { name: 'Tenant' })
-    await screen.findByRole('option', { name: 'Beta' })
-    await u.selectOptions(filter, beta.id)
+    await chooseOption(u, filter, 'Beta')
 
     await waitFor(() => expect(requested).toContain(`?tenantId=${beta.id}`))
     await u.click((await screen.findAllByRole('button', { name: /new user/i }))[0])
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByLabelText('Tenant')).toHaveValue(beta.id)
+    expect(within(dialog).getByLabelText('Tenant')).toHaveTextContent('Beta')
   })
 
   it('keeps the password when it is left empty on edit', async () => {
@@ -214,7 +214,10 @@ describe('UsersPage', () => {
     const u = userEvent.setup()
     renderWithProviders(<UsersPage />, { me: adminMe })
 
+    // The tenants have loaded.
+    await u.click(await screen.findByRole('combobox', { name: 'Tenant' }))
     await screen.findByRole('option', { name: 'Acme' })
+    await u.keyboard('{Escape}')
     await u.click((await screen.findAllByRole('button', { name: /new user/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await u.type(within(dialog).getByLabelText('Email'), 'new@acme.example')

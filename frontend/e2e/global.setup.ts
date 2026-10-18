@@ -8,6 +8,6 @@ setup('sign in as admin', async ({ page }) => {
   await page.getByLabel('Email').fill(admin.email)
   await page.getByLabel('Password').fill(admin.password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: /^Account: / })).toBeVisible()
   await page.context().storageState({ path: adminStorageState })
 })

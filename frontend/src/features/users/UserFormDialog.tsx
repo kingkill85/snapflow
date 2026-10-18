@@ -16,7 +16,7 @@ import {
   ErrorMessage,
   Field,
   FormDialog,
-  SelectField,
+  FormSelectField,
   setApiFieldErrors,
   TextLink,
   useFieldError,
@@ -115,19 +115,21 @@ export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenan
       <Field label={t('field.email')} type="email" autoComplete="off" error={fieldError(errors.email?.message)} {...form.register('email')} />
       <Field label={t('field.fullName')} autoComplete="off" error={fieldError(errors.fullName?.message)} {...form.register('fullName')} />
       {!isSelf && (
-        <SelectField
+        <FormSelectField
+          control={form.control}
+          name="role"
           label={t('field.role')}
           options={me.assignableRoles.map((r) => ({ value: r, label: tCommon(`role.${r}`) }))}
           error={fieldError(errors.role?.message)}
-          {...form.register('role')}
         />
       )}
       {showTenant && (
-        <SelectField
+        <FormSelectField
+          control={form.control}
+          name="tenantId"
           label={t('field.tenant')}
           options={tenants.map((tenant) => ({ value: tenant.id, label: tenant.name }))}
           error={fieldError(errors.tenantId?.message)}
-          {...form.register('tenantId')}
         />
       )}
       {isSelf ? (

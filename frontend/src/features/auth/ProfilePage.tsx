@@ -4,16 +4,14 @@ import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
 import { z } from 'zod'
 
-import { useChangePassword, useLogoutAll, useUpdateMe } from '@/api/generated/auth/auth'
+import { useChangePassword, useUpdateMe } from '@/api/generated/auth/auth'
 import { getListUsersQueryKey } from '@/api/generated/users/users'
 import { useMe, useSetMe } from '@/app/session'
 import {
   apiFields,
   Button,
-  ConfirmDialog,
   errorKey,
   ErrorMessage,
   Field,
@@ -23,6 +21,8 @@ import {
   setApiFieldErrors,
   useFieldError,
 } from '@/components/ui'
+
+import { SignOutEverywhereDialog } from './SignOutEverywhereDialog'
 
 const detailsSchema = z.object({
   fullName: z.string().trim().max(200, errorKey('validation.too_long', { max: 200 })),
@@ -162,42 +162,14 @@ function PasswordForm() {
 
 function Sessions() {
   const { t } = useTranslation('auth')
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const logoutAll = useLogoutAll()
   const [confirming, setConfirming] = useState(false)
-
-  const open = () => {
-    logoutAll.reset()
-    setConfirming(true)
-  }
-
-  const signOutEverywhere = async () => {
-    try {
-      await logoutAll.mutateAsync()
-    } catch {
-      return // shown by ErrorMessage via logoutAll.error
-    }
-    // This session ended too: forget everything cached for this user.
-    queryClient.clear()
-    void navigate('/login', { replace: true })
-  }
 
   return (
     <Section title={t('profile.sessions')} description={t('profile.sessionsDescription')}>
-      <Button variant="secondary" onClick={open}>
+      <Button variant="secondary" onClick={() => setConfirming(true)}>
         <LogOut /> {t('profile.signOutEverywhere')}
       </Button>
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={t('profile.signOutEverywhere')}
-        message={t('profile.signOutEverywhereMessage')}
-        confirmLabel={t('profile.signOutEverywhere')}
-        pending={logoutAll.isPending}
-        onConfirm={() => void signOutEverywhere()}
-        error={<ErrorMessage error={logoutAll.error} />}
-      />
+      <SignOutEverywhereDialog open={confirming} onOpenChange={setConfirming} />
     </Section>
   )
 }

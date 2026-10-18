@@ -9,6 +9,10 @@ import { RouterProvider } from 'react-router/dom'
 
 import { createQueryClient } from './app/queryClient'
 import { router } from './app/router'
+import { initTheme } from './lib/theme'
+
+// The remembered colour theme, before the first paint.
+initTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

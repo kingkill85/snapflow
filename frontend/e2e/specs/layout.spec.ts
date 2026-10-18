@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 import { type Page } from '@playwright/test'
 
-import { expect, test, unique } from '../fixtures'
+import { expect, test, unique, uniqueKey } from '../fixtures'
 
 // Key pages at phone and desktop width, in light and dark mode: nothing may
 // overflow the viewport horizontally (tables scroll inside their own box).
@@ -24,9 +24,76 @@ const viewports = [
   { name: 'desktop', size: { width: 1280, height: 800 } },
 ]
 
+// Every list page on a desktop screen (1280 px and wider), in English and the
+// longer German: all columns incl. the row actions fit, the table box does not
+// scroll (D95).
+const listPages = [
+  { name: 'products', path: '/catalog/products', heading: { en: 'Products', de: 'Produkte' } },
+  { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Product types', de: 'Produkttypen' } },
+  { name: 'function-types', path: '/catalog/function-types', heading: { en: 'Function types', de: 'Funktionstypen' } },
+  { name: 'users', path: '/admin/users', heading: { en: 'Users', de: 'Benutzer' } },
+  { name: 'tenants', path: '/admin/tenants', heading: { en: 'Tenants', de: 'Mandanten' } },
+  { name: 'roles', path: '/admin/roles', heading: { en: 'Roles', de: 'Rollen' } },
+]
+
+/** How far each table box on the page scrolls horizontally (0 = everything fits). */
+async function tableOverflows(page: Page): Promise<number[]> {
+  return page.locator('div:has(> table)').evaluateAll((boxes) => boxes.map((box) => box.scrollWidth - box.clientWidth))
+}
+
 async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow, 'page is wider than the viewport').toBeLessThanOrEqual(0)
+  // The header keeps everything on one line without spilling over (D97).
+  const header = await page.getByRole('banner').evaluateAll((els) => els.map((el) => [el.scrollWidth - el.clientWidth, el.getBoundingClientRect().height]))
+  for (const [spill, height] of header) {
+    expect(spill, 'header content is wider than the header').toBeLessThanOrEqual(0)
+    expect(height, 'header wraps onto a second line').toBeLessThanOrEqual(57)
+  }
+}
+
+for (const width of [1280, 1440, 1920]) {
+  for (const lang of ['en', 'de'] as const) {
+    test.describe(`list pages at ${width} px, ${lang}`, () => {
+      test.use({ viewport: { width, height: 900 } })
+
+      test('every column fits without scrolling the table', async ({ page, api }) => {
+        // Long names, a product with problems, an unavailable product: the widest rows.
+        await api.createUser({ fullName: 'Maximilian Alexander Mustermann-Schmidt' })
+        await api.createFunctionType(uniqueKey('lighting'), unique('Lighting control with presence detection'))
+        await api.createTenant(unique('Elektrotechnik Mustermann-Schmidt GmbH & Co. KG'))
+        const attribute = { key: 'nominal_power', label: { en: 'Nominal power' }, type: 'number', unit: 'W', scope: 'product' } as const
+        const type = await api.createProductType({
+          name: { en: unique('Universal dimmer actuator'), de: unique('Universal-Dimmaktor') },
+          color: '#1f6feb',
+          attributes: [attribute],
+        })
+        await api.createProduct({
+          productTypeId: type.id,
+          modelNumber: unique('M485/GW-ZB.10').replace(/\s+/g, '-'),
+          name: { en: 'Universal dimmer actuator, 4-fold, with manual operation and status LEDs', de: 'Universal-Dimmaktor, 4-fach, mit Handbedienung und Status-LEDs' },
+        })
+        // Required afterwards: the product misses the value, a problem badge in the status cell.
+        await api.updateProductType(type.id, { attributes: [{ ...attribute, required: true }] })
+        await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
+
+        for (const p of listPages) {
+          await page.goto(p.path === '/catalog/products' ? `${p.path}?type=${type.id}` : p.path)
+          await expect(page.getByRole('heading', { name: p.heading[lang], level: 1 })).toBeVisible()
+          await expect(page.getByRole('table')).toBeVisible()
+          await expectNoHorizontalOverflow(page)
+          for (const colorScheme of ['light', 'dark'] as const) {
+            // Reloaded, so everything is painted in the scheme from the start.
+            await page.emulateMedia({ colorScheme })
+            await page.reload()
+            await expect(page.getByRole('table')).toBeVisible()
+            await page.screenshot({ path: `e2e/screenshots/list-${p.name}-${width}-${lang}-${colorScheme}.png`, fullPage: true })
+          }
+          expect(await tableOverflows(page), `${p.name}: the table scrolls`).toEqual([0])
+        }
+      })
+    })
+  }
 }
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -45,7 +112,24 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await page.screenshot({ path: `e2e/screenshots/${p.name}-${viewport.name}-${colorScheme}.png`, fullPage: true })
         }
 
+        // The navigation: section menus and the user menu from 768 px, a side sheet on phones.
         await page.goto('/admin/users')
+        if (viewport.size.width < 768) {
+          await page.getByRole('button', { name: 'Menu' }).click()
+          await expect(page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Products' })).toBeVisible()
+          await page.screenshot({ path: `e2e/screenshots/nav-sheet-${viewport.name}-${colorScheme}.png` })
+          await page.keyboard.press('Escape')
+        } else {
+          await page.getByRole('banner').getByRole('button', { name: 'Catalog' }).click()
+          await expect(page.getByRole('menuitem', { name: 'Products' })).toBeVisible()
+          await page.screenshot({ path: `e2e/screenshots/nav-menu-${viewport.name}-${colorScheme}.png` })
+          await page.keyboard.press('Escape')
+          await page.getByRole('banner').getByRole('button', { name: /^Account: / }).click()
+          await expect(page.getByRole('menuitemradio', { name: 'Dark' })).toBeVisible()
+          await page.screenshot({ path: `e2e/screenshots/user-menu-${viewport.name}-${colorScheme}.png` })
+          await page.keyboard.press('Escape')
+        }
+
         await page.getByRole('button', { name: 'New user' }).click()
         const dialog = page.getByRole('dialog', { name: 'New user' })
         await dialog.getByRole('button', { name: 'Create' }).click()

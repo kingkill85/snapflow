@@ -1,5 +1,5 @@
 import { admin } from '../env'
-import { expect, nav, row, test, uniqueEmail } from '../fixtures'
+import { expect, navEntries, navigate, optionTexts, row, test, uniqueEmail } from '../fixtures'
 
 // What a tenant admin sees and may do.
 test('a partner tenant admin manages only their own tenant', async ({ api, sessionFor }) => {
@@ -10,9 +10,9 @@ test('a partner tenant admin manages only their own tenant', async ({ api, sessi
 
   const page = await sessionFor(tenantAdmin)
   await page.goto('/')
-  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Product types', 'Products', 'Users', 'Roles'])
+  expect(await navEntries(page)).toEqual({ Catalog: ['Products', 'Product types', 'Function types'], Administration: ['Users', 'Roles'] })
 
-  await nav(page).getByRole('link', { name: 'Users' }).click()
+  await navigate(page, 'Administration', 'Users')
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
   await expect(page.getByRole('row')).toHaveCount(3) // header, the tenant admin, the colleague
   await expect(row(page, tenantAdmin.email)).toBeVisible()
@@ -25,7 +25,7 @@ test('a partner tenant admin manages only their own tenant', async ({ api, sessi
   // Creating a user: only roles up to their own, always in their tenant.
   await page.getByRole('button', { name: 'New user' }).click()
   const dialog = page.getByRole('dialog', { name: 'New user' })
-  await expect(dialog.getByLabel('Role').locator('option')).toHaveText(['Tenant admin', 'User'])
+  expect(await optionTexts(dialog.getByLabel('Role'))).toEqual(['Tenant admin', 'User'])
   await expect(dialog.getByLabel('Tenant')).toHaveCount(0)
   const email = uniqueEmail('colleague')
   await dialog.getByLabel('Email').fill(email)
@@ -58,5 +58,5 @@ test('a tenant admin has no access to tenants', async ({ api, sessionFor }) => {
   await page.goto('/admin/tenants')
   await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible()
   await expect(page.getByText('You do not have permission to see this page.')).toBeVisible()
-  await expect(nav(page).getByRole('link', { name: 'Tenants' })).toHaveCount(0)
+  expect(await navEntries(page)).toEqual({ Catalog: ['Products', 'Product types', 'Function types'], Administration: ['Users', 'Roles'] })
 })

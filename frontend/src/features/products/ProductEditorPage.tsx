@@ -35,10 +35,11 @@ import {
   Notice,
   Page,
   Section,
-  SelectField,
+  FormSelectField,
   setApiFieldErrors,
   TextareaField,
   toFieldErrors,
+  TypeBadge,
   useFieldError,
   useUnsavedChanges,
 } from '@/components/ui'
@@ -310,7 +311,10 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
     ...(loaded ? [] : [{ value: '', label: t('field.chooseType') }]),
     ...types
       .filter((pt) => pt.isActive || pt.id === loaded?.productTypeId)
-      .map((pt) => ({ value: pt.id, label: pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) }) })),
+      .map((pt) => {
+        const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
+        return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+      }),
   ]
   const typeChanged = loaded !== null && productTypeId !== loaded.productTypeId
 
@@ -319,11 +323,12 @@ function ProductForm({ item, types, listSearch, onReload, onSaved, onDirtyChange
       <Fieldset disabled={readOnly}>
         <Section title={t('section.basics')}>
           <div className="grid gap-4 sm:grid-cols-3">
-            <SelectField
+            <FormSelectField
+              control={form.control}
+              name="productTypeId"
               label={t('field.productType')}
               options={typeOptions}
               error={fieldError(errors.productTypeId?.message)}
-              {...form.register('productTypeId')}
             />
             <Field
               label={t('field.modelNumber')}

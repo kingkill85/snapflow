@@ -9,6 +9,7 @@ import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { chooseOption } from '@/test/select'
 
 import { ProductTypeEditorPage } from './ProductTypeEditorPage'
 
@@ -113,9 +114,9 @@ describe('ProductTypeEditorPage', () => {
     // Bounds of a text attribute are lengths; an enum has none.
     expect(within(row).getByLabelText('Maximum length')).toBeInTheDocument()
     await u.type(within(row).getByLabelText('Maximum length'), '20')
-    await u.selectOptions(within(row).getByLabelText('Type'), 'enum')
+    await chooseOption(u, within(row).getByLabelText('Type'), 'Choice')
     expect(within(row).queryByLabelText('Maximum length')).not.toBeInTheDocument()
-    await u.selectOptions(within(row).getByLabelText('Set per'), 'variant')
+    await chooseOption(u, within(row).getByLabelText('Set per'), 'Variant')
     await u.click(within(row).getByLabelText('Required'))
     await u.type(within(row).getByLabelText('Unit'), ' ')
 
@@ -178,16 +179,16 @@ describe('ProductTypeEditorPage', () => {
 
     await expandAll(u, attributes)
     expect(own(width, 'Key')).toHaveValue('width_te')
-    expect(within(width).getByLabelText('Type')).toHaveValue('integer')
+    expect(within(width).getByLabelText('Type')).toHaveTextContent('Whole number')
     expect(within(width).getByLabelText('Minimum')).toHaveValue('1')
     expect(within(width).getByLabelText('Maximum')).toHaveValue('12')
     expect(within(width).getByLabelText('Unit')).toHaveValue('TE')
     expect(within(width).getByLabelText('Required')).toBeChecked()
     const colour = group('Attribute 2', attributes)
-    expect(within(colour).getByLabelText('Set per')).toHaveValue('variant')
+    expect(within(colour).getByLabelText('Set per')).toHaveTextContent('Variant')
     expect(within(group('Option 1', colour)).getByLabelText('Label (German)')).toHaveValue('Weiß')
     const protocols = group('Attribute 3', attributes)
-    expect(within(protocols).getByLabelText('Item type')).toHaveValue('text')
+    expect(within(protocols).getByLabelText('Item type')).toHaveTextContent('Text')
     expect(within(protocols).getByLabelText('Maximum items')).toHaveValue('4')
 
     const instance = instanceRegion()
@@ -372,14 +373,14 @@ describe('ProductTypeEditorPage', () => {
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const row = group('Attribute 1', attributes)
     await u.type(own(row, 'Key'), 'width')
-    await u.selectOptions(within(row).getByLabelText('Type'), 'number')
+    await chooseOption(u, within(row).getByLabelText('Type'), 'Number')
     await u.type(within(row).getByLabelText('Minimum'), '10')
     await u.type(within(row).getByLabelText('Maximum'), '2')
     await u.type(within(row).getByLabelText('Unit'), 'x'.repeat(17))
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const choice = group('Attribute 2', attributes)
     await u.type(own(choice, 'Key'), 'width')
-    await u.selectOptions(within(choice).getByLabelText('Type'), 'enum')
+    await chooseOption(u, within(choice).getByLabelText('Type'), 'Choice')
 
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
@@ -475,10 +476,10 @@ describe('ProductTypeEditorPage', () => {
     await expandAll(u, attributes)
 
     // integer with min/max -> boolean; enum with options -> text; list of text -> list of enum.
-    await u.selectOptions(within(group('Attribute 1', attributes)).getByLabelText('Type'), 'boolean')
-    await u.selectOptions(within(group('Attribute 2', attributes)).getByLabelText('Type'), 'text')
+    await chooseOption(u, within(group('Attribute 1', attributes)).getByLabelText('Type'), 'Yes/no')
+    await chooseOption(u, within(group('Attribute 2', attributes)).getByLabelText('Type'), 'Text')
     const protocols = group('Attribute 3', attributes)
-    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'enum')
+    await chooseOption(u, within(protocols).getByLabelText('Item type'), 'Choice')
     await u.click(within(protocols).getByRole('button', { name: 'Add option' }))
     await u.type(within(group('Option 1', protocols)).getByLabelText('Key'), 'knx')
     await u.type(within(group('Option 1', protocols)).getByLabelText('Label (English)'), 'KNX')
@@ -508,10 +509,10 @@ describe('ProductTypeEditorPage', () => {
     const attributes = attributesRegion()
     await expandAll(u, attributes)
     const protocols = group('Attribute 3', attributes)
-    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'enum')
+    await chooseOption(u, within(protocols).getByLabelText('Item type'), 'Choice')
     await u.click(within(protocols).getByRole('button', { name: 'Add option' }))
     await u.type(within(group('Option 1', protocols)).getByLabelText('Key'), 'knx')
-    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'text')
+    await chooseOption(u, within(protocols).getByLabelText('Item type'), 'Text')
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 

@@ -7,7 +7,7 @@ import type { Tenant, User } from '@/api/generated/model'
 import { useListTenants } from '@/api/generated/tenants/tenants'
 import { getListUsersQueryKey, useDeleteUser, useListUsers } from '@/api/generated/users/users'
 import { useCan, useMe } from '@/app/session'
-import { Badge, Button, type Column, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, Select } from '@/components/ui'
+import { Badge, Button, type Column, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction, Select } from '@/components/ui'
 
 import { UserFormDialog } from './UserFormDialog'
 
@@ -76,13 +76,13 @@ export function UsersPage() {
   )
 
   return (
-    <Page title={t('title')} description={t('description')} actions={createButton}>
+    <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
       {allTenants && (
         <Select
           aria-label={t('field.tenant')}
           className="max-w-xs"
           value={tenantFilter}
-          onChange={(e) => setTenantFilter(e.target.value)}
+          onValueChange={setTenantFilter}
           options={[{ value: '', label: t('allTenants') }, ...tenantList.map((tenant) => ({ value: tenant.id, label: tenant.name }))]}
         />
       )}
@@ -99,14 +99,10 @@ export function UsersPage() {
           actions={(u) => (
             <>
               {u.can.update && (
-                <Button size="sm" variant="secondary" onClick={() => openForm(u)}>
-                  <Pencil /> {tCommon('action.edit')}
-                </Button>
+                <RowAction onClick={() => openForm(u)} icon={<Pencil />} label={tCommon('action.edit')} />
               )}
               {u.can.delete && (
-                <Button size="sm" variant="danger" onClick={() => openDelete(u)}>
-                  <Trash2 /> {tCommon('action.delete')}
-                </Button>
+                <RowAction variant="danger" onClick={() => openDelete(u)} icon={<Trash2 />} label={tCommon('action.delete')} />
               )}
             </>
           )}

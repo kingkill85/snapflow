@@ -96,7 +96,7 @@ function AttributeControl({ definition: d, value, onChange, error, disabled }: A
           value={text}
           disabled={disabled}
           aria-required={d.required || undefined}
-          onChange={(e) => onChange(e.target.value)}
+          onValueChange={onChange}
           options={[
             { value: '', label: t('notSet') },
             ...options,

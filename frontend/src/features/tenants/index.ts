@@ -6,5 +6,5 @@ export const tenantsFeature: FeatureModule = {
   path: 'admin/tenants',
   element: TenantsPage,
   permission: 'tenants.manage',
-  nav: { section: 'admin', namespace: 'tenants', labelKey: 'title' },
+  nav: { section: 'admin', namespace: 'tenants', labelKey: 'title', order: 2 },
 }

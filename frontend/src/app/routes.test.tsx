@@ -10,7 +10,7 @@ describe('routes', () => {
     renderRoutes(routes, { route: '/settings/users' })
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Account: Ada Admin' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to start page' })).toHaveAttribute('href', '/')
   })
 })

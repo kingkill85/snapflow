@@ -8,7 +8,7 @@ export const productsFeature: FeatureModule = {
   path: 'catalog/products',
   element: ProductsPage,
   permission: 'catalog.read',
-  nav: { section: 'catalog', namespace: 'products', labelKey: 'title' },
+  nav: { section: 'catalog', namespace: 'products', labelKey: 'title', order: 1 },
   pages: [
     { path: 'new', element: ProductEditorPage, permission: 'catalog.write' },
     // Read-only without catalog.write.

@@ -21,8 +21,7 @@
     "type": "Product type",
     "variants": "Variants",
     "price": "Price",
-    "status": "Status",
-    "problems": "Problems"
+    "status": "Status"
   },
   "problems_one": "{{count}} attribute value needs attention",
   "problems_other": "{{count}} attribute values need attention",

@@ -118,7 +118,10 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
   const offered = (results.data?.pages ?? []).flatMap((page) => page.items).filter((r) => r.id !== variant.id && !linked.has(r.id))
   const typeOptions = [
     { value: '', label: t('allTypes') },
-    ...types.map((pt) => ({ value: pt.id, label: pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) }) })),
+    ...types.map((pt) => {
+      const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
+      return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+    }),
   ]
 
   const change = (next: Item[]) => {
@@ -189,7 +192,7 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
             />
-            <SelectField label={t('addons.typeFilter')} value={typeFilter} options={typeOptions} onChange={(e) => setTypeFilter(e.target.value)} />
+            <SelectField label={t('addons.typeFilter')} value={typeFilter} options={typeOptions} onValueChange={setTypeFilter} />
           </div>
           <div role="region" aria-label={t('addons.results')} className="space-y-2">
             {results.isError ? (
