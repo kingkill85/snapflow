@@ -42,6 +42,12 @@ The top priority is that new features, importers and exporters are easy to add i
 - **Disabled accounts**: with the *right* password, a disabled user (or a user of a disabled tenant) gets 403 `auth.account_disabled`, so they know to contact their admin (as in v1, deliberately). With a wrong password the answer is the usual `auth.invalid_credentials`, so the flag does not leak without the password.
 - **Row-level security** arrives in phase 2 with projects, the first tenant-owned business data. Until then tenant isolation is enforced in the services.
 
+## Catalog: product types and attribute schemas
+
+- **Product types** (`features/producttypes`) are the kinds of device ("Dimmer actuator", "Gateway"). They replace SnapFlow 1's categories and item types; the old item type becomes an attribute such as `bus_system` (D14). Each has a key (lower snake case, unique), a translatable name and description, a position in one global catalog order (`PUT /api/product-types/order` with every id, D24), an active flag (inactive types are hidden from lists unless `includeInactive=true`) and two attribute schemas stored as jsonb: `attributes` (values on the product, or per variant with `scope: "variant"`) and `instanceAttributes` (per installed unit, used from phase 2/3). A type that products use cannot be deleted (`product_type.in_use`, 409); deactivate it instead.
+- **Attribute schemas** (`platform/attrschema`, pure Go) are configuration, never migrations. A definition has a key, label, optional description and unit (display only, D20), a type (`text`, `number`, `integer`, `boolean`, `enum`, `list` of `text`/`number`/`integer`/`enum`), `required`, optional `min`/`max` (value range; length for text; item count for lists) and `options` for enums. `ValidateSchema` checks and normalises a schema when it is saved (D21); `ValidateValues` checks and normalises the values of a product, variant or unit against it (D22) and is the one implementation products (1c), the import (1d) and instances use.
+- **Errors**: all problems of a save come back in one 422 with per-field codes (`attribute.*`, `product_type.*`) at exact locations such as `body.attributes[2].options[0].key`, so the editor shows each next to its row (D23).
+
 ## Extension points
 
 | Extension | Contract |
@@ -61,7 +67,7 @@ All 16 recommendations were accepted, including: smart sizing (resize all instan
 ## Phases
 
 0. Foundation: inventory, skeleton, CI, design system, i18n ← **done with this repo's first commit**
-1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types, attribute schemas, schema-driven import
+1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types and attribute schemas ← **done (backend)**; products, schema-driven import
 2. Projects & floorplan: editor, zones, placements, BOM, proposals (DOCX)
 3. Distribution board: board editor, bus load, loads and channel assignment
 4. MCP & cutover: MCP server, data migration from SnapFlow 1, go-live

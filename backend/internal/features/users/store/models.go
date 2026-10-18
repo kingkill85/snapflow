@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
@@ -18,6 +19,19 @@ type FunctionType struct {
 	Name      i18n.Text
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type ProductType struct {
+	ID                 uuid.UUID
+	Key                string
+	Name               i18n.Text
+	Description        *i18n.Text
+	SortOrder          int32
+	IsActive           bool
+	Attributes         attrschema.Schema
+	InstanceAttributes attrschema.Schema
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type Session struct {

@@ -14,3 +14,18 @@ type Text map[string]string
 func (t Text) Valid() bool {
 	return strings.TrimSpace(t[DefaultLocale]) != ""
 }
+
+// Trimmed returns t with values trimmed and blank locales removed; nil stays
+// nil.
+func (t Text) Trimmed() Text {
+	if t == nil {
+		return nil
+	}
+	out := Text{}
+	for lang, v := range t {
+		if v = strings.TrimSpace(v); v != "" {
+			out[lang] = v
+		}
+	}
+	return out
+}

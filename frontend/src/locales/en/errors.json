@@ -1,47 +1,80 @@
 {
-  "server": { "error": "Something went wrong. Please try again.", "database_unavailable": "The database is not reachable.", "busy": "The server is busy. Please try again in a moment." },
-  "network": { "unavailable": "No connection to the server." },
-  "request": { "not_found": "Not found.", "conflict": "This conflicts with existing data.", "bad": "The request was invalid.", "failed": "The request failed." },
+  "attribute": {
+    "item_type_required": "Choose the type of the list items.",
+    "key_duplicate": "This key is used twice.",
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
+    "label_required": "An English label is required.",
+    "option": "This is not one of the allowed options.",
+    "option_key_duplicate": "This option key is used twice.",
+    "options_required": "Add at least one option.",
+    "range": "This value is outside the allowed range.",
+    "range_invalid": "This limit is invalid. Lengths and counts are whole numbers from 0, and the minimum must not be above the maximum.",
+    "required": "This value is required.",
+    "scope_not_allowed": "Instance attributes have no scope.",
+    "type": "This value has the wrong type.",
+    "unknown": "This attribute does not exist for this product type."
+  },
   "auth": {
-    "required": "Please log in.",
+    "account_disabled": "Your account is disabled. Please contact your administrator.",
     "forbidden": "You are not allowed to do this.",
     "invalid_credentials": "Email or password is wrong.",
-    "account_disabled": "Your account is disabled. Please contact your administrator.",
+    "required": "Please log in.",
     "too_many_attempts": "Too many attempts. Try again in {{seconds}} seconds.",
     "wrong_password": "The current password is wrong."
   },
-  "validation": {
-    "failed": "Please check the highlighted fields.",
-    "required": "This field is required.",
-    "invalid": "This value is invalid.",
-    "too_long": "This value is too long.",
-    "email": "Enter a valid email address.",
-    "password_mismatch": "The passwords do not match."
-  },
   "function_type": {
-    "not_found": "This function type no longer exists.",
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
-    "key_format": "Use lower case letters, digits and underscores, starting with a letter."
+    "not_found": "This function type no longer exists."
+  },
+  "network": {
+    "unavailable": "No connection to the server."
+  },
+  "product_type": {
+    "in_use": "This product type is still used by products. Deactivate it instead.",
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
+    "key_taken": "The key \"{{key}}\" is already used.",
+    "not_found": "This product type no longer exists.",
+    "order_mismatch": "The product types have changed in the meantime. Please reload and try again."
+  },
+  "request": {
+    "bad": "The request was invalid.",
+    "conflict": "This conflicts with existing data.",
+    "failed": "The request failed.",
+    "not_found": "Not found."
+  },
+  "server": {
+    "busy": "The server is busy. Please try again in a moment.",
+    "database_unavailable": "The database is not reachable.",
+    "error": "Something went wrong. Please try again."
   },
   "tenant": {
-    "not_found": "This tenant no longer exists.",
+    "distributor_protected": "The distributor tenant cannot be deactivated or deleted.",
     "name_taken": "A tenant named \"{{name}}\" already exists.",
-    "distributor_protected": "The distributor tenant cannot be deactivated or deleted."
+    "not_found": "This tenant no longer exists."
   },
   "user": {
-    "not_found": "This user no longer exists.",
+    "admin_requires_distributor": "Admins must belong to the distributor tenant.",
     "email_taken": "The email address {{email}} is already used.",
+    "last_admin": "At least one active admin must remain.",
+    "not_found": "This user no longer exists.",
+    "own_deactivation": "You cannot deactivate yourself.",
+    "own_delete": "You cannot delete yourself.",
+    "own_password": "Use your profile to change your own password.",
+    "own_role": "You cannot change your own role.",
+    "own_tenant": "You cannot move yourself to another tenant.",
     "password_too_short": "The password needs at least 8 characters.",
     "role_forbidden": "You cannot assign this role.",
     "target_forbidden": "You cannot change a user with a higher role than yours.",
     "tenant_forbidden": "You cannot manage users of another tenant.",
-    "tenant_not_found": "The selected tenant does not exist.",
-    "admin_requires_distributor": "Admins must belong to the distributor tenant.",
-    "own_role": "You cannot change your own role.",
-    "own_deactivation": "You cannot deactivate yourself.",
-    "own_tenant": "You cannot move yourself to another tenant.",
-    "own_delete": "You cannot delete yourself.",
-    "last_admin": "At least one active admin must remain.",
-    "own_password": "Use your profile to change your own password."
+    "tenant_not_found": "The selected tenant does not exist."
+  },
+  "validation": {
+    "email": "Enter a valid email address.",
+    "failed": "Please check the highlighted fields.",
+    "invalid": "This value is invalid.",
+    "password_mismatch": "The passwords do not match.",
+    "required": "This field is required.",
+    "too_long": "This value is too long."
   }
 }

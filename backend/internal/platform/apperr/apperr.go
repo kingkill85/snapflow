@@ -89,6 +89,17 @@ func Invalid(location, code, detail string) *Error {
 	}
 }
 
+// Validation reports several field validation errors at once, so a form can
+// show all of them in one round trip.
+func Validation(fields ...FieldError) *Error {
+	return &Error{
+		Status: http.StatusUnprocessableEntity,
+		Code:   "validation.failed",
+		Detail: "validation failed",
+		Fields: fields,
+	}
+}
+
 // Install replaces huma's error constructor so that framework errors
 // (validation, unknown routes, panics) use the same format and codes.
 func Install() {

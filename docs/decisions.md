@@ -4,7 +4,11 @@ Every product or design decision taken while building SnapFlow 2, newest step la
 
 ## Open questions
 
-None right now. New ones are added here with the assumption the code follows until they are answered.
+New ones are added here with the assumption the code follows until they are answered.
+
+| # | Step | Question | Assumption the code follows |
+| --- | --- | --- | --- |
+| Q1 | 1b/1c | What happens to existing product values when an admin changes a product type's schema (removes an attribute, makes one required, narrows a range, removes an option)? | 1b saves schema changes without looking at products (there are none yet). 1c re-validates a product's values whenever the product is saved, so stale values surface as field errors on the next edit; schema saves are not blocked |
 
 ## Decided
 
@@ -31,3 +35,7 @@ None right now. New ones are added here with the assumption the code follows unt
 | D19 | 1c | Catalog base currency is USD; projects store their own currency and exchange rate (architecture.md) | SnapFlow 1 prices are USD, so migrated prices and BOM snapshots stay exact | Claude |
 | D20 | 1b | Metric only; attribute units are display text without conversion | The board designer's feet display is the only imperial use and can be a view option later | Claude |
 | D21 | 1a | End-to-end tests with Playwright in Chromium (from Nix, version-pinned to nixpkgs' playwright-driver), against a production build of the frontend, its own backend and a database recreated on every run (`make e2e`, CI job `e2e`) | Same browsers locally and in CI without downloads; the dev database can never be touched; no dev-server reloads mid-test | Claude |
+| D22 | 1b | Saving a schema drops the fields that do not apply to an attribute's type (options of a text attribute, min/max of a boolean, item type of a non-list) instead of rejecting them; product attributes without a scope get "product". Lengths and item counts are whole numbers from 0, integer bounds are whole | The editor can keep hidden inputs when the type changes, and stored schemas stay clean | Claude |
+| D23 | 1b | Attribute values: blank text, blank enum and empty lists count as "not set"; a list of enum options is a set (repeats collapse); text length counts characters; unknown and wrong-scope keys are rejected | One rule for the editor, the import (1d) and instances; typos in imports must not be stored silently | Claude |
+| D24 | 1b | Every validation problem of a product type (key, name, every attribute row, both schemas) is reported in one response, each at its exact location (e.g. `body.attributes[2].options[0].key`) | Long schemas would otherwise need one save per mistake | Claude |
+| D25 | 1b | The catalog order is one order over active and inactive product types; reordering sends the complete list | Reactivating a type puts it back where it was; a complete list detects concurrent changes (`product_type.order_mismatch`) | Claude |

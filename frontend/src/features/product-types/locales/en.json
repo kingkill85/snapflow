@@ -1,0 +1,14 @@
+{
+  "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
+  "deleteTitle": "Delete product type",
+  "edit": "Edit product type",
+  "empty": "No product types yet.",
+  "field": {
+    "key": "Key",
+    "name": "Name",
+    "nameDe": "Name (German)",
+    "nameEn": "Name (English)"
+  },
+  "new": "New product type",
+  "title": "Product types"
+}

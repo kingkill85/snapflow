@@ -17,6 +17,120 @@
         ],
         "type": "object"
       },
+      "AttributeDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Help text per locale; if set, \"en\" is required",
+            "type": "object"
+          },
+          "itemType": {
+            "description": "Type of a list's items",
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "enum"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case, unique within the schema",
+            "examples": [
+              "width_te"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale; \"en\" is required",
+            "type": "object"
+          },
+          "max": {
+            "description": "number/integer: largest value; text: longest length; list: most items",
+            "format": "double",
+            "type": "number"
+          },
+          "min": {
+            "description": "number/integer: smallest value; text: shortest length; list: fewest items",
+            "format": "double",
+            "type": "number"
+          },
+          "options": {
+            "description": "Allowed values of an enum, or of a list of enums",
+            "items": {
+              "$ref": "#/components/schemas/AttributeOption"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "required": {
+            "description": "A value must be set (default false)",
+            "type": "boolean"
+          },
+          "scope": {
+            "description": "Product attributes only: set per product (default) or per variant",
+            "enum": [
+              "product",
+              "variant"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "boolean",
+              "enum",
+              "list"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "description": "Display only, e.g. TE, mA, W",
+            "examples": [
+              "TE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "type"
+        ],
+        "type": "object"
+      },
+      "AttributeOption": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "Stored value, lower snake case",
+            "examples": [
+              "zigbee"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "type": "object"
+      },
       "Error": {
         "additionalProperties": false,
         "properties": {
@@ -342,6 +456,202 @@
           "tenants.access_all"
         ],
         "type": "string"
+      },
+      "ProductType": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductType.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "description": "Values stored on each product, or on each variant (scope)",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale",
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "instanceAttributes": {
+            "description": "Values per installed unit (bus address, MAC, ...), filled in projects",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "isActive": {
+            "description": "Inactive types are hidden from lists unless asked for",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case",
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale",
+            "type": "object"
+          },
+          "sortOrder": {
+            "description": "Position in the catalog, 1 first",
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "sortOrder",
+          "isActive",
+          "attributes",
+          "instanceAttributes",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProductTypeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductTypeInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale; if set, \"en\" is required",
+            "type": "object"
+          },
+          "instanceAttributes": {
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "isActive",
+          "attributes",
+          "instanceAttributes"
+        ],
+        "type": "object"
+      },
+      "ProductTypeList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductTypeList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductType"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "ProductTypeOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductTypeOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every product type id, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
       },
       "ProfileInput": {
         "additionalProperties": false,
@@ -1125,6 +1435,256 @@
         "summary": "Liveness and database check",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/product-types": {
+      "get": {
+        "description": "In catalog order (sortOrder, then key).",
+        "operationId": "listProductTypes",
+        "parameters": [
+          {
+            "description": "Also list inactive product types",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive product types",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductTypeList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List product types",
+        "tags": [
+          "product-types"
+        ]
+      },
+      "post": {
+        "operationId": "createProductType",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductTypeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductType"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a product type",
+        "tags": [
+          "product-types"
+        ]
+      }
+    },
+    "/api/product-types/order": {
+      "put": {
+        "description": "ids must list every product type (active or not) exactly once; they get sortOrder 1..n. Returns all product types in the new order.",
+        "operationId": "reorderProductTypes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductTypeOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductTypeList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of product types",
+        "tags": [
+          "product-types"
+        ]
+      }
+    },
+    "/api/product-types/{id}": {
+      "delete": {
+        "operationId": "deleteProductType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a product type",
+        "tags": [
+          "product-types"
+        ]
+      },
+      "get": {
+        "operationId": "getProductType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductType"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a product type",
+        "tags": [
+          "product-types"
+        ]
+      },
+      "put": {
+        "operationId": "updateProductType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductTypeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductType"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a product type",
+        "tags": [
+          "product-types"
         ]
       }
     },

@@ -1,0 +1,14 @@
+{
+  "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
+  "deleteTitle": "Produkttyp löschen",
+  "edit": "Produkttyp bearbeiten",
+  "empty": "Noch keine Produkttypen.",
+  "field": {
+    "key": "Schlüssel",
+    "name": "Name",
+    "nameDe": "Name (Deutsch)",
+    "nameEn": "Name (Englisch)"
+  },
+  "new": "Neuer Produkttyp",
+  "title": "Produkttypen"
+}
