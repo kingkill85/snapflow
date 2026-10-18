@@ -27,10 +27,10 @@ Not in phase 2: loads in zones and channel assignment, distribution boards, bus 
 
 **project_versions** (tenant-owned through the project; carry `tenant_id` too, for RLS)
 - `id`, `project_id`, `name` (1–100, unique per project case-insensitively, `project_version.name_taken`), `position` (display order: creation order), `created_at`, `updated_at`, `notes` (≤2000).
-- A new project gets one version; the create request carries its name (`firstVersionName`, required), which the dialog pre-fills with "Version 1" in the UI language.
-- Copy a version: `POST /api/projects/{id}/versions` with `sourceVersionId` → deep copy in one transaction (everything a version owns; in 2a only the version row; 2b–2c extend the copy, each step adds its tables to it and to its test). Without a source: empty version.
+- A new project automatically gets one version, named `V1` (language-neutral; the create request has no version fields) (user, 2026-10-18).
+- A new version is either a full copy of an existing version or a fresh, empty start (user, 2026-10-18): `POST /api/projects/{id}/versions` with `name` and optional `sourceVersionId`. With a source → deep copy in one transaction (everything a version owns; in 2a only the version row; 2b–2c extend the copy, each step adds its tables to it and to its test); without → an empty version. The dialog offers "Copy of" (a version select, default the current version) or "Start empty", copy being the default, and pre-fills the name with the next free `V<n>`.
 - Rename, delete. The last version cannot be deleted (`project_version.last`); delete the project instead.
-- Versions are alternatives of one project (e.g. "Basic", "Premium"); pricing settings per version arrive in 2c.
+- Versions serve both as alternative offers and as rounds of changes; pricing settings per version arrive in 2c.
 
 ### Read-only rules (accepted recommendation: read-only by status plus permission)
 - `projects.write` is needed for any change. A project whose status is `completed` or `cancelled` is read-only: every change to it, its versions and (later) its plans fails with 409 `project.read_only`, except changing the status back to `active` (which needs `projects.write`).
@@ -65,8 +65,8 @@ Not in phase 2: loads in zones and channel assignment, distribution boards, bus 
 ### Frontend (`src/features/projects`)
 - Nav: section "Projects" (first section, D97), page "Projects". The home page links there.
 - **List** (`<Page width="wide">`): search, status filter (Active default, Completed, Cancelled, All), tenant filter for admins; columns number, name, customer, tenant (admins), status badge, versions, updated; row click opens the project; row actions Edit, Delete (D115/D117 rules). Empty state with a "New project" call to action. Phone: cards.
-- **Create / edit dialog** (`FormDialog`, `item: Project | null`): name*, tenant (admins, create and edit), customer section (name, company, email, phone, address), product types (`CheckboxGroupField` with `TypeBadge`, at least one), language (`SelectField` of content locales), currency + exchange rate, status (edit only), notes. On create also the first version's name (default "Version 1" from the UI locale).
-- **Project page** `/projects/:id`: header with number, name, customer, status badge, Edit action; version switcher (tabs or select; URL `/projects/:id/versions/:versionId`, default the first) with New version (empty or copy of the current), Rename, Delete (ConfirmDialog; disabled with tooltip on the last version); body: placeholder area for plans ("Plans arrive with the floorplan editor" is NOT shown to users — show an empty state "No plans yet" without an action in 2a; 2b adds the action). Read-only banner when the project is completed/cancelled (notice with "Reopen" for users who may write).
+- **Create / edit dialog** (`FormDialog`, `item: Project | null`): name*, tenant (admins, create and edit), customer section (name, company, email, phone, address), product types (`CheckboxGroupField` with `TypeBadge`, at least one), language (`SelectField` of content locales), currency + exchange rate, status (edit only), notes. 
+- **Project page** `/projects/:id`: header with number, name, customer, status badge, Edit action; version switcher (tabs or select; URL `/projects/:id/versions/:versionId`, default the first) with New version (a copy of a chosen version, or empty), Rename, Delete (ConfirmDialog; disabled with tooltip on the last version); body: placeholder area for plans ("Plans arrive with the floorplan editor" is NOT shown to users — show an empty state "No plans yet" without an action in 2a; 2b adds the action). Read-only banner when the project is completed/cancelled (notice with "Reopen" for users who may write).
 - **Tenants page**: delete dialog explains archive vs delete using `projectCount`; "Show archived" filter, an "Archived" badge and a Restore row action.
 - Full parity: everything the API offers is reachable in the UI.
 
