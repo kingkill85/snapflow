@@ -22,18 +22,30 @@ export type Attribute = {
   itemType?: 'text' | 'number' | 'integer' | 'boolean' | 'enum'
   options?: { key: string; label: Localized }[]
 }
+/** A product type: the system or product line (Zigbee, KNX, …), shown as a badge. */
 export type ProductTypeInput = {
   key: string
   name: Localized
-  description?: Localized
+  abbreviation?: string
   color?: string
+  isActive: boolean
+}
+export type ProductType = ProductTypeInput & { id: string; sortOrder: number; updatedAt: string }
+/** A category: the kind of device, with the attribute schemas. */
+export type CategoryInput = {
+  key: string
+  name: Localized
+  description?: Localized
   isActive: boolean
   attributes: Attribute[]
   instanceAttributes: Omit<Attribute, 'scope'>[]
 }
-export type ProductType = ProductTypeInput & { id: string; sortOrder: number; updatedAt: string }
+export type Category = CategoryInput & { id: string; sortOrder: number; updatedAt: string }
+/** A product type and a category created together: every product needs one of each. */
+export type Kind = { type: ProductType; category: Category; ids: { productTypeId: string; categoryId: string } }
 export type ProductInput = {
   productTypeId: string
+  categoryId: string
   modelNumber: string
   name: Localized
   description?: Localized
@@ -58,7 +70,7 @@ export type Variant = Required<Pick<VariantInput, 'name' | 'price' | 'attributes
     addons: Addon[]
     updatedAt: string
   }
-export type Product = Required<Pick<ProductInput, 'productTypeId' | 'modelNumber' | 'name' | 'attributes' | 'isActive'>> &
+export type Product = Required<Pick<ProductInput, 'productTypeId' | 'categoryId' | 'modelNumber' | 'name' | 'attributes' | 'isActive'>> &
   Pick<ProductInput, 'description'> & {
     id: string
     staleAttributes: Record<string, unknown>
@@ -147,10 +159,10 @@ export class Api {
     return this.json(await this.ctx.post('/api/function-types', { data: { key, name: { en } } }))
   }
 
-  /** Creates a product type; unset fields get defaults (active, no attributes). */
+  /** Creates a product type; unset fields get defaults (active, no badge). */
   async createProductType(input: Partial<ProductTypeInput> = {}): Promise<ProductType> {
     const key = input.key ?? uniqueKey('pt')
-    const data: ProductTypeInput = { key, name: { en: unique('Type') }, isActive: true, attributes: [], instanceAttributes: [], ...input }
+    const data: ProductTypeInput = { key, name: { en: unique('Type') }, isActive: true, ...input }
     return this.json<ProductType>(await this.ctx.post('/api/product-types', { data }))
   }
 
@@ -178,24 +190,69 @@ export class Api {
     }
   }
 
-  /** Replaces a product type with `changes` applied (activation, schema), as the editor would. */
+  /** Replaces a product type with `changes` applied (activation, badge), as the dialog would. */
   async updateProductType(id: string, changes: Partial<ProductTypeInput>): Promise<ProductType> {
     const t = await this.productType(id)
     const current: ProductTypeInput = {
       key: t.key,
       name: t.name,
-      ...(t.description ? { description: t.description } : {}),
+      ...(t.abbreviation ? { abbreviation: t.abbreviation } : {}),
       ...(t.color ? { color: t.color } : {}),
       isActive: t.isActive,
-      attributes: t.attributes,
-      instanceAttributes: t.instanceAttributes,
     }
     const data = { ...current, ...changes, expectedUpdatedAt: t.updatedAt }
     return this.json<ProductType>(await this.ctx.put(`/api/product-types/${id}`, { data }))
   }
 
+  /** Creates a category; unset fields get defaults (active, no attributes). */
+  async createCategory(input: Partial<CategoryInput> = {}): Promise<Category> {
+    const key = input.key ?? uniqueKey('cat')
+    const data: CategoryInput = { key, name: { en: unique('Category') }, isActive: true, attributes: [], instanceAttributes: [], ...input }
+    return this.json<Category>(await this.ctx.post('/api/categories', { data }))
+  }
+
+  async category(id: string): Promise<Category> {
+    return this.json<Category>(await this.ctx.get(`/api/categories/${id}`))
+  }
+
+  /** Every category in catalog order, inactive ones included. */
+  async categories(): Promise<Category[]> {
+    return (await this.json<{ items: Category[] }>(await this.ctx.get('/api/categories', { params: { includeInactive: true } }))).items
+  }
+
+  /** Moves the given categories to the top of the catalog order (see moveProductTypesToTop). */
+  async moveCategoriesToTop(ids: string[]) {
+    for (let attempt = 0; ; attempt++) {
+      const rest = (await this.categories()).map((c) => c.id).filter((id) => !ids.includes(id))
+      const res = await this.ctx.put('/api/categories/order', { data: { ids: [...ids, ...rest] } })
+      if (res.ok()) return
+      if (res.status() !== 422 || attempt >= 5) expect(res.ok(), `${res.url()}: ${res.status()} ${await res.text()}`).toBe(true)
+    }
+  }
+
+  /** Replaces a category with `changes` applied (activation, schema), as the editor would. */
+  async updateCategory(id: string, changes: Partial<CategoryInput>): Promise<Category> {
+    const c = await this.category(id)
+    const current: CategoryInput = {
+      key: c.key,
+      name: c.name,
+      ...(c.description ? { description: c.description } : {}),
+      isActive: c.isActive,
+      attributes: c.attributes,
+      instanceAttributes: c.instanceAttributes,
+    }
+    const data = { ...current, ...changes, expectedUpdatedAt: c.updatedAt }
+    return this.json<Category>(await this.ctx.put(`/api/categories/${id}`, { data }))
+  }
+
+  /** A new product type and a new category (with the schema), for products of their own. */
+  async createKind(category: Partial<CategoryInput> = {}, type: Partial<ProductTypeInput> = {}): Promise<Kind> {
+    const [t, c] = await Promise.all([this.createProductType(type), this.createCategory(category)])
+    return { type: t, category: c, ids: { productTypeId: t.id, categoryId: c.id } }
+  }
+
   /** Creates a product; unset fields get defaults (a unique model number, active). */
-  async createProduct(input: Partial<ProductInput> & { productTypeId: string }): Promise<Product> {
+  async createProduct(input: Partial<ProductInput> & { productTypeId: string; categoryId: string }): Promise<Product> {
     const data = { modelNumber: unique('M').replace(/\s+/g, '-'), name: { en: unique('Product') }, isActive: true, attributes: {}, ...input }
     return this.json<Product>(await this.ctx.post('/api/products', { data }))
   }
@@ -209,6 +266,7 @@ export class Api {
     const p = await this.product(id)
     const data = {
       productTypeId: p.productTypeId,
+      categoryId: p.categoryId,
       modelNumber: p.modelNumber,
       name: p.name,
       ...(p.description ? { description: p.description } : {}),

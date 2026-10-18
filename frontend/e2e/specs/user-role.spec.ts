@@ -11,7 +11,7 @@ test('a user sees the catalog read-only and the roles, nothing to manage', async
   await page.goto('/')
   await expect(page).toHaveURL(/\/catalog\/function-types$/)
   // A section with one page is a plain link.
-  expect(await navEntries(page)).toEqual({ Catalog: ['Products', 'Product types', 'Function types'], Roles: ['Roles'] })
+  expect(await navEntries(page)).toEqual({ Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Roles: ['Roles'] })
 
   await expect(row(page, key)).toContainText(name)
   await expect(page.getByRole('button', { name: 'New function type' })).toHaveCount(0)

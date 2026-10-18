@@ -69,9 +69,9 @@ describe('ProductsPage', () => {
     expect(first).toHaveTextContent('Dimmer 4ch')
     // The product type with its badge (abbreviation on its colour, text for contrast), and the category.
     const cells = within(first).getAllByRole('cell')
-    expect(cells[3]).toHaveTextContent('ZBZigbee')
+    expect(cells[3]).toHaveTextContent('ZBZigbeeDimmer actuators')
     expect(within(cells[3]).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb', color: '#ffffff' })
-    expect(cells[4]).toHaveTextContent('Dimmer actuators')
+    expect(screen.getByRole('columnheader', { name: 'Product type / Category' })).toBeInTheDocument()
     expect(first).toHaveTextContent('$27.00 – $35.00')
     expect(first).toHaveTextContent('Active')
     expect(first).not.toHaveTextContent('attention')

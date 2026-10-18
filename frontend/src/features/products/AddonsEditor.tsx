@@ -244,7 +244,7 @@ export function AddonsEditor({ product, variant, types, categories, readOnly, li
                             </p>
                             {r.sku && <p className="text-xs text-muted">{t('addons.sku', { sku: r.sku })}</p>}
                             <p className="text-muted">
-                              <TypeBadge color={r.productType.color} abbreviation={r.productType.abbreviation}>
+                              <TypeBadge color={r.productType.color} abbreviation={r.productType.abbreviation} wrap>
                                 {localized(r.productName)} · {localized(r.category.name)}
                               </TypeBadge>
                             </p>

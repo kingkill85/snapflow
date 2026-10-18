@@ -20,8 +20,7 @@
     "image": "Image",
     "modelNumber": "Model number",
     "name": "Name",
-    "type": "Product type",
-    "category": "Category",
+    "typeCategory": "Product type / Category",
     "variants": "Variants",
     "price": "Price",
     "status": "Status"

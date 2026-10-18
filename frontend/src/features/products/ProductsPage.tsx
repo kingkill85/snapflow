@@ -197,16 +197,20 @@ export function ProductsPage() {
     },
     // On narrow screens the table scrolls instead of breaking names word by word.
     { header: t('column.name'), cell: (p) => localized(p.name), className: 'min-w-48' },
+    // The product type (badge and name) with the category below it: one
+    // column, so every column still fits from 1280 px (D95, D105).
     {
-      header: t('column.type'),
+      header: t('column.typeCategory'),
       cell: (p) => (
-        <TypeBadge color={p.productType.color} abbreviation={p.productType.abbreviation} wrap>
-          {localized(p.productType.name)}
-        </TypeBadge>
+        <div className="space-y-0.5">
+          <TypeBadge color={p.productType.color} abbreviation={p.productType.abbreviation} wrap>
+            {localized(p.productType.name)}
+          </TypeBadge>
+          <p className="break-words text-muted">{localized(p.category.name)}</p>
+        </div>
       ),
       className: 'min-w-36',
     },
-    { header: t('column.category'), cell: (p) => localized(p.category.name), className: 'min-w-32' },
     { header: t('column.variants'), cell: (p) => p.variantCount, className: 'text-right tabular-nums' },
     {
       header: t('column.price'),
