@@ -1,12 +1,24 @@
 name: CI
 
+# check: every push to main and every pull request.
+# e2e: pull requests only, in two shards (the layout matrix left out, D107).
+# e2e-visual: the full layout matrix, on pull requests labelled "visual" or by hand.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A new push cancels the run of the previous one; adding a label does not.
+  group: ci-${{ github.event_name }}-${{ github.ref }}-${{ github.event.action == 'labeled' && 'label' || 'run' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
+    # Adding a label only starts e2e-visual (when the label is "visual").
+    if: github.event_name != 'workflow_dispatch' && github.event.action != 'labeled'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +39,38 @@ jobs:
 
   e2e:
     needs: check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            frontend/node_modules
+          key: ${{ runner.os }}-${{ hashFiles('backend/go.sum', 'frontend/package-lock.json', 'flake.lock') }}
+      - name: Install frontend dependencies
+        run: nix develop -c sh -c 'cd frontend && npm ci'
+      - name: End-to-end tests, shard ${{ matrix.shard }}/2 (Chromium from Nix, Postgres via docker compose)
+        run: nix develop -c make e2e args="--shard=${{ matrix.shard }}/2"
+      - name: Upload blob report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: frontend/e2e/blob-report
+          retention-days: 3
+
+  e2e-report:
+    # One HTML report from the shards' blob reports, only when a shard failed.
+    needs: e2e
+    if: always() && needs.e2e.result == 'failure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,14 +84,48 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('backend/go.sum', 'frontend/package-lock.json', 'flake.lock') }}
       - name: Install frontend dependencies
         run: nix develop -c sh -c 'cd frontend && npm ci'
-      - name: End-to-end tests (Chromium from Nix, Postgres via docker compose)
-        run: nix develop -c make e2e
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: frontend/e2e/all-blob-reports
+          merge-multiple: true
+      - name: Merge reports
+        run: nix develop -c sh -c 'cd frontend && npx playwright merge-reports --reporter html e2e/all-blob-reports'
       - name: Upload Playwright report
-        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 14
+
+  e2e-visual:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'visual') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'visual'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: actions/cache@v4
+        with:
           path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            frontend/node_modules
+          key: ${{ runner.os }}-${{ hashFiles('backend/go.sum', 'frontend/package-lock.json', 'flake.lock') }}
+      - name: Install frontend dependencies
+        run: nix develop -c sh -c 'cd frontend && npm ci'
+      - name: Layout matrix (every page x width x light/dark x en/de)
+        run: nix develop -c make e2e-visual
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual
+          path: |
+            frontend/e2e/screenshots
             frontend/e2e/playwright-report
             frontend/e2e/test-results
           retention-days: 14

@@ -16,9 +16,11 @@ make dev-backend    # API on :8000
 make dev-frontend   # UI on :5173, /api proxied to :8000
 make generate       # sqlc + OpenAPI export + TS client (run after any SQL or API change)
 make lint           # golangci-lint, oxlint, tsc
-make test           # Go tests (real Postgres via Testcontainers) + Vitest
-make check          # everything CI runs, incl. "generated code is committed"
-make e2e            # Playwright click-through on a fresh snapflow_e2e database (args="--ui" etc.)
+make test           # Go tests (one shared Postgres, compose service testdb on :55432; a database per package) + Vitest
+make check          # everything CI runs: generate, then lint + tests in parallel, then "generated code is committed"
+make e2e            # Playwright click-through on a fresh e2e database (args="--ui", args="users.spec.ts" etc.)
+make e2e-visual     # the full layout matrix (widths x light/dark x en/de) with screenshots
+E2E_SLOT=3 make e2e # own ports + database per slot; unset = derived from the checkout path (parallel worktrees)
 make feature name=product_types   # scaffold a full feature, backend + frontend
 ```
 

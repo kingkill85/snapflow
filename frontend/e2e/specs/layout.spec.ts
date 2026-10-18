@@ -1,13 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { type Page } from '@playwright/test'
+import { type Page, type TestInfo } from '@playwright/test'
 
 import { expect, test, unique, uniqueKey } from '../fixtures'
 
-// Key pages at phone and desktop width, in light and dark mode: nothing may
-// overflow the viewport horizontally (tables scroll inside their own box).
-// Screenshots land in e2e/screenshots/ for a look by eye.
+// Key pages at phone, tablet and desktop width, in light and dark mode: nothing
+// may overflow the viewport horizontally (tables scroll inside their own box).
+//
+// The default run checks a slim smoke: phone (390) and desktop (1280) in light
+// mode, and the list pages at 1280 px in English and German. Every other
+// combination is tagged @visual and runs with `make e2e-visual` (the "visual"
+// project), which also saves screenshots to e2e/screenshots/ for a look by eye.
 const pages = [
   { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
   { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
@@ -20,10 +24,21 @@ const pages = [
 ]
 
 const viewports = [
-  { name: 'phone', size: { width: 390, height: 844 } },
-  { name: 'tablet', size: { width: 768, height: 1024 } },
-  { name: 'desktop', size: { width: 1280, height: 800 } },
+  { name: 'phone', size: { width: 390, height: 844 }, smoke: true },
+  { name: 'tablet', size: { width: 768, height: 1024 }, smoke: false },
+  { name: 'desktop', size: { width: 1280, height: 800 }, smoke: true },
 ]
+
+/** Tags a combination that is not part of the smoke as @visual (left out of the default run). */
+function tags(smoke: boolean) {
+  return smoke ? {} : { tag: '@visual' }
+}
+
+/** Screenshots are for the visual review only; the smoke just checks the layout. */
+async function screenshot(page: Page, testInfo: TestInfo, file: string, fullPage = false) {
+  if (testInfo.project.name !== 'visual') return
+  await page.screenshot({ path: `e2e/screenshots/${file}.png`, fullPage })
+}
 
 // Every list page on a desktop screen (1280 px and wider), in English and the
 // longer German: all columns incl. the row actions fit, the table box does not
@@ -73,10 +88,10 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 for (const width of [1280, 1440, 1920]) {
   for (const lang of ['en', 'de'] as const) {
-    test.describe(`list pages at ${width} px, ${lang}`, () => {
+    test.describe(`list pages at ${width} px, ${lang}`, tags(width === 1280), () => {
       test.use({ viewport: { width, height: 900 } })
 
-      test('every column fits without scrolling the table', async ({ page, api }) => {
+      test('every column fits without scrolling the table', async ({ page, api }, testInfo) => {
         // Long names, a product with problems, an unavailable product: the widest rows.
         await api.createUser({ fullName: 'Maximilian Alexander Mustermann-Schmidt' })
         await api.createFunctionType(uniqueKey('lighting'), unique('Lighting control with presence detection'))
@@ -100,12 +115,14 @@ for (const width of [1280, 1440, 1920]) {
           await expect(page.getByRole('heading', { name: p.heading[lang], level: 1 })).toBeVisible()
           await expect(page.getByRole('table')).toBeVisible()
           await expectNoHorizontalOverflow(page)
-          for (const colorScheme of ['light', 'dark'] as const) {
-            // Reloaded, so everything is painted in the scheme from the start.
-            await page.emulateMedia({ colorScheme })
-            await page.reload()
-            await expect(page.getByRole('table')).toBeVisible()
-            await page.screenshot({ path: `e2e/screenshots/list-${p.name}-${width}-${lang}-${colorScheme}.png`, fullPage: true })
+          if (testInfo.project.name === 'visual') {
+            for (const colorScheme of ['light', 'dark'] as const) {
+              // Reloaded, so everything is painted in the scheme from the start.
+              await page.emulateMedia({ colorScheme })
+              await page.reload()
+              await expect(page.getByRole('table')).toBeVisible()
+              await screenshot(page, testInfo, `list-${p.name}-${width}-${lang}-${colorScheme}`, true)
+            }
           }
           expect(await tableOverflows(page), `${p.name}: the table scrolls`).toEqual([0])
           for (const slack of await tableSlack(page)) expect(slack, `${p.name}: less than 40 px to spare`).toBeGreaterThanOrEqual(40)
@@ -117,10 +134,10 @@ for (const width of [1280, 1440, 1920]) {
 
 for (const colorScheme of ['light', 'dark'] as const) {
   for (const viewport of viewports) {
-    test.describe(`${viewport.name}, ${colorScheme}`, () => {
+    test.describe(`${viewport.name}, ${colorScheme}`, tags(viewport.smoke && colorScheme === 'light'), () => {
       test.use({ colorScheme, viewport: viewport.size })
 
-      test('app pages fit the screen', async ({ page, api }) => {
+      test('app pages fit the screen', async ({ page, api }, testInfo) => {
         // Something to delete, and a long name in the table.
         await api.createUser({ fullName: 'Maximilian Alexander Mustermann-Schmidt' })
         for (const p of pages) {
@@ -128,7 +145,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await expect(page.getByRole('heading', { name: p.heading, level: 1 })).toBeVisible()
           await expect(page.getByText('Loading…')).toHaveCount(0)
           await expectNoHorizontalOverflow(page)
-          await page.screenshot({ path: `e2e/screenshots/${p.name}-${viewport.name}-${colorScheme}.png`, fullPage: true })
+          await screenshot(page, testInfo, `${p.name}-${viewport.name}-${colorScheme}`, true)
         }
 
         // The navigation: section menus and the user menu from 768 px, a side sheet on phones.
@@ -136,16 +153,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
         if (viewport.size.width < 768) {
           await page.getByRole('button', { name: 'Menu' }).click()
           await expect(page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Products' })).toBeVisible()
-          await page.screenshot({ path: `e2e/screenshots/nav-sheet-${viewport.name}-${colorScheme}.png` })
+          await screenshot(page, testInfo, `nav-sheet-${viewport.name}-${colorScheme}`)
           await page.keyboard.press('Escape')
         } else {
           await page.getByRole('banner').getByRole('button', { name: 'Catalog' }).click()
           await expect(page.getByRole('menuitem', { name: 'Products' })).toBeVisible()
-          await page.screenshot({ path: `e2e/screenshots/nav-menu-${viewport.name}-${colorScheme}.png` })
+          await screenshot(page, testInfo, `nav-menu-${viewport.name}-${colorScheme}`)
           await page.keyboard.press('Escape')
           await page.getByRole('banner').getByRole('button', { name: /^Account: / }).click()
           await expect(page.getByRole('menuitemradio', { name: 'Dark' })).toBeVisible()
-          await page.screenshot({ path: `e2e/screenshots/user-menu-${viewport.name}-${colorScheme}.png` })
+          await screenshot(page, testInfo, `user-menu-${viewport.name}-${colorScheme}`)
           await page.keyboard.press('Escape')
         }
 
@@ -154,15 +171,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await dialog.getByRole('button', { name: 'Create' }).click()
         await expect(dialog.getByLabel('Email')).toHaveAccessibleDescription('Enter a valid email address.')
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/user-dialog-${viewport.name}-${colorScheme}.png` })
+        await screenshot(page, testInfo, `user-dialog-${viewport.name}-${colorScheme}`)
         await dialog.getByRole('button', { name: 'Cancel' }).click()
 
         await page.getByRole('button', { name: 'Delete' }).first().click()
         await expect(page.getByRole('dialog', { name: 'Delete user' })).toBeVisible()
-        await page.screenshot({ path: `e2e/screenshots/delete-dialog-${viewport.name}-${colorScheme}.png` })
+        await screenshot(page, testInfo, `delete-dialog-${viewport.name}-${colorScheme}`)
       })
 
-      test('the category editor and the product type dialog fit the screen', async ({ page, api }) => {
+      test('the category editor and the product type dialog fit the screen', async ({ page, api }, testInfo) => {
         const category = await api.createCategory({
           name: { en: 'Universal dimmer actuators with a rather long name for narrow screens' },
           attributes: [
@@ -184,7 +201,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto(`/catalog/categories/${category.id}`)
         await expect(page.getByRole('heading', { name: 'Edit category', level: 1 })).toBeVisible()
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/category-collapsed-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await screenshot(page, testInfo, `category-collapsed-${viewport.name}-${colorScheme}`, true)
 
         const attrs = page.getByRole('region', { name: 'Attributes', exact: true })
         await attrs.getByRole('button', { name: 'Expand all' }).click()
@@ -194,7 +211,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByRole('button', { name: 'Update' }).click()
         await expect(attrs.getByLabel('Minimum', { exact: true })).toHaveAccessibleDescription('Enter a number.')
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/category-expanded-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await screenshot(page, testInfo, `category-expanded-${viewport.name}-${colorScheme}`, true)
 
         // The list with a long name.
         await page.goto('/catalog/categories')
@@ -211,10 +228,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
         const dialog = page.getByRole('dialog', { name: 'Edit product type' })
         await expect(dialog.getByTestId('type-abbreviation')).toHaveText('ZB3PRO')
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/product-type-dialog-${viewport.name}-${colorScheme}.png` })
+        await screenshot(page, testInfo, `product-type-dialog-${viewport.name}-${colorScheme}`)
       })
 
-      test('the product pages fit the screen', async ({ page, api }) => {
+      test('the product pages fit the screen', async ({ page, api }, testInfo) => {
         const image = await api.uploadFile('blue.png', 'image/png', readFileSync(fileURLToPath(new URL('../assets/blue.png', import.meta.url))))
         const { type, ids } = await api.createKind({
           name: { en: unique('Universal dimmer actuators with a rather long name') },
@@ -248,31 +265,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto(`/catalog/products?type=${type.id}`)
         await expect(page.getByRole('row').filter({ hasText: product.modelNumber })).toBeVisible()
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/products-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await screenshot(page, testInfo, `products-${viewport.name}-${colorScheme}`, true)
 
         await page.goto(`/catalog/products/${product.id}`)
         await expect(page.getByRole('heading', { name: 'Edit product', level: 1 })).toBeVisible()
         await expect(page.getByRole('row').filter({ hasText: 'Ivory white glossy' })).toContainText(sku)
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/product-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await screenshot(page, testInfo, `product-${viewport.name}-${colorScheme}`, true)
 
         await page.goto(`/catalog/products/${product.id}/variants/${variant.id}`)
         await expect(page.getByRole('heading', { name: 'Edit variant', level: 1 })).toBeVisible()
         await expect(page.getByRole('region', { name: 'Search results' }).getByRole('listitem').first()).toBeVisible()
         await expect(page.getByRole('img', { name: 'Image' })).toBeVisible()
         await expectNoHorizontalOverflow(page)
-        await page.screenshot({ path: `e2e/screenshots/variant-${viewport.name}-${colorScheme}.png`, fullPage: true })
+        await screenshot(page, testInfo, `variant-${viewport.name}-${colorScheme}`, true)
       })
 
       test.describe('signed out', () => {
         test.use({ storageState: { cookies: [], origins: [] } })
 
-        test('login page fits the screen', async ({ page }) => {
+        test('login page fits the screen', async ({ page }, testInfo) => {
           await page.goto('/login')
           await page.getByRole('button', { name: 'Sign in' }).click()
           await expect(page.getByLabel('Email')).toHaveAccessibleDescription('This field is required.')
           await expectNoHorizontalOverflow(page)
-          await page.screenshot({ path: `e2e/screenshots/login-${viewport.name}-${colorScheme}.png`, fullPage: true })
+          await screenshot(page, testInfo, `login-${viewport.name}-${colorScheme}`, true)
         })
       })
     })
