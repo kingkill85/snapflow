@@ -12,8 +12,8 @@ import { apiFields, Button, errorKey, ErrorMessage, Field, setApiFieldErrors, us
 import { safeReturnTo } from './return-to'
 
 const schema = z.object({
-  email: z.string().trim().min(1, errorKey('validation.required')).max(254, errorKey('validation.too_long')),
-  password: z.string().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long')),
+  email: z.string().trim().min(1, errorKey('validation.required')).max(254, errorKey('validation.too_long', { max: 254 })),
+  password: z.string().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long', { max: 200 })),
 })
 type FormValues = z.infer<typeof schema>
 

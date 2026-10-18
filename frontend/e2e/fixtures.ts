@@ -7,6 +7,31 @@ export { expect }
 export type Role = 'admin' | 'tenant_admin' | 'user'
 export type Tenant = { id: string; name: string; isDistributor: boolean; isActive: boolean }
 export type User = { id: string; email: string; fullName: string; role: Role; tenantId: string; isActive: boolean }
+export type Localized = { en: string; de?: string }
+export type AttributeType = 'text' | 'number' | 'integer' | 'boolean' | 'enum' | 'list'
+export type Attribute = {
+  key: string
+  label: Localized
+  description?: Localized
+  type: AttributeType
+  required?: boolean
+  unit?: string
+  scope?: 'product' | 'variant'
+  min?: number
+  max?: number
+  itemType?: 'text' | 'number' | 'integer' | 'boolean' | 'enum'
+  options?: { key: string; label: Localized }[]
+}
+export type ProductTypeInput = {
+  key: string
+  name: Localized
+  description?: Localized
+  color?: string
+  isActive: boolean
+  attributes: Attribute[]
+  instanceAttributes: Omit<Attribute, 'scope'>[]
+}
+export type ProductType = ProductTypeInput & { id: string; sortOrder: number; updatedAt: string }
 /** A user created by a spec, with the password it signs in with. */
 export type Account = User & { password: string }
 
@@ -15,6 +40,11 @@ let counter = 0
 export function unique(prefix: string): string {
   counter += 1
   return `${prefix} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${counter}`
+}
+
+/** A unique key (lower snake case), e.g. "pt_k3x9a1_2". */
+export function uniqueKey(prefix: string): string {
+  return unique(prefix).replace(/[\s-]+/g, '_').toLowerCase()
 }
 
 /** A unique email address. */
@@ -79,6 +109,37 @@ export class Api {
 
   async createFunctionType(key: string, en: string): Promise<{ id: string }> {
     return this.json(await this.ctx.post('/api/function-types', { data: { key, name: { en } } }))
+  }
+
+  /** Creates a product type; unset fields get defaults (active, no attributes). */
+  async createProductType(input: Partial<ProductTypeInput> = {}): Promise<ProductType> {
+    const key = input.key ?? uniqueKey('pt')
+    const data: ProductTypeInput = { key, name: { en: unique('Type') }, isActive: true, attributes: [], instanceAttributes: [], ...input }
+    return this.json<ProductType>(await this.ctx.post('/api/product-types', { data }))
+  }
+
+  async productType(id: string): Promise<ProductType> {
+    return this.json<ProductType>(await this.ctx.get(`/api/product-types/${id}`))
+  }
+
+  /** Every product type in catalog order, inactive ones included. */
+  async productTypes(): Promise<ProductType[]> {
+    return (await this.json<{ items: ProductType[] }>(await this.ctx.get('/api/product-types', { params: { includeInactive: true } }))).items
+  }
+
+  /**
+   * Moves the given product types to the top of the catalog order, in this
+   * order. Specs run in parallel and keep creating types (which go to the
+   * end), so a type a spec reorders is kept away from the others' this way.
+   */
+  async moveProductTypesToTop(ids: string[]) {
+    for (let attempt = 0; ; attempt++) {
+      const rest = (await this.productTypes()).map((t) => t.id).filter((id) => !ids.includes(id))
+      const res = await this.ctx.put('/api/product-types/order', { data: { ids: [...ids, ...rest] } })
+      if (res.ok()) return
+      // Another spec created or deleted a type meanwhile: try again.
+      if (res.status() !== 422 || attempt >= 5) expect(res.ok(), `${res.url()}: ${res.status()} ${await res.text()}`).toBe(true)
+    }
   }
 
   async dispose() {

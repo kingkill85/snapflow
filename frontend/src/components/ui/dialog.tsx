@@ -88,13 +88,15 @@ type ConfirmDialogProps = {
   title: string
   message: string
   confirmLabel: string
+  /** Defaults to "Cancel". */
+  cancelLabel?: string
   pending: boolean
   onConfirm: () => void
   error?: ReactNode
 }
 
 /** The one delete/confirm pattern. */
-export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel, pending, onConfirm, error }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel, cancelLabel, pending, onConfirm, error }: ConfirmDialogProps) {
   const { t } = useTranslation()
   return (
     <Dialog
@@ -105,7 +107,7 @@ export function ConfirmDialog({ open, onOpenChange, title, message, confirmLabel
       footer={
         <>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            {t('action.cancel')}
+            {cancelLabel ?? t('action.cancel')}
           </Button>
           <Button variant="danger" disabled={pending} onClick={onConfirm}>
             {confirmLabel}

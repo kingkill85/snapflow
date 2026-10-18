@@ -7,7 +7,7 @@ export function Input({ className, ...props }: ComponentProps<'input'>) {
   return (
     <input
       className={cn(
-        'h-9 w-full rounded-control border border-line bg-surface px-3 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 aria-invalid:border-danger',
+        'h-9 w-full rounded-control border border-line bg-surface px-3 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger',
         className,
       )}
       {...props}
@@ -28,13 +28,13 @@ export function Field({ label, error, hint, id, ...props }: FieldProps) {
   const messageId = `${inputId}-message`
   const message = error || hint
   return (
-    <div className="space-y-1.5">
+    <div className="group/field space-y-1.5">
       <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
       <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
       {message && (
-        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
+        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
           {message}
         </p>
       )}

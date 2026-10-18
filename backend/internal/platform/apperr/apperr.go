@@ -25,9 +25,26 @@ type Error struct {
 }
 
 type FieldError struct {
-	Location string `json:"location" doc:"Where the error occurred, e.g. body.key"`
-	Code     string `json:"code" doc:"Stable error code, used as i18n key"`
-	Detail   string `json:"detail,omitempty"`
+	Location string         `json:"location" doc:"Where the error occurred, e.g. body.key"`
+	Code     string         `json:"code" doc:"Stable error code, used as i18n key"`
+	Detail   string         `json:"detail,omitempty"`
+	Params   map[string]any `json:"params,omitempty" doc:"Values for the translated message, e.g. {\"max\": 100}"`
+}
+
+// Field returns a field error without params.
+func Field(location, code, detail string) FieldError {
+	return FieldError{Location: location, Code: code, Detail: detail}
+}
+
+// With returns a copy of f with the param key set.
+func (f FieldError) With(key string, value any) FieldError {
+	params := make(map[string]any, len(f.Params)+1)
+	for k, v := range f.Params {
+		params[k] = v
+	}
+	params[key] = value
+	f.Params = params
+	return f
 }
 
 func (e *Error) Error() string  { return e.Detail }
@@ -86,6 +103,17 @@ func Invalid(location, code, detail string) *Error {
 		Code:   "validation.failed",
 		Detail: "validation failed",
 		Fields: []FieldError{{Location: location, Code: code, Detail: detail}},
+	}
+}
+
+// Validation reports several field validation errors at once, so a form can
+// show all of them in one round trip.
+func Validation(fields ...FieldError) *Error {
+	return &Error{
+		Status: http.StatusUnprocessableEntity,
+		Code:   "validation.failed",
+		Detail: "validation failed",
+		Fields: fields,
 	}
 }
 

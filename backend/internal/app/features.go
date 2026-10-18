@@ -6,6 +6,7 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	functiontypesstore "github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
+	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
@@ -30,5 +31,6 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	tenants.Register(api, c.tenants)
 	users.Register(api, c.users, deps.Cookies)
 	functiontypes.Register(api, functiontypes.NewService(functiontypesstore.New(deps.DB)))
+	producttypes.Register(api, producttypes.NewService(deps.DB))
 	// scaffold:features
 }

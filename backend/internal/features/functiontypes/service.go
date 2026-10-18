@@ -111,11 +111,16 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func validate(in FunctionTypeInput) error {
+	var errs []apperr.FieldError
 	if !keyPattern.MatchString(in.Key) {
-		return apperr.Invalid("body.key", "function_type.key_format", "key must be lower snake case")
+		errs = append(errs, apperr.Field("body.key", "function_type.key_format", "key must be lower snake case"))
 	}
+	errs = append(errs, in.Name.Check("body.name", 0)...)
 	if !in.Name.Valid() {
-		return apperr.Invalid("body.name.en", "validation.required", "English name is required")
+		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
+	}
+	if len(errs) > 0 {
+		return apperr.Validation(errs...)
 	}
 	return nil
 }

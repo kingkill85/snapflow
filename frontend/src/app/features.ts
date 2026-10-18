@@ -3,6 +3,7 @@ import { functionTypesFeature } from '@/features/function-types'
 import { rolesFeature } from '@/features/roles'
 import { tenantsFeature } from '@/features/tenants'
 import { usersFeature } from '@/features/users'
+import { productTypesFeature } from '@/features/product-types'
 // scaffold:imports
 
 import type { FeatureModule } from './feature'
@@ -15,5 +16,6 @@ export const features: FeatureModule[] = [
   tenantsFeature,
   rolesFeature,
   profileFeature,
+  productTypesFeature,
   // scaffold:features
 ]

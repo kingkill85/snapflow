@@ -16,13 +16,16 @@ type Options = {
   route?: string
   /** The app's query client (session checks on 401/403, retries) instead of a bare one. */
   appClient?: boolean
+  /** Fills the query cache before rendering, e.g. to start from a warm cache. */
+  prepare?: (client: QueryClient) => void
 }
 
-function setup({ me = adminMe, appClient = false }: Options) {
+function setup({ me = adminMe, appClient = false, prepare }: Options) {
   const client = appClient
     ? createQueryClient()
     : new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   if (me) client.setQueryData(getGetMeQueryKey(), me)
+  prepare?.(client)
   return client
 }
 

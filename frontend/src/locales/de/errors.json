@@ -1,47 +1,112 @@
 {
-  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar.", "busy": "Der Server ist ausgelastet. Bitte versuchen Sie es gleich noch einmal." },
-  "network": { "unavailable": "Keine Verbindung zum Server." },
-  "request": { "not_found": "Nicht gefunden.", "conflict": "Das widerspricht vorhandenen Daten.", "bad": "Die Anfrage war ungültig.", "failed": "Die Anfrage ist fehlgeschlagen." },
+  "attribute": {
+    "bound_negative": "Längen und Anzahlen können nicht negativ sein.",
+    "bound_range": "Diese Grenze muss zwischen {{min}} und {{max}} liegen.",
+    "bound_whole": "Diese Grenze muss eine ganze Zahl sein.",
+    "count": "Anzahl der Einträge: {{min}} bis {{max}}.",
+    "count_max": "Anzahl der Einträge: höchstens {{max}}.",
+    "count_min": "Anzahl der Einträge: mindestens {{min}}.",
+    "item_type_required": "Wählen Sie den Typ der Listeneinträge.",
+    "key_copy": "Ändern Sie den Schlüssel des kopierten Attributs.",
+    "key_duplicate": "Dieser Schlüssel ist doppelt vergeben.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "label_required": "Eine englische Bezeichnung ist erforderlich.",
+    "length": "Anzahl der Zeichen: {{min}} bis {{max}}.",
+    "length_max": "Anzahl der Zeichen: höchstens {{max}}.",
+    "length_min": "Anzahl der Zeichen: mindestens {{min}}.",
+    "min_above_options": "Das Minimum kann nicht über der Anzahl der Optionen ({{max}}) liegen.",
+    "option": "Das ist keine der erlaubten Optionen ({{options}}).",
+    "option_key_duplicate": "Dieser Options-Schlüssel ist doppelt vergeben.",
+    "options_required": "Fügen Sie mindestens eine Option hinzu.",
+    "range": "Geben Sie einen Wert zwischen {{min}} und {{max}} ein.",
+    "range_invalid": "Das Maximum darf nicht unter dem Minimum ({{min}}) liegen.",
+    "range_max": "Geben Sie einen Wert von höchstens {{max}} ein.",
+    "range_min": "Geben Sie einen Wert von mindestens {{min}} ein.",
+    "required": "Dieser Wert ist erforderlich.",
+    "required_max": "Ein Pflichtwert braucht ein Maximum von mindestens {{min}}.",
+    "scope_name": {
+      "product": "Produkt",
+      "variant": "Variante"
+    },
+    "type": "Dieser Wert muss $t(attribute.type_name.{{expected}}) sein.",
+    "type_name": {
+      "boolean": "ja oder nein",
+      "enum": "eine der Optionen",
+      "integer": "eine ganze Zahl",
+      "list": "eine Liste",
+      "number": "eine Zahl",
+      "text": "Text"
+    },
+    "unknown": "Dieses Attribut gibt es für diesen Produkttyp nicht.",
+    "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt."
+  },
   "auth": {
-    "required": "Bitte anmelden.",
+    "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
     "forbidden": "Dafür fehlt die Berechtigung.",
     "invalid_credentials": "E-Mail oder Passwort ist falsch.",
-    "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
+    "required": "Bitte anmelden.",
     "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
   },
-  "validation": {
-    "failed": "Bitte die markierten Felder prüfen.",
-    "required": "Dieses Feld ist erforderlich.",
-    "invalid": "Dieser Wert ist ungültig.",
-    "too_long": "Dieser Wert ist zu lang.",
-    "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
-    "password_mismatch": "Die Passwörter stimmen nicht überein."
-  },
   "function_type": {
-    "not_found": "Dieser Funktionstyp existiert nicht mehr.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
-    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben."
+    "not_found": "Dieser Funktionstyp existiert nicht mehr."
+  },
+  "network": {
+    "unavailable": "Keine Verbindung zum Server."
+  },
+  "product_type": {
+    "color_format": "Geben Sie eine Farbe als #rrggbb ein, z. B. #1f6feb.",
+    "in_use": "Dieser Produkttyp wird noch von Produkten verwendet. Deaktivieren Sie ihn stattdessen.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
+    "not_found": "Dieser Produkttyp existiert nicht mehr.",
+    "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
+  "request": {
+    "bad": "Die Anfrage war ungültig.",
+    "conflict": "Das widerspricht vorhandenen Daten.",
+    "failed": "Die Anfrage ist fehlgeschlagen.",
+    "not_found": "Nicht gefunden."
+  },
+  "server": {
+    "busy": "Der Server ist ausgelastet. Bitte versuchen Sie es gleich noch einmal.",
+    "database_unavailable": "Die Datenbank ist nicht erreichbar.",
+    "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen."
   },
   "tenant": {
-    "not_found": "Dieser Mandant existiert nicht mehr.",
+    "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden.",
     "name_taken": "Ein Mandant namens \"{{name}}\" existiert bereits.",
-    "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden."
+    "not_found": "Dieser Mandant existiert nicht mehr."
   },
   "user": {
-    "not_found": "Dieser Benutzer existiert nicht mehr.",
+    "admin_requires_distributor": "Admins müssen zum Distributor-Mandanten gehören.",
     "email_taken": "Die E-Mail-Adresse {{email}} wird bereits verwendet.",
+    "last_admin": "Mindestens ein aktiver Admin muss erhalten bleiben.",
+    "not_found": "Dieser Benutzer existiert nicht mehr.",
+    "own_deactivation": "Sie können sich nicht selbst deaktivieren.",
+    "own_delete": "Sie können sich nicht selbst löschen.",
+    "own_password": "Ihr eigenes Passwort ändern Sie in Ihrem Profil.",
+    "own_role": "Ihre eigene Rolle können Sie nicht ändern.",
+    "own_tenant": "Sie können sich nicht selbst in einen anderen Mandanten verschieben.",
     "password_too_short": "Das Passwort braucht mindestens 8 Zeichen.",
     "role_forbidden": "Diese Rolle können Sie nicht vergeben.",
     "target_forbidden": "Benutzer mit einer höheren Rolle als Ihrer können Sie nicht ändern.",
     "tenant_forbidden": "Benutzer anderer Mandanten können Sie nicht verwalten.",
-    "tenant_not_found": "Der gewählte Mandant existiert nicht.",
-    "admin_requires_distributor": "Admins müssen zum Distributor-Mandanten gehören.",
-    "own_role": "Ihre eigene Rolle können Sie nicht ändern.",
-    "own_deactivation": "Sie können sich nicht selbst deaktivieren.",
-    "own_tenant": "Sie können sich nicht selbst in einen anderen Mandanten verschieben.",
-    "own_delete": "Sie können sich nicht selbst löschen.",
-    "last_admin": "Mindestens ein aktiver Admin muss erhalten bleiben.",
-    "own_password": "Ihr eigenes Passwort ändern Sie in Ihrem Profil."
+    "tenant_not_found": "Der gewählte Mandant existiert nicht."
+  },
+  "validation": {
+    "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
+    "failed": "Bitte die markierten Felder prüfen.",
+    "invalid": "Dieser Wert ist ungültig.",
+    "locale": "Diese Sprache wird nicht unterstützt.",
+    "min_above_max": "Das Maximum darf nicht unter dem Minimum liegen.",
+    "number": "Bitte eine Zahl eingeben.",
+    "password_mismatch": "Die Passwörter stimmen nicht überein.",
+    "required": "Dieses Feld ist erforderlich.",
+    "too_long": "Dieser Wert ist zu lang (höchstens {{max}} Zeichen).",
+    "too_many": "Es sind zu viele Einträge (höchstens {{max}})."
   }
 }

@@ -11,6 +11,11 @@ import { cn } from '@/lib/cn'
 import { features } from './features'
 import { useCan, useMe } from './session'
 
+// The navigation groups features by section, in this order; within a
+// section they keep the order of the features list (`make feature` appends).
+const sectionOrder = ['catalog', 'projects', 'admin'] as const
+const navFeatures = sectionOrder.flatMap((section) => features.filter((f) => f.nav?.section === section))
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn('rounded-control px-3 py-1.5 text-sm whitespace-nowrap', isActive ? 'bg-canvas font-medium' : 'text-muted hover:text-ink')
 
@@ -40,8 +45,8 @@ export function AppShell() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 px-4 sm:px-6 lg:h-14 lg:flex-nowrap lg:gap-x-6">
           <span className="flex h-14 items-center font-semibold lg:h-auto">{t('app.name')}</span>
           <nav className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-t border-line px-4 py-2 sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6 lg:order-none lg:mx-0 lg:w-auto lg:flex-1 lg:border-0 lg:p-0">
-            {features
-              .filter((f) => f.nav && (!f.permission || can(f.permission)))
+            {navFeatures
+              .filter((f) => !f.permission || can(f.permission))
               .map((f) => (
                 <NavLink key={f.path} to={`/${f.path}`} className={navLinkClass}>
                   {t(f.nav!.labelKey as never, { ns: f.nav!.namespace }) as string}

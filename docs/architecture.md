@@ -42,6 +42,15 @@ The top priority is that new features, importers and exporters are easy to add i
 - **Disabled accounts**: with the *right* password, a disabled user (or a user of a disabled tenant) gets 403 `auth.account_disabled`, so they know to contact their admin (as in v1, deliberately). With a wrong password the answer is the usual `auth.invalid_credentials`, so the flag does not leak without the password.
 - **Row-level security** arrives in phase 2 with projects, the first tenant-owned business data. Until then tenant isolation is enforced in the services.
 
+## Catalog: product types and attribute schemas
+
+- **Product types** (`features/producttypes`) are the kinds of device ("Dimmer actuator", "Gateway"). They replace SnapFlow 1's categories and item types; the old item type becomes an attribute such as `bus_system` (D14). Each has a key (lower snake case, 1–64 characters, unique), a translatable name (100 characters) and description (2000), an optional badge colour (`#rrggbb`, D38), a position in one global catalog order (`PUT /api/product-types/order` with every id, D25), an active flag (inactive types are hidden from lists unless `includeInactive=true`) and two attribute schemas stored as jsonb: `attributes` (values on the product, or per variant with `scope: "variant"`) and `instanceAttributes` (per installed unit, used from phase 2/3; their definitions have no scope). A type that products use cannot be deleted (`product_type.in_use`, 409); deactivate it instead.
+- **Concurrency**: creates and reorders run in a transaction holding one advisory lock (`pg_advisory_xact_lock`), so sort orders never collide; a reorder also row-locks every type, so none is deleted underneath it. Updates are optimistic (D37): the body carries `expectedUpdatedAt`, the UPDATE matches it, and a mismatch is 409 `product_type.stale`.
+- **Attribute schemas** (`platform/attrschema`, pure Go) are configuration, never migrations. A definition has a key, label (100 characters), optional description (500) and unit (display only, D20), a type (`text`, `number`, `integer`, `boolean`, `enum`, `list` of `text`/`number`/`integer`/`enum`), `required`, optional `min`/`max` (value range; length for text; item count for lists, D35) and `options` for enums. At most 200 attributes and 500 options (D40); integers within ±(2^53−1) (D30); schemas no value can satisfy are rejected (D34). `CheckSchema`/`CheckInstanceSchema` check and normalise a schema when it is saved (D22); `ValidateValues`/`ValidateInstanceValues` check and normalise the values of a product, variant or unit against it (D23) and are the one implementation products (1c), the import (1d, behind a lenient cell parser, D32) and instances use. With `Unknown: Keep` (product saves) values of keys the schema no longer has come back as stale instead of failing (D31); `Unknown: Reject` (imports) reports them.
+- **Translatable texts** (`i18n.Text`) accept only `i18n.Locales` (en, de; the frontend's language list must match) and `en` is required (D36).
+- **Errors**: all problems of a save come back in one 422 with per-field codes (`attribute.*`, `product_type.*`, `validation.*`) and params (e.g. `max`, `min`, `options`, `expected`, `scope`) at exact locations such as `body.attributes[2].options[0].key`, so the editor shows each next to its row (D24, D39). Fields with a fixed set of values (type, item type, scope) are checked by the API schema first (D33).
+- **Editor** (`frontend/src/features/product-types`): one page per type for create, edit and read-only view (D27). It always loads the current version and sends it back as `expectedUpdatedAt` (D37, D44), asks before unsaved changes are lost (D28), keeps long schemas navigable with collapsible attribute cards (D45) and shows every server error at its field or spelled out (D46, D47).
+
 ## Extension points
 
 | Extension | Contract |
@@ -61,7 +70,7 @@ All 16 recommendations were accepted, including: smart sizing (resize all instan
 ## Phases
 
 0. Foundation: inventory, skeleton, CI, design system, i18n ← **done with this repo's first commit**
-1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types, attribute schemas, schema-driven import
+1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types and attribute schemas ← **done (backend)**; products, schema-driven import
 2. Projects & floorplan: editor, zones, placements, BOM, proposals (DOCX)
 3. Distribution board: board editor, bus load, loads and channel assignment
 4. MCP & cutover: MCP server, data migration from SnapFlow 1, go-live

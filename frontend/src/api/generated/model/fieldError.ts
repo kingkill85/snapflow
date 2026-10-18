@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { FieldErrorParams } from './fieldErrorParams';
 
 export interface FieldError {
   /** Stable error code, used as i18n key */
@@ -11,4 +12,6 @@ export interface FieldError {
   detail?: string;
   /** Where the error occurred, e.g. body.key */
   location: string;
+  /** Values for the translated message, e.g. {"max": 100} */
+  params?: FieldErrorParams;
 }

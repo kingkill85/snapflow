@@ -2,12 +2,30 @@
 export { Badge } from './badge'
 export { Button, type ButtonProps } from './button'
 export { CheckboxField } from './checkbox'
+export { ColorField } from './color-field'
 export { type Column, DataTable } from './data-table'
 export { ConfirmDialog, Dialog, FormDialog } from './dialog'
 export { Field, Input } from './field'
-export { type ApiFieldMap, apiFields, errorKey, type ErrorKey, setApiFieldErrors, useFieldError } from './form-errors'
+export { Fieldset, FormActions } from './form-layout'
+export {
+  type ApiFieldMap,
+  apiFields,
+  decodeMessage,
+  errorKey,
+  type ErrorKey,
+  errorParamNames,
+  type ErrorParams,
+  focusFirstError,
+  setApiFieldErrors,
+  useFieldError,
+} from './form-errors'
+export { IconButton } from './icon-button'
 export { EmptyState, ErrorMessage, Loading, Notice, Page } from './page'
+export { type MoveAction, RepeaterControls, RepeaterItem } from './repeater'
 export { Section } from './section'
 export { Select, SelectField, type SelectOption } from './select'
 export { TextLink } from './text-link'
+export { TypeBadge } from './type-badge'
+export { Textarea, TextareaField } from './textarea'
 export { useErrorMessage } from './use-error-message'
+export { useRepeaterFocus } from './use-repeater-focus'
