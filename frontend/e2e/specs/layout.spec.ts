@@ -7,6 +7,8 @@ import { expect, test } from '../fixtures'
 // Screenshots land in e2e/screenshots/ for a look by eye.
 const pages = [
   { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
+  { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
+  { name: 'product-type-new', path: '/catalog/product-types/new', heading: 'New product type' },
   { name: 'users', path: '/admin/users', heading: 'Users' },
   { name: 'tenants', path: '/admin/tenants', heading: 'Tenants' },
   { name: 'roles', path: '/admin/roles', heading: 'Roles' },
@@ -52,6 +54,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.getByRole('button', { name: 'Delete' }).first().click()
         await expect(page.getByRole('dialog', { name: 'Delete user' })).toBeVisible()
         await page.screenshot({ path: `e2e/screenshots/delete-dialog-${viewport.name}-${colorScheme}.png` })
+      })
+
+      test('the product type editor fits the screen', async ({ page, api }) => {
+        const type = await api.createProductType({
+          name: { en: 'Universal dimmer actuator with a rather long name for narrow screens' },
+          color: '#1f6feb',
+          attributes: [
+            { key: 'nominal_power_per_channel', label: { en: 'Nominal power per channel at 230 V' }, type: 'number', unit: 'W', scope: 'variant', min: 0, max: 500, required: true },
+            {
+              key: 'colour',
+              label: { en: 'Colour' },
+              type: 'list',
+              itemType: 'enum',
+              scope: 'variant',
+              options: [
+                { key: 'white', label: { en: 'White', de: 'Weiß' } },
+                { key: 'anthracite_grey', label: { en: 'Anthracite grey' } },
+              ],
+            },
+          ],
+          instanceAttributes: [{ key: 'bus_address', label: { en: 'Bus address' }, type: 'text', required: true }],
+        })
+        await page.goto(`/catalog/product-types/${type.id}`)
+        await expect(page.getByRole('heading', { name: 'Edit product type', level: 1 })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/product-type-collapsed-${viewport.name}-${colorScheme}.png`, fullPage: true })
+
+        const attrs = page.getByRole('region', { name: 'Attributes', exact: true })
+        await attrs.getByRole('button', { name: 'Expand all' }).click()
+        // Errors at the fields, the cards marked.
+        await attrs.getByLabel('Minimum', { exact: true }).fill('12,5')
+        await page.getByRole('button', { name: 'Update' }).click()
+        await expect(attrs.getByLabel('Minimum', { exact: true })).toHaveAccessibleDescription('Enter a number.')
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/product-type-expanded-${viewport.name}-${colorScheme}.png`, fullPage: true })
+
+        // The list with a coloured, long name; the read-only view of a user.
+        await page.goto('/catalog/product-types')
+        await expect(page.getByRole('row').filter({ hasText: type.key })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
       })
 
       test.describe('signed out', () => {

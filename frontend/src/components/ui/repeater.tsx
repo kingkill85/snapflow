@@ -56,8 +56,9 @@ export function RepeaterItem({ title, name = title, subtitle, controls, compact,
         compact ? 'space-y-2 bg-surface p-3' : 'space-y-4 bg-canvas p-4',
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1">
+      {/* Narrow screens: the controls wrap below the title instead of squeezing it away. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 basis-48 items-center gap-1">
           {collapsible && (
             <IconButton
               label={t(expanded ? 'action.collapseItem' : 'action.expandItem', { item: name })}
@@ -80,7 +81,7 @@ export function RepeaterItem({ title, name = title, subtitle, controls, compact,
             {subtitle && <span className="ml-2 font-normal text-muted">{subtitle}</span>}
           </p>
         </div>
-        {controls && <div className="flex shrink-0 flex-wrap justify-end gap-1">{controls}</div>}
+        {controls && <div className="ml-auto flex flex-wrap justify-end gap-1">{controls}</div>}
       </div>
       {open && (
         <div id={bodyId} className={compact ? 'space-y-2' : 'space-y-4'}>

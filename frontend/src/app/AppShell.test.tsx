@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router'
@@ -39,5 +39,11 @@ describe('AppShell', () => {
     expect(await screen.findByText('login page')).toBeInTheDocument()
     expect(called).toBe(true)
     expect(client.getQueryData(getGetMeQueryKey())).toBeUndefined()
+  })
+
+  it('groups the navigation by section: catalog first, admin last', async () => {
+    renderWithProviders(routes)
+    const links = within(await screen.findByRole('navigation')).getAllByRole('link')
+    expect(links.map((l) => l.textContent)).toEqual(['Function types', 'Product types', 'Users', 'Tenants', 'Roles'])
   })
 })

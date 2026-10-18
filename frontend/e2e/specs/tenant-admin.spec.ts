@@ -10,7 +10,7 @@ test('a partner tenant admin manages only their own tenant', async ({ api, sessi
 
   const page = await sessionFor(tenantAdmin)
   await page.goto('/')
-  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Users', 'Roles'])
+  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Product types', 'Users', 'Roles'])
 
   await nav(page).getByRole('link', { name: 'Users' }).click()
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
