@@ -97,3 +97,17 @@ Not in phase 2: loads in zones and channel assignment, distribution boards, bus 
 - Exporter registry in the backend (`GET /api/exporters`), canonical proposal document model built from project + version + BOM + pricing + plans, rendered by a DOCX exporter (Go, OOXML). Language = project language (Q1 assumption). Content: header with tenant and customer data, project number/name/version, quantity table with one column per plan and category rows, totals block (discount, services, grand total, local currency), zone summary per plan, plan images with placements (rendered server-side or uploaded from the editor's PNG export — decide).
 - Split per product type (one document per selected type, discount/services handling decided and recorded — SnapFlow 1 applied them in full to every document).
 - Each generated proposal is recorded (who, when, version, file) and downloadable again; tenant letterhead (logo, address) as tenant settings if cheap, else later.
+
+---
+
+## Outlook: phase 3 concept agreed with the user (2026-10-18/19)
+
+Not built in phase 2; recorded so 2b–2d leave room for it. Customer-facing write-up: "SnapFlow – Distribution boards concept" PDF.
+
+- **Zone needs**: each zone has a list of needs (function type, quantity, power per unit, load type, note); room templates fill it. Loads are not catalog products and not in the BOM.
+- **Product capabilities** come from Excel columns (e.g. "Dimmer outputs", "Relay outputs", "Inputs", "Bus current (mA)", "Width (TE)"): the numbers live only in the product rows. A category holds no numbers; it has fields, and each field has a **meaning** for the board check (outputs of a kind supplied, limit per output, bus current used / supplied, rail space, wireless places …) or "just information".
+- **Field meanings are defined once per column for the whole catalog** (user, 2026-10-19). The import checks each mapped column: known columns take their type and meaning automatically; unknown columns are listed on the mapping page ("New columns – what do they mean?") and the user sets type and meaning before the preview continues; the answers are saved for every later import and category. Categories created by the import therefore come out complete.
+- **Mounting** per category (floorplan / board / both), overridable per product.
+- **Matching and checks**: each need is connected to a channel whose output kind serves its function type and whose limits hold; several needs may share a channel (circuit). Checks: rooms covered, free/missing channels, overloads, bus current and devices per bus line (a bus line belongs to one system), rail space, Zigbee gateway places (gateway field "Max devices"; each Zigbee device uses 1 place; devices connected to a gateway, suggested by floor/nearness). Empty fields do not count; Zigbee products need nothing.
+- **Existing devices** (placements flagged `existing`, 2b) count technically and are programmed later, but never invoiced.
+- **Later**: programming export per system (Zigbee device list per gateway, KNX addresses for ETS, HDL subnet/device IDs) from the planned data plus per-unit fields filled in on site.
