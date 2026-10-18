@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kingkill85/snapflow/backend/internal/app"
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/config"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
@@ -79,8 +80,13 @@ func serve(ctx context.Context) error {
 		return fmt.Errorf("bootstrap: %w", err)
 	}
 
+	storage, err := files.NewStorage(cfg.StorageDir)
+	if err != nil {
+		return err
+	}
 	router, _ := app.New(app.Deps{
 		DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}, TrustedProxies: cfg.TrustedProxies,
+		Storage: storage,
 	})
 	if cfg.StaticDir != "" {
 		httpserver.MountSPA(router, cfg.StaticDir)

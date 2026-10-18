@@ -44,6 +44,45 @@ overrides:
         go_type:
           type: string
           pointer: true
+      - db_type: text
+        nullable: true
+        go_type:
+          type: string
+          pointer: true
+      - db_type: pg_catalog.int4
+        nullable: true
+        go_type:
+          type: int32
+          pointer: true
+      # Money (numeric) is a decimal string in Go, never a float.
+      - db_type: pg_catalog.numeric
+        go_type: string
+      - db_type: pg_catalog.numeric
+        nullable: true
+        go_type:
+          type: string
+          pointer: true
+      - column: products.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: products.description
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+          pointer: true
+      - column: products.attributes
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
+          type: Values
+      - column: product_variants.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: product_variants.attributes
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
+          type: Values
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -77,4 +116,18 @@ sql:
       go:
         <<: *go
         out: internal/features/producttypes/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/files/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/files/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/products/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/products/store
   # scaffold:sqlc

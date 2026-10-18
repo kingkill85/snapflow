@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
@@ -27,6 +28,8 @@ type Deps struct {
 	Cookies auth.Cookies
 	// TrustedProxies may set X-Forwarded-For (see platform/clientip).
 	TrustedProxies []netip.Prefix
+	// Storage keeps uploaded files; nil when only exporting OpenAPI.
+	Storage *files.Storage
 }
 
 // New returns the router with all API routes and the huma API for tests.

@@ -17,6 +17,107 @@
         ],
         "type": "object"
       },
+      "Addon": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantId": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "imageFileId": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "price": {
+            "examples": [
+              "4.50"
+            ],
+            "type": "string"
+          },
+          "productId": {
+            "description": "Product of the add-on variant",
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "required": {
+            "description": "Added to the BOM automatically",
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "addonVariantId",
+          "productId",
+          "modelNumber",
+          "productName",
+          "variantName",
+          "price",
+          "available",
+          "required",
+          "sortOrder"
+        ],
+        "type": "object"
+      },
+      "AddonInput": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantId": {
+            "type": "string"
+          },
+          "required": {
+            "description": "Default false (optional add-on)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "addonVariantId"
+        ],
+        "type": "object"
+      },
+      "AddonList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AddonList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "addons": {
+            "description": "The complete add-on list in order (at most 100)",
+            "items": {
+              "$ref": "#/components/schemas/AddonInput"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "addons"
+        ],
+        "type": "object"
+      },
       "AttributeDefinition": {
         "additionalProperties": false,
         "properties": {
@@ -200,6 +301,68 @@
         "required": [
           "location",
           "code"
+        ],
+        "type": "object"
+      },
+      "File": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/File.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "contentType": {
+            "examples": [
+              "image/jpeg"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "height": {
+            "description": "Pixels, for images",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sha256": {
+            "description": "Hex SHA-256 of the stored bytes; also the download's ETag",
+            "type": "string"
+          },
+          "size": {
+            "description": "Bytes as stored (after downscaling)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "url": {
+            "description": "Download path (needs a login)",
+            "examples": [
+              "/api/files/3f2c…"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Pixels, for images",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "contentType",
+          "size",
+          "sha256",
+          "url",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -542,6 +705,271 @@
         ],
         "type": "string"
       },
+      "Product": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Product.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributeErrors": {
+            "description": "Problems of the stored values against the current schema, at attributes.\u003ckey\u003e",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Product-scope attribute values by key",
+            "type": "object"
+          },
+          "available": {
+            "description": "Product and product type are active",
+            "type": "boolean"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "description": "The product's own flag",
+            "type": "boolean"
+          },
+          "modelNumber": {
+            "examples": [
+              "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ProductTypeRef"
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "staleAttributes": {
+            "additionalProperties": {},
+            "description": "Values whose key the type's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them",
+            "type": "object"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          },
+          "variants": {
+            "description": "In variant order",
+            "items": {
+              "$ref": "#/components/schemas/Variant"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "productTypeId",
+          "productType",
+          "modelNumber",
+          "name",
+          "attributes",
+          "staleAttributes",
+          "attributeErrors",
+          "isActive",
+          "available",
+          "variants",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProductInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Product-scope values by key; stale values are kept only if they are sent back",
+            "type": "object"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 5000 characters; if set, \"en\" is required",
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "modelNumber": {
+            "description": "Unique ignoring case, at most 100 characters",
+            "examples": [
+              "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 200 characters; \"en\" is required",
+            "type": "object"
+          },
+          "productTypeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productTypeId",
+          "modelNumber",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "ProductListItem": {
+        "additionalProperties": false,
+        "properties": {
+          "attributeErrors": {
+            "description": "Attribute problems of the product and its variants against the current schema",
+            "format": "int64",
+            "type": "integer"
+          },
+          "available": {
+            "description": "Product and product type are active",
+            "type": "boolean"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "previewImageFileId": {
+            "description": "Image of the first active variant that has one",
+            "type": "string"
+          },
+          "priceMax": {
+            "description": "Highest price of the active variants",
+            "examples": [
+              "31.50"
+            ],
+            "type": "string"
+          },
+          "priceMin": {
+            "description": "Lowest price of the active variants",
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ProductTypeRef"
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "staleAttributes": {
+            "description": "Stale values on the product and its variants",
+            "format": "int64",
+            "type": "integer"
+          },
+          "variantCount": {
+            "description": "All variants, active or not",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "productTypeId",
+          "productType",
+          "modelNumber",
+          "name",
+          "isActive",
+          "available",
+          "variantCount",
+          "attributeErrors",
+          "staleAttributes",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProductPage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductPage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductListItem"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Matching products, all pages",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
       "ProductType": {
         "additionalProperties": false,
         "properties": {
@@ -752,6 +1180,37 @@
         ],
         "type": "object"
       },
+      "ProductTypeRef": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "description": "Badge colour, #rrggbb",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
       "ProductTypeUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -822,6 +1281,65 @@
           "isActive",
           "attributes",
           "instanceAttributes"
+        ],
+        "type": "object"
+      },
+      "ProductUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Product-scope values by key; stale values are kept only if they are sent back",
+            "type": "object"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 5000 characters; if set, \"en\" is required",
+            "type": "object"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if the product changed since, the update fails with product.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "modelNumber": {
+            "description": "Unique ignoring case, at most 100 characters",
+            "examples": [
+              "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 200 characters; \"en\" is required",
+            "type": "object"
+          },
+          "productTypeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "productTypeId",
+          "modelNumber",
+          "name",
+          "isActive"
         ],
         "type": "object"
       },
@@ -1144,6 +1662,333 @@
           "items"
         ],
         "type": "object"
+      },
+      "Variant": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Variant.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "addons": {
+            "description": "In add-on order",
+            "items": {
+              "$ref": "#/components/schemas/Addon"
+            },
+            "type": "array"
+          },
+          "attributeErrors": {
+            "description": "As on the product",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Variant-scope attribute values by key",
+            "type": "object"
+          },
+          "available": {
+            "description": "Variant, product and product type are active",
+            "type": "boolean"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "imageFileId": {
+            "description": "Image, served at /api/files/{id}",
+            "type": "string"
+          },
+          "isActive": {
+            "description": "The variant's own flag",
+            "type": "boolean"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "e.g. Ivory White; \"Standard\" when a product has one variant",
+            "type": "object"
+          },
+          "price": {
+            "description": "List price in USD, a decimal string with two places",
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "staleAttributes": {
+            "additionalProperties": {},
+            "description": "As on the product",
+            "type": "object"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "name",
+          "price",
+          "attributes",
+          "staleAttributes",
+          "attributeErrors",
+          "sortOrder",
+          "isActive",
+          "available",
+          "addons",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "VariantInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/VariantInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Variant-scope values by key",
+            "type": "object"
+          },
+          "imageFileId": {
+            "description": "An uploaded file (POST /api/files); leave out for no image",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Unique within the product (English, ignoring case); at most 100 characters; \"en\" is required",
+            "type": "object"
+          },
+          "price": {
+            "description": "USD as a decimal string: up to 10 digits, optionally a point and 1-2 decimals",
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "sku": {
+            "description": "Unique ignoring case when set; at most 100 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "price",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "VariantOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/VariantOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every variant id of the product, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "VariantPage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/VariantPage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VariantSearchItem"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "VariantSearchItem": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "imageFileId": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Variant name",
+            "type": "object"
+          },
+          "price": {
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ProductTypeRef"
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productTypeId",
+          "productType",
+          "modelNumber",
+          "productName",
+          "name",
+          "price",
+          "available"
+        ],
+        "type": "object"
+      },
+      "VariantUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/VariantUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Variant-scope values by key",
+            "type": "object"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if the variant changed since, the update fails with variant.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "imageFileId": {
+            "description": "An uploaded file (POST /api/files); leave out for no image",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Unique within the product (English, ignoring case); at most 100 characters; \"en\" is required",
+            "type": "object"
+          },
+          "price": {
+            "description": "USD as a decimal string: up to 10 digits, optionally a point and 1-2 decimals",
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "sku": {
+            "description": "Unique ignoring case when set; at most 100 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "name",
+          "price",
+          "isActive"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1378,6 +2223,116 @@
         "summary": "Change the logged-in user's password; ends their other sessions",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/files": {
+      "post": {
+        "description": "Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large). Other content is 415 file.type. JPEG and PNG wider than 1600 px are scaled down to 1600 px in the same format. The same stored bytes always give the same file.",
+        "operationId": "uploadFile",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "file": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": "JPEG, PNG or WebP image, at most 10 MB",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Upload an image",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/files/{id}": {
+      "get": {
+        "description": "Needs a login (the session cookie works for \u003cimg\u003e). Contents never change: the ETag is the SHA-256 and responses may be cached privately for a year; If-None-Match gives 304.",
+        "operationId": "getFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file"
+          },
+          "304": {
+            "description": "Not modified"
+          }
+        },
+        "summary": "Download a file",
+        "tags": [
+          "files"
         ]
       }
     },
@@ -1861,6 +2816,538 @@
         ]
       }
     },
+    "/api/products": {
+      "get": {
+        "description": "One page in catalog order: product type order, then model number.",
+        "operationId": "listProducts",
+        "parameters": [
+          {
+            "description": "Only products of this type",
+            "explode": false,
+            "in": "query",
+            "name": "productTypeId",
+            "schema": {
+              "description": "Only products of this type",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Case-insensitive substring of model number, English or German name, or a variant's SKU",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Case-insensitive substring of model number, English or German name, or a variant's SKU",
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Also list inactive products and products of inactive types",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive products and products of inactive types",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Page size, 1-200",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-200",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List products",
+        "tags": [
+          "products"
+        ]
+      },
+      "post": {
+        "description": "Without variants; add them with createVariant.",
+        "operationId": "createProduct",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a product",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/products/{id}": {
+      "delete": {
+        "operationId": "deleteProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a product with its variants and add-on links",
+        "tags": [
+          "products"
+        ]
+      },
+      "get": {
+        "operationId": "getProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a product with its variants and add-ons",
+        "tags": [
+          "products"
+        ]
+      },
+      "put": {
+        "description": "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt.",
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a product",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/products/{id}/variants": {
+      "post": {
+        "description": "Appended after the product's other variants.",
+        "operationId": "createVariant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variant"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a variant",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/products/{id}/variants/order": {
+      "put": {
+        "description": "ids must list every variant of the product exactly once (422 variant.order_mismatch). Returns the product.",
+        "operationId": "reorderVariants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of a product's variants",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/products/{id}/variants/{variantId}": {
+      "delete": {
+        "operationId": "deleteVariant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a variant and its add-on links (both directions)",
+        "tags": [
+          "products"
+        ]
+      },
+      "put": {
+        "description": "Add-ons are unchanged. Fails with 409 variant.stale if the variant changed since expectedUpdatedAt.",
+        "operationId": "updateVariant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variant"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a variant",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/products/{id}/variants/{variantId}/addons": {
+      "put": {
+        "description": "The complete list in order, in one transaction. Every add-on variant must exist (addon.variant_not_found), differ from the variant (addon.self) and appear once (addon.duplicate). Returns the variant.",
+        "operationId": "replaceVariantAddons",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddonList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variant"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace a variant's add-ons",
+        "tags": [
+          "products"
+        ]
+      }
+    },
     "/api/roles": {
       "get": {
         "operationId": "getRoleMatrix",
@@ -2292,6 +3779,77 @@
         "summary": "Update a user",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/variants": {
+      "get": {
+        "description": "For the add-on picker; in catalog order (product type, model number, variant order). Lists inactive variants too, flagged by available.",
+        "operationId": "searchVariants",
+        "parameters": [
+          {
+            "description": "Case-insensitive substring of model number, product or variant name (en/de) or SKU",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Case-insensitive substring of model number, product or variant name (en/de) or SKU",
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, 1-200",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-200",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Search variants across the catalog",
+        "tags": [
+          "products"
         ]
       }
     }

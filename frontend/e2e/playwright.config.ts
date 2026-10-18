@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 
 import { defineConfig, devices } from '@playwright/test'
 
-import { admin, adminStorageState, backendPort, backendURL, databaseURL, distributorName, frontendPort, frontendURL } from './env'
+import { admin, adminStorageState, backendPort, backendURL, databaseURL, distributorName, frontendPort, frontendURL, storageDir } from './env'
 
 // Run with `make e2e`, which recreates the database first. Servers are always
 // started fresh (against the e2e database) unless E2E_REUSE_SERVERS=1 is set,
@@ -48,7 +48,8 @@ export default defineConfig({
   webServer: [
     {
       name: 'backend',
-      command: 'go run ./cmd/snapflow serve',
+      // Starts with an empty file store, like the database.
+      command: `rm -rf '${storageDir}' && go run ./cmd/snapflow serve`,
       cwd: '../../backend',
       url: `${backendURL}/api/health`,
       reuseExistingServer: reuse,
@@ -63,6 +64,7 @@ export default defineConfig({
         DISTRIBUTOR_NAME: distributorName,
         TRUSTED_PROXIES: '',
         STATIC_DIR: '',
+        STORAGE_DIR: storageDir,
       },
     },
     {

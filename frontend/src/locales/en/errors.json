@@ -1,4 +1,9 @@
 {
+  "addon": {
+    "duplicate": "This add-on is already in the list.",
+    "self": "A variant cannot be its own add-on.",
+    "variant_not_found": "This variant no longer exists."
+  },
   "attribute": {
     "bound_negative": "Lengths and item counts cannot be negative.",
     "bound_range": "This limit must be between {{min}} and {{max}}.",
@@ -48,6 +53,12 @@
     "too_many_attempts": "Too many attempts. Try again in {{seconds}} seconds.",
     "wrong_password": "The current password is wrong."
   },
+  "file": {
+    "not_found": "This file no longer exists.",
+    "too_large": "The file is too large (at most {{maxMb}} MB).",
+    "too_many_pixels": "The image is too large (at most {{megapixels}} megapixels).",
+    "type": "Only JPEG, PNG and WebP images are accepted."
+  },
   "function_type": {
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
@@ -55,6 +66,12 @@
   },
   "network": {
     "unavailable": "No connection to the server."
+  },
+  "product": {
+    "model_number_taken": "The model number \"{{modelNumber}}\" is already used.",
+    "not_found": "This product no longer exists.",
+    "stale": "Someone else changed this product in the meantime. Reload it and make your changes again.",
+    "type_not_found": "The selected product type no longer exists."
   },
   "product_type": {
     "color_format": "Enter a colour as #rrggbb, e.g. #1f6feb.",
@@ -108,5 +125,13 @@
     "required": "This field is required.",
     "too_long": "This value is too long (at most {{max}} characters).",
     "too_many": "There are too many entries (at most {{max}})."
+  },
+  "variant": {
+    "name_taken": "This product already has a variant named \"{{name}}\".",
+    "not_found": "This variant no longer exists.",
+    "order_mismatch": "The variants have changed in the meantime. Please reload and try again.",
+    "price_format": "Enter a price such as 27 or 27.50 (up to 10 digits and 2 decimals).",
+    "sku_taken": "The SKU \"{{sku}}\" is already used.",
+    "stale": "Someone else changed this variant in the meantime. Reload it and make your changes again."
   }
 }

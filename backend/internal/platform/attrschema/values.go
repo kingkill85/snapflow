@@ -298,3 +298,8 @@ func toWhole(v any) (float64, bool) {
 	f, ok := toFloat(v)
 	return f, ok && f == math.Trunc(f)
 }
+
+// Values are the attribute values of one product, variant or unit, by
+// attribute key. Stored as jsonb; read back, numbers are float64 (see the
+// package doc).
+type Values map[string]any

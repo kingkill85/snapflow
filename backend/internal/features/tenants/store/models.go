@@ -13,12 +13,34 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+type File struct {
+	ID          uuid.UUID
+	Sha256      string
+	ContentType string
+	Size        int64
+	Width       *int32
+	Height      *int32
+	CreatedAt   time.Time
+}
+
 type FunctionType struct {
 	ID        uuid.UUID
 	Key       string
 	Name      i18n.Text
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Product struct {
+	ID            uuid.UUID
+	ProductTypeID uuid.UUID
+	ModelNumber   string
+	Name          i18n.Text
+	Description   *i18n.Text
+	Attributes    attrschema.Values
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type ProductType struct {
@@ -33,6 +55,20 @@ type ProductType struct {
 	InstanceAttributes attrschema.InstanceSchema
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+}
+
+type ProductVariant struct {
+	ID          uuid.UUID
+	ProductID   uuid.UUID
+	Name        i18n.Text
+	Sku         *string
+	Price       string
+	ImageFileID *uuid.UUID
+	Attributes  attrschema.Values
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Session struct {
@@ -63,4 +99,11 @@ type User struct {
 	IsActive     bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type VariantAddon struct {
+	VariantID      uuid.UUID
+	AddonVariantID uuid.UUID
+	Required       bool
+	SortOrder      int32
 }

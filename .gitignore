@@ -4,6 +4,8 @@ frontend/dist/
 *.local
 .env
 coverage/
+# Uploaded files of the development server (STORAGE_DIR default)
+backend/data/
 
 # Agent worktrees
 .claude/worktrees/
