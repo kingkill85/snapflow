@@ -2,9 +2,19 @@
 
 Every product or design decision taken while building SnapFlow 2, newest step last. "Claude" decisions were made during implementation on a stated reason; overrule any of them and the next step changes the code. Open questions carry the assumption the code follows until they are answered.
 
+Decisions D1–D94 were reviewed and confirmed by the user on 2026-10-18.
+
 ## Open questions
 
-New ones are added here with the assumption the code follows until they are answered. None are open.
+These come from the rewrite plan and belong to later phases; nothing in phase 1 depends on them. Each states the default the code will follow if it is still open when its phase starts.
+
+| # | Phase | Question | Default until answered |
+| --- | --- | --- | --- |
+| Q1 | 2 | Does a proposal's language follow the project or the customer? | The project's language |
+| Q2 | 2 | Two users on one plan: is a lock with last-write-wins enough, or is real-time collaboration needed? | Edit lock per plan, last write wins after the lock is released |
+| Q3 | 3 | Should the system suggest or auto-place modules for unmet demand? | No; show unmet demand as a check warning only |
+| Q4 | 4 | MCP: read-only, or may it make changes? | Read-only |
+| Q5 | any | Keep the product name "SnapFlow"? | Keep it |
 
 | # | Step | Question | Assumption the code follows |
 | --- | --- | --- | --- |
