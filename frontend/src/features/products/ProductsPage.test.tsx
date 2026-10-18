@@ -8,6 +8,7 @@ import i18n from '@/i18n'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { translation } from '@/test/translatable'
 import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
@@ -313,7 +314,7 @@ describe('ProductsPage', () => {
     expect(last()).toEqual({ search: 'dim', productTypeId: zigbeeType.id, limit: '50', offset: '50' })
 
     await u.click(screen.getByRole('link', { name: 'M485/DIM.4' }))
-    await u.type(await screen.findByLabelText('Name (German)'), ' neu')
+    await u.type(await (await translation(u, document.body, 'Name', 'de')), ' neu')
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
     await u.click(within(await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })).getByRole('button', { name: 'Leave page' }))
 

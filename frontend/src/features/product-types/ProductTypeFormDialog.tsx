@@ -18,16 +18,22 @@ import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   apiFields,
   Button,
-  CheckboxField,
   ColorField,
   errorKey,
   ErrorMessage,
   Field,
   FormDialog,
+  FormTranslatableField,
+  fromTranslatable,
   setApiFieldErrors,
+  SwitchField,
+  toTranslatable,
+  translatableApiFields,
+  translatableSchema,
   TypeBadge,
   useFieldError,
 } from '@/components/ui'
+import { useLocalized } from '@/i18n/localized'
 
 /** Limits of the API. */
 const limits = { key: 64, name: 100, abbreviation: 6 }
@@ -53,12 +59,7 @@ const schema = z.object({
     .string()
     .regex(/^[a-z][a-z0-9_]*$/, errorKey('product_type.key_format'))
     .max(limits.key, errorKey('validation.too_long', { max: limits.key })),
-  nameEn: z
-    .string()
-    .trim()
-    .min(1, errorKey('validation.required'))
-    .max(limits.name, errorKey('validation.too_long', { max: limits.name })),
-  nameDe: z.string().trim().max(limits.name, errorKey('validation.too_long', { max: limits.name })),
+  name: translatableSchema({ max: limits.name, required: errorKey('validation.required') }),
   abbreviation: z
     .string()
     .trim()
@@ -71,12 +72,11 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = apiFields<FormValues>(['key', 'abbreviation', 'color', 'isActive'], { 'name.en': 'nameEn', 'name.de': 'nameDe' })
+const fields = { ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'isActive']), ...translatableApiFields('name') }
 
 const toFormValues = (item: ProductType | null): FormValues => ({
   key: item?.key ?? '',
-  nameEn: item?.name.en ?? '',
-  nameDe: item?.name.de ?? '',
+  name: toTranslatable(item?.name),
   abbreviation: item?.abbreviation ?? '',
   color: item?.color ?? '',
   isActive: item?.isActive ?? true,
@@ -87,7 +87,7 @@ const toInput = (v: FormValues): ProductTypeInput => {
   const color = v.color.trim().toLowerCase()
   return {
     key: v.key,
-    name: { en: v.nameEn, ...(v.nameDe ? { de: v.nameDe } : {}) },
+    name: fromTranslatable(v.name),
     ...(abbreviation ? { abbreviation } : {}),
     ...(color ? { color } : {}),
     isActive: v.isActive,
@@ -111,6 +111,7 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
   const { t } = useTranslation('productTypes')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
+  const localized = useLocalized()
   const queryClient = useQueryClient()
   const create = useCreateProductType()
   const update = useUpdateProductType()
@@ -138,7 +139,7 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
     resetUpdate()
   }, [open, item, reset, resetCreate, resetUpdate])
 
-  const [nameEn, abbreviation, color] = useWatch({ control: form.control, name: ['nameEn', 'abbreviation', 'color'] })
+  const [name, abbreviation, color] = useWatch({ control: form.control, name: ['name', 'abbreviation', 'color'] })
   const previewColor = /^#[0-9a-fA-F]{6}$/.test(color.trim()) ? color.trim() : undefined
 
   const submit = form.handleSubmit(async (values) => {
@@ -197,11 +198,15 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
         />
       }
     >
-      <Field label={t('field.key')} hint={t('field.keyHint')} error={fieldError(errors.key?.message)} {...form.register('key')} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('field.nameEn')} error={fieldError(errors.nameEn?.message)} {...form.register('nameEn')} />
-        <Field label={t('field.nameDe')} error={fieldError(errors.nameDe?.message)} {...form.register('nameDe')} />
-      </div>
+      <Field
+        label={t('field.key')}
+        hint={t('field.keyHint')}
+        required
+        autoComplete="off"
+        error={fieldError(errors.key?.message)}
+        {...form.register('key')}
+      />
+      <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
       <div className="grid items-start gap-4 sm:grid-cols-2">
         <Field
           label={t('field.abbreviation')}
@@ -232,11 +237,11 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
         <p className="text-sm font-medium">{t('field.preview')}</p>
         <div data-testid="badge-preview" className="rounded-control border border-line bg-canvas px-3 py-2 text-sm">
           <TypeBadge color={previewColor} abbreviation={normalizedAbbreviation(abbreviation)}>
-            {nameEn.trim() || t('field.previewName')}
+            {localized(name).trim() || t('field.previewName')}
           </TypeBadge>
         </div>
       </div>
-      <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
+      <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
     </FormDialog>
   )
 }

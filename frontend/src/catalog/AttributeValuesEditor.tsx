@@ -7,7 +7,7 @@ import { useLocalized } from '@/i18n/localized'
 
 import { type AttributeFormValue, type AttributeFormValues, type Definition, formValueOf, isRaw, rawItems } from './attribute-values'
 
-/** The hint under an attribute's input: required, its bounds, its description. */
+/** The hint under an attribute's input: its bounds and its description (required is marked at the label, D113). */
 function useHint() {
   const { t } = useTranslation('catalog')
   const localized = useLocalized()
@@ -18,7 +18,7 @@ function useHint() {
     return undefined
   }
   return (d: Definition) => {
-    const parts: (string | undefined)[] = [d.required ? t('hint.required') : undefined]
+    const parts: (string | undefined)[] = []
     if (d.type === 'text') parts.push(bounds('length', d.min, d.max))
     if (d.type === 'number' || d.type === 'integer') parts.push(bounds('range', d.min, d.max))
     if (d.type === 'integer') parts.push(t('hint.whole'))
@@ -95,7 +95,7 @@ function AttributeControl({ definition: d, value, onChange, error, disabled }: A
           error={error}
           value={text}
           disabled={disabled}
-          aria-required={d.required || undefined}
+          required={d.required}
           onValueChange={onChange}
           options={[
             { value: '', label: t('notSet') },
@@ -115,6 +115,7 @@ function AttributeControl({ definition: d, value, onChange, error, disabled }: A
             value={list}
             unknownLabel={unknownOption}
             disabled={disabled}
+            required={d.required}
             onChange={onChange}
           />
         )
@@ -127,6 +128,7 @@ function AttributeControl({ definition: d, value, onChange, error, disabled }: A
           value={list}
           suffix={d.unit}
           disabled={disabled}
+          required={d.required}
           inputMode={d.itemType === 'integer' ? 'numeric' : d.itemType === 'number' ? 'decimal' : undefined}
           onChange={onChange}
         />
@@ -140,7 +142,7 @@ function AttributeControl({ definition: d, value, onChange, error, disabled }: A
           suffix={d.unit}
           value={text}
           disabled={disabled}
-          aria-required={d.required || undefined}
+          required={d.required}
           inputMode={d.type === 'integer' ? 'numeric' : d.type === 'number' ? 'decimal' : undefined}
           autoComplete="off"
           onChange={(e) => onChange(e.target.value)}

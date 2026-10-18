@@ -23,7 +23,6 @@ import { catalogCurrency } from '@/catalog/money'
 import {
   type ApiFieldMap,
   Button,
-  CheckboxField,
   EmptyState,
   ErrorMessage,
   errorKey,
@@ -31,6 +30,7 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  FormTranslatableField,
   ImageUpload,
   LeaveLink,
   Loading,
@@ -38,6 +38,7 @@ import {
   Page,
   Section,
   setApiFieldErrors,
+  SwitchField,
   toFieldErrors,
   useErrorMessage,
   useFieldError,
@@ -255,7 +256,6 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
     setErrorRevision((r) => r + 1)
   }
 
-
   const errorAt = (name: `values.${string}` | `keep.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
 
   const chooseImage = async (file: File) => {
@@ -327,14 +327,14 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
       {loaded && loaded.isActive && !loaded.available && <Notice tone="warning">{t('variant.productInactive')}</Notice>}
       <Fieldset disabled={readOnly}>
         <Section title={t('variant.section.basics')}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label={t('variant.field.nameEn')}
-              hint={t('variant.field.nameHint')}
-              error={fieldError(errors.name?.en?.message)}
-              {...form.register('name.en')}
-            />
-            <Field label={t('variant.field.nameDe')} error={fieldError(errors.name?.de?.message)} {...form.register('name.de')} />
+          <FormTranslatableField
+            control={form.control}
+            name="name"
+            label={t('variant.field.name')}
+            hint={t('variant.field.nameHint')}
+            required
+          />
+          <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field
               label={t('variant.field.sku')}
               hint={t('variant.field.skuHint')}
@@ -345,6 +345,7 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
             <Field
               label={t('variant.field.price')}
               hint={t('variant.field.priceHint')}
+              required
               suffix={catalogCurrency}
               inputMode="decimal"
               autoComplete="off"
@@ -364,7 +365,7 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
             onSelect={(file) => void chooseImage(file)}
             onRemove={removeImage}
           />
-          <CheckboxField label={t('variant.field.active')} hint={t('variant.field.activeHint')} {...form.register('isActive')} />
+          <SwitchField label={t('variant.field.active')} hint={t('variant.field.activeHint')} {...form.register('isActive')} />
         </Section>
         <Section title={t('variant.section.attributes')} description={t('variant.section.attributesHint')}>
           {loaded && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}

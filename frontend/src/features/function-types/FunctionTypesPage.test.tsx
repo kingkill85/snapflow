@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FunctionType } from '@/api/generated/model'
 import { userMe } from '@/test/fixtures'
+import { translation } from '@/test/translatable'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -60,7 +61,7 @@ describe('FunctionTypesPage', () => {
     await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
-    await user.type(within(dialog).getByLabelText('Name (English)'), 'Dimmer')
+    await user.type((await translation(user, dialog, 'Name', 'en')), 'Dimmer')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -97,9 +98,45 @@ describe('FunctionTypesPage', () => {
     await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
-    await user.type(within(dialog).getByLabelText('Name (English)'), 'Dimmer')
+    await user.type((await translation(user, dialog, 'Name', 'en')), 'Dimmer')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('The key "dimmer" is already used.')
+  })
+
+  it('shows a server error of one language on the tab of that language', async () => {
+    server.use(
+      http.get('/api/function-types', () => HttpResponse.json({ items: [] })),
+      http.post('/api/function-types', () =>
+        HttpResponse.json(
+          {
+            status: 422,
+            code: 'validation.failed',
+            fields: [{ location: 'body.name.de', code: 'validation.control_chars' }],
+          },
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
+    await user.type(await translation(user, dialog, 'Name', 'en'), 'Dimmer')
+    await user.type(await translation(user, dialog, 'Name', 'de'), 'Dimmer')
+    await user.click(within(dialog).getByRole('tab', { name: 'English' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+
+    // The German tab opens, is marked, and its input shows the error.
+    const german = within(dialog).getByRole('tab', { name: 'German' })
+    await waitFor(() => expect(german).toHaveAttribute('aria-selected', 'true'))
+    expect(german).toHaveAccessibleDescription('Has an error')
+    expect(within(dialog).getByRole('tab', { name: 'English' })).toHaveAccessibleDescription('Filled in')
+    const input = within(dialog).getByLabelText('Name')
+    expect(input).toHaveAttribute('lang', 'de')
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAccessibleDescription(/control characters/i)
   })
 })

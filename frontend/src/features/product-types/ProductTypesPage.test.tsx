@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { ProductType, ProductTypeInput, ProductTypeUpdate } from '@/api/generated/model'
 import { getSearchVariantsQueryKey } from '@/api/generated/products/products'
 import { adminMe, userMe } from '@/test/fixtures'
+import { translation } from '@/test/translatable'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -128,7 +129,7 @@ describe('ProductTypesPage', () => {
     expect(within(preview).getByTestId('type-color')).toBeInTheDocument()
 
     await u.type(within(dialog).getByLabelText('Key'), 'knx')
-    await u.type(within(dialog).getByLabelText('Name (English)'), 'KNX')
+    await u.type((await translation(u, dialog, 'Name', 'en')), 'KNX')
     await u.type(within(dialog).getByLabelText('Abbreviation'), ' knx ')
     await u.type(within(dialog).getByLabelText('Colour'), '#FFCC00')
     // The preview follows the form; a light colour gets black text.
@@ -183,7 +184,7 @@ describe('ProductTypesPage', () => {
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(within(dialog).getByLabelText('Key')).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
-    expect(within(dialog).getByLabelText('Name (English)')).toHaveAccessibleDescription('This field is required.')
+    expect(await translation(u, dialog, 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
     expect(within(dialog).getByLabelText('Abbreviation')).toHaveAccessibleDescription('This value is too long (at most 6 characters).')
     expect(within(dialog).getByLabelText('Colour')).toHaveAccessibleDescription('Enter a colour as #rrggbb, e.g. #1f6feb.')
     expect(posted).toBe(false)
@@ -200,7 +201,7 @@ describe('ProductTypesPage', () => {
     await u.click(await screen.findByRole('button', { name: 'New product type' }))
     const dialog = await screen.findByRole('dialog')
     await u.type(within(dialog).getByLabelText('Key'), 'zigbee')
-    await u.type(within(dialog).getByLabelText('Name (English)'), 'Zigbee')
+    await u.type((await translation(u, dialog, 'Name', 'en')), 'Zigbee')
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('The key "zigbee" is already used.')
@@ -259,7 +260,7 @@ describe('ProductTypesPage', () => {
 
     // Reload starts over from the current version.
     await u.click(within(alert).getByRole('button', { name: 'Reload' }))
-    await waitFor(() => expect(within(dialog).getByLabelText('Name (English)')).toHaveValue('Zigbee 3.0'))
+    await waitFor(async () => expect(await translation(u, dialog, 'Name', 'en')).toHaveValue('Zigbee 3.0'))
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     await u.click(within(dialog).getByLabelText('Active'))
     await u.click(within(dialog).getByRole('button', { name: 'Update' }))

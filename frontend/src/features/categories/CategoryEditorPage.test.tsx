@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
@@ -9,6 +9,7 @@ import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { shownTranslation, translation } from '@/test/translatable'
 import { chooseOption } from '@/test/select'
 
 import { CategoryEditorPage } from './CategoryEditorPage'
@@ -50,7 +51,9 @@ const existing: Category = {
 }
 const editRoute = `/catalog/categories/${existing.id}`
 
-const group = (name: string, container: HTMLElement = document.body) => within(container).getByRole('group', { name })
+/** A group by name; an attribute card is named by its position and label, e.g. "Attribute 2: Colour". */
+const group = (name: string, container: HTMLElement = document.body) =>
+  within(container).getByRole('group', { name: (n) => n === name || n.startsWith(`${name}: `) })
 /** The attribute row's own field (option rows inside repeat the labels). */
 const own = (row: HTMLElement, label: string) => within(row).getAllByLabelText(label)[0]
 const region = (name: string) => screen.getByRole('region', { name })
@@ -58,6 +61,11 @@ const attributesRegion = () => region('Attributes')
 const instanceRegion = () => region('Instance attributes')
 
 type User = ReturnType<typeof userEvent.setup>
+/** Chooses an entry of an attribute card's "⋯" menu (move to top or bottom, insert below, duplicate, remove). */
+async function cardAction(u: User, card: HTMLElement, action: string) {
+  await u.click(within(card).getByRole('button', { name: /^More actions for attribute \d+$/ }))
+  await u.click(await screen.findByRole('menuitem', { name: action }))
+}
 /** Rows of an existing type start collapsed. */
 const expandAll = (u: User, section: HTMLElement) => u.click(within(section).getByRole('button', { name: 'Expand all' }))
 
@@ -101,14 +109,14 @@ describe('CategoryEditorPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'New category' })).toBeInTheDocument()
     await u.type(screen.getByLabelText('Key'), 'gateway')
-    await u.type(screen.getByLabelText('Name (English)'), 'Gateway')
-    await u.type(screen.getByLabelText('Name (German)'), 'Gateway')
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'Gateway')
+    await u.type((await translation(u, document.body, 'Name', 'de')), 'Gateway')
 
     const attributes = attributesRegion()
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const row = group('Attribute 1', attributes)
     await u.type(own(row, 'Key'), 'bus_system')
-    await u.type(own(row, 'Label (English)'), 'Bus system')
+    await u.type((await translation(u, row, 'Label', 'en')), 'Bus system')
     // Bounds of a text attribute are lengths; an enum has none.
     expect(within(row).getByLabelText('Maximum length')).toBeInTheDocument()
     await u.type(within(row).getByLabelText('Maximum length'), '20')
@@ -121,10 +129,10 @@ describe('CategoryEditorPage', () => {
     await u.click(within(row).getByRole('button', { name: 'Add option' }))
     await u.click(within(row).getByRole('button', { name: 'Add option' }))
     await u.type(within(group('Option 1', row)).getByLabelText('Key'), 'zigbee')
-    await u.type(within(group('Option 1', row)).getByLabelText('Label (English)'), 'Zigbee')
+    await u.type((await translation(u, group('Option 1', row), 'Label', 'en')), 'Zigbee')
     await u.type(within(group('Option 2', row)).getByLabelText('Key'), 'knx')
-    await u.type(within(group('Option 2', row)).getByLabelText('Label (English)'), 'KNX')
-    await u.type(within(group('Option 2', row)).getByLabelText('Label (German)'), 'KNX')
+    await u.type((await translation(u, group('Option 2', row), 'Label', 'en')), 'KNX')
+    await u.type((await translation(u, group('Option 2', row), 'Label', 'de')), 'KNX')
     // Move KNX first.
     await u.click(within(group('Option 2', row)).getByRole('button', { name: 'Move option 2 up' }))
 
@@ -162,16 +170,18 @@ describe('CategoryEditorPage', () => {
 
     const basics = region('Basics')
     expect(within(basics).getByLabelText('Key')).toHaveValue('dimmer_actuator')
-    expect(within(basics).getByLabelText('Name (German)')).toHaveValue('Dimmaktor')
-    expect(within(basics).getByLabelText('Description (English)')).toHaveValue('DIN rail dimmer')
+    expect(await translation(u, basics, 'Name', 'de')).toHaveValue('Dimmaktor')
+    expect(await translation(u, basics, 'Description', 'en')).toHaveValue('DIN rail dimmer')
 
     // Collapsed rows summarise what they define.
     const attributes = attributesRegion()
     const width = group('Attribute 1', attributes)
-    expect(width).toHaveTextContent('Width · Whole number · TE · Required · Product')
+    // Titled by the label, with key, type, unit, required and scope beside it (D114).
+    expect(screen.getByRole('group', { name: 'Attribute 1: Width' })).toBe(width)
+    expect(width).toHaveTextContent('width_te · Whole number · TE · Required · Product')
     expect(within(width).queryByLabelText('Key')).not.toBeInTheDocument()
-    expect(group('Attribute 2', attributes)).toHaveTextContent('Colour · Choice · Variant')
-    expect(group('Attribute 1', instanceRegion())).toHaveTextContent('Bus address · Text · Required')
+    expect(group('Attribute 2', attributes)).toHaveTextContent('Colourcolour · Choice · Variant')
+    expect(group('Attribute 1', instanceRegion())).toHaveTextContent('Bus addressbus_address · Text · Required')
 
     await expandAll(u, attributes)
     expect(own(width, 'Key')).toHaveValue('width_te')
@@ -182,7 +192,7 @@ describe('CategoryEditorPage', () => {
     expect(within(width).getByLabelText('Required')).toBeChecked()
     const colour = group('Attribute 2', attributes)
     expect(within(colour).getByLabelText('Set per')).toHaveTextContent('Variant')
-    expect(within(group('Option 1', colour)).getByLabelText('Label (German)')).toHaveValue('Weiß')
+    expect(await translation(u, group('Option 1', colour), 'Label', 'de')).toHaveValue('Weiß')
     const protocols = group('Attribute 3', attributes)
     expect(within(protocols).getByLabelText('Item type')).toHaveTextContent('Text')
     expect(within(protocols).getByLabelText('Maximum items')).toHaveValue('4')
@@ -264,7 +274,7 @@ describe('CategoryEditorPage', () => {
       'The maximum must not be below the minimum (5).',
     )
 
-    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Remove attribute 2' }))
+    await cardAction(u, group('Attribute 2', attributes), 'Remove')
 
     const protocols = group('Attribute 2', attributes)
     expect(own(protocols, 'Key')).toHaveValue('protocols')
@@ -339,7 +349,7 @@ describe('CategoryEditorPage', () => {
     renderRoutes(routes, { me: adminMe, route: '/catalog/categories/new' })
 
     await u.type(await screen.findByLabelText('Key'), 'Bad Key')
-    await u.type(screen.getByLabelText('Name (German)'), 'x'.repeat(101))
+    await u.type((await translation(u, document.body, 'Name', 'de')), 'x'.repeat(101))
     const attributes = attributesRegion()
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const row = group('Attribute 1', attributes)
@@ -358,9 +368,9 @@ describe('CategoryEditorPage', () => {
     const key = within(region('Basics')).getByLabelText('Key')
     expect(key).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
     expect(key).toHaveFocus()
-    expect(screen.getByLabelText('Name (English)')).toHaveAccessibleDescription('This field is required.')
-    expect(screen.getByLabelText('Name (German)')).toHaveAccessibleDescription('This value is too long (at most 100 characters).')
-    expect(own(row, 'Label (English)')).toHaveAccessibleDescription('An English label is required.')
+    expect(await translation(u, document.body, 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
+    expect(await translation(u, document.body, 'Name', 'de')).toHaveAccessibleDescription('This value is too long (at most 100 characters).')
+    expect(await translation(u, row, 'Label', 'en')).toHaveAccessibleDescription('An English label is required.')
     expect(within(row).getByLabelText('Maximum')).toHaveAccessibleDescription('The maximum must not be below the minimum (10).')
     expect(within(row).getByLabelText('Unit')).toHaveAccessibleDescription('This value is too long (at most 16 characters).')
     expect(own(choice, 'Key')).toHaveAccessibleDescription('This key is used twice.')
@@ -426,18 +436,56 @@ describe('CategoryEditorPage', () => {
   it('requires the English text when only a German description is given', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
-    await u.clear(within(region('Basics')).getByLabelText('Description (English)'))
-    await u.type(within(region('Basics')).getByLabelText('Description (German)'), 'Dimmer für die Hutschiene')
+    await u.clear(await translation(u, region('Basics'), 'Description', 'en'))
+    await u.type((await translation(u, region('Basics'), 'Description', 'de')), 'Dimmer für die Hutschiene')
     const attributes = attributesRegion()
     await expandAll(u, attributes)
     const width = group('Attribute 1', attributes)
-    await u.type(own(width, 'Description (German)'), 'Breite in TE')
+    await u.type((await translation(u, width, 'Description', 'de')), 'Breite in TE')
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
-    expect(within(region('Basics')).getByLabelText('Description (English)')).toHaveAccessibleDescription('This field is required.')
-    expect(own(width, 'Description (English)')).toHaveAccessibleDescription('This field is required.')
+    // The English tabs open by themselves (the German ones were shown), and the first one is focused.
+    const basics = shownTranslation(region('Basics'), 'Description')
+    expect(basics.language).toBe('English')
+    expect(basics.input).toHaveAttribute('lang', 'en')
+    expect(basics.input).toHaveAccessibleDescription('This field is required.')
+    expect(basics.input).toHaveFocus()
+    const own = shownTranslation(width, 'Description')
+    expect(own.language).toBe('English')
+    expect(own.input).toHaveAccessibleDescription('This field is required.')
     expect(puts).toHaveLength(0)
+  })
+
+  it('shows a server error of an option label translation on its tab in a collapsed card, also after a second save', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, {
+        code: 'validation.failed',
+        fields: [{ location: 'body.attributes[1].options[0].label.de', code: 'validation.control_chars' }],
+      }),
+    )
+    const attributes = attributesRegion()
+    expect(within(group('Attribute 2', attributes)).queryByLabelText('Key')).not.toBeInTheDocument()
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    // The card opens, the German tab of the option's label opens and its input is focused.
+    const white = group('Option 1', group('Attribute 2', attributes))
+    await waitFor(() => expect(shownTranslation(white, 'Label').language).toBe('German'))
+    const label = shownTranslation(white, 'Label').input
+    expect(label).toHaveValue('Weiß')
+    expect(label).toHaveAccessibleDescription(/control characters/i)
+    expect(label).toHaveFocus()
+    expect(within(white).getByRole('tab', { name: 'German' })).toHaveAccessibleDescription('Has an error')
+
+    // Looking at the English text and saving again: back to the German error.
+    await u.click(within(white).getByRole('tab', { name: 'English' }))
+    expect(shownTranslation(white, 'Label').language).toBe('English')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    const option = () => group('Option 1', group('Attribute 2', attributesRegion()))
+    await waitFor(() => expect(shownTranslation(option(), 'Label').language).toBe('German'))
+    expect(shownTranslation(option(), 'Label').input).toHaveFocus()
   })
 
   it('sends only what applies after an attribute type change', async () => {
@@ -453,7 +501,7 @@ describe('CategoryEditorPage', () => {
     await chooseOption(u, within(protocols).getByLabelText('Item type'), 'Choice')
     await u.click(within(protocols).getByRole('button', { name: 'Add option' }))
     await u.type(within(group('Option 1', protocols)).getByLabelText('Key'), 'knx')
-    await u.type(within(group('Option 1', protocols)).getByLabelText('Label (English)'), 'KNX')
+    await u.type((await translation(u, group('Option 1', protocols), 'Label', 'en')), 'KNX')
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -503,12 +551,18 @@ describe('CategoryEditorPage', () => {
     expect(within(group('Attribute 2', attributes)).queryByLabelText('Key')).not.toBeInTheDocument()
 
     // Protocols to the top; focus stays on a move button that still works.
-    await u.click(within(group('Attribute 3', attributes)).getByRole('button', { name: 'Move attribute 3 to the top' }))
+    await cardAction(u, group('Attribute 3', attributes), 'Move to top')
     expect(group('Attribute 1', attributes)).toHaveTextContent('Protocols')
+    expect(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Move attribute 1 down' })).toHaveFocus()
+    // To the bottom and back from the menu: focus lands on the moved card's working move button.
+    await cardAction(u, group('Attribute 1', attributes), 'Move to bottom')
+    expect(group('Attribute 3', attributes)).toHaveTextContent('Protocols')
+    expect(within(group('Attribute 3', attributes)).getByRole('button', { name: 'Move attribute 3 up' })).toHaveFocus()
+    await cardAction(u, group('Attribute 3', attributes), 'Move to top')
     expect(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Move attribute 1 down' })).toHaveFocus()
 
     // Duplicate width (now attribute 2): an open copy below, whose key must be changed.
-    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Duplicate attribute 2' }))
+    await cardAction(u, group('Attribute 2', attributes), 'Duplicate')
     const copy = group('Attribute 3', attributes)
     expect(own(copy, 'Key')).toHaveValue('width_te_copy')
     expect(own(copy, 'Key')).toHaveFocus()
@@ -520,16 +574,19 @@ describe('CategoryEditorPage', () => {
     await u.type(own(copy, 'Key'), 'height_te')
 
     // Insert an empty row below the first.
-    await u.click(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Insert below attribute 1' }))
+    await cardAction(u, group('Attribute 1', attributes), 'Insert below')
     const inserted = group('Attribute 2', attributes)
     expect(own(inserted, 'Key')).toHaveValue('')
     expect(own(inserted, 'Key')).toHaveFocus()
     await u.type(own(inserted, 'Key'), 'bus_system')
-    await u.type(own(inserted, 'Label (English)'), 'Bus system')
+    await u.type((await translation(u, inserted, 'Label', 'en')), 'Bus system')
 
     // Move the colour (last) to the bottom is disabled; to the top works.
     const last = group('Attribute 5', attributes)
-    expect(within(last).getByRole('button', { name: 'Move attribute 5 to the bottom' })).toBeDisabled()
+    await u.click(within(last).getByRole('button', { name: 'More actions for attribute 5' }))
+    expect(await screen.findByRole('menuitem', { name: 'Move to bottom' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Move to top' })).not.toHaveAttribute('aria-disabled')
+    await u.keyboard('{Escape}')
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -544,10 +601,10 @@ describe('CategoryEditorPage', () => {
     const attributes = attributesRegion()
 
     // Removing focuses the next row's first control ...
-    await u.click(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Remove attribute 1' }))
+    await cardAction(u, group('Attribute 1', attributes), 'Remove')
     expect(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Expand attribute 1' })).toHaveFocus()
     // ... or, without a next row, the add button.
-    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Remove attribute 2' }))
+    await cardAction(u, group('Attribute 2', attributes), 'Remove')
     expect(within(attributes).getByRole('button', { name: 'Add attribute' })).toHaveFocus()
 
     // Adding focuses the new row's first field, at the end or at the top.
@@ -579,8 +636,8 @@ describe('CategoryEditorPage', () => {
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: editRoute })
 
-    await u.clear(await screen.findByLabelText('Name (English)'))
-    await u.type(screen.getByLabelText('Name (English)'), 'My dimmer')
+    await u.clear(await (await translation(u, document.body, 'Name', 'en')))
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'My dimmer')
     version = { ...existing, name: { en: 'Their dimmer' }, updatedAt: '2026-02-01T00:00:00Z' }
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -588,7 +645,7 @@ describe('CategoryEditorPage', () => {
     expect(alert).toHaveTextContent('Someone else changed this category in the meantime.')
     await u.click(within(alert).getByRole('button', { name: 'Reload' }))
 
-    await waitFor(() => expect(screen.getByLabelText('Name (English)')).toHaveValue('Their dimmer'))
+    await waitFor(async () => expect(await translation(u, document.body, 'Name', 'en')).toHaveValue('Their dimmer'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -612,7 +669,7 @@ describe('CategoryEditorPage', () => {
     })
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
-    expect(await screen.findByLabelText('Name (English)')).toHaveValue('Fresh name')
+    expect(await (await translation(u, document.body, 'Name', 'en'))).toHaveValue('Fresh name')
     expect(gets).toHaveLength(1)
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -624,13 +681,13 @@ describe('CategoryEditorPage', () => {
     const u = userEvent.setup()
     await openEditor()
 
-    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    await u.type((await translation(u, document.body, 'Name', 'de')), ' neu')
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
 
     let dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
     await u.click(within(dialog).getByRole('button', { name: 'Stay' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByLabelText('Name (German)')).toHaveValue('Dimmaktor neu')
+    expect(await translation(u, document.body, 'Name', 'de')).toHaveValue('Dimmaktor neu')
 
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
     dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
@@ -661,17 +718,17 @@ describe('CategoryEditorPage', () => {
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: editRoute })
 
-    await u.clear(await screen.findByLabelText('Name (English)'))
-    await u.type(screen.getByLabelText('Name (English)'), 'Saved name')
+    await u.clear(await (await translation(u, document.body, 'Name', 'en')))
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'Saved name')
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Name (English)')).toHaveValue('Saved name')
+    expect(await translation(u, document.body, 'Name', 'en')).toHaveValue('Saved name')
     // The saved version is clean: no prompt, Back to list.
     expect(screen.getByRole('link', { name: 'Back to list' })).toBeInTheDocument()
 
     // The notice is over once something changes; the next update sends the saved version.
-    await u.type(screen.getByLabelText('Name (English)'), ' 2')
+    await u.type((await translation(u, document.body, 'Name', 'en')), ' 2')
     expect(screen.queryByText('Saved.')).not.toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
@@ -686,7 +743,7 @@ describe('CategoryEditorPage', () => {
     await openEditor()
 
     expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/categories')
-    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    await u.type((await translation(u, document.body, 'Name', 'de')), ' neu')
     expect(screen.queryByRole('link', { name: 'Back to list' })).not.toBeInTheDocument()
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
     const dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
@@ -714,6 +771,13 @@ describe('CategoryEditorPage', () => {
     const attributes = attributesRegion()
     expect(own(group('Attribute 1', attributes), 'Key')).toBeDisabled()
     expect(within(group('Option 1', group('Attribute 2', attributes))).getByLabelText('Key')).toHaveValue('white')
+    // Every translation can be read: the language tabs still work (a plain click: user-event treats
+    // everything inside a disabled fieldset as disabled, browsers only its controls).
+    const name = within(region('Basics'))
+    expect(name.getByLabelText('Name')).toHaveValue('Dimmer actuator')
+    fireEvent.click(within(region('Basics')).getAllByRole('tab', { name: 'German' })[0])
+    expect(name.getByLabelText('Name')).toHaveValue('Dimmaktor')
+    expect(name.getByLabelText('Name')).toBeDisabled()
     expect(
       screen.queryByRole('button', { name: /update|add attribute|remove|move|duplicate|insert|expand|collapse/i }),
     ).not.toBeInTheDocument()

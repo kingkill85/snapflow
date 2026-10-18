@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { [[.Type]] } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
+import { translation } from '@/test/translatable'
 
 import { [[.Plural]]Page } from './[[.Plural]]Page'
 
@@ -38,7 +39,7 @@ describe('[[.Plural]]Page', () => {
 
     await user.click((await screen.findAllByRole('button', { name: /new/i }))[0])
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name (English)'), 'Sample')
+    await user.type(await translation(user, dialog, 'Name', 'en'), 'Sample')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

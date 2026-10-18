@@ -4,7 +4,6 @@
   "yes": "Yes",
   "no": "No",
   "hint": {
-    "required": "Required",
     "length": "{{min}} to {{max}} characters",
     "lengthMin": "At least {{min}} characters",
     "lengthMax": "At most {{max}} characters",

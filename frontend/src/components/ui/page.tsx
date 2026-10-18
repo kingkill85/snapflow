@@ -13,15 +13,16 @@ type PageProps = {
   children: ReactNode
   /**
    * `wide` for list and data pages, so tables get the screen (D95); the
-   * default keeps forms and editors at a readable width.
+   * default keeps forms and editors at a readable width; `narrow` for a
+   * single column of short forms, e.g. the profile (D116).
    */
-  width?: 'default' | 'wide'
+  width?: 'default' | 'wide' | 'narrow'
 }
 
 /** Every page: header with title and actions, then content. */
 export function Page({ title, description, actions, width = 'default', children }: PageProps) {
   return (
-    <div className={cn('mx-auto w-full space-y-6 px-4 py-6 sm:px-6', width === 'wide' ? 'max-w-[96rem]' : 'max-w-6xl')}>
+    <div className={cn('mx-auto w-full space-y-6 px-4 py-6 sm:px-6', { wide: 'max-w-[96rem]', default: 'max-w-6xl', narrow: 'max-w-3xl' }[width])}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">{title}</h1>

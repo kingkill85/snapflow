@@ -9,8 +9,6 @@
   "field": {
     "key": "Schlüssel",
     "name": "Name",
-    "keyHint": "z. B. dimmer, switching, blind",
-    "nameEn": "Name (Englisch)",
-    "nameDe": "Name (Deutsch)"
+    "keyHint": "z. B. dimmer, switching, blind"
   }
 }

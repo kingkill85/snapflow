@@ -20,10 +20,6 @@
     "home": "Go to start page",
     "moveUpItem": "Move {{item}} up",
     "moveDownItem": "Move {{item}} down",
-    "moveTopItem": "Move {{item}} to the top",
-    "moveBottomItem": "Move {{item}} to the bottom",
-    "insertBelowItem": "Insert below {{item}}",
-    "duplicateItem": "Duplicate {{item}}",
     "removeItem": "Remove {{item}}",
     "expandItem": "Expand {{item}}",
     "collapseItem": "Collapse {{item}}",
@@ -39,7 +35,12 @@
     "keep": "Keep",
     "undo": "Undo",
     "signOutEverywhere": "Sign out everywhere",
-    "close": "Close"
+    "close": "Close",
+    "moreItem": "More actions for {{item}}",
+    "moveTop": "Move to top",
+    "moveBottom": "Move to bottom",
+    "insertBelow": "Insert below",
+    "duplicate": "Duplicate"
   },
   "state": {
     "loading": "Loading…",
@@ -51,7 +52,8 @@
     "errorTitle": "Something went wrong",
     "error": "This page could not be shown. Please reload it or go to the start page.",
     "hasErrors": "Contains errors",
-    "none": "None"
+    "none": "None",
+    "required": "Required"
   },
   "account": {
     "profile": "Profile",
@@ -100,5 +102,12 @@
     "system": "System",
     "light": "Light",
     "dark": "Dark"
+  },
+  "translation": {
+    "languages": "Translations of {{field}}",
+    "filled": "Filled in",
+    "missing": "Not translated yet",
+    "error": "Has an error",
+    "required": "Required, not filled in yet"
   }
 }

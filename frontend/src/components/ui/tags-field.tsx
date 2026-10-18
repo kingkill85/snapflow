@@ -1,4 +1,3 @@
-import * as LabelPrimitive from '@radix-ui/react-label'
 import { Plus, X } from 'lucide-react'
 import { type ComponentProps, type KeyboardEvent, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { Button } from './button'
 import { Input } from './field'
 import { IconButton } from './icon-button'
+import { FieldLabel } from './label'
 
 type TagsFieldProps = {
   label: string
@@ -20,6 +20,8 @@ type TagsFieldProps = {
   /** Shown after each item, e.g. a unit. */
   suffix?: string
   inputMode?: ComponentProps<'input'>['inputMode']
+  /** Marks the label with an asterisk and the input with aria-required. */
+  required?: boolean
 }
 
 /**
@@ -27,7 +29,7 @@ type TagsFieldProps = {
  * added with Enter, the Add button or by leaving the input, and shown as a
  * removable chip.
  */
-export function TagsField({ label, value, onChange, error, hint, disabled, suffix, inputMode }: TagsFieldProps) {
+export function TagsField({ label, value, onChange, error, hint, disabled, suffix, inputMode, required }: TagsFieldProps) {
   const { t } = useTranslation()
   const inputId = useId()
   const messageId = `${inputId}-message`
@@ -48,17 +50,11 @@ export function TagsField({ label, value, onChange, error, hint, disabled, suffi
   }
 
   return (
-    <div className="group/field space-y-1.5">
-      {disabled ? (
-        // No input to label: the label names the list instead.
-        <p id={labelId} className="text-sm font-medium">
-          {label}
-        </p>
-      ) : (
-        <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
-          {label}
-        </LabelPrimitive.Root>
-      )}
+    <div className="group/field min-w-0 space-y-1.5">
+      {/* Read-only there is no input to label: the label names the list instead. */}
+      <FieldLabel htmlFor={disabled ? undefined : inputId} id={disabled ? labelId : undefined} required={required}>
+        {label}
+      </FieldLabel>
       {value.length > 0 && (
         <ul aria-labelledby={disabled ? labelId : undefined} className="flex flex-wrap gap-1.5">
           {value.map((item, i) => (
@@ -87,6 +83,7 @@ export function TagsField({ label, value, onChange, error, hint, disabled, suffi
             onBlur={add}
             aria-invalid={error ? true : undefined}
             aria-describedby={message ? messageId : undefined}
+            aria-required={required || undefined}
           />
           <Button variant="secondary" onClick={add} disabled={draft.trim() === ''}>
             <Plus /> {t('action.add')}

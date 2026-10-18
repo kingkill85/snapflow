@@ -60,7 +60,7 @@ export function FunctionTypesPage() {
   const rowActions = (ft: FunctionType) => (
     <>
       <RowAction onClick={() => openForm(ft)} icon={<Pencil />} label={tCommon('action.edit')} />
-      <RowAction variant="danger" onClick={() => openDelete(ft)} icon={<Trash2 />} label={tCommon('action.delete')} />
+      <RowAction variant="danger-quiet" onClick={() => openDelete(ft)} icon={<Trash2 />} label={tCommon('action.delete')} />
     </>
   )
 
@@ -76,7 +76,7 @@ export function FunctionTypesPage() {
           rowKey={(ft) => ft.id}
           columns={[
             { header: t('field.key'), cell: (ft) => <code className="text-xs">{ft.key}</code> },
-            { header: t('field.name'), cell: (ft) => localized(ft.name) },
+            { header: t('field.name'), cell: (ft) => localized(ft.name), mobile: 'title' },
           ]}
           actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}

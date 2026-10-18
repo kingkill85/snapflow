@@ -20,10 +20,6 @@
     "home": "Zur Startseite",
     "moveUpItem": "{{item}} nach oben verschieben",
     "moveDownItem": "{{item}} nach unten verschieben",
-    "moveTopItem": "{{item}} ganz nach oben verschieben",
-    "moveBottomItem": "{{item}} ganz nach unten verschieben",
-    "insertBelowItem": "Unter {{item}} einfügen",
-    "duplicateItem": "{{item}} duplizieren",
     "removeItem": "{{item}} entfernen",
     "expandItem": "{{item}} aufklappen",
     "collapseItem": "{{item}} zuklappen",
@@ -39,7 +35,12 @@
     "keep": "Behalten",
     "undo": "Rückgängig",
     "signOutEverywhere": "Überall abmelden",
-    "close": "Schließen"
+    "close": "Schließen",
+    "moreItem": "Weitere Aktionen für {{item}}",
+    "moveTop": "Ganz nach oben",
+    "moveBottom": "Ganz nach unten",
+    "insertBelow": "Darunter einfügen",
+    "duplicate": "Duplizieren"
   },
   "state": {
     "loading": "Wird geladen…",
@@ -51,7 +52,8 @@
     "errorTitle": "Etwas ist schiefgelaufen",
     "error": "Diese Seite konnte nicht angezeigt werden. Bitte laden Sie sie neu oder gehen Sie zur Startseite.",
     "hasErrors": "Enthält Fehler",
-    "none": "Keine"
+    "none": "Keine",
+    "required": "Pflichtfeld"
   },
   "account": {
     "profile": "Profil",
@@ -100,5 +102,12 @@
     "system": "System",
     "light": "Hell",
     "dark": "Dunkel"
+  },
+  "translation": {
+    "languages": "Übersetzungen von {{field}}",
+    "filled": "Ausgefüllt",
+    "missing": "Noch nicht übersetzt",
+    "error": "Fehlerhaft",
+    "required": "Pflichtfeld, noch nicht ausgefüllt"
   }
 }

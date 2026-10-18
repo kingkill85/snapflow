@@ -14,8 +14,9 @@ import (
 // DefaultLocale must always be present in a Text.
 const DefaultLocale = "en"
 
-// Locales are the languages SnapFlow speaks, DefaultLocale first. The
-// frontend's language list (frontend/src/i18n/resources.ts) must match.
+// Locales are the languages translatable content is kept in, DefaultLocale
+// first. The frontend's content locales (frontend/src/i18n/content-locales.ts)
+// must match; its UI languages are a separate list.
 var Locales = []string{DefaultLocale, "de"}
 
 // IsLocale reports whether l is one of Locales.

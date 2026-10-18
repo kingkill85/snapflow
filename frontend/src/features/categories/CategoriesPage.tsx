@@ -108,6 +108,7 @@ export function CategoriesPage() {
     { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px text-right tabular-nums' },
     {
       header: t('field.name'),
+      mobile: 'title',
       cell: (p) => <TextLink to={`${listPath}/${p.id}`}>{localized(p.name)}</TextLink>,
     },
     { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code> },
@@ -140,7 +141,7 @@ export function CategoriesPage() {
           <RowAction to={`${listPath}/${p.id}`} icon={<Pencil />} label={tCommon('action.edit')} />
         )}
         {p.can.delete && (
-          <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
+          <RowAction variant="danger-quiet" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
       </>
     )

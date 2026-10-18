@@ -16,18 +16,19 @@ type RowActionProps = Omit<ButtonProps, 'size' | 'children' | 'asChild'> & {
 
 /**
  * An action in a table row (Edit, Delete; rule 9, D95): icon + text on wide
- * screens, icon only below `xl` so the columns keep their room. The text stays
- * in the accessible name either way, the tooltip shows it on hover.
+ * screens and in the stacked cards of phones, icon only from `md` to `xl` so
+ * the columns keep their room. The text stays in the accessible name either
+ * way, the tooltip shows it on hover. Delete is `variant="danger-quiet"`.
  */
 export function RowAction({ icon, label, to, state, variant = 'secondary', className, ...props }: RowActionProps) {
   const content = (
     <>
       {icon}
-      <span className="sr-only xl:not-sr-only">{label}</span>
+      <span className="max-md:not-sr-only md:sr-only xl:not-sr-only">{label}</span>
     </>
   )
   // relative: the hidden text stays inside the button, not at the page edge of a scrolling table.
-  const classes = cn('relative w-8 px-0 xl:w-auto xl:px-3', className)
+  const classes = cn('relative px-3 md:w-8 md:px-0 xl:w-auto xl:px-3', className)
   if (to !== undefined) {
     return (
       <Button asChild size="sm" variant={variant} title={label} className={classes}>

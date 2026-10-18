@@ -8,6 +8,7 @@ import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { shownTranslation, translation } from '@/test/translatable'
 import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
@@ -94,7 +95,7 @@ describe('ProductEditorPage', () => {
     expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
     await chooseOption(u, screen.getByLabelText('Category'), 'Dimmer actuators')
     await u.type(screen.getByLabelText('Model number'), ' M1 ')
-    await u.type(screen.getByLabelText('Name (English)'), 'Dimmer')
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'Dimmer')
 
     await u.type(inAttributes('Series'), 'Pro')
     await u.type(inAttributes('Power'), '12.5')
@@ -152,7 +153,7 @@ describe('ProductEditorPage', () => {
     const width = inAttributes('Width')
     expect(width).toHaveAttribute('inputmode', 'numeric')
     expect(width).toHaveAttribute('aria-required', 'true')
-    expect(width).toHaveAccessibleDescription('Required · 1 to 12 · Whole number')
+    expect(width).toHaveAccessibleDescription('1 to 12 · Whole number')
     expect(inAttributes('DALI')).toBeChecked()
     const bus = inAttributes('Bus system')
     expect(bus).toHaveTextContent('Zigbee')
@@ -245,6 +246,29 @@ describe('ProductEditorPage', () => {
     expect(inAttributes('Width')).toHaveAttribute('aria-invalid', 'true')
     expect(inAttributes('Protocols')).toHaveAccessibleDescription('Number of characters: at most 10.')
     expect(inAttributes('Width')).toHaveFocus()
+  })
+
+  it('shows server errors of German texts on the German tabs', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, {
+        code: 'validation.failed',
+        fields: [
+          { location: 'body.name.de', code: 'validation.control_chars' },
+          { location: 'body.description.de', code: 'validation.too_long', params: { max: 5000 } },
+        ],
+      }),
+    )
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const basics = region('Basics')
+    await waitFor(() => expect(shownTranslation(basics, 'Name').language).toBe('German'))
+    expect(shownTranslation(basics, 'Name').input).toHaveAccessibleDescription(/control characters/i)
+    expect(shownTranslation(basics, 'Name').input).toHaveFocus()
+    expect(shownTranslation(basics, 'Description').language).toBe('German')
+    expect(shownTranslation(basics, 'Description').input).toHaveAccessibleDescription('This value is too long (at most 5000 characters).')
+    expect(within(basics).getAllByRole('tab', { name: 'English' })[0]).toHaveAccessibleDescription('Filled in')
   })
 
   it('shows a taken model number at its field', async () => {
@@ -353,8 +377,8 @@ describe('ProductEditorPage', () => {
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: editRoute })
 
-    await u.clear(await screen.findByLabelText('Name (English)'))
-    await u.type(screen.getByLabelText('Name (English)'), 'My dimmer')
+    await u.clear(await (await translation(u, document.body, 'Name', 'en')))
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'My dimmer')
     version = { ...dimmer, name: { en: 'Their dimmer' }, updatedAt: '2026-02-01T00:00:00Z' }
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -362,7 +386,7 @@ describe('ProductEditorPage', () => {
     expect(alert).toHaveTextContent('Someone else changed this product in the meantime.')
     await u.click(within(alert).getByRole('button', { name: 'Reload' }))
 
-    await waitFor(() => expect(screen.getByLabelText('Name (English)')).toHaveValue('Their dimmer'))
+    await waitFor(async () => expect(await translation(u, document.body, 'Name', 'en')).toHaveValue('Their dimmer'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -379,7 +403,7 @@ describe('ProductEditorPage', () => {
     const variants = region('Variants')
     expect(within(variants).getByRole('link', { name: 'Add variant' })).toBeInTheDocument()
 
-    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    await u.type((await translation(u, document.body, 'Name', 'de')), ' neu')
 
     // While the product form is dirty, the variant links and buttons are off.
     expect(variants).toHaveTextContent('Save the product first to open or add variants.')
@@ -391,7 +415,7 @@ describe('ProductEditorPage', () => {
     let dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
     await u.click(within(dialog).getByRole('button', { name: 'Stay' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByLabelText('Name (German)')).toHaveValue('Dimmer 4-fach neu')
+    expect(await translation(u, document.body, 'Name', 'de')).toHaveValue('Dimmer 4-fach neu')
 
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
     dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
@@ -407,7 +431,7 @@ describe('ProductEditorPage', () => {
 
     expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/products')
     expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
-    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    await u.type((await translation(u, document.body, 'Name', 'de')), ' neu')
     expect(screen.getByRole('link', { name: 'Cancel' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Back to list' })).not.toBeInTheDocument()
 
@@ -415,7 +439,7 @@ describe('ProductEditorPage', () => {
 
     // Stays on the page, restarted from the saved version.
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Name (German)')).toHaveValue('Dimmer 4-fach neu')
+    expect(await translation(u, document.body, 'Name', 'de')).toHaveValue('Dimmer 4-fach neu')
     expect(screen.getByRole('link', { name: 'Back to list' })).toBeInTheDocument()
     expect(within(region('Variants')).getByRole('link', { name: 'Ivory White' })).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))

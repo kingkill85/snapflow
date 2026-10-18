@@ -11,12 +11,12 @@ import { getListTenantsQueryKey, useCreateTenant, useUpdateTenant } from '@/api/
 import { useMe } from '@/app/session'
 import {
   apiFields,
-  CheckboxField,
   errorKey,
   ErrorMessage,
   Field,
   FormDialog,
   setApiFieldErrors,
+  SwitchField,
   useFieldError,
 } from '@/components/ui'
 
@@ -83,11 +83,11 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
       onSubmit={() => void submit()}
       error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
-      <Field label={t('field.name')} error={fieldError(errors.name?.message)} {...form.register('name')} />
+      <Field label={t('field.name')} required autoComplete="off" error={fieldError(errors.name?.message)} {...form.register('name')} />
       {item?.isDistributor ? (
         <p className="text-sm text-muted">{t('field.distributorHint')}</p>
       ) : (
-        <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
+        <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
       )}
     </FormDialog>
   )

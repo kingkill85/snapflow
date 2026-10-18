@@ -20,7 +20,6 @@ import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   type ApiFieldMap,
   Button,
-  CheckboxField,
   EmptyState,
   ErrorMessage,
   errorKey,
@@ -28,13 +27,14 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  FormTranslatableField,
   LeaveLink,
   Loading,
   Notice,
   Page,
   Section,
   setApiFieldErrors,
-  TextareaField,
+  SwitchField,
   useFieldError,
   useUnsavedChanges,
 } from '@/components/ui'
@@ -223,24 +223,19 @@ function CategoryEditor({ item, notice, onReload, onSaved, onChanged }: Category
       <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
         <Fieldset disabled={readOnly}>
           <Section title={t('section.basics')}>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label={t('field.key')} hint={t('field.keyHint')} error={fieldError(errors.key?.message)} {...form.register('key')} />
-              <Field label={t('field.nameEn')} error={fieldError(errors.name?.en?.message)} {...form.register('name.en')} />
-              <Field label={t('field.nameDe')} error={fieldError(errors.name?.de?.message)} {...form.register('name.de')} />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextareaField
-                label={t('field.descriptionEn')}
-                error={fieldError(errors.description?.en?.message)}
-                {...form.register('description.en')}
+            <div className="grid items-start gap-4 sm:grid-cols-2">
+              <Field
+                label={t('field.key')}
+                hint={t('field.keyHint')}
+                required
+                autoComplete="off"
+                error={fieldError(errors.key?.message)}
+                {...form.register('key')}
               />
-              <TextareaField
-                label={t('field.descriptionDe')}
-                error={fieldError(errors.description?.de?.message)}
-                {...form.register('description.de')}
-              />
+              <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
             </div>
-            <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
+            <FormTranslatableField control={form.control} name="description" label={t('field.description')} multiline />
+            <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
           </Section>
           <Section title={t('section.attributes')} description={t('section.attributesHint')}>
             <SchemaEditor form={form} name="attributes" readOnly={readOnly} startCollapsed={loaded !== null} errorRevision={errorRevision} />

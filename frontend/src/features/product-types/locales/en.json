@@ -13,8 +13,6 @@
     "key": "Key",
     "keyHint": "e.g. zigbee, knx, hdl_buspro",
     "name": "Name",
-    "nameEn": "Name (English)",
-    "nameDe": "Name (German)",
     "abbreviation": "Abbreviation",
     "abbreviationHint": "Badge text, up to 6 characters, e.g. ZB. Empty for a dot.",
     "color": "Colour",

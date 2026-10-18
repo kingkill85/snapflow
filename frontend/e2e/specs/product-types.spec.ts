@@ -1,4 +1,4 @@
-import { chooseLanguage, expect, navigate, row, test, unique, uniqueKey } from '../fixtures'
+import { chooseLanguage, expect, navigate, row, test, unique, uniqueKey, translation } from '../fixtures'
 
 // Product types (the remodel replacing D14): the systems and product lines
 // (Zigbee, KNX, …) with a badge, edited in a dialog. Product types are
@@ -17,8 +17,8 @@ test('an admin creates a product type with a badge in a dialog, edits and deacti
   await expect(preview.getByTestId('type-color')).toBeVisible()
 
   await dialog.getByLabel('Key').fill(key)
-  await dialog.getByLabel('Name (English)').fill(name)
-  await dialog.getByLabel('Name (German)').fill(`${name} DE`)
+  await (await translation(dialog, 'Name', 'en')).fill(name)
+  await (await translation(dialog, 'Name', 'de')).fill(`${name} DE`)
   await dialog.getByLabel('Abbreviation').fill(' zb ')
   await dialog.getByLabel('Colour', { exact: true }).fill('#1F6FEB')
   // The preview: the abbreviation upper case on the colour, white text for contrast.
@@ -62,12 +62,12 @@ test('the dialog reports mistakes at their fields, a taken key from the server',
   await dialog.getByLabel('Colour', { exact: true }).fill('blue')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog.getByLabel('Key')).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
-  await expect(dialog.getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
+  await expect(await translation(dialog, 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
   await expect(dialog.getByLabel('Abbreviation')).toHaveAccessibleDescription('This value is too long (at most 6 characters).')
   await expect(dialog.getByLabel('Colour', { exact: true })).toHaveAccessibleDescription('Enter a colour as #rrggbb, e.g. #1f6feb.')
 
   await dialog.getByLabel('Key').fill(taken.key)
-  await dialog.getByLabel('Name (English)').fill(unique('Taken'))
+  await (await translation(dialog, 'Name', 'en')).fill(unique('Taken'))
   await dialog.getByLabel('Abbreviation').fill('TK')
   await dialog.getByLabel('Colour', { exact: true }).fill('')
   await dialog.getByRole('button', { name: 'Create' }).click()
@@ -90,7 +90,7 @@ test('a save over a newer version is refused, and Reload shows that version', as
   const stale = dialog.getByRole('alert').filter({ hasText: 'Someone else changed this product type in the meantime.' })
   await expect(stale).toBeVisible()
   await stale.getByRole('button', { name: 'Reload' }).click()
-  await expect(dialog.getByLabel('Name (English)')).toHaveValue(renamed)
+  await expect(await translation(dialog, 'Name', 'en')).toHaveValue(renamed)
   await expect(dialog.getByLabel('Abbreviation')).toHaveValue('OLD')
   await dialog.getByLabel('Abbreviation').fill('NEW')
   await dialog.getByRole('button', { name: 'Update' }).click()

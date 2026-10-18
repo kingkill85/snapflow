@@ -55,5 +55,6 @@ export const resources = {
   },
 } as const
 
+// The UI languages (switcher, i18next). Content languages are contentLocales.
 export const languages = ['en', 'de'] as const
 export type Language = (typeof languages)[number]

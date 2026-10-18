@@ -426,3 +426,26 @@ export async function chooseOption(select: Locator, label: string) {
 
 /** A table row containing the given text. */
 export const row = (page: Page, text: string) => page.getByRole('row').filter({ hasText: text })
+
+/**
+ * The input of one language of a TranslatableField (D109): shows that
+ * language's tab and returns its input, e.g.
+ * `await (await translation(dialog, 'Name', 'de')).fill('Dimmer')`. `ui` is
+ * the interface language, which names the tabs and the list of them. The
+ * first such field in `scope` is used (a card's own before its options').
+ */
+export async function translation(scope: Locator | Page, label: string, language: 'en' | 'de', ui: 'en' | 'de' = 'en'): Promise<Locator> {
+  const list = ui === 'de' ? `Übersetzungen von ${label}` : `Translations of ${label}`
+  const page = 'page' in scope ? scope.page() : scope
+  const field = scope.locator('[data-translatable]').filter({ has: page.getByRole('tablist', { name: list, exact: true }) }).first()
+  const tab = field.getByRole('tab', { name: new Intl.DisplayNames([ui], { type: 'language' }).of(language), exact: true })
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  return field.getByLabel(label, { exact: true })
+}
+
+/** Chooses an entry of a card's "⋯" menu (Move to top/bottom, Insert below, Duplicate, Remove; D114). */
+export async function cardAction(card: Locator, action: string) {
+  await card.getByRole('button', { name: /^(More actions for|Weitere Aktionen für) / }).click()
+  await card.page().getByRole('menuitem', { name: action, exact: true }).click()
+}

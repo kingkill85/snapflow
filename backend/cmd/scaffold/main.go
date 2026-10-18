@@ -164,7 +164,7 @@ func writeLocales(dir string, n names) error {
 			"edit":          "Edit " + n.Lower,
 			"deleteTitle":   "Delete " + n.Lower,
 			"deleteMessage": `Delete "{{name}}"? This cannot be undone.`,
-			"field":         map[string]string{"name": "Name", "nameEn": "Name (English)", "nameDe": "Name (German)"},
+			"field":         map[string]string{"name": "Name"},
 		},
 		// German starts as English with a TODO marker; translate before release.
 		"de": {
@@ -174,7 +174,7 @@ func writeLocales(dir string, n names) error {
 			"edit":          "TODO Edit " + n.Lower,
 			"deleteTitle":   "TODO Delete " + n.Lower,
 			"deleteMessage": `"{{name}}" löschen? Das kann nicht rückgängig gemacht werden.`,
-			"field":         map[string]string{"name": "Name", "nameEn": "Name (Englisch)", "nameDe": "Name (Deutsch)"},
+			"field":         map[string]string{"name": "Name"},
 		},
 	}
 	for lang, content := range locales {

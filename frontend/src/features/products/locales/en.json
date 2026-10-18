@@ -46,12 +46,10 @@
     "chooseCategory": "Choose a category",
     "modelNumber": "Model number",
     "modelNumberHint": "e.g. M485/GW-ZB.10; unique in the catalog",
-    "nameEn": "Name (English)",
-    "nameDe": "Name (German)",
-    "descriptionEn": "Description (English)",
-    "descriptionDe": "Description (German)",
     "active": "Active",
-    "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting."
+    "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting.",
+    "name": "Name",
+    "description": "Description"
   },
   "categoryChange": "You changed the category. When you save, this product's values are checked against the new category's attributes; values the new category does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new category are flagged on the variants.",
   "chooseCategoryFirst": "Choose a category to fill in its attributes.",
@@ -92,9 +90,8 @@
       "attributesHint": "Values of the category's attributes that are set per variant."
     },
     "field": {
-      "nameEn": "Name (English)",
+      "name": "Name",
       "nameHint": "e.g. Ivory White; \"Standard\" when the product has only one variant",
-      "nameDe": "Name (German)",
       "sku": "SKU",
       "skuHint": "Optional; unique in the catalog",
       "price": "Price",

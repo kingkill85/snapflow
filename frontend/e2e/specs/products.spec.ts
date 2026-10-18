@@ -17,6 +17,7 @@ import {
   row,
   type StoredFile,
   test,
+  translation,
   unique,
   uniqueKey,
 } from '../fixtures'
@@ -127,9 +128,9 @@ test('an admin creates a product with every kind of attribute; the values persis
   await expect(attributes(page)).toContainText('Choose a category to fill in its attributes.')
   await chooseOption(basics(page).getByLabel('Category'), category.name.en)
   await basics(page).getByLabel('Model number').fill(model)
-  await basics(page).getByLabel('Name (English)').fill(name)
-  await basics(page).getByLabel('Name (German)').fill(`${name} DE`)
-  await basics(page).getByLabel('Description (English)').fill('Dims two channels.')
+  await (await translation(basics(page), 'Name', 'en')).fill(name)
+  await (await translation(basics(page), 'Name', 'de')).fill(`${name} DE`)
+  await (await translation(basics(page), 'Description', 'en')).fill('Dims two channels.')
 
   const attrs = attributes(page)
   // Only the product attributes; "Finish" is set per variant.
@@ -213,7 +214,7 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
   await chooseOption(grunddaten.getByLabel('Produkttyp'), type.name.de!)
   await chooseOption(grunddaten.getByLabel('Kategorie'), category.name.de!)
   await grunddaten.getByLabel('Modellnummer').fill(model)
-  await grunddaten.getByLabel('Name (Englisch)').fill(unique('Dimmer'))
+  await (await translation(grunddaten, 'Name', 'en', 'de')).fill(unique('Dimmer'))
   const attrs = region(page, 'Attribute')
   await attrs.getByLabel('Modellname').fill('DA-2')
   await attrs.getByLabel('Leistung').fill('2,5')
@@ -233,8 +234,8 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
 
   await region(page, 'Varianten').getByRole('link', { name: 'Variante hinzufügen' }).click()
   await expect(page.getByRole('heading', { name: 'Neue Variante', level: 1 })).toBeVisible()
-  await region(page, 'Grunddaten').getByLabel('Name (Englisch)').fill('Ivory White')
-  await region(page, 'Grunddaten').getByLabel('Name (Deutsch)').fill('Elfenbeinweiß')
+  await (await translation(region(page, 'Grunddaten'), 'Name', 'en', 'de')).fill('Ivory White')
+  await (await translation(region(page, 'Grunddaten'), 'Name', 'de', 'de')).fill('Elfenbeinweiß')
   await region(page, 'Grunddaten').getByLabel('Preis').fill('27,50')
   await region(page, 'Attribute').getByLabel('Oberfläche').fill('matt')
   await page.getByRole('button', { name: 'Erstellen' }).click()
@@ -259,8 +260,8 @@ test('variants: add one with an image, replace and remove it; other files are re
   await expect(addons(page)).toContainText('Add-ons can be added once the variant is created.')
 
   const sku = modelNumber('SKU')
-  await basics(page).getByLabel('Name (English)').fill('Ivory White')
-  await basics(page).getByLabel('Name (German)').fill('Elfenbeinweiß')
+  await (await translation(basics(page), 'Name', 'en')).fill('Ivory White')
+  await (await translation(basics(page), 'Name', 'de')).fill('Elfenbeinweiß')
   await basics(page).getByLabel('SKU').fill(sku)
   await basics(page).getByLabel('Price').fill('27.50')
   await attributes(page).getByLabel('Finish').fill('glossy')
@@ -443,7 +444,7 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   await expect(page).toHaveURL(new RegExp(`/variants/${variant.id}$`))
 
   // Update saves the variant only; the add-ons stay unsaved (D89).
-  await basics(page).getByLabel('Name (German)').fill('Standard DE')
+  await (await translation(basics(page), 'Name', 'de')).fill('Standard DE')
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(page.getByText('The add-ons have unsaved changes.')).toHaveCount(2)
@@ -625,13 +626,13 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   await expect(categorySelect).toHaveAccessibleDescription(/This field is required\./)
   await expect(typeSelect).toBeFocused()
   await expect(basics(page).getByLabel('Model number')).toHaveAccessibleDescription('This field is required.')
-  await expect(basics(page).getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
 
   // The server: invisible characters in the model number, a required attribute.
   await chooseOption(typeSelect, type.name.en)
   await chooseOption(categorySelect, category.name.en)
   await basics(page).getByLabel('Model number').fill(`Zero​Width-${taken.modelNumber}`)
-  await basics(page).getByLabel('Name (English)').fill(unique('Valid'))
+  await (await translation(basics(page), 'Name', 'en')).fill(unique('Valid'))
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(basics(page).getByLabel('Model number')).toHaveAccessibleDescription(/Control characters .* are not allowed\./)
   await expect(attributes(page).getByLabel('Model name')).toHaveAccessibleDescription(/This value is required\./)
@@ -651,7 +652,7 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   // Variant: price format and a taken SKU.
   const other = await api.createVariant(taken.id, { sku: modelNumber('SKU') })
   await variants(page).getByRole('link', { name: 'Add variant' }).click()
-  await basics(page).getByLabel('Name (English)').fill('Standard')
+  await (await translation(basics(page), 'Name', 'en')).fill('Standard')
   const price = basics(page).getByLabel('Price')
   for (const wrong of ['12.345', '1e3', '-1', '27,5,0']) {
     await price.fill(wrong)
@@ -678,20 +679,20 @@ test('a product save over a newer version is refused, and Reload shows that vers
     await expect(basics(p).getByLabel('Model number')).toHaveValue(product.modelNumber)
   }
   const first = unique('First')
-  await basics(page).getByLabel('Name (English)').fill(first)
+  await (await translation(basics(page), 'Name', 'en')).fill(first)
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
 
-  await basics(other).getByLabel('Description (English)').fill('Second')
+  await (await translation(basics(other), 'Description', 'en')).fill('Second')
   await other.getByRole('button', { name: 'Update' }).click()
   const stale = other.getByRole('alert').filter({ hasText: 'Someone else changed this product in the meantime.' })
   await expect(stale).toBeVisible()
   await stale.getByRole('button', { name: 'Reload' }).click()
-  await expect(basics(other).getByLabel('Name (English)')).toHaveValue(first)
-  await expect(basics(other).getByLabel('Description (English)')).toHaveValue('')
+  await expect(await translation(basics(other), 'Name', 'en')).toHaveValue(first)
+  await expect(await translation(basics(other), 'Description', 'en')).toHaveValue('')
   await expect(stale).toHaveCount(0)
 
-  await basics(other).getByLabel('Description (English)').fill('Second try')
+  await (await translation(basics(other), 'Description', 'en')).fill('Second try')
   await other.getByRole('button', { name: 'Update' }).click()
   await expect(other.getByText('Saved.')).toBeVisible()
   expect(await api.product(product.id)).toMatchObject({ name: { en: first }, description: { en: 'Second try' } })
@@ -703,20 +704,20 @@ test('a variant save over a newer version is refused, and Reload shows that vers
   const other = await sessionFor(admin)
   for (const p of [page, other]) {
     await p.goto(path)
-    await expect(basics(p).getByLabel('Name (English)')).toHaveValue('Standard')
+    await expect(await translation(basics(p), 'Name', 'en')).toHaveValue('Standard')
   }
   await basics(page).getByLabel('Price').fill('99.90')
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
 
-  await basics(other).getByLabel('Name (German)').fill('Standard DE')
+  await (await translation(basics(other), 'Name', 'de')).fill('Standard DE')
   await other.getByRole('button', { name: 'Update' }).click()
   const stale = other.getByRole('alert').filter({ hasText: 'Someone else changed this variant in the meantime.' })
   await expect(stale).toBeVisible()
   await stale.getByRole('button', { name: 'Reload' }).click()
   await expect(basics(other).getByLabel('Price')).toHaveValue('99.90')
-  await expect(basics(other).getByLabel('Name (German)')).toHaveValue('')
-  await basics(other).getByLabel('Name (German)').fill('Standard DE')
+  await expect(await translation(basics(other), 'Name', 'de')).toHaveValue('')
+  await (await translation(basics(other), 'Name', 'de')).fill('Standard DE')
   await other.getByRole('button', { name: 'Update' }).click()
   await expect(other.getByText('Saved.')).toBeVisible()
   expect((await api.product(product.id)).variants[0]).toMatchObject({ price: '99.90', name: { en: 'Standard', de: 'Standard DE' } })
@@ -772,7 +773,7 @@ test('the list searches, filters by type and category and shows inactive product
 
   // Cancel after a change asks first, then returns to the filtered list.
   await row(page, p1.modelNumber).getByRole('link', { name: 'Edit' }).click()
-  await basics(page).getByLabel('Name (English)').fill('Changed')
+  await (await translation(basics(page), 'Name', 'en')).fill('Changed')
   await page.getByRole('link', { name: 'Cancel' }).click()
   await page.getByRole('dialog', { name: 'Discard unsaved changes?' }).getByRole('button', { name: 'Leave page' }).click()
   await expect(page).toHaveURL(filtered)
@@ -834,7 +835,7 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
   await expect(page.getByRole('link', { name: 'Cancel' })).toHaveCount(0)
   await expect(variantRows(page).getByRole('link', { name: 'Standard' })).toBeVisible()
 
-  await basics(page).getByLabel('Name (English)').fill('Unsaved name')
+  await (await translation(basics(page), 'Name', 'en')).fill('Unsaved name')
   await expect(page.getByRole('link', { name: 'Cancel' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Back to list' })).toHaveCount(0)
   // Variants cannot be opened or added until the product is saved (D88).
@@ -847,14 +848,14 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
   const confirm = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
   await confirm.getByRole('button', { name: 'Stay' }).click()
   await expect(page).toHaveURL(new RegExp(`/catalog/products/${product.id}$`))
-  await expect(basics(page).getByLabel('Name (English)')).toHaveValue('Unsaved name')
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveValue('Unsaved name')
 
   // Back to the stored value: nothing unsaved any more.
-  await basics(page).getByLabel('Name (English)').fill(product.name.en)
+  await (await translation(basics(page), 'Name', 'en')).fill(product.name.en)
   await expect(page.getByRole('link', { name: 'Back to list' })).toBeVisible()
   await expect(variantRows(page).getByRole('link', { name: 'Standard' })).toBeVisible()
 
-  await basics(page).getByLabel('Name (English)').fill('Saved name')
+  await (await translation(basics(page), 'Name', 'en')).fill('Saved name')
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Back to list' })).toBeVisible()

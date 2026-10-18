@@ -22,7 +22,6 @@ import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEdi
 import {
   type ApiFieldMap,
   Button,
-  CheckboxField,
   EmptyState,
   ErrorMessage,
   errorKey,
@@ -30,6 +29,7 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  FormTranslatableField,
   LeaveLink,
   Loading,
   Notice,
@@ -37,7 +37,7 @@ import {
   Section,
   FormSelectField,
   setApiFieldErrors,
-  TextareaField,
+  SwitchField,
   toFieldErrors,
   TypeBadge,
   useFieldError,
@@ -358,6 +358,7 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
               name="productTypeId"
               label={t('field.productType')}
               hint={t('field.productTypeHint')}
+              required
               options={typeOptions}
               error={fieldError(errors.productTypeId?.message)}
             />
@@ -366,33 +367,23 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
               name="categoryId"
               label={t('field.category')}
               hint={t('field.categoryHint')}
+              required
               options={categoryOptions}
               error={fieldError(errors.categoryId?.message)}
             />
             <Field
               label={t('field.modelNumber')}
               hint={t('field.modelNumberHint')}
+              required
               autoComplete="off"
               error={fieldError(errors.modelNumber?.message)}
               {...form.register('modelNumber')}
             />
           </div>
-          <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
           {categoryChanged && <Notice tone="warning">{t('categoryChange')}</Notice>}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('field.nameEn')} error={fieldError(errors.name?.en?.message)} {...form.register('name.en')} />
-            <Field label={t('field.nameDe')} error={fieldError(errors.name?.de?.message)} {...form.register('name.de')} />
-            <TextareaField
-              label={t('field.descriptionEn')}
-              error={fieldError(errors.description?.en?.message)}
-              {...form.register('description.en')}
-            />
-            <TextareaField
-              label={t('field.descriptionDe')}
-              error={fieldError(errors.description?.de?.message)}
-              {...form.register('description.de')}
-            />
-          </div>
+          <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
+          <FormTranslatableField control={form.control} name="description" label={t('field.description')} multiline />
+          <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
         </Section>
         <Section title={t('section.attributes')} description={t('section.attributesHint')}>
           {loaded && !categoryChanged && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}

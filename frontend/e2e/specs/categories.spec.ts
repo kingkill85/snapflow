@@ -1,7 +1,7 @@
 import { type Locator, type Page } from '@playwright/test'
 
 import { admin } from '../env'
-import { chooseLanguage, chooseOption, expect, navigate, optionTexts, row, test, type Attribute, unique, uniqueKey } from '../fixtures'
+import { chooseLanguage, chooseOption, expect, navigate, optionTexts, row, test, type Attribute, unique, uniqueKey, translation, cardAction } from '../fixtures'
 
 // Categories and their attribute schemas (step 1b): the list, the schema
 // editor and who may do what. Categories are global and other specs run in
@@ -12,8 +12,8 @@ const listPath = '/catalog/categories'
 const basics = (page: Page) => page.getByRole('region', { name: 'Basics' })
 const attributes = (page: Page) => page.getByRole('region', { name: 'Attributes', exact: true })
 const instanceAttributes = (page: Page) => page.getByRole('region', { name: 'Instance attributes' })
-/** Attribute card n (1-based) of a schema section. */
-const card = (section: Locator, n: number) => section.getByRole('group', { name: `Attribute ${n}`, exact: true })
+/** Attribute card n (1-based) of a schema section, named "Attribute n: <label>" (D114). */
+const card = (section: Locator, n: number) => section.getByRole('group', { name: new RegExp(`^Attribute ${n}(: |$)`) })
 const option = (attribute: Locator, n: number) => attribute.getByRole('group', { name: `Option ${n}`, exact: true })
 /** The attribute's own Key field (its options have one too). */
 const keyOf = (attribute: Locator) => attribute.getByLabel('Key', { exact: true }).first()
@@ -24,8 +24,8 @@ async function addAttribute(section: Locator, n: number, fields: { key: string; 
   const attribute = card(section, n)
   await expect(keyOf(attribute)).toBeFocused()
   await keyOf(attribute).fill(fields.key)
-  await attribute.getByLabel('Label (English)').fill(fields.en)
-  if (fields.de) await attribute.getByLabel('Label (German)').fill(fields.de)
+  await (await translation(attribute, 'Label', 'en')).fill(fields.en)
+  if (fields.de) await (await translation(attribute, 'Label', 'de')).fill(fields.de)
   if (fields.type) await chooseOption(attribute.getByLabel('Type', { exact: true }), fields.type)
   return attribute
 }
@@ -35,8 +35,8 @@ async function addOption(attribute: Locator, n: number, key: string, en: string,
   const o = option(attribute, n)
   await expect(o.getByLabel('Key')).toBeFocused()
   await o.getByLabel('Key').fill(key)
-  await o.getByLabel('Label (English)').fill(en)
-  if (de) await o.getByLabel('Label (German)').fill(de)
+  await (await translation(o, 'Label', 'en')).fill(en)
+  if (de) await (await translation(o, 'Label', 'de')).fill(de)
 }
 
 /** A simple text attribute for seeding. */
@@ -50,9 +50,9 @@ test('an admin creates a category with every kind of attribute, reopens and edit
   await expect(page.getByRole('heading', { name: 'New category', level: 1 })).toBeVisible()
 
   await basics(page).getByLabel('Key').fill(key)
-  await basics(page).getByLabel('Name (English)').fill(name)
-  await basics(page).getByLabel('Name (German)').fill(`${name} DE`)
-  await basics(page).getByLabel('Description (English)').fill('Switches and dims lights.')
+  await (await translation(basics(page), 'Name', 'en')).fill(name)
+  await (await translation(basics(page), 'Name', 'de')).fill(`${name} DE`)
+  await (await translation(basics(page), 'Description', 'en')).fill('Switches and dims lights.')
 
   const attrs = attributes(page)
   await expect(attrs.getByText('No attributes yet.')).toBeVisible()
@@ -149,22 +149,23 @@ test('an admin creates a category with every kind of attribute, reopens and edit
   await listed.getByRole('link', { name }).click()
   await expect(page.getByRole('heading', { name: 'Edit category', level: 1 })).toBeVisible()
   await expect(basics(page).getByLabel('Key')).toHaveValue(key)
+  // Titled by the label, with key, type, unit, required and scope beside it (D114).
   const summaries = [
-    'Model name · Text · Required · Product',
-    'Power · Number · W · Variant',
-    'Width · Whole number · TE · Product',
-    'Dimmable · Yes/no · Product',
-    'Colour · Choice · Variant',
-    'Protocols · List · Product',
-    'Tags · List · Product',
+    ['Model name', 'Text · Required · Product'],
+    ['Power', 'Number · W · Variant'],
+    ['Width', 'Whole number · TE · Product'],
+    ['Dimmable', 'Yes/no · Product'],
+    ['Colour', 'Choice · Variant'],
+    ['Protocols', 'List · Product'],
+    ['Tags', 'List · Product'],
   ]
-  for (const [i, summary] of summaries.entries()) {
-    await expect(card(attrs, i + 1)).toContainText(summary)
+  for (const [i, [label, summary]] of summaries.entries()) {
+    await expect(attrs.getByRole('group', { name: `Attribute ${i + 1}: ${label}`, exact: true })).toContainText(summary)
     await expect(card(attrs, i + 1).getByRole('button', { name: `Expand attribute ${i + 1}` })).toHaveAttribute('aria-expanded', 'false')
   }
   await expect(attrs.getByLabel('Key', { exact: true })).toHaveCount(0)
-  await expect(card(inst, 1)).toContainText('Bus address · Text · Required')
-  await expect(card(inst, 2)).toContainText('MAC address · Text')
+  await expect(inst.getByRole('group', { name: 'Attribute 1: Bus address', exact: true })).toContainText('Text · Required')
+  await expect(inst.getByRole('group', { name: 'Attribute 2: MAC address', exact: true })).toContainText('Text')
 
   // Edit: open one card, change a bound and the name.
   await card(attrs, 2).getByRole('button', { name: 'Expand attribute 2' }).click()
@@ -172,13 +173,13 @@ test('an admin creates a category with every kind of attribute, reopens and edit
   await card(attrs, 2).getByLabel('Maximum', { exact: true }).fill('15')
   await card(attrs, 2).getByRole('button', { name: 'Collapse attribute 2' }).click()
   const renamed = unique('Switch actuator')
-  await basics(page).getByLabel('Name (English)').fill(renamed)
+  await (await translation(basics(page), 'Name', 'en')).fill(renamed)
   await expect(page.getByRole('link', { name: 'Cancel' })).toBeVisible()
   await page.getByRole('button', { name: 'Update' }).click()
   // An update stays in the editor, restarted from the saved version.
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/catalog/categories/${id}$`))
-  await expect(basics(page).getByLabel('Name (English)')).toHaveValue(renamed)
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveValue(renamed)
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(row(page, key)).toContainText(renamed)
@@ -201,7 +202,7 @@ test('the editor shows each mistake at its field and opens the cards with errors
   await a.getByLabel('Minimum', { exact: true }).fill('1e3')
   await addAttribute(attrs, 3, { key: 'colour', en: 'Colour', type: 'Choice' })
   // A duplicate keeps "_copy" in its key until it is changed.
-  await card(attrs, 2).getByRole('button', { name: 'Duplicate attribute 2' }).click()
+  await cardAction(card(attrs, 2), 'Duplicate')
   await expect(keyOf(card(attrs, 3))).toBeFocused()
   await expect(keyOf(card(attrs, 3))).toHaveValue('power_copy')
   await expect(card(attrs, 4)).toContainText('colour')
@@ -214,8 +215,8 @@ test('the editor shows each mistake at its field and opens the cards with errors
 
   await expect(basics(page).getByLabel('Key')).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
   await expect(basics(page).getByLabel('Key')).toBeFocused()
-  await expect(basics(page).getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
-  await expect(card(attrs, 1).getByLabel('Label (English)')).toHaveAccessibleDescription('An English label is required.')
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
+  await expect(await translation(card(attrs, 1), 'Label', 'en')).toHaveAccessibleDescription('An English label is required.')
   await expect(card(attrs, 1).getByLabel('Maximum length')).toHaveAccessibleDescription('The maximum must not be below the minimum (5).')
   await expect(card(attrs, 2).getByLabel('Minimum', { exact: true })).toHaveAccessibleDescription('Enter a number.')
   await expect(keyOf(card(attrs, 3))).toHaveAccessibleDescription('Change the key of the copied attribute.')
@@ -231,8 +232,8 @@ test('the editor shows each mistake at its field and opens the cards with errors
 
   // Fixed, except for a key the server knows is taken.
   await basics(page).getByLabel('Key').fill(taken.key)
-  await basics(page).getByLabel('Name (English)').fill(unique('Taken'))
-  await card(attrs, 1).getByLabel('Label (English)').fill('Label')
+  await (await translation(basics(page), 'Name', 'en')).fill(unique('Taken'))
+  await (await translation(card(attrs, 1), 'Label', 'en')).fill('Label')
   await card(attrs, 1).getByLabel('Maximum length').fill('20')
   await card(attrs, 2).getByLabel('Minimum', { exact: true }).fill('12,5')
   await keyOf(card(attrs, 3)).fill('power_max')
@@ -262,7 +263,7 @@ test('long schemas: collapse, expand, move, insert, duplicate and remove with se
   await page.goto(`${listPath}/${category.id}`)
   const attrs = attributes(page)
   const subtitles = async (texts: string[]) => {
-    for (const [i, text] of texts.entries()) await expect(card(attrs, i + 1)).toContainText(`${text} · Text`)
+    for (const [i, text] of texts.entries()) await expect(card(attrs, i + 1)).toHaveAccessibleName(`Attribute ${i + 1}: ${text}`)
   }
   await subtitles(['A1', 'A2', 'A3', 'A4', 'A5'])
 
@@ -273,43 +274,43 @@ test('long schemas: collapse, expand, move, insert, duplicate and remove with se
   await expect(attrs.getByRole('button', { name: /^Expand attribute \d$/ })).toHaveCount(5)
 
   // To the top: focus stays on the card's controls (its "to the top" is disabled now).
-  await card(attrs, 4).getByRole('button', { name: 'Move attribute 4 to the top' }).click()
+  await cardAction(card(attrs, 4), 'Move to top')
   await subtitles(['A4', 'A1', 'A2', 'A3', 'A5'])
   await expect(card(attrs, 1).getByRole('button', { name: 'Move attribute 1 down' })).toBeFocused()
   await page.keyboard.press('Enter')
   await subtitles(['A1', 'A4', 'A2', 'A3', 'A5'])
   await expect(card(attrs, 2).getByRole('button', { name: 'Move attribute 2 down' })).toBeFocused()
-  await card(attrs, 2).getByRole('button', { name: 'Move attribute 2 to the bottom' }).click()
+  await cardAction(card(attrs, 2), 'Move to bottom')
   await subtitles(['A1', 'A2', 'A3', 'A5', 'A4'])
   await expect(card(attrs, 5).getByRole('button', { name: 'Move attribute 5 up' })).toBeFocused()
 
   // Insert below: a new open card, its key focused.
-  await card(attrs, 1).getByRole('button', { name: 'Insert below attribute 1' }).click()
+  await cardAction(card(attrs, 1), 'Insert below')
   await expect(keyOf(card(attrs, 2))).toBeFocused()
   await expect(keyOf(card(attrs, 2))).toHaveValue('')
   await subtitles(['A1'])
-  await expect(card(attrs, 3)).toContainText('A2 · Text')
+  await expect(card(attrs, 3)).toHaveAccessibleName('Attribute 3: A2')
 
   // Duplicate: a copy right below, "_copy" in its key.
-  await card(attrs, 3).getByRole('button', { name: 'Duplicate attribute 3' }).click()
+  await cardAction(card(attrs, 3), 'Duplicate')
   await expect(keyOf(card(attrs, 4))).toBeFocused()
   await expect(keyOf(card(attrs, 4))).toHaveValue('a2_copy')
-  await expect(card(attrs, 4).getByLabel('Label (English)')).toHaveValue('A2')
+  await expect(await translation(card(attrs, 4), 'Label', 'en')).toHaveValue('A2')
 
   // Remove: focus moves to the next card, after the last one to "Add attribute".
-  await card(attrs, 4).getByRole('button', { name: 'Remove attribute 4' }).click()
-  await expect(attrs.getByRole('group', { name: /^Attribute \d$/ })).toHaveCount(6)
+  await cardAction(card(attrs, 4), 'Remove')
+  await expect(attrs.getByRole('group', { name: /^Attribute \d(: |$)/ })).toHaveCount(6)
   await expect(card(attrs, 4).getByRole('button', { name: 'Expand attribute 4' })).toBeFocused()
-  await expect(card(attrs, 4)).toContainText('A3 · Text')
-  await card(attrs, 6).getByRole('button', { name: 'Remove attribute 6' }).click()
+  await expect(card(attrs, 4)).toHaveAccessibleName('Attribute 4: A3')
+  await cardAction(card(attrs, 6), 'Remove')
   await expect(attrs.getByRole('button', { name: 'Add attribute', exact: true })).toBeFocused()
 
   // "Add attribute" above the list adds at the top.
   await attrs.getByRole('button', { name: 'Add attribute at the top' }).click()
   await expect(keyOf(card(attrs, 1))).toBeFocused()
   await keyOf(card(attrs, 1)).fill('a0')
-  await card(attrs, 1).getByLabel('Label (English)').fill('A0')
-  await card(attrs, 3).getByRole('button', { name: 'Remove attribute 3' }).click() // the empty inserted one
+  await (await translation(card(attrs, 1), 'Label', 'en')).fill('A0')
+  await cardAction(card(attrs, 3), 'Remove') // the empty inserted one
 
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
@@ -327,14 +328,14 @@ test('leaving the editor with unsaved changes asks first', async ({ page, api })
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.goto(`${listPath}/${category.id}`)
-  await basics(page).getByLabel('Name (English)').fill('Unsaved name')
+  await (await translation(basics(page), 'Name', 'en')).fill('Unsaved name')
   await navigate(page, 'Catalog', 'Function types')
   const confirm = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
   await expect(confirm).toBeVisible()
   await confirm.getByRole('button', { name: 'Stay' }).click()
   await expect(confirm).toBeHidden()
   await expect(page).toHaveURL(new RegExp(`/catalog/categories/${category.id}$`))
-  await expect(basics(page).getByLabel('Name (English)')).toHaveValue('Unsaved name')
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveValue('Unsaved name')
 
   await page.getByRole('link', { name: 'Cancel' }).click()
   await expect(confirm).toBeVisible()
@@ -345,7 +346,7 @@ test('leaving the editor with unsaved changes asks first', async ({ page, api })
 
   // Back in the editor: the stored version, and leaving it asks nothing.
   await row(page, category.key).getByRole('link', { name: category.name.en }).click()
-  await expect(basics(page).getByLabel('Name (English)')).toHaveValue(category.name.en)
+  await expect(await translation(basics(page), 'Name', 'en')).toHaveValue(category.name.en)
   await expect(page.getByRole('link', { name: 'Cancel' })).toHaveCount(0)
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(/\/catalog\/categories$/)
@@ -361,22 +362,22 @@ test('a save over a newer version is refused, and Reload shows that version', as
   }
 
   const first = unique('First')
-  await basics(page).getByLabel('Name (English)').fill(first)
+  await (await translation(basics(page), 'Name', 'en')).fill(first)
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
 
-  await basics(other).getByLabel('Name (English)').fill(unique('Second'))
+  await (await translation(basics(other), 'Name', 'en')).fill(unique('Second'))
   await other.getByRole('button', { name: 'Update' }).click()
   const stale = other.getByRole('alert').filter({ hasText: 'Someone else changed this category in the meantime.' })
   await expect(stale).toBeVisible()
   await expect(other).toHaveURL(new RegExp(`/catalog/categories/${category.id}$`))
   await stale.getByRole('button', { name: 'Reload' }).click()
-  await expect(basics(other).getByLabel('Name (English)')).toHaveValue(first)
+  await expect(await translation(basics(other), 'Name', 'en')).toHaveValue(first)
   await expect(stale).toHaveCount(0)
   expect((await api.category(category.id)).name.en).toBe(first)
 
   // The reloaded version saves.
-  await basics(other).getByLabel('Description (English)').fill('Second try')
+  await (await translation(basics(other), 'Description', 'en')).fill('Second try')
   await other.getByRole('button', { name: 'Update' }).click()
   await expect(other.getByText('Saved.')).toBeVisible()
   expect(await api.category(category.id)).toMatchObject({ name: { en: first }, description: { en: 'Second try' } })
@@ -507,12 +508,14 @@ test('the editor in German', async ({ page, api }) => {
   await expect(page.getByRole('heading', { name: 'Kategorie bearbeiten', level: 1 })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Grunddaten' }).getByLabel('Schlüssel')).toHaveValue(category.key)
   const attrs = page.getByRole('region', { name: 'Attribute', exact: true })
-  const first = attrs.getByRole('group', { name: 'Attribut 1', exact: true })
-  await expect(first).toContainText('Reichweite · Ganzzahl · m · Pflichtfeld · Variante')
+  const first = attrs.getByRole('group', { name: 'Attribut 1: Reichweite', exact: true })
+  await expect(first).toContainText('range · Ganzzahl · m · Pflichtfeld · Variante')
   await expect(attrs.getByRole('button', { name: 'Alle aufklappen' })).toBeVisible()
   await first.getByRole('button', { name: 'Attribut 1 aufklappen' }).click()
   expect(await optionTexts(first.getByLabel('Typ', { exact: true }))).toEqual(['Text', 'Zahl', 'Ganzzahl', 'Ja/Nein', 'Auswahl', 'Liste'])
-  await expect(first.getByRole('button', { name: 'Attribut 1 ganz nach unten verschieben' })).toBeDisabled()
+  await first.getByRole('button', { name: /^Weitere Aktionen für / }).click()
+  await expect(page.getByRole('menuitem', { name: 'Ganz nach unten' })).toBeDisabled()
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Aktualisieren' })).toBeVisible()
   // Nothing changed: the way out is "Back to list" (D84).
   await expect(page.getByRole('link', { name: 'Zurück zur Liste' })).toBeVisible()

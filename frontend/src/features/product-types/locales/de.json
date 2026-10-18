@@ -13,8 +13,6 @@
     "key": "Schlüssel",
     "keyHint": "z. B. zigbee, knx, hdl_buspro",
     "name": "Name",
-    "nameEn": "Name (Englisch)",
-    "nameDe": "Name (Deutsch)",
     "abbreviation": "Kürzel",
     "abbreviationHint": "Text im Abzeichen, bis zu 6 Zeichen, z. B. ZB. Leer für einen Punkt.",
     "color": "Farbe",

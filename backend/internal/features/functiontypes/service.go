@@ -72,6 +72,8 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return FunctionType{}, err
 	}
+	// Names are stored trimmed, blank translations dropped (as for the other catalog texts).
+	in.Name = in.Name.Trimmed()
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
@@ -86,6 +88,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return FunctionType{}, err
 	}
+	// Names are stored trimmed, blank translations dropped (as for the other catalog texts).
+	in.Name = in.Name.Trimmed()
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
