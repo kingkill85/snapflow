@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Category } from '@/api/generated/model'
 import { getGetCategoryQueryKey } from '@/api/generated/categories/categories'
+import { getGetProductQueryKey, getListProductsQueryKey } from '@/api/generated/products/products'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
@@ -106,7 +107,7 @@ describe('CategoriesPage', () => {
     expect(screen.getAllByRole('link', { name: /new category/i })[0]).toHaveAttribute('href', '/catalog/categories/new')
   })
 
-  it('reorders with the full id list, inactive types included', async () => {
+  it('reorders with the full id list, inactive categories included', async () => {
     let all = [alpha, beta, gamma]
     let sent: unknown
     server.use(
@@ -130,7 +131,7 @@ describe('CategoriesPage', () => {
     expect(names).toEqual(['Wall switch', 'Dimmer actuator'])
   })
 
-  it('moves down past the visible neighbour, keeping hidden inactive types in place', async () => {
+  it('moves down past the visible neighbour, keeping hidden inactive categories in place', async () => {
     let all = [alpha, beta, gamma]
     let sent: unknown
     server.use(
@@ -174,7 +175,7 @@ describe('CategoriesPage', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Wall switch' })).not.toBeInTheDocument())
   })
 
-  it('applies the move again when a type was added between the fetch and the save', async () => {
+  it('applies the move again when a category was added between the fetch and the save', async () => {
     const delta = category({ id: '6f1c2b8e-0000-4000-8000-000000000004', key: 'delta', name: { en: 'Delta' }, sortOrder: 4 })
     let all = [alpha, gamma]
     const sent: unknown[] = []
@@ -248,6 +249,9 @@ describe('CategoriesPage', () => {
     const u = userEvent.setup()
     const { client } = renderWithProviders(<CategoriesPage />, { me: adminMe })
     client.setQueryData(getGetCategoryQueryKey(gamma.id), gamma)
+    // Products embed their category: lists, picker and products refetch.
+    client.setQueryData(getListProductsQueryKey({ limit: 50 }), { items: [], total: 0 })
+    client.setQueryData(getGetProductQueryKey('p1'), {})
 
     const row = (await screen.findByRole('link', { name: 'Wall switch' })).closest('tr')!
     await u.click(within(row).getByRole('button', { name: /delete/i }))
@@ -257,5 +261,7 @@ describe('CategoriesPage', () => {
     expect(screen.getByText('Dimmer actuator')).toBeInTheDocument()
     // Its editor must not show it from the cache.
     expect(client.getQueryData(getGetCategoryQueryKey(gamma.id))).toBeUndefined()
+    expect(client.getQueryState(getListProductsQueryKey({ limit: 50 }))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(getGetProductQueryKey('p1'))?.isInvalidated).toBe(true)
   })
 })

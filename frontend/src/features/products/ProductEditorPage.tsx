@@ -61,10 +61,9 @@ import {
   listHref,
   listPath,
   listSearchFrom,
-  noticeFrom,
   productPath,
-  type SaveNotice,
   useFreshCategories,
+  useSaveNotice,
   useFreshProductTypes,
 } from './paths'
 import { VariantsSection } from './VariantsSection'
@@ -139,7 +138,7 @@ function ExistingProduct({ id }: { id: string }) {
   const categories = useFreshCategories()
   // Increased to restart the form from a newer version (Reload, or after a save).
   const [generation, setGeneration] = useState(0)
-  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
+  const [notice, setNotice] = useSaveNotice()
   const [dirty, setDirty] = useState(false)
   const unsaved = useUnsavedChanges(dirty)
 

@@ -13,6 +13,7 @@ import {
   useReorderProductTypes,
 } from '@/api/generated/product-types/product-types'
 import { useCan } from '@/app/session'
+import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   Badge,
   Button,
@@ -70,7 +71,7 @@ export function ProductTypesPage() {
     } catch {
       return // shown by ErrorMessage via remove.error
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() }), invalidateProductQueries(queryClient)])
     setDeleting(null)
   }
 
@@ -102,7 +103,7 @@ export function ProductTypesPage() {
         break
       }
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() }), invalidateProductQueries(queryClient)])
     setMoving(false)
   }
 

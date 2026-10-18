@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
+
 import { ApiError } from '@/api/client'
 import { useListCategories } from '@/api/generated/categories/categories'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
@@ -45,3 +48,20 @@ export const listSearchFrom = (state: unknown): string => {
 
 /** The product list with the filters it was left with. */
 export const listHref = (listSearch: string) => `${listPath}${listSearch}`
+
+/**
+ * The notice an editor shows after a save that continued on its page (from
+ * the navigation state), with a setter to end it. The notice is removed from
+ * the history entry once read, so a reload of the page does not show it again.
+ */
+export function useSaveNotice() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
+  useEffect(() => {
+    if (noticeFrom(location.state) === null) return
+    const { notice: _read, ...rest } = stateOf(location.state)
+    void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: rest })
+  }, [location, navigate])
+  return [notice, setNotice] as const
+}

@@ -82,7 +82,7 @@ describe('ProductEditorPage', () => {
       http.get('/api/products/:id', () => HttpResponse.json(created)),
     )
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: '/catalog/products/new' })
+    const { router } = renderRoutes(routes, { me: adminMe, route: '/catalog/products/new' })
 
     expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument()
     expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
@@ -115,6 +115,9 @@ describe('ProductEditorPage', () => {
 
     // The new product's page, to add its variants.
     expect(await screen.findByText('Product created. Add its variants below.')).toBeInTheDocument()
+    // Read once: removed from the history entry, so a reload does not show it again.
+    await waitFor(() => expect(router.state.location.state).not.toHaveProperty('notice'))
+    expect(screen.getByText('Product created. Add its variants below.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
     expect(posted).toEqual({
       productTypeId: zigbeeType.id,

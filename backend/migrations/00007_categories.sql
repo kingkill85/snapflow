@@ -50,9 +50,12 @@ ALTER TABLE product_types
 UPDATE product_types SET updated_at = greatest(now(), updated_at + interval '1 microsecond');
 
 -- +goose Down
--- Best effort: the schemas and descriptions go back to the product type with
--- the category's id (the mapping the Up migration created); categories created
--- since are lost.
+-- Best effort (tested by migrations_test.go): the schemas and descriptions go
+-- back to the product type with the category's id (the mapping the Up
+-- migration created). Lost: categories created since (no product type with
+-- their id), which category a product belongs to (products moved to another
+-- category go back to their type's schema), and the product types'
+-- abbreviations. Running Up again rebuilds categories from the product types.
 ALTER TABLE product_types
     DROP COLUMN abbreviation,
     ADD COLUMN description jsonb,

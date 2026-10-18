@@ -53,3 +53,22 @@ func MigrateTo(ctx context.Context, url string, version int64) error {
 	}
 	return nil
 }
+
+// MigrateDownTo rolls migrations back until version is the newest applied.
+// Tests use it to check that Down migrations work.
+func MigrateDownTo(ctx context.Context, url string, version int64) error {
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.FS)
+	if err != nil {
+		return fmt.Errorf("create migration provider: %w", err)
+	}
+	if _, err := provider.DownTo(ctx, version); err != nil {
+		return fmt.Errorf("roll back migrations: %w", err)
+	}
+	return nil
+}

@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import type { ProductType, ProductTypeInput, ProductTypeUpdate } from '@/api/generated/model'
+import { getSearchVariantsQueryKey } from '@/api/generated/products/products'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
@@ -103,7 +104,7 @@ describe('ProductTypesPage', () => {
     expect(screen.getByRole('button', { name: 'New product type' })).toBeInTheDocument()
   })
 
-  it('creates a product type in a dialog with a badge preview, sending the abbreviation upper case', async () => {
+  it('creates a product type in a dialog with a badge preview of the stored abbreviation', async () => {
     let all = [alpha]
     let posted: ProductTypeInput | undefined
     server.use(
@@ -116,7 +117,8 @@ describe('ProductTypesPage', () => {
       }),
     )
     const u = userEvent.setup()
-    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    const { client } = renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    client.setQueryData(getSearchVariantsQueryKey({ search: 'x' }), { items: [], total: 0 })
 
     await u.click(await screen.findByRole('button', { name: 'New product type' }))
     const dialog = await screen.findByRole('dialog', { name: 'New product type' })
@@ -136,8 +138,27 @@ describe('ProductTypesPage', () => {
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(posted).toEqual({ key: 'knx', name: { en: 'KNX' }, abbreviation: 'KNX', color: '#ffcc00', isActive: true })
+    // Sent as typed (trimmed): the server normalises it.
+    expect(posted).toEqual({ key: 'knx', name: { en: 'KNX' }, abbreviation: 'knx', color: '#ffcc00', isActive: true })
     await waitFor(() => expect(names()).toEqual(['ZBZigbee', 'KNXKNX']))
+    // Products show their type's badge: the add-on picker refetches.
+    expect(client.getQueryState(getSearchVariantsQueryKey({ search: 'x' }))?.isInvalidated).toBe(true)
+  })
+
+  it('previews the abbreviation as the server stores it and counts characters, not UTF-16 units', async () => {
+    server.use(listHandler(() => []))
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    await u.click((await screen.findAllByRole('button', { name: 'New product type' }))[0])
+    const dialog = await screen.findByRole('dialog')
+    // "ß" has no single upper-case character: kept, as Go's strings.ToUpper does.
+    await u.type(within(dialog).getByLabelText('Abbreviation'), ' straße ')
+    expect(within(dialog).getByTestId('type-abbreviation')).toHaveTextContent('STRAßE')
+    // Six characters outside the BMP are 12 UTF-16 units, still within the limit.
+    await u.clear(within(dialog).getByLabelText('Abbreviation'))
+    await u.type(within(dialog).getByLabelText('Abbreviation'), '𝐀𝐁𝐂𝐃𝐄𝐅')
+    await u.click(within(dialog).getByRole('button', { name: 'Create' }))
+    expect(within(dialog).getByLabelText('Abbreviation')).not.toHaveAccessibleDescription(/too long/)
   })
 
   it('checks key, name, abbreviation and colour before saving', async () => {

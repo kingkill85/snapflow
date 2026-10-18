@@ -53,10 +53,9 @@ import {
   isNotFound,
   listPath,
   listSearchFrom,
-  noticeFrom,
   productPath,
-  type SaveNotice,
   useFreshCategories,
+  useSaveNotice,
   useFreshProductTypes,
   variantPath,
 } from './paths'
@@ -84,7 +83,7 @@ function VariantPage({ productId, variantId }: { productId: string; variantId?: 
   const types = useFreshProductTypes()
   const categories = useFreshCategories()
   const [generation, setGeneration] = useState(0)
-  const [notice, setNotice] = useState<SaveNotice | null>(() => noticeFrom(location.state))
+  const [notice, setNotice] = useSaveNotice()
   const [formDirty, setFormDirty] = useState(false)
   const [addonsDirty, setAddonsDirty] = useState(false)
   const unsaved = useUnsavedChanges(formDirty || addonsDirty)

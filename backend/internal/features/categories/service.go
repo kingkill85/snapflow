@@ -179,7 +179,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 	return fromRow(actor, row), nil
 }
 
-// Delete removes a category. Types that products use cannot be deleted
+// Delete removes a category. Categories that products use cannot be deleted
 // (category.in_use); deactivate them instead.
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {

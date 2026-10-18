@@ -50,7 +50,7 @@ type SchemaEditorProps = {
   form: Form
   name: SchemaName
   readOnly: boolean
-  /** Rows loaded with the page start collapsed (editing an existing type); new rows always start expanded. */
+  /** Rows loaded with the page start collapsed (editing an existing category); new rows always start expanded. */
   startCollapsed: boolean
   /** Increases with every save that failed validation: rows with errors open again. */
   errorRevision: number

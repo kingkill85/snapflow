@@ -15,6 +15,7 @@ import {
   useReorderCategories,
 } from '@/api/generated/categories/categories'
 import { useCan } from '@/app/session'
+import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   Badge,
   Button,
@@ -65,16 +66,16 @@ export function CategoriesPage() {
       return // shown by ErrorMessage via remove.error
     }
     queryClient.removeQueries({ queryKey: getGetCategoryQueryKey(deleting.id) })
-    await queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() }), invalidateProductQueries(queryClient)])
     setDeleting(null)
   }
 
-  // Moves a type past its visible neighbour. The order covers inactive types
-  // too and the API wants all ids, so the move is applied to the full list,
-  // fetched fresh (D29). If the item or its neighbour is gone, nothing is
-  // sent. If another type was created or deleted between the fetch and the
-  // save (order_mismatch), the move is still well defined: it is applied to
-  // the list fetched again, a few times at most.
+  // Moves a category past its visible neighbour. The order covers inactive
+  // categories too and the API wants all ids, so the move is applied to the
+  // full list, fetched fresh (D29). If the item or its neighbour is gone,
+  // nothing is sent. If another category was created or deleted between the
+  // fetch and the save (order_mismatch), the move is still well defined: it
+  // is applied to the list fetched again, a few times at most (D92).
   const move = async (item: Category, neighbour: Category, direction: 'up' | 'down') => {
     setMoving(true)
     setMoveError(null)
@@ -97,13 +98,13 @@ export function CategoriesPage() {
         break
       }
     }
-    await queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() }), invalidateProductQueries(queryClient)])
     setMoving(false)
   }
 
   const rows = list.data?.items ?? []
   const columns: Column<Category>[] = [
-    // The position among the rows shown (sortOrder counts hidden inactive types too).
+    // The position among the rows shown (sortOrder counts hidden inactive categories too).
     { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px text-right tabular-nums' },
     {
       header: t('field.name'),

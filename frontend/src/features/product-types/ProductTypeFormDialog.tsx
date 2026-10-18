@@ -14,6 +14,7 @@ import {
   useCreateProductType,
   useUpdateProductType,
 } from '@/api/generated/product-types/product-types'
+import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   apiFields,
   Button,
@@ -31,6 +32,22 @@ import {
 /** Limits of the API. */
 const limits = { key: 64, name: 100, abbreviation: 6 }
 
+/**
+ * The abbreviation as the server stores it (D101): Unicode NFC, trimmed,
+ * upper case per character like Go's strings.ToUpper (a character whose
+ * upper case is longer, such as "ß", stays as it is). For the preview only;
+ * the form sends the text as typed (trimmed) and the server normalises it.
+ */
+const normalizedAbbreviation = (s: string) =>
+  [...s.normalize('NFC').trim()]
+    .map((c) => {
+      const upper = c.toUpperCase()
+      return [...upper].length === 1 ? upper : c
+    })
+    .join('')
+/** Characters (code points), as the server counts them. */
+const characters = (s: string) => [...s.normalize('NFC').trim()].length
+
 const schema = z.object({
   key: z
     .string()
@@ -45,7 +62,7 @@ const schema = z.object({
   abbreviation: z
     .string()
     .trim()
-    .max(limits.abbreviation, errorKey('validation.too_long', { max: limits.abbreviation })),
+    .refine((v) => characters(v) <= limits.abbreviation, errorKey('validation.too_long', { max: limits.abbreviation })),
   color: z
     .string()
     .trim()
@@ -66,7 +83,7 @@ const toFormValues = (item: ProductType | null): FormValues => ({
 })
 
 const toInput = (v: FormValues): ProductTypeInput => {
-  const abbreviation = v.abbreviation.trim().toUpperCase()
+  const abbreviation = v.abbreviation.trim()
   const color = v.color.trim().toLowerCase()
   return {
     key: v.key,
@@ -137,7 +154,7 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
       }
       return // shown by ErrorMessage via mutation.error
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() }), invalidateProductQueries(queryClient)])
     onOpenChange(false)
   })
 
@@ -214,7 +231,7 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
       <div className="space-y-1.5">
         <p className="text-sm font-medium">{t('field.preview')}</p>
         <div data-testid="badge-preview" className="rounded-control border border-line bg-canvas px-3 py-2 text-sm">
-          <TypeBadge color={previewColor} abbreviation={abbreviation.trim().toUpperCase()}>
+          <TypeBadge color={previewColor} abbreviation={normalizedAbbreviation(abbreviation)}>
             {nameEn.trim() || t('field.previewName')}
           </TypeBadge>
         </div>

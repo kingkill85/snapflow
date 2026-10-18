@@ -387,6 +387,14 @@ func TestNormalisesOnSave(t *testing.T) {
 		t.Errorf("umlauts: %q", got.Abbreviation)
 	}
 
+	// Per character like the frontend's preview: "ß" has no single upper-case
+	// character and stays.
+	b = body("hdl")
+	b["abbreviation"] = "ßx"
+	if got := create(t, api, b); got.Abbreviation != "ßX" {
+		t.Errorf("sharp s: %q", got.Abbreviation)
+	}
+
 	// No colour or abbreviation clears them; blank is none.
 	nb := updateBody(got, body("zigbee"))
 	nb["abbreviation"] = "   "

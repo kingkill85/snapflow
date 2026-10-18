@@ -155,6 +155,62 @@ FROM categories ORDER BY sort_order`)
 	assertPgError(t, db, "23514", `UPDATE product_types SET abbreviation = 'TOOLONG' WHERE id = $1`, dimmer)
 }
 
+// Down and Up again: the schemas go back to the product types by id, then
+// the backfill runs again. Categories without a product type of the same id,
+// product types' abbreviations and product moves to other categories are
+// lost (documented in the migration and D100).
+func TestCategoriesDownAndUp(t *testing.T) {
+	ctx := context.Background()
+	url := testdb.NewDatabase(t)
+	if err := database.MigrateTo(ctx, url, 6); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	const dimmer = "00000000-0000-0000-0000-00000000000a"
+	schema := `[{"key":"width_te","label":{"en":"Width"},"type":"integer","scope":"product"}]`
+	mustExec(t, db, `INSERT INTO product_types (id, key, name, description, sort_order, attributes) VALUES ($1, 'dimmer', '{"en":"Dimmer"}', '{"en":"DIN rail"}', 1, $2)`, dimmer, schema)
+	mustExec(t, db, `INSERT INTO products (product_type_id, model_number, name, attributes) VALUES ($1, 'DIM-1', '{"en":"Dimmer 1"}', '{"width_te":4}')`, dimmer)
+	if err := database.Migrate(ctx, url); err != nil {
+		t.Fatal(err)
+	}
+	// Changed after the migration: the schema, a category of its own, a badge.
+	newSchema := `[{"key":"width_te","label":{"en":"Width"},"type":"integer","scope":"product","required":true}]`
+	mustExec(t, db, `UPDATE categories SET attributes = $1 WHERE id = $2`, newSchema, dimmer)
+	mustExec(t, db, `INSERT INTO categories (key, name, sort_order) VALUES ('sensors', '{"en":"Sensors"}', 2)`)
+	mustExec(t, db, `UPDATE product_types SET abbreviation = 'DM' WHERE id = $1`, dimmer)
+
+	if err := database.MigrateDownTo(ctx, url, 6); err != nil {
+		t.Fatal(err)
+	}
+	var attrs, description string
+	if err := db.QueryRow(ctx, `SELECT attributes::text, description::text FROM product_types WHERE id = $1`, dimmer).Scan(&attrs, &description); err != nil {
+		t.Fatal(err)
+	}
+	if !jsonEqual(raw(attrs), raw(newSchema)) || !jsonEqual(raw(description), raw(`{"en":"DIN rail"}`)) {
+		t.Errorf("after down: %s %s", attrs, description)
+	}
+	var categoriesLeft bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'categories')`).Scan(&categoriesLeft); err != nil || categoriesLeft {
+		t.Errorf("categories still there: %v %v", categoriesLeft, err)
+	}
+
+	// And up again.
+	if err := database.Migrate(ctx, url); err != nil {
+		t.Fatal(err)
+	}
+	var categoryID, categoryAttrs string
+	if err := db.QueryRow(ctx, `SELECT p.category_id::text, c.attributes::text FROM products p JOIN categories c ON c.id = p.category_id`).Scan(&categoryID, &categoryAttrs); err != nil {
+		t.Fatal(err)
+	}
+	if categoryID != dimmer || !jsonEqual(raw(categoryAttrs), raw(newSchema)) {
+		t.Errorf("after up again: %s %s", categoryID, categoryAttrs)
+	}
+}
+
 // On an empty database the migration creates the tables and nothing else.
 func TestCategoriesEmptyDatabase(t *testing.T) {
 	ctx := context.Background()

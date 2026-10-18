@@ -16,6 +16,7 @@ import {
   useUpdateCategory,
 } from '@/api/generated/categories/categories'
 import { useCan } from '@/app/session'
+import { invalidateProductQueries } from '@/catalog/invalidate'
 import {
   type ApiFieldMap,
   Button,
@@ -193,12 +194,12 @@ function CategoryEditor({ item, notice, onReload, onSaved, onChanged }: Category
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
     }
-    await queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() }), invalidateProductQueries(queryClient)])
     if (loaded) {
       onSaved?.(result)
       return
     }
-    // A new type continues on its edit page (D84).
+    // A new category continues on its edit page (D84).
     unsaved.allow()
     queryClient.setQueryData(getGetCategoryQueryKey(result.id), result)
     void navigate(`${listPath}/${result.id}`, { replace: true, state: { notice: 'created' } })

@@ -440,7 +440,7 @@ describe('CategoryEditorPage', () => {
     expect(puts).toHaveLength(0)
   })
 
-  it('sends only what applies after a type change', async () => {
+  it('sends only what applies after an attribute type change', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
     const attributes = attributesRegion()
