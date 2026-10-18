@@ -10,8 +10,13 @@ export function RolesPage() {
   const { t: tCommon } = useTranslation()
   const matrix = useGetRoleMatrix()
 
-  if (matrix.isPending) return <Loading />
-  if (matrix.isError) return <ErrorMessage error={matrix.error} />
+  if (matrix.isPending || matrix.isError) {
+    return (
+      <Page title={t('title')} description={t('description')}>
+        {matrix.isPending ? <Loading /> : <ErrorMessage error={matrix.error} />}
+      </Page>
+    )
+  }
 
   const columns: Column<Permission>[] = [
     {
@@ -28,9 +33,9 @@ export function RolesPage() {
       className: 'text-center',
       cell: (p: Permission) =>
         r.permissions.includes(p) ? (
-          <Check className="mx-auto size-4 text-success" aria-label={t('allowed')} />
+          <Check className="mx-auto size-4 text-success" role="img" aria-label={t('allowed')} />
         ) : (
-          <Minus className="mx-auto size-4 text-muted" aria-label={t('denied')} />
+          <Minus className="mx-auto size-4 text-muted" role="img" aria-label={t('denied')} />
         ),
     })),
   ]

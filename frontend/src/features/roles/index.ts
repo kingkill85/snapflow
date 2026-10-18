@@ -5,6 +5,5 @@ import { RolesPage } from './RolesPage'
 export const rolesFeature: FeatureModule = {
   path: 'admin/roles',
   element: RolesPage,
-  permission: 'users.manage',
   nav: { section: 'admin', namespace: 'roles', labelKey: 'title' },
 }

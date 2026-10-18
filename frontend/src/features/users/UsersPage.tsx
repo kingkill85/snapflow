@@ -20,8 +20,9 @@ export function UsersPage() {
   const can = useCan()
   const queryClient = useQueryClient()
 
-  // Only callers who see every tenant choose tenants; everyone else works in their own.
-  const allTenants = can('tenants.access_all')
+  // Only callers who see and manage every tenant choose tenants (the tenant
+  // list needs tenants.manage); everyone else works in their own.
+  const allTenants = can('tenants.access_all') && can('tenants.manage')
   const [tenantFilter, setTenantFilter] = useState('')
   const tenants = useListTenants({ query: { enabled: allTenants } })
   const tenantList = allTenants ? (tenants.data?.items ?? noTenants) : noTenants
@@ -35,6 +36,12 @@ export function UsersPage() {
   const openForm = (user: User | null) => {
     setEditing(user)
     setFormOpen(true)
+  }
+
+  // Each delete starts without the previous attempt's error.
+  const openDelete = (user: User | null) => {
+    remove.reset()
+    setDeleting(user)
   }
 
   const confirmDelete = async () => {
@@ -79,6 +86,7 @@ export function UsersPage() {
           options={[{ value: '', label: t('allTenants') }, ...tenantList.map((tenant) => ({ value: tenant.id, label: tenant.name }))]}
         />
       )}
+      {tenants.isError && <ErrorMessage error={tenants.error} />}
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (
@@ -96,7 +104,7 @@ export function UsersPage() {
                 </Button>
               )}
               {u.can.delete && (
-                <Button size="sm" variant="danger" onClick={() => setDeleting(u)}>
+                <Button size="sm" variant="danger" onClick={() => openDelete(u)}>
                   <Trash2 /> {tCommon('action.delete')}
                 </Button>
               )}
@@ -116,7 +124,7 @@ export function UsersPage() {
 
       <ConfirmDialog
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && openDelete(null)}
         title={t('deleteTitle')}
         message={t('deleteMessage', { name: deleting?.fullName || deleting?.email })}
         confirmLabel={tCommon('action.delete')}

@@ -11,13 +11,16 @@ import {
   useUpdate[[.Type]],
 } from '@/api/generated/[[.URL]]/[[.URL]]'
 import type { [[.Type]] } from '@/api/generated/model'
-import { ErrorMessage, Field, FormDialog } from '@/components/ui'
+import { apiFields, errorKey, ErrorMessage, Field, FormDialog, setApiFieldErrors, useFieldError } from '@/components/ui'
 
 const schema = z.object({
-  nameEn: z.string().trim().min(1, 'validation.required'),
+  nameEn: z.string().trim().min(1, errorKey('validation.required')),
   nameDe: z.string().trim(),
 })
 type FormValues = z.infer<typeof schema>
+
+// API error locations shown at the form's fields.
+const fields = apiFields<FormValues>([], { 'name.en': 'nameEn', 'name.de': 'nameDe' })
 
 type Props = {
   open: boolean
@@ -29,7 +32,7 @@ type Props = {
 export function [[.Type]]FormDialog({ open, onOpenChange, item }: Props) {
   const { t } = useTranslation('[[.NS]]')
   const { t: tCommon } = useTranslation()
-  const { t: tError } = useTranslation('errors')
+  const fieldError = useFieldError()
   const queryClient = useQueryClient()
   const create = useCreate[[.Type]]()
   const update = useUpdate[[.Type]]()
@@ -54,14 +57,13 @@ export function [[.Type]]FormDialog({ open, onOpenChange, item }: Props) {
     try {
       if (item) await update.mutateAsync({ id: item.id, data })
       else await create.mutateAsync({ data })
-    } catch {
+    } catch (error) {
+      setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
     }
     await queryClient.invalidateQueries({ queryKey: getList[[.Plural]]QueryKey() })
     onOpenChange(false)
   })
-
-  const fieldError = (message?: string) => (message ? tError(message as never) : undefined)
 
   return (
     <FormDialog
@@ -71,10 +73,10 @@ export function [[.Type]]FormDialog({ open, onOpenChange, item }: Props) {
       submitLabel={item ? tCommon('action.update') : tCommon('action.create')}
       submitting={mutation.isPending}
       onSubmit={() => void submit()}
-      error={<ErrorMessage error={mutation.error} />}
+      error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
       <Field label={t('field.nameEn')} error={fieldError(errors.nameEn?.message)} {...form.register('nameEn')} />
-      <Field label={t('field.nameDe')} {...form.register('nameDe')} />
+      <Field label={t('field.nameDe')} error={fieldError(errors.nameDe?.message)} {...form.register('nameDe')} />
     </FormDialog>
   )
 }

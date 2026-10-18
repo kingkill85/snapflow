@@ -40,5 +40,5 @@ export const userMe: Me = {
   tenantId: '00000000-0000-4000-8000-0000000000a1',
   tenantName: 'Acme',
   permissions: ['catalog.read', 'projects.read', 'projects.write'],
-  assignableRoles: ['user'],
+  assignableRoles: [],
 }

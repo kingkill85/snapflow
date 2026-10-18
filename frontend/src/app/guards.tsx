@@ -10,6 +10,7 @@ import { useCan, useSession } from './session'
 
 /** Renders the child routes only for a logged-in user; others go to /login. */
 export function RequireAuth() {
+  const { t } = useTranslation()
   const session = useSession()
   const location = useLocation()
   if (session.isPending) return <Loading />
@@ -19,7 +20,7 @@ export function RequireAuth() {
   }
   if (!session.me) {
     return (
-      <Page title="SnapFlow">
+      <Page title={t('app.name')}>
         <ErrorMessage error={session.error} />
       </Page>
     )

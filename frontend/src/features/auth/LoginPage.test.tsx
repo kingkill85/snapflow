@@ -55,7 +55,35 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
     const form = screen.getByRole('button', { name: 'Sign in' }).closest('form')!
-    expect(await within(form).findByRole('alert')).toHaveTextContent('Too many login attempts. Try again in 42 seconds.')
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Too many attempts. Try again in 42 seconds.')
+  })
+
+  it('sends a user who is already logged in to the requested page', async () => {
+    renderWithProviders(routes, { me: adminMe, route: '/login?returnTo=%2Fadmin%2Fusers' })
+
+    expect(await screen.findByText('users page')).toBeInTheDocument()
+  })
+
+  it('shows field errors from the API at the field', async () => {
+    server.use(
+      http.get('/api/auth/me', () => problem(401, 'auth.required')),
+      http.post('/api/auth/login', () =>
+        HttpResponse.json(
+          { status: 422, code: 'validation.failed', fields: [{ location: 'body.email', code: 'validation.invalid' }] },
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(routes, { me: null, route: '/login' })
+
+    await user.type(await screen.findByLabelText('Email'), 'admin@example.com')
+    await user.type(screen.getByLabelText('Password'), 'secret-password')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('This value is invalid.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveAccessibleDescription('This value is invalid.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Please check the highlighted fields.')
   })
 
   it('only returns to paths inside the app', () => {

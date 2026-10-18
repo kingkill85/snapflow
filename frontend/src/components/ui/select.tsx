@@ -34,15 +34,16 @@ export function SelectField({ label, error, hint, id, ...props }: SelectFieldPro
   const generated = useId()
   const selectId = id ?? generated
   const messageId = `${selectId}-message`
+  const message = error || hint
   return (
     <div className="space-y-1.5">
       <LabelPrimitive.Root htmlFor={selectId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
-      <Select id={selectId} aria-invalid={error ? true : undefined} aria-describedby={messageId} {...props} />
-      {(error || hint) && (
+      <Select id={selectId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
+      {message && (
         <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
-          {error ?? hint}
+          {message}
         </p>
       )}
     </div>

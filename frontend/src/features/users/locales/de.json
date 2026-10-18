@@ -18,6 +18,8 @@
     "activeHint": "Inaktive Benutzer können sich nicht anmelden.",
     "password": "Passwort",
     "passwordHint": "Mindestens 8 Zeichen",
-    "passwordResetHint": "Leer lassen, um das Passwort zu behalten. Ein neues Passwort meldet den Benutzer ab."
+    "passwordResetHint": "Leer lassen, um das Passwort zu behalten. Ein neues Passwort meldet den Benutzer ab.",
+    "ownPasswordHint": "Ihr eigenes Passwort ändern Sie in Ihrem Profil.",
+    "openProfile": "Profil öffnen"
   }
 }

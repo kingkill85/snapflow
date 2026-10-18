@@ -9,15 +9,29 @@ import { getGetMeQueryKey } from '@/api/generated/auth/auth'
 import { getListUsersQueryKey, useCreateUser, useUpdateUser } from '@/api/generated/users/users'
 import { Role, type Tenant, type User } from '@/api/generated/model'
 import { useMe } from '@/app/session'
-import { CheckboxField, ErrorMessage, Field, FormDialog, SelectField } from '@/components/ui'
+import {
+  apiFields,
+  CheckboxField,
+  errorKey,
+  ErrorMessage,
+  Field,
+  FormDialog,
+  SelectField,
+  setApiFieldErrors,
+  TextLink,
+  useFieldError,
+} from '@/components/ui'
 
 const schema = z.object({
-  email: z.email('validation.email'),
-  fullName: z.string().trim(),
+  email: z.email(errorKey('validation.email')).max(254, errorKey('validation.too_long')),
+  fullName: z.string().trim().max(200, errorKey('validation.too_long')),
   role: z.enum(Role),
   tenantId: z.string(),
   isActive: z.boolean(),
-  password: z.string().refine((v) => v === '' || v.length >= 8, 'user.password_too_short'),
+  password: z
+    .string()
+    .refine((v) => v === '' || v.length >= 8, errorKey('user.password_too_short'))
+    .max(200, errorKey('validation.too_long')),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -35,15 +49,19 @@ type Props = {
 export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenantId }: Props) {
   const { t } = useTranslation('users')
   const { t: tCommon } = useTranslation()
-  const { t: tError } = useTranslation('errors')
+  const fieldError = useFieldError()
   const me = useMe()
   const queryClient = useQueryClient()
   const create = useCreateUser()
   const update = useUpdateUser()
   const mutation = item ? update : create
 
-  // Nobody changes their own role, tenant or status; those fields keep their values.
+  // Nobody changes their own role, tenant, status or password here; those
+  // fields keep their values (the password is changed on the profile).
   const isSelf = item?.id === me.id
+  const showTenant = !isSelf && tenants.length > 0
+  // The fields this form renders, which show the API's per-field errors.
+  const fields = apiFields<FormValues>(['email', 'fullName', !isSelf && 'role', showTenant && 'tenantId', !isSelf && 'password'])
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
   const { errors } = form.formState
@@ -68,22 +86,21 @@ export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenan
 
   const submit = form.handleSubmit(async ({ password, ...values }) => {
     if (!item && password === '') {
-      form.setError('password', { message: 'validation.required' })
+      form.setError('password', { message: errorKey('validation.required') })
       return
     }
     const data = { ...values, ...(password ? { password } : {}) }
     try {
       if (item) await update.mutateAsync({ id: item.id, data })
       else await create.mutateAsync({ data })
-    } catch {
+    } catch (error) {
+      setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
     }
     await queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() })
     if (isSelf) await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() })
     onOpenChange(false)
   })
-
-  const fieldError = (message?: string) => (message ? tError(message as never) : undefined)
 
   return (
     <FormDialog
@@ -93,32 +110,40 @@ export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenan
       submitLabel={item ? tCommon('action.update') : tCommon('action.create')}
       submitting={mutation.isPending}
       onSubmit={() => void submit()}
-      error={<ErrorMessage error={mutation.error} />}
+      error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
       <Field label={t('field.email')} type="email" autoComplete="off" error={fieldError(errors.email?.message)} {...form.register('email')} />
-      <Field label={t('field.fullName')} autoComplete="off" {...form.register('fullName')} />
+      <Field label={t('field.fullName')} autoComplete="off" error={fieldError(errors.fullName?.message)} {...form.register('fullName')} />
       {!isSelf && (
         <SelectField
           label={t('field.role')}
           options={me.assignableRoles.map((r) => ({ value: r, label: tCommon(`role.${r}`) }))}
+          error={fieldError(errors.role?.message)}
           {...form.register('role')}
         />
       )}
-      {!isSelf && tenants.length > 0 && (
+      {showTenant && (
         <SelectField
           label={t('field.tenant')}
           options={tenants.map((tenant) => ({ value: tenant.id, label: tenant.name }))}
+          error={fieldError(errors.tenantId?.message)}
           {...form.register('tenantId')}
         />
       )}
-      <Field
-        label={t('field.password')}
-        type="password"
-        autoComplete="new-password"
-        hint={item ? t('field.passwordResetHint') : t('field.passwordHint')}
-        error={fieldError(errors.password?.message)}
-        {...form.register('password')}
-      />
+      {isSelf ? (
+        <p className="text-sm text-muted">
+          {t('field.ownPasswordHint')} <TextLink to="/profile">{t('field.openProfile')}</TextLink>
+        </p>
+      ) : (
+        <Field
+          label={t('field.password')}
+          type="password"
+          autoComplete="new-password"
+          hint={item ? t('field.passwordResetHint') : t('field.passwordHint')}
+          error={fieldError(errors.password?.message)}
+          {...form.register('password')}
+        />
+      )}
       {!isSelf && <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />}
     </FormDialog>
   )

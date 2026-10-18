@@ -12,8 +12,6 @@
     "detailsDescription": "Your name and the email address you sign in with.",
     "fullName": "Full name",
     "email": "Email",
-    "role": "Role",
-    "tenant": "Tenant",
     "password": "Password",
     "passwordDescription": "Changing the password signs you out everywhere else.",
     "currentPassword": "Current password",
@@ -21,6 +19,10 @@
     "newPasswordHint": "At least 8 characters",
     "confirmPassword": "Repeat new password",
     "changePassword": "Change password",
-    "passwordChanged": "Password changed."
+    "passwordChanged": "Password changed.",
+    "sessions": "Sessions",
+    "sessionsDescription": "Signs you out on every device and browser, including this one.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signOutEverywhereMessage": "Sign out on every device, including this one? You will need to sign in again."
   }
 }

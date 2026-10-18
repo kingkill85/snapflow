@@ -33,6 +33,12 @@ export function [[.Plural]]Page() {
     setFormOpen(true)
   }
 
+  // Each delete starts without the previous attempt's error.
+  const openDelete = (item: [[.Type]] | null) => {
+    remove.reset()
+    setDeleting(item)
+  }
+
   const confirmDelete = async () => {
     if (!deleting) return
     try {
@@ -56,7 +62,7 @@ export function [[.Plural]]Page() {
       <Button size="sm" variant="secondary" onClick={() => openForm(item)}>
         <Pencil /> {tCommon('action.edit')}
       </Button>
-      <Button size="sm" variant="danger" onClick={() => setDeleting(item)}>
+      <Button size="sm" variant="danger" onClick={() => openDelete(item)}>
         <Trash2 /> {tCommon('action.delete')}
       </Button>
     </>
@@ -82,7 +88,7 @@ export function [[.Plural]]Page() {
 
       <ConfirmDialog
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && openDelete(null)}
         title={t('deleteTitle')}
         message={t('deleteMessage', { name: localized(deleting?.name) })}
         confirmLabel={tCommon('action.delete')}

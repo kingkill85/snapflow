@@ -7,13 +7,14 @@
     "forbidden": "You are not allowed to do this.",
     "invalid_credentials": "Email or password is wrong.",
     "account_disabled": "Your account is disabled. Please contact your administrator.",
-    "too_many_attempts": "Too many login attempts. Try again in {{seconds}} seconds.",
+    "too_many_attempts": "Too many attempts. Try again in {{seconds}} seconds.",
     "wrong_password": "The current password is wrong."
   },
   "validation": {
     "failed": "Please check the highlighted fields.",
     "required": "This field is required.",
     "invalid": "This value is invalid.",
+    "too_long": "This value is too long.",
     "email": "Enter a valid email address.",
     "password_mismatch": "The passwords do not match."
   },

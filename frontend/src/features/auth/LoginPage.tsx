@@ -7,25 +7,28 @@ import { z } from 'zod'
 
 import { getGetMeQueryKey, useLogin } from '@/api/generated/auth/auth'
 import { useSession } from '@/app/session'
-import { Button, ErrorMessage, Field } from '@/components/ui'
+import { apiFields, Button, errorKey, ErrorMessage, Field, setApiFieldErrors, useFieldError } from '@/components/ui'
 
 import { safeReturnTo } from './return-to'
 
 const schema = z.object({
-  email: z.string().trim().min(1, 'validation.required'),
-  password: z.string().min(1, 'validation.required'),
+  email: z.string().trim().min(1, errorKey('validation.required')).max(254, errorKey('validation.too_long')),
+  password: z.string().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long')),
 })
 type FormValues = z.infer<typeof schema>
 
+const fields = apiFields<FormValues>(['email', 'password'])
+
 export function LoginPage() {
   const { t } = useTranslation('auth')
-  const { t: tError } = useTranslation('errors')
+  const fieldError = useFieldError()
   const session = useSession()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const returnTo = safeReturnTo(params.get('returnTo'))
-  const login = useLogin()
+  // A failed login says nothing about a session; don't re-check it.
+  const login = useLogin({ mutation: { meta: { skipSessionCheck: true } } })
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } })
   const { errors } = form.formState
@@ -34,7 +37,8 @@ export function LoginPage() {
     let me
     try {
       me = await login.mutateAsync({ data })
-    } catch {
+    } catch (error) {
+      setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via login.error
     }
     // Start clean: nothing cached for a previous user survives a login.
@@ -45,8 +49,6 @@ export function LoginPage() {
 
   if (session.me) return <Navigate to={returnTo} replace />
 
-  const fieldError = (message?: string) => (message ? tError(message as never) : undefined)
-
   return (
     <main className="flex min-h-svh items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 rounded-control border border-line bg-surface p-8 shadow-sm">
@@ -55,7 +57,7 @@ export function LoginPage() {
           <p className="text-sm text-muted">{t('login.subtitle')}</p>
         </div>
         <form className="space-y-4" noValidate onSubmit={(e) => void submit(e)}>
-          <ErrorMessage error={login.error} />
+          <ErrorMessage error={login.error} fields={fields} />
           <Field
             label={t('login.email')}
             type="email"

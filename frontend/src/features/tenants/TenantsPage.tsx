@@ -26,6 +26,12 @@ export function TenantsPage() {
     setFormOpen(true)
   }
 
+  // Each delete starts without the previous attempt's error.
+  const openDelete = (tenant: Tenant | null) => {
+    remove.reset()
+    setDeleting(tenant)
+  }
+
   const confirmDelete = async () => {
     if (!deleting) return
     try {
@@ -78,7 +84,7 @@ export function TenantsPage() {
                 </Button>
               )}
               {tenant.can.delete && (
-                <Button size="sm" variant="danger" onClick={() => setDeleting(tenant)}>
+                <Button size="sm" variant="danger" onClick={() => openDelete(tenant)}>
                   <Trash2 /> {tCommon('action.delete')}
                 </Button>
               )}
@@ -92,7 +98,7 @@ export function TenantsPage() {
 
       <ConfirmDialog
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && openDelete(null)}
         title={t('deleteTitle')}
         message={t('deleteMessage', { name: deleting?.name })}
         confirmLabel={tCommon('action.delete')}

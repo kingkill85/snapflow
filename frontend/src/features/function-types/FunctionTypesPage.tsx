@@ -33,6 +33,12 @@ export function FunctionTypesPage() {
     setFormOpen(true)
   }
 
+  // Each delete starts without the previous attempt's error.
+  const openDelete = (item: FunctionType | null) => {
+    remove.reset()
+    setDeleting(item)
+  }
+
   const confirmDelete = async () => {
     if (!deleting) return
     try {
@@ -56,7 +62,7 @@ export function FunctionTypesPage() {
       <Button size="sm" variant="secondary" onClick={() => openForm(ft)}>
         <Pencil /> {tCommon('action.edit')}
       </Button>
-      <Button size="sm" variant="danger" onClick={() => setDeleting(ft)}>
+      <Button size="sm" variant="danger" onClick={() => openDelete(ft)}>
         <Trash2 /> {tCommon('action.delete')}
       </Button>
     </>
@@ -85,7 +91,7 @@ export function FunctionTypesPage() {
 
       <ConfirmDialog
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && openDelete(null)}
         title={t('deleteTitle')}
         message={t('deleteMessage', { name: localized(deleting?.name) })}
         confirmLabel={tCommon('action.delete')}

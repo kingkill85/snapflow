@@ -3,11 +3,18 @@ import { http, HttpResponse } from 'msw'
 import { Route, Routes, useLocation } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
-import { userMe } from '@/test/fixtures'
+import type { Me } from '@/api/generated/model'
+import { adminMe, tenantAdminMe, userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
-import { RequireAuth, RequirePermission } from './guards'
+import { features } from './features'
+import { Home, RequireAuth, RequirePermission } from './guards'
+
+function PathProbe() {
+  const location = useLocation()
+  return <p>landed on {location.pathname}</p>
+}
 
 function LoginProbe() {
   const location = useLocation()
@@ -53,5 +60,36 @@ describe('guards', () => {
 
     expect(await screen.findByText('You do not have permission to see this page.')).toBeInTheDocument()
     expect(screen.queryByText('users page')).not.toBeInTheDocument()
+  })
+
+  it('sends a user to the function types', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="*" element={<PathProbe />} />
+      </Routes>,
+      { me: userMe },
+    )
+
+    expect(await screen.findByText('landed on /catalog/function-types')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['admin', adminMe],
+    ['tenant admin', tenantAdminMe],
+    ['user', userMe],
+  ] as [string, Me][])('sends a %s to a page they may see', async (_, me) => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="*" element={<PathProbe />} />
+      </Routes>,
+      { me },
+    )
+
+    const text = (await screen.findByText(/^landed on /)).textContent!
+    const feature = features.find((f) => text === `landed on /${f.path}`)
+    expect(feature).toBeDefined()
+    expect(!feature!.permission || me.permissions.includes(feature!.permission)).toBe(true)
   })
 })

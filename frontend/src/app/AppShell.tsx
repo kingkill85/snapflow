@@ -25,11 +25,12 @@ export function AppShell() {
   const signOut = async () => {
     try {
       await logout.mutateAsync()
-    } finally {
-      // Forget everything cached for this user, even if the call failed.
-      queryClient.clear()
-      void navigate('/login', { replace: true })
+    } catch {
+      // Signed out locally anyway; the session expires on its own.
     }
+    // Forget everything cached for this user, even if the call failed.
+    queryClient.clear()
+    void navigate('/login', { replace: true })
   }
 
   return (

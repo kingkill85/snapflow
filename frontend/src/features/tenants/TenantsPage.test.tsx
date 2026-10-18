@@ -4,6 +4,8 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import type { Tenant } from '@/api/generated/model'
+import { getListUsersQueryKey } from '@/api/generated/users/users'
+import { adminMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -67,5 +69,71 @@ describe('TenantsPage', () => {
 
     await user.click(await screen.findByRole('button', { name: /delete/i }))
     expect(await screen.findByText('Delete "Acme" and all its users? This cannot be undone.')).toBeInTheDocument()
+  })
+
+  it('deactivates a partner', async () => {
+    let put: unknown
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({})] })),
+      http.put('/api/tenants/:id', async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json(tenant({ isActive: false }))
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByLabelText('Active'))
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(put).toEqual({ name: 'Acme', isActive: false })
+  })
+
+  it('explains instead of offering to deactivate the distributor, and refreshes the session for the own tenant', async () => {
+    let meReloaded = false
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [distributor] })),
+      http.put('/api/tenants/:id', () => HttpResponse.json(distributor)),
+      http.get('/api/auth/me', () => {
+        meReloaded = true
+        return HttpResponse.json(adminMe)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />, { me: adminMe })
+
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('The distributor tenant always stays active.')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Active')).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(meReloaded).toBe(true)
+  })
+
+  it('refreshes the user list after deleting a tenant', async () => {
+    let items = [tenant({})]
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items })),
+      http.delete('/api/tenants/:id', () => {
+        items = []
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    const { client } = renderWithProviders(<TenantsPage />)
+    client.setQueryData(getListUsersQueryKey(), { items: [] })
+
+    await user.click(await screen.findByRole('button', { name: /delete/i }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(client.getQueryState(getListUsersQueryKey())?.isInvalidated).toBe(true)
+    expect(await screen.findByText('No tenants yet.')).toBeInTheDocument()
   })
 })

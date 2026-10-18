@@ -12,8 +12,6 @@
     "detailsDescription": "Ihr Name und die E-Mail-Adresse, mit der Sie sich anmelden.",
     "fullName": "Vollständiger Name",
     "email": "E-Mail",
-    "role": "Rolle",
-    "tenant": "Mandant",
     "password": "Passwort",
     "passwordDescription": "Eine Passwortänderung meldet Sie überall sonst ab.",
     "currentPassword": "Aktuelles Passwort",
@@ -21,6 +19,10 @@
     "newPasswordHint": "Mindestens 8 Zeichen",
     "confirmPassword": "Neues Passwort wiederholen",
     "changePassword": "Passwort ändern",
-    "passwordChanged": "Passwort geändert."
+    "passwordChanged": "Passwort geändert.",
+    "sessions": "Sitzungen",
+    "sessionsDescription": "Meldet Sie auf allen Geräten und Browsern ab, auch auf diesem.",
+    "signOutEverywhere": "Überall abmelden",
+    "signOutEverywhereMessage": "Auf allen Geräten abmelden, auch auf diesem? Danach müssen Sie sich erneut anmelden."
   }
 }

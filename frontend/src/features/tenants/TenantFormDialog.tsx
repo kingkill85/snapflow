@@ -5,15 +5,28 @@ import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { getGetMeQueryKey } from '@/api/generated/auth/auth'
 import type { Tenant } from '@/api/generated/model'
 import { getListTenantsQueryKey, useCreateTenant, useUpdateTenant } from '@/api/generated/tenants/tenants'
-import { CheckboxField, ErrorMessage, Field, FormDialog } from '@/components/ui'
+import { useMe } from '@/app/session'
+import {
+  apiFields,
+  CheckboxField,
+  errorKey,
+  ErrorMessage,
+  Field,
+  FormDialog,
+  setApiFieldErrors,
+  useFieldError,
+} from '@/components/ui'
 
 const schema = z.object({
-  name: z.string().trim().min(1, 'validation.required'),
+  name: z.string().trim().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long')),
   isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
+
+const fields = apiFields<FormValues>(['name'])
 
 type Props = {
   open: boolean
@@ -25,7 +38,8 @@ type Props = {
 export function TenantFormDialog({ open, onOpenChange, item }: Props) {
   const { t } = useTranslation('tenants')
   const { t: tCommon } = useTranslation()
-  const { t: tError } = useTranslation('errors')
+  const fieldError = useFieldError()
+  const me = useMe()
   const queryClient = useQueryClient()
   const create = useCreateTenant()
   const update = useUpdateTenant()
@@ -49,10 +63,13 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
     try {
       if (item) await update.mutateAsync({ id: item.id, data })
       else await create.mutateAsync({ data })
-    } catch {
+    } catch (error) {
+      setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
     }
     await queryClient.invalidateQueries({ queryKey: getListTenantsQueryKey() })
+    // The session shows the user's own tenant name.
+    if (item?.id === me.tenantId) await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() })
     onOpenChange(false)
   })
 
@@ -64,9 +81,9 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
       submitLabel={item ? tCommon('action.update') : tCommon('action.create')}
       submitting={mutation.isPending}
       onSubmit={() => void submit()}
-      error={<ErrorMessage error={mutation.error} />}
+      error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
-      <Field label={t('field.name')} error={errors.name?.message ? tError(errors.name.message as never) : undefined} {...form.register('name')} />
+      <Field label={t('field.name')} error={fieldError(errors.name?.message)} {...form.register('name')} />
       {item?.isDistributor ? (
         <p className="text-sm text-muted">{t('field.distributorHint')}</p>
       ) : (

@@ -7,13 +7,14 @@
     "forbidden": "Dafür fehlt die Berechtigung.",
     "invalid_credentials": "E-Mail oder Passwort ist falsch.",
     "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
-    "too_many_attempts": "Zu viele Anmeldeversuche. Bitte in {{seconds}} Sekunden erneut versuchen.",
+    "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
   },
   "validation": {
     "failed": "Bitte die markierten Felder prüfen.",
     "required": "Dieses Feld ist erforderlich.",
     "invalid": "Dieser Wert ist ungültig.",
+    "too_long": "Dieser Wert ist zu lang.",
     "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
     "password_mismatch": "Die Passwörter stimmen nicht überein."
   },
