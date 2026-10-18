@@ -10,7 +10,7 @@ import type { Role } from './role';
 export interface Me {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** Roles the user may give to others */
+  /** Roles the user may give to others; empty without users.manage */
   assignableRoles: Role[];
   email: string;
   fullName: string;

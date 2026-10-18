@@ -13,16 +13,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kingkill85/snapflow/backend/internal/app"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
+
+// TrustedProxy is the address test requests come from (humatest's
+// RemoteAddr). It is a trusted proxy, so tests choose the client address
+// with an "X-Forwarded-For: <ip>" header.
+var TrustedProxy = netip.MustParsePrefix("127.0.0.1/32")
 
 const (
 	AdminEmail = "admin@snapflow.test"
@@ -37,6 +44,9 @@ type API struct {
 	Admin Session
 	// Distributor is the distributor tenant's ID.
 	Distributor uuid.UUID
+	// DB is the test database, for setting up states the API cannot create
+	// (e.g. expired sessions).
+	DB *pgxpool.Pool
 }
 
 // Session is a logged-in user. Pass Cookie as a request argument.
@@ -58,8 +68,8 @@ func New(t *testing.T) *API {
 	}); err != nil {
 		t.Fatalf("apptest: bootstrap: %v", err)
 	}
-	_, api := app.New(app.Deps{DB: pool})
-	a := &API{TestAPI: humatest.Wrap(t, api), t: t}
+	_, api := app.New(app.Deps{DB: pool, TrustedProxies: []netip.Prefix{TrustedProxy}})
+	a := &API{TestAPI: humatest.Wrap(t, api), t: t, DB: pool}
 	a.Admin = a.Login(AdminEmail, Password)
 	a.Distributor = a.Admin.TenantID
 	return a

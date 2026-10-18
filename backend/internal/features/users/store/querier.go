@@ -21,7 +21,12 @@ type Querier interface {
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (Session, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserForUpdate(ctx context.Context, id uuid.UUID) (User, error)
 	ListUsers(ctx context.Context, tenantID *uuid.UUID) ([]User, error)
+	// LockActiveAdmins locks every active admin row, in a fixed order so that
+	// concurrent callers queue instead of deadlocking.
+	LockActiveAdmins(ctx context.Context) ([]uuid.UUID, error)
+	PromoteToAdmin(ctx context.Context, arg PromoteToAdminParams) (User, error)
 	SetPasswordHash(ctx context.Context, arg SetPasswordHashParams) error
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	UpdateProfile(ctx context.Context, arg UpdateProfileParams) (User, error)

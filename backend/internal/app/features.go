@@ -9,7 +9,6 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
-	usersstore "github.com/kingkill85/snapflow/backend/internal/features/users/store"
 	// scaffold:imports
 )
 
@@ -22,7 +21,7 @@ type core struct {
 
 func newCore(db *pgxpool.Pool) core {
 	t := tenants.NewService(tenantsstore.New(db))
-	return core{tenants: t, users: users.NewService(usersstore.New(db), t)}
+	return core{tenants: t, users: users.NewService(db, t)}
 }
 
 // registerFeatures is the one place where feature modules are wired in.

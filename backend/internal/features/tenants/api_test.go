@@ -2,9 +2,12 @@ package tenants_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
@@ -64,6 +67,28 @@ func TestValidationAndConflicts(t *testing.T) {
 		t.Fatalf("duplicate: got %d: %s", resp.Code, resp.Body)
 	}
 	assertContains(t, resp.Body.String(), `"code":"tenant.name_taken"`)
+
+	other := idOf(t, api.Post("/api/tenants", admin, tenant("Other", true)).Body.String())
+	resp = api.Put("/api/tenants/"+other, admin, tenant("aCmE", true))
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("rename to taken name: got %d: %s", resp.Code, resp.Body)
+	}
+	assertContains(t, resp.Body.String(), `"code":"tenant.name_taken"`)
+}
+
+func TestUnknownTenant(t *testing.T) {
+	api := apptest.New(t)
+	path := "/api/tenants/" + uuid.NewString()
+	for op, resp := range map[string]*httptest.ResponseRecorder{
+		"get":    api.Get(path, api.Admin.Cookie),
+		"update": api.Put(path, api.Admin.Cookie, tenant("Ghost", true)),
+		"delete": api.Delete(path, api.Admin.Cookie),
+	} {
+		if resp.Code != http.StatusNotFound {
+			t.Errorf("%s: got %d", op, resp.Code)
+		}
+		assertContains(t, resp.Body.String(), `"code":"tenant.not_found"`)
+	}
 }
 
 func TestDistributorIsProtected(t *testing.T) {

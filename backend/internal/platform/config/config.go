@@ -3,8 +3,12 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
+
+	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
 )
 
 type Config struct {
@@ -17,10 +21,13 @@ type Config struct {
 	CookieSecure bool
 	// DistributorName names the distributor tenant when it is first created.
 	DistributorName string
-	// AdminEmail and AdminPassword create the first admin when there is no
-	// active admin. Leave them empty once an admin exists.
+	// AdminEmail and AdminPassword create the admin, or promote the existing
+	// user with that email, when there is no active admin.
 	AdminEmail    string
 	AdminPassword string
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
+	// believed when determining the client address (login rate limits).
+	TrustedProxies []netip.Prefix
 }
 
 func Load() (Config, error) {
@@ -36,6 +43,9 @@ func Load() (Config, error) {
 		DistributorName: getenv("DISTRIBUTOR_NAME", "Distributor"),
 		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
+	}
+	if c.TrustedProxies, err = clientip.ParseProxies(os.Getenv("TRUSTED_PROXIES")); err != nil {
+		return c, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	if c.DatabaseURL == "" {
 		return c, errors.New("DATABASE_URL is required")

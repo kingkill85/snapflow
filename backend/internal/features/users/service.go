@@ -5,6 +5,7 @@ package users
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -42,14 +43,41 @@ type UserInput struct {
 	Password string     `json:"password,omitempty" maxLength:"200" doc:"Required on create. On update, set it to reset the password; this ends the user's sessions"`
 }
 
-type Service struct {
-	q       store.Querier
-	tenants *tenants.Service
-	logins  *ratelimit.Limiter
+// DB is the database the service runs on; *pgxpool.Pool implements it.
+type DB interface {
+	store.DBTX
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-func NewService(q store.Querier, tenants *tenants.Service) *Service {
-	return &Service{q: q, tenants: tenants, logins: ratelimit.New(10, 5*time.Minute)}
+// Failed attempts are counted in fixed windows of limitPeriod (see Login).
+const limitPeriod = 5 * time.Minute
+
+type Service struct {
+	db      DB
+	q       *store.Queries
+	tenants *tenants.Service
+
+	// Failed logins per (email, client IP), per email and per client IP.
+	loginPairFailures  *ratelimit.Limiter
+	loginEmailFailures *ratelimit.Limiter
+	loginIPFailures    *ratelimit.Limiter
+	// Wrong current passwords per user (ChangePassword).
+	passwordFailures *ratelimit.Limiter
+}
+
+func NewService(db DB, tenants *tenants.Service) *Service {
+	return &Service{
+		db: db, q: store.New(db), tenants: tenants,
+		loginPairFailures:  ratelimit.New(10, limitPeriod),
+		loginEmailFailures: ratelimit.New(50, limitPeriod),
+		loginIPFailures:    ratelimit.New(100, limitPeriod),
+		passwordFailures:   ratelimit.New(10, limitPeriod),
+	}
+}
+
+// inTx runs fn in one transaction; any error rolls it back.
+func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) error {
+	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
 }
 
 // List returns the users the caller may manage. Callers who see every tenant
@@ -100,7 +128,7 @@ func (s *Service) Create(ctx context.Context, in UserInput) (User, error) {
 	if in.Password == "" {
 		return User{}, apperr.Invalid("body.password", "validation.required", "password is required")
 	}
-	hash, err := hashPassword("body.password", in.Password)
+	hash, err := hashPassword(ctx, "body.password", in.Password)
 	if err != nil {
 		return User{}, err
 	}
@@ -115,111 +143,222 @@ func (s *Service) Create(ctx context.Context, in UserInput) (User, error) {
 	return toUser(actor, row), nil
 }
 
+// Update changes a user. It runs in one transaction with the user's row
+// locked, so concurrent changes cannot together remove the last admin.
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in UserInput) (User, error) {
 	actor, err := auth.Require(ctx, auth.PermUsersManage)
 	if err != nil {
 		return User{}, err
 	}
-	current, err := s.visible(ctx, actor, id)
+	before, err := s.visible(ctx, actor, id)
 	if err != nil {
 		return User{}, err
-	}
-	if !actor.CanManage(current.Role) {
-		return User{}, errTargetForbidden()
-	}
-	tenantID := current.TenantID
-	if in.TenantID != nil {
-		tenantID = *in.TenantID
-	}
-	if err := s.checkAssignment(ctx, actor, in.Role, tenantID); err != nil {
-		return User{}, err
-	}
-	// Nobody can lock themselves out. This also keeps at least one admin:
-	// only an admin can change an admin, and not themselves.
-	if id == actor.UserID {
-		if in.Role != current.Role {
-			return User{}, apperr.New(http.StatusConflict, "user.own_role", "you cannot change your own role")
-		}
-		if !in.IsActive {
-			return User{}, apperr.New(http.StatusConflict, "user.own_deactivation", "you cannot deactivate yourself")
-		}
-		if tenantID != current.TenantID {
-			return User{}, apperr.New(http.StatusConflict, "user.own_tenant", "you cannot move yourself to another tenant")
-		}
 	}
 	var hash string
 	if in.Password != "" {
-		if hash, err = hashPassword("body.password", in.Password); err != nil {
+		if id == actor.UserID {
+			return User{}, apperr.New(http.StatusConflict, "user.own_password", "use your profile to change your own password")
+		}
+		// Hash before the transaction, so no lock is held meanwhile.
+		if hash, err = hashPassword(ctx, "body.password", in.Password); err != nil {
 			return User{}, err
 		}
 	}
-
 	email := normalizeEmail(in.Email)
-	row, err := s.q.UpdateUser(ctx, store.UpdateUserParams{
-		ID: id, TenantID: tenantID, Email: email, FullName: strings.TrimSpace(in.FullName),
-		Role: in.Role, IsActive: in.IsActive,
-	})
-	if err != nil {
-		return User{}, mapErr(err, email)
-	}
-	if hash != "" {
-		if err := s.setPassword(ctx, id, hash, nil); err != nil {
-			return User{}, err
+
+	var out User
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		admins, err := s.lockAdminsIf(ctx, q, isActiveAdmin(before))
+		if err != nil {
+			return err
 		}
-	}
-	return toUser(actor, row), nil
+		current, err := s.visibleForUpdate(ctx, q, actor, id)
+		if err != nil {
+			return err
+		}
+		if !actor.CanManage(current.Role) {
+			return errTargetForbidden()
+		}
+		tenantID := current.TenantID
+		if in.TenantID != nil {
+			tenantID = *in.TenantID
+		}
+		// Nobody can lock themselves out.
+		if id == actor.UserID {
+			if in.Role != current.Role {
+				return apperr.New(http.StatusConflict, "user.own_role", "you cannot change your own role")
+			}
+			if !in.IsActive {
+				return apperr.New(http.StatusConflict, "user.own_deactivation", "you cannot deactivate yourself")
+			}
+			if tenantID != current.TenantID {
+				return apperr.New(http.StatusConflict, "user.own_tenant", "you cannot move yourself to another tenant")
+			}
+		}
+		if err := s.checkAssignment(ctx, actor, in.Role, tenantID); err != nil {
+			return err
+		}
+		if isActiveAdmin(current) && (in.Role != auth.RoleAdmin || !in.IsActive) {
+			if err := s.keepAnAdmin(ctx, q, admins, id); err != nil {
+				return err
+			}
+		}
+		row, err := q.UpdateUser(ctx, store.UpdateUserParams{
+			ID: id, TenantID: tenantID, Email: email, FullName: strings.TrimSpace(in.FullName),
+			Role: in.Role, IsActive: in.IsActive,
+		})
+		if err != nil {
+			return mapErr(err, email)
+		}
+		if hash != "" {
+			if err := setPassword(ctx, q, id, hash, nil); err != nil {
+				return err
+			}
+		}
+		out = toUser(actor, row)
+		return nil
+	})
+	return out, err
 }
 
+// Delete removes a user, in one transaction like Update.
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermUsersManage)
 	if err != nil {
 		return err
 	}
-	current, err := s.visible(ctx, actor, id)
+	before, err := s.visible(ctx, actor, id)
 	if err != nil {
 		return err
 	}
 	if id == actor.UserID {
 		return apperr.New(http.StatusConflict, "user.own_delete", "you cannot delete yourself")
 	}
-	if !actor.CanManage(current.Role) {
-		return errTargetForbidden()
-	}
-	if _, err := s.q.DeleteUser(ctx, id); err != nil {
-		return err
-	}
-	return nil
+	return s.inTx(ctx, func(q *store.Queries) error {
+		admins, err := s.lockAdminsIf(ctx, q, isActiveAdmin(before))
+		if err != nil {
+			return err
+		}
+		current, err := s.visibleForUpdate(ctx, q, actor, id)
+		if err != nil {
+			return err
+		}
+		if !actor.CanManage(current.Role) {
+			return errTargetForbidden()
+		}
+		if isActiveAdmin(current) {
+			if err := s.keepAnAdmin(ctx, q, admins, id); err != nil {
+				return err
+			}
+		}
+		n, err := q.DeleteUser(ctx, id)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return apperr.NotFound("user.not_found")
+		}
+		return nil
+	})
 }
 
-// Bootstrap prepares an empty installation: it makes sure the distributor
-// tenant exists and, when there is no active admin, creates one from the
-// given credentials (skipped if email is empty). It runs at startup.
+// lockAdminsIf locks the active admin rows when cond holds. Callers lock
+// them before the target row, so two transactions that both touch admins
+// always lock in the same order and queue instead of deadlocking.
+func (s *Service) lockAdminsIf(ctx context.Context, q *store.Queries, cond bool) ([]uuid.UUID, error) {
+	if !cond {
+		return nil, nil
+	}
+	return q.LockActiveAdmins(ctx)
+}
+
+// keepAnAdmin refuses a change that would leave no active admin besides
+// the user id. admins are the locked active admins, or nil if not yet locked.
+func (s *Service) keepAnAdmin(ctx context.Context, q *store.Queries, admins []uuid.UUID, id uuid.UUID) error {
+	if admins == nil {
+		var err error
+		if admins, err = q.LockActiveAdmins(ctx); err != nil {
+			return err
+		}
+	}
+	for _, a := range admins {
+		if a != id {
+			return nil
+		}
+	}
+	return apperr.New(http.StatusConflict, "user.last_admin", "at least one active admin must remain")
+}
+
+func isActiveAdmin(u store.User) bool { return u.Role == auth.RoleAdmin && u.IsActive }
+
+// Bootstrap prepares an installation at startup: it makes sure the
+// distributor tenant exists and, when there is no active admin, makes email
+// an admin with password pw. An existing user with that email is promoted
+// (moved to the distributor, activated, password reset); otherwise the user
+// is created.
 func (s *Service) Bootstrap(ctx context.Context, distributorName, email, pw string) error {
 	distributor, err := s.tenants.EnsureDistributor(ctx, distributorName)
 	if err != nil {
 		return err
 	}
-	if email == "" {
-		return nil
-	}
 	admins, err := s.q.CountActiveAdmins(ctx)
 	if err != nil || admins > 0 {
 		return err
 	}
-	hash, err := hashPassword("ADMIN_PASSWORD", pw)
+	email = normalizeEmail(email)
+	if email == "" {
+		slog.WarnContext(ctx, "bootstrap: there is no active admin; set ADMIN_EMAIL and ADMIN_PASSWORD to create one")
+		return nil
+	}
+	hash, err := hashPassword(ctx, "ADMIN_PASSWORD", pw)
 	if err != nil {
 		return err
 	}
-	_, err = s.q.CreateUser(ctx, store.CreateUserParams{
-		TenantID: distributor.ID, Email: normalizeEmail(email), FullName: "Administrator",
-		PasswordHash: hash, Role: auth.RoleAdmin, IsActive: true,
-	})
-	return mapErr(err, email)
+	existing, err := s.q.GetUserByEmail(ctx, email)
+	switch {
+	case err == nil:
+		err = s.inTx(ctx, func(q *store.Queries) error {
+			if _, err := q.PromoteToAdmin(ctx, store.PromoteToAdminParams{
+				ID: existing.ID, TenantID: distributor.ID, PasswordHash: hash,
+			}); err != nil {
+				return err
+			}
+			return q.DeleteUserSessions(ctx, store.DeleteUserSessionsParams{UserID: existing.ID})
+		})
+		if err != nil {
+			return err
+		}
+		slog.WarnContext(ctx, "bootstrap: no active admin; promoted the existing user ADMIN_EMAIL to admin and reset their password",
+			"email", email, "user_id", existing.ID, "previous_role", existing.Role, "previous_tenant_id", existing.TenantID)
+		return nil
+	case errors.Is(err, pgx.ErrNoRows):
+		row, err := s.q.CreateUser(ctx, store.CreateUserParams{
+			TenantID: distributor.ID, Email: email, FullName: "Administrator",
+			PasswordHash: hash, Role: auth.RoleAdmin, IsActive: true,
+		})
+		if err != nil {
+			return mapErr(err, email)
+		}
+		slog.InfoContext(ctx, "bootstrap: created the first admin", "email", email, "user_id", row.ID)
+		return nil
+	default:
+		return err
+	}
 }
 
 // visible loads a user the actor may see; others look like they do not exist.
 func (s *Service) visible(ctx context.Context, actor auth.Actor, id uuid.UUID) (store.User, error) {
 	row, err := s.q.GetUser(ctx, id)
+	return checkVisible(actor, row, err)
+}
+
+// visibleForUpdate is visible with the row locked until the transaction ends.
+func (s *Service) visibleForUpdate(ctx context.Context, q *store.Queries, actor auth.Actor, id uuid.UUID) (store.User, error) {
+	row, err := q.GetUserForUpdate(ctx, id)
+	return checkVisible(actor, row, err)
+}
+
+func checkVisible(actor auth.Actor, row store.User, err error) (store.User, error) {
 	if err != nil {
 		return store.User{}, mapErr(err, "")
 	}
@@ -251,11 +390,20 @@ func (s *Service) checkAssignment(ctx context.Context, actor auth.Actor, role au
 	return nil
 }
 
-func hashPassword(location, pw string) (string, error) {
+func hashPassword(ctx context.Context, location, pw string) (string, error) {
 	if len([]rune(pw)) < password.MinLength {
 		return "", apperr.Invalid(location, "user.password_too_short", "password is too short")
 	}
-	return password.Hash(pw)
+	h, err := password.Hash(ctx, pw)
+	return h, passwordErr(err)
+}
+
+// passwordErr turns a full hashing queue into 503 server.busy.
+func passwordErr(err error) error {
+	if errors.Is(err, password.ErrBusy) {
+		return apperr.New(http.StatusServiceUnavailable, "server.busy", "server busy, try again shortly")
+	}
+	return err
 }
 
 func normalizeEmail(email string) string {

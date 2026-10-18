@@ -79,7 +79,9 @@ func serve(ctx context.Context) error {
 		return fmt.Errorf("bootstrap: %w", err)
 	}
 
-	router, _ := app.New(app.Deps{DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}})
+	router, _ := app.New(app.Deps{
+		DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}, TrustedProxies: cfg.TrustedProxies,
+	})
 	if cfg.StaticDir != "" {
 		httpserver.MountSPA(router, cfg.StaticDir)
 	}

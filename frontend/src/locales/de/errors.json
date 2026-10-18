@@ -1,5 +1,5 @@
 {
-  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar." },
+  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar.", "busy": "Der Server ist ausgelastet. Bitte versuchen Sie es gleich noch einmal." },
   "network": { "unavailable": "Keine Verbindung zum Server." },
   "request": { "not_found": "Nicht gefunden.", "conflict": "Das widerspricht vorhandenen Daten.", "bad": "Die Anfrage war ungültig.", "failed": "Die Anfrage ist fehlgeschlagen." },
   "auth": {
@@ -39,6 +39,8 @@
     "own_role": "Ihre eigene Rolle können Sie nicht ändern.",
     "own_deactivation": "Sie können sich nicht selbst deaktivieren.",
     "own_tenant": "Sie können sich nicht selbst in einen anderen Mandanten verschieben.",
-    "own_delete": "Sie können sich nicht selbst löschen."
+    "own_delete": "Sie können sich nicht selbst löschen.",
+    "last_admin": "Mindestens ein aktiver Admin muss erhalten bleiben.",
+    "own_password": "Ihr eigenes Passwort ändern Sie in Ihrem Profil."
   }
 }

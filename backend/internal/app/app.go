@@ -3,7 +3,9 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"net/netip"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
 )
 
 const Version = "0.1.0"
@@ -22,6 +25,8 @@ const Version = "0.1.0"
 type Deps struct {
 	DB      *pgxpool.Pool
 	Cookies auth.Cookies
+	// TrustedProxies may set X-Forwarded-For (see platform/clientip).
+	TrustedProxies []netip.Prefix
 }
 
 // New returns the router with all API routes and the huma API for tests.
@@ -31,7 +36,7 @@ func New(deps Deps) (chi.Router, huma.API) {
 	huma.DefaultArrayNullable = false
 
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
+	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer, clientip.Middleware(deps.TrustedProxies))
 
 	cfg := huma.DefaultConfig("SnapFlow API", Version)
 	cfg.OpenAPIPath = "/api/openapi"
@@ -78,7 +83,8 @@ func registerHealth(api huma.API, deps Deps) {
 		Tags:        []string{"system"},
 	}), func(ctx context.Context, _ *struct{}) (*healthOutput, error) {
 		if err := deps.DB.Ping(ctx); err != nil {
-			return nil, apperr.New(http.StatusServiceUnavailable, "server.database_unavailable", err.Error())
+			slog.ErrorContext(ctx, "health: database ping", "error", err)
+			return nil, apperr.New(http.StatusServiceUnavailable, "server.database_unavailable", "database unavailable")
 		}
 		out := &healthOutput{}
 		out.Body.Status = "ok"

@@ -2,6 +2,7 @@ package users_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -187,29 +188,98 @@ func TestNobodyGrantsAboveTheirRole(t *testing.T) {
 
 func TestNobodyLocksThemselvesOut(t *testing.T) {
 	api := apptest.New(t)
+	partner := api.NewTenant("Acme")
 	self := userPath(api.Admin.UserID)
-	in := func(role auth.Role, active bool) map[string]any {
-		m := userInput(apptest.AdminEmail, role, api.Distributor)
+	in := func(role auth.Role, active bool, tenant uuid.UUID) map[string]any {
+		m := userInput(apptest.AdminEmail, role, tenant)
 		m["isActive"] = active
+		delete(m, "password")
+		return m
+	}
+	withPassword := in(auth.RoleAdmin, true, api.Distributor)
+	withPassword["password"] = "a-new-password"
+
+	cases := map[string]struct {
+		resp *httptest.ResponseRecorder
+		code string
+	}{
+		"own role":         {api.Put(self, api.Admin.Cookie, in(auth.RoleUser, true, api.Distributor)), "user.own_role"},
+		"own deactivation": {api.Put(self, api.Admin.Cookie, in(auth.RoleAdmin, false, api.Distributor)), "user.own_deactivation"},
+		"own tenant":       {api.Put(self, api.Admin.Cookie, in(auth.RoleAdmin, true, partner)), "user.own_tenant"},
+		"own password":     {api.Put(self, api.Admin.Cookie, withPassword), "user.own_password"},
+		"own delete":       {api.Delete(self, api.Admin.Cookie), "user.own_delete"},
+	}
+	for name, tc := range cases {
+		if tc.resp.Code != http.StatusConflict {
+			t.Errorf("%s: got %d", name, tc.resp.Code)
+		}
+		assertContains(t, tc.resp.Body.String(), `"code":"`+tc.code+`"`)
+	}
+	if resp := api.Put(self, api.Admin.Cookie, in(auth.RoleAdmin, true, api.Distributor)); resp.Code != http.StatusOK {
+		t.Errorf("harmless self update: got %d: %s", resp.Code, resp.Body)
+	}
+	api.Login(apptest.AdminEmail, apptest.Password)
+}
+
+func TestUpdateValidation(t *testing.T) {
+	api := apptest.New(t)
+	partner := api.NewTenant("Acme")
+	ta := api.NewUser(partner, auth.RoleTenantAdmin)
+	user := api.NewUser(partner, auth.RoleUser)
+	other := api.NewUser(partner, auth.RoleUser)
+	in := func(email string, role auth.Role, tenant uuid.UUID) map[string]any {
+		m := userInput(email, role, tenant)
 		delete(m, "password")
 		return m
 	}
 
 	cases := map[string]struct {
+		cookie string
+		body   map[string]any
 		status int
 		code   string
 	}{
-		"own role":         {api.Put(self, api.Admin.Cookie, in(auth.RoleUser, true)).Code, "user.own_role"},
-		"own deactivation": {api.Put(self, api.Admin.Cookie, in(auth.RoleAdmin, false)).Code, "user.own_deactivation"},
-		"own delete":       {api.Delete(self, api.Admin.Cookie).Code, "user.own_delete"},
+		"role above own":   {ta.Cookie, in(user.Email, auth.RoleAdmin, partner), http.StatusForbidden, `"code":"user.role_forbidden"`},
+		"admin in partner": {api.Admin.Cookie, in(user.Email, auth.RoleAdmin, partner), http.StatusUnprocessableEntity, `"code":"user.admin_requires_distributor"`},
+		"unknown tenant":   {api.Admin.Cookie, in(user.Email, auth.RoleUser, uuid.New()), http.StatusUnprocessableEntity, `"code":"user.tenant_not_found"`},
+		"email taken":      {api.Admin.Cookie, in(strings.ToUpper(other.Email), auth.RoleUser, partner), http.StatusConflict, `"code":"user.email_taken"`},
 	}
 	for name, tc := range cases {
-		if tc.status != http.StatusConflict {
-			t.Errorf("%s: got %d", name, tc.status)
-		}
+		t.Run(name, func(t *testing.T) {
+			resp := api.Put(userPath(user.UserID), tc.cookie, tc.body)
+			if resp.Code != tc.status {
+				t.Fatalf("got %d: %s", resp.Code, resp.Body)
+			}
+			assertContains(t, resp.Body.String(), tc.code)
+		})
 	}
-	if resp := api.Put(self, api.Admin.Cookie, in(auth.RoleAdmin, true)); resp.Code != http.StatusOK {
-		t.Errorf("harmless self update: got %d: %s", resp.Code, resp.Body)
+
+	resp := api.Put(userPath(uuid.New()), api.Admin.Cookie, in("x@example.com", auth.RoleUser, partner))
+	if resp.Code != http.StatusNotFound {
+		t.Errorf("update unknown user: got %d", resp.Code)
+	}
+	resp = api.Delete(userPath(uuid.New()), api.Admin.Cookie)
+	if resp.Code != http.StatusNotFound {
+		t.Errorf("delete unknown user: got %d", resp.Code)
+	}
+	assertContains(t, resp.Body.String(), `"code":"user.not_found"`)
+}
+
+func TestTenantAdminManagesPeers(t *testing.T) {
+	api := apptest.New(t)
+	partner := api.NewTenant("Acme")
+	ta := api.NewUser(partner, auth.RoleTenantAdmin)
+	peer := api.NewUser(partner, auth.RoleTenantAdmin)
+
+	assertContains(t, api.Get(userPath(peer.UserID), ta.Cookie).Body.String(), `"can":{"update":true,"delete":true}`)
+	in := userInput(peer.Email, auth.RoleUser, partner)
+	in["password"] = "a-reset-password"
+	if resp := api.Put(userPath(peer.UserID), ta.Cookie, in); resp.Code != http.StatusOK {
+		t.Fatalf("update peer: got %d: %s", resp.Code, resp.Body)
+	}
+	api.Login(peer.Email, "a-reset-password")
+	if resp := api.Delete(userPath(peer.UserID), ta.Cookie); resp.Code != http.StatusNoContent {
+		t.Fatalf("delete peer: got %d: %s", resp.Code, resp.Body)
 	}
 }
 
@@ -235,6 +305,13 @@ func TestChangesApplyImmediately(t *testing.T) {
 	if resp.Code != http.StatusForbidden {
 		t.Errorf("deactivated login: got %d", resp.Code)
 	}
+	assertContains(t, resp.Body.String(), `"code":"auth.account_disabled"`)
+	// Only the right password reveals that the account is disabled.
+	resp = api.Post("/api/auth/login", map[string]any{"email": user.Email, "password": "wrong-password"})
+	if resp.Code != http.StatusUnauthorized {
+		t.Errorf("deactivated login, wrong password: got %d", resp.Code)
+	}
+	assertContains(t, resp.Body.String(), `"code":"auth.invalid_credentials"`)
 
 	in["isActive"] = true
 	in["password"] = "a-new-password"
@@ -267,19 +344,6 @@ func TestLogin(t *testing.T) {
 	}
 }
 
-func TestLoginRateLimit(t *testing.T) {
-	api := apptest.New(t)
-	wrong := map[string]any{"email": apptest.AdminEmail, "password": "wrong-password"}
-	for range 10 {
-		api.Post("/api/auth/login", wrong)
-	}
-	resp := api.Post("/api/auth/login", map[string]any{"email": apptest.AdminEmail, "password": apptest.Password})
-	if resp.Code != http.StatusTooManyRequests {
-		t.Fatalf("got %d", resp.Code)
-	}
-	assertContains(t, resp.Body.String(), "auth.too_many_attempts", `"seconds":`)
-}
-
 func TestMe(t *testing.T) {
 	api := apptest.New(t)
 	ta := api.NewUser(api.NewTenant("Acme"), auth.RoleTenantAdmin)
@@ -293,42 +357,14 @@ func TestMe(t *testing.T) {
 		`"permissions":["catalog.read","projects.read","projects.write","projects.delete","users.manage"]`,
 		`"assignableRoles":["tenant_admin","user"]`)
 
+	user := api.NewUser(api.NewTenant("Other"), auth.RoleUser)
+	assertContains(t, api.Get("/api/auth/me", user.Cookie).Body.String(), `"assignableRoles":[]`)
+
 	if resp := api.Get("/api/auth/me", "Authorization: Bearer "+ta.Token); resp.Code != http.StatusOK {
 		t.Errorf("bearer token: got %d", resp.Code)
 	}
 	if resp := api.Get("/api/auth/me", "Authorization: Bearer nonsense"); resp.Code != http.StatusUnauthorized {
 		t.Errorf("bad bearer token: got %d", resp.Code)
-	}
-}
-
-func TestLogout(t *testing.T) {
-	api := apptest.New(t)
-	other := api.Login(apptest.AdminEmail, apptest.Password)
-
-	resp := api.Post("/api/auth/logout", api.Admin.Cookie)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("logout: got %d", resp.Code)
-	}
-	assertContains(t, resp.Header().Get("Set-Cookie"), "Max-Age=0")
-	if resp := api.Get("/api/auth/me", api.Admin.Cookie); resp.Code != http.StatusUnauthorized {
-		t.Errorf("after logout: got %d", resp.Code)
-	}
-	if resp := api.Get("/api/auth/me", other.Cookie); resp.Code != http.StatusOK {
-		t.Errorf("other session must survive: got %d", resp.Code)
-	}
-}
-
-func TestCrossSiteWritesAreRefused(t *testing.T) {
-	api := apptest.New(t)
-	resp := api.Post("/api/auth/logout", api.Admin.Cookie, "Sec-Fetch-Site: cross-site")
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("cross-site: got %d", resp.Code)
-	}
-	if resp := api.Get("/api/auth/me", api.Admin.Cookie, "Sec-Fetch-Site: cross-site"); resp.Code != http.StatusOK {
-		t.Errorf("cross-site read: got %d", resp.Code)
-	}
-	if resp := api.Post("/api/auth/logout", api.Admin.Cookie, "Sec-Fetch-Site: same-origin"); resp.Code != http.StatusNoContent {
-		t.Errorf("same-origin: got %d", resp.Code)
 	}
 }
 

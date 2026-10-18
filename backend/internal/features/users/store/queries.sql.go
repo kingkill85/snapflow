@@ -192,6 +192,27 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const getUserForUpdate = `-- name: GetUserForUpdate :one
+SELECT id, tenant_id, email, full_name, password_hash, role, is_active, created_at, updated_at FROM users WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetUserForUpdate(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserForUpdate, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.FullName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, tenant_id, email, full_name, password_hash, role, is_active, created_at, updated_at FROM users
 WHERE $1::uuid IS NULL OR tenant_id = $1
@@ -226,6 +247,61 @@ func (q *Queries) ListUsers(ctx context.Context, tenantID *uuid.UUID) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockActiveAdmins = `-- name: LockActiveAdmins :many
+SELECT id FROM users WHERE role = 'admin' AND is_active ORDER BY id FOR UPDATE
+`
+
+// LockActiveAdmins locks every active admin row, in a fixed order so that
+// concurrent callers queue instead of deadlocking.
+func (q *Queries) LockActiveAdmins(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockActiveAdmins)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const promoteToAdmin = `-- name: PromoteToAdmin :one
+UPDATE users SET tenant_id = $2, password_hash = $3, role = 'admin', is_active = true, updated_at = now()
+WHERE id = $1
+RETURNING id, tenant_id, email, full_name, password_hash, role, is_active, created_at, updated_at
+`
+
+type PromoteToAdminParams struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	PasswordHash string
+}
+
+func (q *Queries) PromoteToAdmin(ctx context.Context, arg PromoteToAdminParams) (User, error) {
+	row := q.db.QueryRow(ctx, promoteToAdmin, arg.ID, arg.TenantID, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.FullName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const setPasswordHash = `-- name: SetPasswordHash :exec

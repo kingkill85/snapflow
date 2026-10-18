@@ -212,6 +212,71 @@ export const useLogout = <TError = ErrorType<Error>,
       return useMutation(getLogoutMutationOptions(options), queryClient);
     }
     /**
+ * @summary Sign out everywhere: end all of the caller's sessions, including the current one
+ */
+export const logoutAll = (
+
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<void>(
+      {url: `/api/auth/logout-all`, method: 'POST', signal
+    },
+      );
+    }
+
+
+
+
+export const getLogoutAllMutationKey = () => ['logoutAll'] as const;
+
+export const getLogoutAllMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAll>>, TError,void, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof logoutAll>>, TError,void, TContext> => {
+
+const mutationKey = getLogoutAllMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAll>>, void> = () => {
+
+
+          return  logoutAll()
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutAllMutationResult = NonNullable<Awaited<ReturnType<typeof logoutAll>>>
+
+    export type LogoutAllMutationError = ErrorType<Error>
+
+
+    /**
+ * @summary Sign out everywhere: end all of the caller's sessions, including the current one
+ */
+export const useLogoutAll = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAll>>, TError,void, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof logoutAll>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutAllMutationOptions(options), queryClient);
+    }
+    /**
  * @summary Get the logged-in user
  */
 export const getMe = (

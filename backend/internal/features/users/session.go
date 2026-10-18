@@ -6,9 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +18,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/password"
+	"github.com/kingkill85/snapflow/backend/internal/platform/ratelimit"
 )
 
 // Me is the logged-in user with everything the client needs to adapt the UI.
@@ -29,7 +30,7 @@ type Me struct {
 	TenantID        uuid.UUID         `json:"tenantId"`
 	TenantName      string            `json:"tenantName"`
 	Permissions     []auth.Permission `json:"permissions" doc:"What the user may do, from the permission matrix"`
-	AssignableRoles []auth.Role       `json:"assignableRoles" doc:"Roles the user may give to others"`
+	AssignableRoles []auth.Role       `json:"assignableRoles" doc:"Roles the user may give to others; empty without users.manage"`
 }
 
 type LoginInput struct {
@@ -51,42 +52,68 @@ type PasswordInput struct {
 const renewAfter = time.Hour
 
 // Login checks the credentials and opens a session. It returns the session
-// token, which only the client keeps.
-func (s *Service) Login(ctx context.Context, in LoginInput) (string, Me, error) {
+// token, which only the client keeps. clientIP is the caller's address as
+// determined by the HTTP layer.
+//
+// Only failed attempts count towards the limits, so a stranger who guesses
+// at an account cannot lock its owner out: failures are limited per
+// (email, client IP) pair, with looser caps per email and per client IP
+// against distributed and spraying attacks. A successful login clears the
+// pair.
+func (s *Service) Login(ctx context.Context, in LoginInput, clientIP string) (string, Me, error) {
 	email := normalizeEmail(in.Email)
-	if ok, wait := s.logins.Allow(email); !ok {
-		return "", Me{}, apperr.New(http.StatusTooManyRequests, "auth.too_many_attempts", "too many login attempts").
-			With("seconds", int(wait.Seconds())+1)
+	pairKey := email + "|" + clientIP
+	var wait time.Duration
+	for _, c := range []struct {
+		l   *ratelimit.Limiter
+		key string
+	}{{s.loginPairFailures, pairKey}, {s.loginEmailFailures, email}, {s.loginIPFailures, clientIP}} {
+		if ok, w := c.l.Check(c.key); !ok {
+			wait = max(wait, w)
+		}
 	}
-	invalid := apperr.New(http.StatusUnauthorized, "auth.invalid_credentials", "invalid email or password")
+	if wait > 0 {
+		return "", Me{}, apperr.TooManyRequests("auth.too_many_attempts", "too many login attempts", wait)
+	}
+	failed := func() (string, Me, error) {
+		s.loginPairFailures.Add(pairKey)
+		s.loginEmailFailures.Add(email)
+		s.loginIPFailures.Add(clientIP)
+		return "", Me{}, apperr.New(http.StatusUnauthorized, "auth.invalid_credentials", "invalid email or password")
+	}
 
 	row, err := s.q.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Spend the same time as a real check so timing does not reveal accounts.
-		_, _ = password.Verify(in.Password, dummyHash())
-		return "", Me{}, invalid
+		if _, err := password.Verify(ctx, in.Password, dummyHash); err != nil {
+			return "", Me{}, passwordErr(err)
+		}
+		return failed()
 	}
 	if err != nil {
 		return "", Me{}, err
 	}
-	ok, err := password.Verify(in.Password, row.PasswordHash)
+	ok, err := password.Verify(ctx, in.Password, row.PasswordHash)
 	if err != nil {
-		return "", Me{}, err
+		return "", Me{}, passwordErr(err)
 	}
 	if !ok {
-		return "", Me{}, invalid
+		return failed()
 	}
+	s.loginPairFailures.Reset(pairKey)
 	tenant, err := s.tenants.Lookup(ctx, row.TenantID)
 	if err != nil {
 		return "", Me{}, err
 	}
+	// Deliberate (as in v1): only with the right password, a disabled
+	// account says so, so its user knows to contact their admin.
 	if !row.IsActive || !tenant.IsActive {
 		return "", Me{}, apperr.New(http.StatusForbidden, "auth.account_disabled", "account disabled")
 	}
-	s.logins.Reset(email)
 
+	// Housekeeping only: a failure must not prevent the login.
 	if err := s.q.DeleteExpiredSessions(ctx); err != nil {
-		return "", Me{}, err
+		slog.WarnContext(ctx, "login: delete expired sessions", "error", err)
 	}
 	token, err := newToken()
 	if err != nil {
@@ -141,6 +168,16 @@ func (s *Service) Logout(ctx context.Context) error {
 	return s.q.DeleteSession(ctx, actor.SessionID)
 }
 
+// LogoutAll ends every session of the caller, the current one included
+// ("sign out everywhere").
+func (s *Service) LogoutAll(ctx context.Context) error {
+	actor, err := auth.Require(ctx)
+	if err != nil {
+		return err
+	}
+	return s.q.DeleteUserSessions(ctx, store.DeleteUserSessionsParams{UserID: actor.UserID})
+}
+
 func (s *Service) Me(ctx context.Context) (Me, error) {
 	actor, err := auth.Require(ctx)
 	if err != nil {
@@ -170,36 +207,46 @@ func (s *Service) UpdateProfile(ctx context.Context, in ProfileInput) (Me, error
 }
 
 // ChangePassword sets a new password after checking the current one and ends
-// every other session of the caller.
+// every other session of the caller. Wrong current passwords are limited
+// per user, so a hijacked session cannot be used to guess the password.
 func (s *Service) ChangePassword(ctx context.Context, in PasswordInput) error {
 	actor, err := auth.Require(ctx)
 	if err != nil {
 		return err
 	}
+	key := actor.UserID.String()
+	if ok, wait := s.passwordFailures.Check(key); !ok {
+		return apperr.TooManyRequests("auth.too_many_attempts", "too many wrong passwords", wait)
+	}
 	row, err := s.q.GetUser(ctx, actor.UserID)
 	if err != nil {
 		return mapErr(err, "")
 	}
-	ok, err := password.Verify(in.CurrentPassword, row.PasswordHash)
+	ok, err := password.Verify(ctx, in.CurrentPassword, row.PasswordHash)
 	if err != nil {
-		return err
+		return passwordErr(err)
 	}
 	if !ok {
+		s.passwordFailures.Add(key)
 		return apperr.Invalid("body.currentPassword", "auth.wrong_password", "current password is wrong")
 	}
-	hash, err := hashPassword("body.newPassword", in.NewPassword)
+	hash, err := hashPassword(ctx, "body.newPassword", in.NewPassword)
 	if err != nil {
 		return err
 	}
-	return s.setPassword(ctx, actor.UserID, hash, &actor.SessionID)
+	s.passwordFailures.Reset(key)
+	return s.inTx(ctx, func(q *store.Queries) error {
+		return setPassword(ctx, q, actor.UserID, hash, &actor.SessionID)
+	})
 }
 
 // setPassword stores a new hash and ends the user's sessions except keep.
-func (s *Service) setPassword(ctx context.Context, userID uuid.UUID, hash string, keep *uuid.UUID) error {
-	if err := s.q.SetPasswordHash(ctx, store.SetPasswordHashParams{ID: userID, PasswordHash: hash}); err != nil {
+// Call it inside a transaction.
+func setPassword(ctx context.Context, q *store.Queries, userID uuid.UUID, hash string, keep *uuid.UUID) error {
+	if err := q.SetPasswordHash(ctx, store.SetPasswordHashParams{ID: userID, PasswordHash: hash}); err != nil {
 		return err
 	}
-	return s.q.DeleteUserSessions(ctx, store.DeleteUserSessionsParams{UserID: userID, Keep: keep})
+	return q.DeleteUserSessions(ctx, store.DeleteUserSessionsParams{UserID: userID, Keep: keep})
 }
 
 func (s *Service) me(ctx context.Context, actor auth.Actor, row store.User) (Me, error) {
@@ -211,10 +258,14 @@ func (s *Service) me(ctx context.Context, actor auth.Actor, row store.User) (Me,
 }
 
 func toMe(actor auth.Actor, row store.User, tenantName string) Me {
+	assignable := []auth.Role{}
+	if actor.Can(auth.PermUsersManage) {
+		assignable = actor.AssignableRoles()
+	}
 	return Me{
 		ID: row.ID, Email: row.Email, FullName: row.FullName, Role: row.Role,
 		TenantID: row.TenantID, TenantName: tenantName,
-		Permissions: row.Role.Permissions(), AssignableRoles: actor.AssignableRoles(),
+		Permissions: row.Role.Permissions(), AssignableRoles: assignable,
 	}
 }
 
@@ -231,10 +282,9 @@ func hashToken(token string) []byte {
 	return sum[:]
 }
 
-var dummyHash = sync.OnceValue(func() string {
-	h, _ := password.Hash("not a real password")
-	return h
-})
+// dummyHash is checked for unknown emails. It is a constant, so computing it
+// can never fail (e.g. with password.ErrBusy); its parameters match Hash.
+const dummyHash = "$argon2id$v=19$m=19456,t=2,p=1$l3UbfKSVZM8C/5c01VtcKA$aKKB6DSZmvJ0qe19K9l2BQa9K2niwiruWL9W2x77dvc"
 
 // RoleMatrix is the permission matrix as data.
 type RoleMatrix struct {

@@ -258,7 +258,7 @@
             "type": "string"
           },
           "assignableRoles": {
-            "description": "Roles the user may give to others",
+            "description": "Roles the user may give to others; empty without users.manage",
             "items": {
               "$ref": "#/components/schemas/Role"
             },
@@ -759,6 +759,37 @@
           }
         },
         "summary": "End the current session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "operationId": "logoutAll",
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign out everywhere: end all of the caller's sessions, including the current one",
         "tags": [
           "auth"
         ]

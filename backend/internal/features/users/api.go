@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
 )
 
 const (
@@ -162,7 +163,7 @@ func registerAccount(api huma.API, svc *Service, cookies auth.Cookies) {
 		Summary:     "Log in and receive a session cookie",
 		Tags:        []string{authTag},
 	}), func(ctx context.Context, in *struct{ Body LoginInput }) (*loginOutput, error) {
-		token, me, err := svc.Login(ctx, in.Body)
+		token, me, err := svc.Login(ctx, in.Body, clientip.FromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -178,6 +179,20 @@ func registerAccount(api huma.API, svc *Service, cookies auth.Cookies) {
 		DefaultStatus: http.StatusNoContent,
 	}, func(ctx context.Context, _ *struct{}) (*logoutOutput, error) {
 		if err := svc.Logout(ctx); err != nil {
+			return nil, err
+		}
+		return &logoutOutput{SetCookie: cookies.Clear()}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "logoutAll",
+		Method:        http.MethodPost,
+		Path:          "/api/auth/logout-all",
+		Summary:       "Sign out everywhere: end all of the caller's sessions, including the current one",
+		Tags:          []string{authTag},
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, _ *struct{}) (*logoutOutput, error) {
+		if err := svc.LogoutAll(ctx); err != nil {
 			return nil, err
 		}
 		return &logoutOutput{SetCookie: cookies.Clear()}, nil

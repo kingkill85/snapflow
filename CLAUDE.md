@@ -27,7 +27,7 @@ Single tests: `cd backend && go test ./internal/features/functiontypes -run Test
 
 1. **Business rules live in the backend, once.** Prices, totals, BOM, checks: computed in a Go service, never in the frontend. The frontend displays what the API returns.
 2. **A feature is a vertical slice.** Backend `internal/features/<pkg>/` (queries.sql, service.go, api.go, api_test.go, generated store/), frontend `src/features/<name>/` (page, dialogs, locales, tests). Start new features with `make feature`, then extend.
-3. **Layers:** `api.go` only maps HTTP to service calls. `service.go` holds rules and validation. SQL lives in `queries.sql`; `store/` is generated (never edit). Features do not read each other's tables; call the other feature's service.
+3. **Layers:** `api.go` only maps HTTP to service calls. `service.go` holds rules and validation. SQL lives in `queries.sql`; `store/` is generated (never edit). Features do not read each other's tables; call the other feature's service. sqlc generates models of all tables into every `store/`: never use the models of another feature's tables.
 4. **Schema changes = new goose migration** in `backend/migrations/` (never edit an applied one). sqlc reads the same files.
 5. **Never edit generated code:** `backend/internal/features/*/store/`, `api/openapi.json`, `frontend/src/api/generated/`. Change the source, run `make generate`, commit the result.
 6. **Errors:** return `apperr` errors with a stable `code` (e.g. `function_type.key_taken`) and `params`. The frontend translates codes from `src/locales/<lang>/errors.json`; add the key in en and de.

@@ -6,11 +6,19 @@ ORDER BY email;
 -- name: GetUser :one
 SELECT * FROM users WHERE id = $1;
 
+-- name: GetUserForUpdate :one
+SELECT * FROM users WHERE id = $1 FOR UPDATE;
+
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1;
 
 -- name: CountActiveAdmins :one
 SELECT count(*) FROM users WHERE role = 'admin' AND is_active;
+
+-- LockActiveAdmins locks every active admin row, in a fixed order so that
+-- concurrent callers queue instead of deadlocking.
+-- name: LockActiveAdmins :many
+SELECT id FROM users WHERE role = 'admin' AND is_active ORDER BY id FOR UPDATE;
 
 -- name: CreateUser :one
 INSERT INTO users (tenant_id, email, full_name, password_hash, role, is_active)
@@ -19,6 +27,11 @@ RETURNING *;
 
 -- name: UpdateUser :one
 UPDATE users SET tenant_id = $2, email = $3, full_name = $4, role = $5, is_active = $6, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: PromoteToAdmin :one
+UPDATE users SET tenant_id = $2, password_hash = $3, role = 'admin', is_active = true, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

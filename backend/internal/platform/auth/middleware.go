@@ -75,16 +75,16 @@ func SecuritySchemes(o *huma.OpenAPI) {
 // (permissions, tenant boundaries) stays in the services.
 func Middleware(api huma.API, authn Authenticator, cookies Cookies) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
+		if crossSiteWrite(ctx) {
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "cross-site request refused")
+			return
+		}
 		token, fromCookie := credentials(ctx)
 		authenticated := false
 		if token != "" {
 			actor, renewed, err := authn.Authenticate(ctx.Context(), token)
 			switch {
 			case err == nil:
-				if fromCookie && crossSiteWrite(ctx) {
-					_ = huma.WriteErr(api, ctx, http.StatusForbidden, "cross-site request refused")
-					return
-				}
 				if renewed && fromCookie {
 					c := cookies.Session(token)
 					ctx.AppendHeader("Set-Cookie", c.String())
@@ -123,8 +123,10 @@ func credentials(ctx huma.Context) (token string, fromCookie bool) {
 }
 
 // crossSiteWrite refuses state-changing requests that a browser marks as
-// coming from another site. SameSite=Lax already withholds the cookie there;
-// this is the second line of CSRF defence.
+// coming from another site, whatever the credentials (cookie, bearer or none,
+// e.g. login). SameSite=Lax already withholds the cookie there; this is the
+// second line of CSRF defence. Non-browser clients send no Sec-Fetch-Site
+// and are unaffected.
 func crossSiteWrite(ctx huma.Context) bool {
 	switch ctx.Method() {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
