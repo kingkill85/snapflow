@@ -192,7 +192,8 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
         value: pt.id,
         label,
         content: (
-          <TypeBadge color={pt.color} abbreviation={pt.abbreviation}>
+          // Wraps: on a phone the long names would run out of the dialog.
+          <TypeBadge color={pt.color} abbreviation={pt.abbreviation} wrap>
             {label}
           </TypeBadge>
         ),

@@ -18,7 +18,7 @@ export function CheckboxField({ label, hint, error, id, ...props }: CheckboxFiel
           type="checkbox"
           aria-invalid={error ? true : undefined}
           aria-describedby={message ? messageId : undefined}
-          className="size-4 rounded accent-primary disabled:opacity-50"
+          className="size-4 shrink-0 rounded accent-primary disabled:opacity-50"
           {...props}
         />
         {label}

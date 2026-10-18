@@ -44,7 +44,7 @@ export function SwitchField({ label, hint, error, id, className, ...props }: Swi
           {label}
         </label>
         {message && (
-          <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
+          <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
             {message}
           </p>
         )}
