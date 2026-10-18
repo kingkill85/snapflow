@@ -1,82 +1,29 @@
 {
   "title": "Product types",
-  "description": "The kinds of devices in the catalog. Each product type defines which attributes its products have.",
+  "description": "The systems and product lines in the catalog (Zigbee, KNX, HDL Buspro, …). Every product belongs to one; projects choose theirs.",
   "empty": "No product types yet.",
   "new": "New product type",
   "edit": "Edit product type",
-  "readOnly": "You can view this product type but not change it.",
-  "created": "Product type created.",
   "showInactive": "Show inactive",
   "moveUp": "Move {{name}} up",
   "moveDown": "Move {{name}} down",
   "deleteTitle": "Delete product type",
   "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
-  "section": {
-    "basics": "Basics",
-    "attributes": "Attributes",
-    "attributesHint": "Values stored on each product, or on each of its variants (e.g. width, bus system, colour).",
-    "instanceAttributes": "Instance attributes",
-    "instanceAttributesHint": "Values filled in per installed unit in a project (e.g. bus address, MAC address)."
-  },
   "field": {
     "key": "Key",
-    "keyHint": "e.g. dimmer_actuator, wall_switch",
+    "keyHint": "e.g. zigbee, knx, hdl_buspro",
     "name": "Name",
     "nameEn": "Name (English)",
     "nameDe": "Name (German)",
-    "descriptionEn": "Description (English)",
-    "descriptionDe": "Description (German)",
+    "abbreviation": "Abbreviation",
+    "abbreviationHint": "Badge text, up to 6 characters, e.g. ZB. Empty for a dot.",
+    "color": "Colour",
+    "colorHint": "Badge colour, e.g. #1f6feb. Empty for none.",
+    "preview": "Badge preview",
+    "previewName": "Name",
     "active": "Active",
     "activeHint": "Inactive product types are hidden from the catalog but keep their products.",
-    "attributeCount": "Attributes",
     "status": "Status",
-    "labelEn": "Label (English)",
-    "labelDe": "Label (German)",
-    "type": "Type",
-    "itemType": "Item type",
-    "scope": "Set per",
-    "unit": "Unit",
-    "unitHint": "Display only, e.g. TE, mA, W",
-    "required": "Required",
-    "requiredHint": "A value must be set.",
-    "position": "Position",
-    "color": "Colour",
-    "colorHint": "Badge colour in lists, e.g. #1f6feb. Empty for none."
-  },
-  "schema": {
-    "item": "Attribute {{n}}",
-    "empty": "No attributes yet.",
-    "add": "Add attribute",
-    "keyHint": "e.g. width_te, bus_system",
-    "itemName": "attribute {{n}}",
-    "addFirst": "Add attribute at the top"
-  },
-  "type": {
-    "text": "Text",
-    "number": "Number",
-    "integer": "Whole number",
-    "boolean": "Yes/no",
-    "enum": "Choice",
-    "list": "List"
-  },
-  "scope": {
-    "product": "Product",
-    "variant": "Variant",
-    "hint": "Variant values can differ per variant, e.g. colour."
-  },
-  "bounds": {
-    "value": { "min": "Minimum", "max": "Maximum" },
-    "length": { "min": "Minimum length", "max": "Maximum length" },
-    "items": { "min": "Minimum items", "max": "Maximum items" }
-  },
-  "options": {
-    "title": "Options",
-    "item": "Option {{n}}",
-    "add": "Add option",
-    "itemName": "option {{n}}"
-  },
-  "notFound": {
-    "title": "Product type not found",
-    "message": "This product type does not exist (anymore)."
+    "position": "Position"
   }
 }

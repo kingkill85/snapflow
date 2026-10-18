@@ -1,5 +1,5 @@
 {
-  "empty": "This product type defines no attributes here.",
+  "empty": "This category defines no attributes here.",
   "notSet": "Not set",
   "yes": "Yes",
   "no": "No",
@@ -19,7 +19,7 @@
   },
   "extra": {
     "title": "Values no longer in the schema",
-    "description": "These values are stored, but the product type no longer has them here (renamed, removed, or now set per product or per variant). They are kept unchanged until you remove them.",
+    "description": "These values are stored, but the category no longer has them here (renamed, removed, or now set per product or per variant). They are kept unchanged until you remove them.",
     "removed": "Removed on save",
     "remove": "Remove {{key}}",
     "removeShort": "Remove",

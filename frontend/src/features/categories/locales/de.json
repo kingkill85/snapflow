@@ -1,0 +1,89 @@
+{
+  "title": "Kategorien",
+  "description": "Die Gerätearten im Katalog (Gateways, Touchscreens, Dimmaktoren, …). Jede Kategorie legt fest, welche Attribute ihre Produkte haben.",
+  "empty": "Noch keine Kategorien.",
+  "new": "Neue Kategorie",
+  "edit": "Kategorie bearbeiten",
+  "readOnly": "Sie können diese Kategorie ansehen, aber nicht ändern.",
+  "created": "Kategorie erstellt.",
+  "showInactive": "Inaktive anzeigen",
+  "moveUp": "{{name}} nach oben verschieben",
+  "moveDown": "{{name}} nach unten verschieben",
+  "deleteTitle": "Kategorie löschen",
+  "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
+  "section": {
+    "basics": "Grunddaten",
+    "attributes": "Attribute",
+    "attributesHint": "Werte, die an jedem Produkt oder an jeder seiner Varianten gespeichert werden (z. B. Breite, Bussystem, Farbe).",
+    "instanceAttributes": "Instanz-Attribute",
+    "instanceAttributesHint": "Werte, die im Projekt pro verbautem Gerät erfasst werden (z. B. Busadresse, MAC-Adresse)."
+  },
+  "field": {
+    "key": "Schlüssel",
+    "keyHint": "z. B. gateways, dimmer_actuators",
+    "name": "Name",
+    "nameEn": "Name (Englisch)",
+    "nameDe": "Name (Deutsch)",
+    "descriptionEn": "Beschreibung (Englisch)",
+    "descriptionDe": "Beschreibung (Deutsch)",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Kategorien sind im Katalog ausgeblendet, ihre Produkte bleiben erhalten.",
+    "attributeCount": "Attribute",
+    "status": "Status",
+    "labelEn": "Bezeichnung (Englisch)",
+    "labelDe": "Bezeichnung (Deutsch)",
+    "type": "Typ",
+    "itemType": "Typ der Einträge",
+    "scope": "Festgelegt pro",
+    "unit": "Einheit",
+    "unitHint": "Nur zur Anzeige, z. B. TE, mA, W",
+    "required": "Pflichtfeld",
+    "requiredHint": "Ein Wert muss gesetzt sein.",
+    "position": "Position"
+  },
+  "schema": {
+    "item": "Attribut {{n}}",
+    "empty": "Noch keine Attribute.",
+    "add": "Attribut hinzufügen",
+    "keyHint": "z. B. width_te, bus_system",
+    "itemName": "Attribut {{n}}",
+    "addFirst": "Attribut oben hinzufügen"
+  },
+  "type": {
+    "text": "Text",
+    "number": "Zahl",
+    "integer": "Ganzzahl",
+    "boolean": "Ja/Nein",
+    "enum": "Auswahl",
+    "list": "Liste"
+  },
+  "scope": {
+    "product": "Produkt",
+    "variant": "Variante",
+    "hint": "Variantenwerte können je Variante abweichen, z. B. die Farbe."
+  },
+  "bounds": {
+    "value": {
+      "min": "Minimum",
+      "max": "Maximum"
+    },
+    "length": {
+      "min": "Mindestlänge",
+      "max": "Maximallänge"
+    },
+    "items": {
+      "min": "Mindestanzahl Einträge",
+      "max": "Höchstanzahl Einträge"
+    }
+  },
+  "options": {
+    "title": "Optionen",
+    "item": "Option {{n}}",
+    "add": "Option hinzufügen",
+    "itemName": "Option {{n}}"
+  },
+  "notFound": {
+    "title": "Kategorie nicht gefunden",
+    "message": "Diese Kategorie gibt es nicht (mehr)."
+  }
+}

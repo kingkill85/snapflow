@@ -40,6 +40,7 @@ const keep = z.record(z.string(), z.boolean())
 export const productSchema = z
   .object({
     productTypeId: z.string().min(1, errorKey('validation.required')),
+    categoryId: z.string().min(1, errorKey('validation.required')),
     modelNumber: z
       .string()
       .refine((v) => v.trim() !== '', errorKey('validation.required'))
@@ -92,6 +93,7 @@ const keepAll = (stored: Record<string, unknown>) => Object.fromEntries(Object.k
 export function toProductFormValues(item: Product | null, defs: Definition[]): ProductFormValues {
   return {
     productTypeId: item?.productTypeId ?? '',
+    categoryId: item?.categoryId ?? '',
     modelNumber: item?.modelNumber ?? '',
     name: textValues(item?.name),
     description: textValues(item?.description),
@@ -128,6 +130,7 @@ export function toProductInput(v: ProductFormValues, attributes: Record<string, 
   const description = optionalLocalized(v.description)
   return {
     productTypeId: v.productTypeId,
+    categoryId: v.categoryId,
     modelNumber: v.modelNumber.trim(),
     name: localized(v.name),
     ...(description ? { description } : {}),
@@ -150,7 +153,7 @@ export function toVariantInput(v: VariantFormValues, attributes: Record<string, 
   }
 }
 
-const productFields = ['productTypeId', 'modelNumber', 'name.en', 'name.de', 'description.en', 'description.de']
+const productFields = ['productTypeId', 'categoryId', 'modelNumber', 'name.en', 'name.de', 'description.en', 'description.de']
 const variantFields = ['name.en', 'name.de', 'sku', 'price', 'imageFileId']
 
 /** API error locations shown at the form's fields, for the definitions shown and the stored values outside them. */

@@ -1,4 +1,5 @@
 import { ApiError } from '@/api/client'
+import { useListCategories } from '@/api/generated/categories/categories'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
 
 export const listPath = '/catalog/products'
@@ -9,8 +10,11 @@ export const variantPath = (productId: string, variantId: string) => `${productP
 /** Editors never start from cached data (D44): fetched on every visit, never refreshed underneath the form. */
 export const fresh = { staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false } as const
 
-/** Every product type with its current schema, fresh for an editor. */
+/** Every product type, fresh for an editor. */
 export const useFreshProductTypes = () => useListProductTypes({ includeInactive: true }, { query: fresh })
+
+/** Every category with its current schema, fresh for an editor. */
+export const useFreshCategories = () => useListCategories({ includeInactive: true }, { query: fresh })
 
 /** A missing record, or an id that is not one (422 at path.*). */
 export const isNotFound = (error: unknown) =>

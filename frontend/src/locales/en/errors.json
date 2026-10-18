@@ -42,7 +42,7 @@
       "number": "a number",
       "text": "text"
     },
-    "unknown": "This attribute does not exist for this product type.",
+    "unknown": "This attribute does not exist in this category.",
     "wrong_scope": "This attribute is set per $t(attribute.scope_name.{{scope}})."
   },
   "auth": {
@@ -52,6 +52,14 @@
     "required": "Please log in.",
     "too_many_attempts": "Too many attempts. Try again in {{seconds}} seconds.",
     "wrong_password": "The current password is wrong."
+  },
+  "category": {
+    "in_use": "This category is still used by products. Deactivate it instead.",
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
+    "key_taken": "The key \"{{key}}\" is already used.",
+    "not_found": "This category no longer exists.",
+    "order_mismatch": "The categories have changed in the meantime. Please reload and try again.",
+    "stale": "Someone else changed this category in the meantime. Reload it and make your changes again."
   },
   "file": {
     "not_found": "This file no longer exists.",
@@ -68,6 +76,8 @@
     "unavailable": "No connection to the server."
   },
   "product": {
+    "category_inactive": "This category is inactive. Choose an active category.",
+    "category_not_found": "The selected category no longer exists.",
     "model_number_taken": "The model number \"{{modelNumber}}\" is already used.",
     "not_found": "This product no longer exists.",
     "stale": "Someone else changed this product in the meantime. Reload it and make your changes again.",

@@ -12,6 +12,8 @@
   "searchHint": "Model number, name or SKU",
   "typeFilter": "Product type",
   "allTypes": "All product types",
+  "categoryFilter": "Category",
+  "allCategories": "All categories",
   "deleteTitle": "Delete product",
   "deleteMessage": "Delete \"{{name}}\" with all its variants and add-on links? This cannot be undone.",
   "column": {
@@ -19,25 +21,30 @@
     "modelNumber": "Model number",
     "name": "Name",
     "type": "Product type",
+    "category": "Category",
     "variants": "Variants",
     "price": "Price",
     "status": "Status"
   },
   "problems_one": "{{count}} attribute value needs attention",
   "problems_other": "{{count}} attribute values need attention",
-  "unavailableHint": "Active, but its product type is inactive.",
+  "unavailableHint": "Active, but its product type or category is inactive.",
   "noPrice": "–",
   "section": {
     "basics": "Basics",
     "attributes": "Attributes",
-    "attributesHint": "Values of the product type's attributes that are set per product.",
+    "attributesHint": "Values of the category's attributes that are set per product.",
     "variants": "Variants",
     "variantsHint": "The sellable versions of this product, each with its own price, image and add-ons."
   },
   "field": {
     "productType": "Product type",
+    "productTypeHint": "The system or product line, e.g. Zigbee",
     "chooseType": "Choose a product type",
     "inactiveType": "{{name}} (inactive)",
+    "category": "Category",
+    "categoryHint": "The kind of device; defines the attributes",
+    "chooseCategory": "Choose a category",
     "modelNumber": "Model number",
     "modelNumberHint": "e.g. M485/GW-ZB.10; unique in the catalog",
     "nameEn": "Name (English)",
@@ -47,9 +54,9 @@
     "active": "Active",
     "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting."
   },
-  "typeChange": "You changed the product type. When you save, this product's values are checked against the new type's attributes; values the new type does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new type are flagged on the variants.",
-  "chooseTypeFirst": "Choose a product type to fill in its attributes.",
-  "storedErrors": "Some stored values do not match the product type's current attributes. They are marked below; correct them before saving.",
+  "categoryChange": "You changed the category. When you save, this product's values are checked against the new category's attributes; values the new category does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new category are flagged on the variants.",
+  "chooseCategoryFirst": "Choose a category to fill in its attributes.",
+  "storedErrors": "Some stored values do not match the category's current attributes. They are marked below; correct them before saving.",
   "notFound": {
     "title": "Product not found",
     "message": "This product does not exist (anymore)."
@@ -83,7 +90,7 @@
     "section": {
       "basics": "Basics",
       "attributes": "Attributes",
-      "attributesHint": "Values of the product type's attributes that are set per variant."
+      "attributesHint": "Values of the category's attributes that are set per variant."
     },
     "field": {
       "nameEn": "Name (English)",
@@ -98,7 +105,7 @@
       "active": "Active",
       "activeHint": "Inactive variants cannot be added to projects."
     },
-    "productInactive": "This variant is not available because its product or product type is inactive.",
+    "productInactive": "This variant is not available because its product, product type or category is inactive.",
     "notFound": {
       "title": "Variant not found",
       "message": "This variant does not exist (anymore)."
@@ -122,6 +129,7 @@
     "saved": "Add-ons saved.",
     "unsaved": "The add-ons have unsaved changes.",
     "typeFilter": "Product type",
+    "categoryFilter": "Category",
     "sku": "SKU {{sku}}",
     "shown_one": "{{count}} variant shown",
     "shown_other": "{{count}} variants shown",

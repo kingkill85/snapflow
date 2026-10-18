@@ -56,9 +56,9 @@ type SchemaEditorProps = {
   errorRevision: number
 }
 
-/** Edits one attribute schema of a product type: a list of attribute definitions. */
+/** Edits one attribute schema of a category: a list of attribute definitions. */
 export function SchemaEditor({ form, name, readOnly, startCollapsed, errorRevision }: SchemaEditorProps) {
-  const { t } = useTranslation('productTypes')
+  const { t } = useTranslation('categories')
   const { t: tCommon } = useTranslation()
   const errorAt = useErrorAt(form)
   const { fields, insert, remove, move } = useFieldArray({ control: form.control, name })
@@ -164,7 +164,7 @@ type AttributeRowProps = {
 }
 
 function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpandedChange, controls }: AttributeRowProps) {
-  const { t } = useTranslation('productTypes')
+  const { t } = useTranslation('categories')
   const localized = useLocalized()
   const errorAt = useErrorAt(form)
   const path = `${name}.${index}` as const
@@ -276,7 +276,7 @@ type OptionsEditorProps = {
 
 /** The allowed values of an enum (or a list of enums). */
 function OptionsEditor({ form, path, readOnly }: OptionsEditorProps) {
-  const { t } = useTranslation('productTypes')
+  const { t } = useTranslation('categories')
   const errorAt = useErrorAt(form)
   const { fields, append, remove, move } = useFieldArray({ control: form.control, name: `${path}.options` })
   const focus = useRepeaterFocus(fields)

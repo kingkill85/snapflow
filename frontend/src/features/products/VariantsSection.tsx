@@ -174,8 +174,8 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
     </Button>
   )
 
-  // Variants whose stored values no longer match the type's schema, e.g.
-  // after the product's type changed (D68): flagged, never refused.
+  // Variants whose stored values no longer match the category's schema, e.g.
+  // after the product's category changed (D68): flagged, never refused.
   const withProblems = rows.filter((v) => problemCount(v) > 0)
 
   return (

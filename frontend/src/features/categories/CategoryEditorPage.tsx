@@ -2,25 +2,24 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { ProductType } from '@/api/generated/model'
+import type { Category } from '@/api/generated/model'
 import {
-  getGetProductTypeQueryKey,
-  getListProductTypesQueryKey,
-  useCreateProductType,
-  useGetProductType,
-  useUpdateProductType,
-} from '@/api/generated/product-types/product-types'
+  getGetCategoryQueryKey,
+  getListCategoriesQueryKey,
+  useCreateCategory,
+  useGetCategory,
+  useUpdateCategory,
+} from '@/api/generated/categories/categories'
 import { useCan } from '@/app/session'
 import {
   type ApiFieldMap,
   Button,
   CheckboxField,
-  ColorField,
   EmptyState,
   ErrorMessage,
   errorKey,
@@ -43,13 +42,13 @@ import { useLocalized } from '@/i18n/localized'
 import { editorFields, formSchema, type FormValues, toFormValues, toInput } from './form'
 import { SchemaEditor } from './SchemaEditor'
 
-export const listPath = '/catalog/product-types'
+export const listPath = '/catalog/categories'
 
-/** catalog/product-types/new and catalog/product-types/:id */
-export function ProductTypeEditorPage() {
+/** catalog/categories/new and catalog/categories/:id */
+export function CategoryEditorPage() {
   const { id } = useParams()
-  if (id === undefined) return <ProductTypeEditor item={null} />
-  return <ExistingProductType key={id} id={id} />
+  if (id === undefined) return <CategoryEditor item={null} />
+  return <ExistingCategory key={id} id={id} />
 }
 
 /** Shown after a save that stays in the editor (D84). */
@@ -57,7 +56,7 @@ type SaveNotice = 'created' | 'saved'
 const noticeFrom = (state: unknown): SaveNotice | null =>
   typeof state === 'object' && state !== null && 'notice' in state && (state.notice === 'created' || state.notice === 'saved') ? state.notice : null
 
-/** A missing product type, or an id that is not one (422 at path.id). */
+/** A missing category, or an id that is not one (422 at path.id). */
 const isNotFound = (error: unknown) =>
   error instanceof ApiError && (error.status === 404 || (error.status === 422 && error.fields.some((f) => f.location.startsWith('path.'))))
 
@@ -65,13 +64,13 @@ function BackToList() {
   return <LeaveLink to={listPath} dirty={false} />
 }
 
-function ExistingProductType({ id }: { id: string }) {
-  const { t } = useTranslation('productTypes')
+function ExistingCategory({ id }: { id: string }) {
+  const { t } = useTranslation('categories')
   const { t: tCommon } = useTranslation()
   // The editor never starts from cached data: it is fetched on every visit,
   // and the form shows only once that fetch is done (D44). With
   // expectedUpdatedAt (D37) no one overwrites a newer version unknowingly.
-  const query = useGetProductType(id, { query: { staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false } })
+  const query = useGetCategory(id, { query: { staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false } })
   const queryClient = useQueryClient()
   // Increased to restart the form from a newer version (Reload, or after a save).
   const [generation, setGeneration] = useState(0)
@@ -101,13 +100,13 @@ function ExistingProductType({ id }: { id: string }) {
     setGeneration((g) => g + 1)
   }
   // An update stays in the editor and restarts it from the saved version (D84).
-  const saved = (updated: ProductType) => {
-    queryClient.setQueryData(getGetProductTypeQueryKey(id), updated)
+  const saved = (updated: Category) => {
+    queryClient.setQueryData(getGetCategoryQueryKey(id), updated)
     setNotice('saved')
     setGeneration((g) => g + 1)
   }
   return (
-    <ProductTypeEditor
+    <CategoryEditor
       key={`${query.data.id}:${generation}`}
       item={query.data}
       notice={notice}
@@ -118,20 +117,20 @@ function ExistingProductType({ id }: { id: string }) {
   )
 }
 
-type ProductTypeEditorProps = {
-  item: ProductType | null
+type CategoryEditorProps = {
+  item: Category | null
   /** The message about the last save. */
   notice?: SaveNotice | null
   onReload?: () => Promise<void>
   /** After an update: restart from the saved version. */
-  onSaved?: (updated: ProductType) => void
+  onSaved?: (updated: Category) => void
   /** Something was changed after the last save (its notice is over). */
   onChanged?: () => void
 }
 
-/** The editor itself; read-only for users who may not change product types. */
-function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: ProductTypeEditorProps) {
-  const { t } = useTranslation('productTypes')
+/** The editor itself; read-only for users who may not change categories. */
+function CategoryEditor({ item, notice, onReload, onSaved, onChanged }: CategoryEditorProps) {
+  const { t } = useTranslation('categories')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
   const fieldError = useFieldError()
@@ -142,8 +141,8 @@ function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: Produ
   const readOnly = loaded ? !loaded.can.update : !canWrite
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const create = useCreateProductType()
-  const update = useUpdateProductType()
+  const create = useCreateCategory()
+  const update = useUpdateCategory()
   const mutation = loaded ? update : create
 
   const form = useForm<FormValues>({
@@ -179,7 +178,7 @@ function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: Produ
   const save = async (values: FormValues) => {
     const data = toInput(values)
     const fields = editorFields(values)
-    let result: ProductType
+    let result: Category
     try {
       result = loaded
         ? await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
@@ -188,20 +187,20 @@ function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: Produ
       setErrorFields(fields)
       setApiFieldErrors(error, form.setError, fields)
       // A taken key comes without a location (409), but belongs to the Key field.
-      if (error instanceof ApiError && error.code === 'product_type.key_taken') {
-        form.setError('key', { type: 'server', message: errorKey('product_type.key_taken', { key: values.key }) })
+      if (error instanceof ApiError && error.code === 'category.key_taken') {
+        form.setError('key', { type: 'server', message: errorKey('category.key_taken', { key: values.key }) })
       }
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
     }
-    await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
+    await queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() })
     if (loaded) {
       onSaved?.(result)
       return
     }
     // A new type continues on its edit page (D84).
     unsaved.allow()
-    queryClient.setQueryData(getGetProductTypeQueryKey(result.id), result)
+    queryClient.setQueryData(getGetCategoryQueryKey(result.id), result)
     void navigate(`${listPath}/${result.id}`, { replace: true, state: { notice: 'created' } })
   }
 
@@ -214,7 +213,7 @@ function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: Produ
     if (invalid) failed()
   }
 
-  const stale = mutation.error instanceof ApiError && mutation.error.code === 'product_type.stale'
+  const stale = mutation.error instanceof ApiError && mutation.error.code === 'category.stale'
   const title = readOnly && loaded ? localized(loaded.name) : loaded ? t('edit') : t('new')
 
   return (
@@ -240,27 +239,7 @@ function ProductTypeEditor({ item, notice, onReload, onSaved, onChanged }: Produ
                 {...form.register('description.de')}
               />
             </div>
-            <div className="grid items-start gap-4 sm:grid-cols-3">
-              <Controller
-                control={form.control}
-                name="color"
-                render={({ field, fieldState }) => (
-                  <ColorField
-                    label={t('field.color')}
-                    hint={t('field.colorHint')}
-                    error={fieldError(fieldState.error?.message)}
-                    name={field.name}
-                    value={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
-                )}
-              />
-              <div className="sm:col-span-2 sm:pt-7">
-                <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
-              </div>
-            </div>
+            <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
           </Section>
           <Section title={t('section.attributes')} description={t('section.attributesHint')}>
             <SchemaEditor form={form} name="attributes" readOnly={readOnly} startCollapsed={loaded !== null} errorRevision={errorRevision} />

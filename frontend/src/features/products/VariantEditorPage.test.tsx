@@ -9,7 +9,7 @@ import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
 import { chooseOption, optionTexts } from '@/test/select'
 
-import { black, dimmer, gatewayType, ids, ivory, problem, types } from './test-fixtures'
+import { black, categories, dimmer, gatewayCategory, ids, ivory, knxType, problem, types } from './test-fixtures'
 import { VariantEditorPage } from './VariantEditorPage'
 
 const routes = [
@@ -32,6 +32,7 @@ function handlers(product: () => Product = () => dimmer, respond?: () => Respons
   const uploads: { name: string; type: string }[] = []
   server.use(
     http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+    http.get('/api/categories', () => HttpResponse.json({ items: categories })),
     http.get('/api/variants', () => HttpResponse.json({ items: [], total: 0 })),
     http.get('/api/products/:id', () => HttpResponse.json(product())),
     http.put('/api/products/:id/variants/:variantId', async ({ request }) => {
@@ -55,6 +56,8 @@ const searchItem = (n: number, overrides: Partial<VariantSearchItem> = {}): Vari
   productId: ids.id(n + 100),
   productTypeId: dimmer.productTypeId,
   productType: dimmer.productType,
+  categoryId: dimmer.categoryId,
+  category: dimmer.category,
   modelNumber: `ACC-${n}`,
   productName: { en: `Accessory ${n}` },
   name: { en: 'Grey' },
@@ -95,7 +98,7 @@ describe('VariantEditorPage', () => {
     expect(await screen.findByRole('img', { name: 'Image' })).toHaveAttribute('src', `/api/files/${uploadedId}`)
     expect(uploads).toEqual([{ name: 'photo.png', type: 'image/png' }])
 
-    // Only the variant attributes of the type.
+    // Only the variant attributes of the category.
     const attributes = region('Attributes')
     expect(within(attributes).queryByLabelText('Width')).not.toBeInTheDocument()
     await chooseOption(u, within(attributes).getByLabelText('Colour'), 'Black')
@@ -372,7 +375,7 @@ describe('VariantEditorPage', () => {
     await waitFor(() => expect(saved).toEqual({ addons: [{ addonVariantId: other.id, required: true }] }))
   })
 
-  it('browses variants in catalog order before anything is typed, pages with Show more and filters by type', async () => {
+  it('browses variants in catalog order before anything is typed, pages with Show more and filters by type and category', async () => {
     const searched: Record<string, string>[] = []
     handlers()
     // 45 variants of the catalog: the first page holds the variant itself and its linked add-on.
@@ -385,7 +388,12 @@ describe('VariantEditorPage', () => {
       http.get('/api/variants', ({ request }) => {
         const params = new URL(request.url).searchParams
         searched.push(Object.fromEntries(params))
-        const rows = params.get('productTypeId') === gatewayType.id ? catalog.slice(2, 5) : catalog
+        const rows =
+          params.get('productTypeId') === knxType.id
+            ? catalog.slice(2, 5)
+            : params.get('categoryId') === gatewayCategory.id
+              ? catalog.slice(2, 4)
+              : catalog
         const offset = Number(params.get('offset'))
         return HttpResponse.json({ items: rows.slice(offset, offset + Number(params.get('limit'))), total: rows.length })
       }),
@@ -408,18 +416,26 @@ describe('VariantEditorPage', () => {
     expect(within(results).queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
     expect(searched.map((p) => p.offset)).toEqual(['0', '20', '40'])
 
+    // Each row names its product with the type badge and the category.
+    const first = within(results).getAllByRole('listitem')[0]
+    expect(first).toHaveTextContent('ZBAccessory 600 · Dimmer actuators')
+    expect(within(first).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb' })
+
     // The type filter offers the type names and starts again at the first page.
     const typeFilter = within(addons).getByLabelText('Product type')
-    expect(await optionTexts(u, typeFilter)).toEqual([
-      'All product types',
-      'Dimmer actuator',
-      'Gateway',
-      'Legacy (inactive)',
-    ])
-    await chooseOption(u, typeFilter, 'Gateway')
+    expect(await optionTexts(u, typeFilter)).toEqual(['All product types', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
+    await chooseOption(u, typeFilter, 'KNX')
     expect(await within(results).findByText('3 variants shown')).toBeInTheDocument()
-    expect(searched[searched.length - 1]).toEqual({ productTypeId: gatewayType.id, limit: '20', offset: '0' })
+    expect(searched[searched.length - 1]).toEqual({ productTypeId: knxType.id, limit: '20', offset: '0' })
     expect(within(results).queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+
+    // So does the category filter.
+    await chooseOption(u, typeFilter, 'All product types')
+    const categoryFilter = within(addons).getByLabelText('Category')
+    expect(await optionTexts(u, categoryFilter)).toEqual(['All categories', 'Dimmer actuators', 'Gateways', 'Retired (inactive)'])
+    await chooseOption(u, categoryFilter, 'Gateways')
+    expect(await within(results).findByText('2 variants shown')).toBeInTheDocument()
+    expect(searched[searched.length - 1]).toEqual({ categoryId: gatewayCategory.id, limit: '20', offset: '0' })
   })
 
   it('says when nothing matches, also when only the variant itself and linked add-ons match', async () => {

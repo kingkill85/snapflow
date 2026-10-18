@@ -12,6 +12,8 @@ import commonDe from '@/locales/de/common.json'
 import errorsDe from '@/locales/de/errors.json'
 import commonEn from '@/locales/en/common.json'
 import errorsEn from '@/locales/en/errors.json'
+import categoriesDe from '@/features/categories/locales/de.json'
+import categoriesEn from '@/features/categories/locales/en.json'
 import productTypesDe from '@/features/product-types/locales/de.json'
 import productTypesEn from '@/features/product-types/locales/en.json'
 import catalogDe from '@/catalog/locales/de.json'
@@ -32,6 +34,7 @@ export const resources = {
     tenants: tenantsEn,
     roles: rolesEn,
     productTypes: productTypesEn,
+    categories: categoriesEn,
     catalog: catalogEn,
     products: productsEn,
     // scaffold:i18n-en
@@ -45,6 +48,7 @@ export const resources = {
     tenants: tenantsDe,
     roles: rolesDe,
     productTypes: productTypesDe,
+    categories: categoriesDe,
     catalog: catalogDe,
     products: productsDe,
     // scaffold:i18n-de

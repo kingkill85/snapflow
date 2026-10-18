@@ -3,31 +3,30 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import { getGetProductTypeQueryKey } from '@/api/generated/product-types/product-types'
-import type { ProductType, ProductTypeUpdate } from '@/api/generated/model'
+import { getGetCategoryQueryKey } from '@/api/generated/categories/categories'
+import type { Category, CategoryUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
 import { chooseOption } from '@/test/select'
 
-import { ProductTypeEditorPage } from './ProductTypeEditorPage'
+import { CategoryEditorPage } from './CategoryEditorPage'
 
 const problem = (status: number, body: object) =>
   HttpResponse.json({ status, ...body }, { status, headers: { 'Content-Type': 'application/problem+json' } })
 
 const routes = [
-  { path: '/catalog/product-types', element: <p>list page</p> },
-  { path: '/catalog/product-types/new', element: <ProductTypeEditorPage /> },
-  { path: '/catalog/product-types/:id', element: <ProductTypeEditorPage /> },
+  { path: '/catalog/categories', element: <p>list page</p> },
+  { path: '/catalog/categories/new', element: <CategoryEditorPage /> },
+  { path: '/catalog/categories/:id', element: <CategoryEditorPage /> },
 ]
 
-const existing: ProductType = {
+const existing: Category = {
   id: '6f1c2b8e-0000-4000-8000-000000000001',
   key: 'dimmer_actuator',
   name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
   description: { en: 'DIN rail dimmer' },
-  color: '#1f6feb',
   sortOrder: 1,
   isActive: true,
   attributes: [
@@ -49,7 +48,7 @@ const existing: ProductType = {
   updatedAt: '2026-01-01T00:00:00Z',
   can: { update: true, delete: true },
 }
-const editRoute = `/catalog/product-types/${existing.id}`
+const editRoute = `/catalog/categories/${existing.id}`
 
 const group = (name: string, container: HTMLElement = document.body) => within(container).getByRole('group', { name })
 /** The attribute row's own field (option rows inside repeat the labels). */
@@ -63,48 +62,47 @@ type User = ReturnType<typeof userEvent.setup>
 const expandAll = (u: User, section: HTMLElement) => u.click(within(section).getByRole('button', { name: 'Expand all' }))
 
 /** GET returns `item`, PUT records the body (and answers with `respond`, if given). */
-function editHandlers(item: () => ProductType = () => existing, respond?: () => Response) {
-  const puts: ProductTypeUpdate[] = []
+function editHandlers(item: () => Category = () => existing, respond?: () => Response) {
+  const puts: CategoryUpdate[] = []
   const gets: number[] = []
   server.use(
-    http.get('/api/product-types/:id', () => {
+    http.get('/api/categories/:id', () => {
       gets.push(Date.now())
       return HttpResponse.json(item())
     }),
-    http.put('/api/product-types/:id', async ({ request }) => {
-      puts.push((await request.json()) as ProductTypeUpdate)
+    http.put('/api/categories/:id', async ({ request }) => {
+      puts.push((await request.json()) as CategoryUpdate)
       return respond ? respond() : HttpResponse.json(item())
     }),
   )
   return { puts, gets }
 }
 
-async function openEditor(item?: () => ProductType, respond?: () => Response) {
+async function openEditor(item?: () => Category, respond?: () => Response) {
   const calls = editHandlers(item, respond)
   renderRoutes(routes, { me: adminMe, route: editRoute })
-  await screen.findByRole('heading', { name: 'Edit product type' })
+  await screen.findByRole('heading', { name: 'Edit category' })
   return calls
 }
 
-describe('ProductTypeEditorPage', () => {
-  it('creates a product type with an enum attribute, sending exactly what applies', async () => {
+describe('CategoryEditorPage', () => {
+  it('creates a category with an enum attribute, sending exactly what applies', async () => {
     let posted: unknown
-    const created: ProductType = { ...existing, id: '6f1c2b8e-0000-4000-8000-000000000099', key: 'gateway', name: { en: 'Gateway', de: 'Gateway' } }
+    const created: Category = { ...existing, id: '6f1c2b8e-0000-4000-8000-000000000099', key: 'gateway', name: { en: 'Gateway', de: 'Gateway' } }
     server.use(
-      http.post('/api/product-types', async ({ request }) => {
+      http.post('/api/categories', async ({ request }) => {
         posted = await request.json()
         return HttpResponse.json(created, { status: 201 })
       }),
-      http.get('/api/product-types/:id', () => HttpResponse.json(created)),
+      http.get('/api/categories/:id', () => HttpResponse.json(created)),
     )
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/new' })
+    renderRoutes(routes, { me: adminMe, route: '/catalog/categories/new' })
 
-    expect(await screen.findByRole('heading', { name: 'New product type' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'New category' })).toBeInTheDocument()
     await u.type(screen.getByLabelText('Key'), 'gateway')
     await u.type(screen.getByLabelText('Name (English)'), 'Gateway')
     await u.type(screen.getByLabelText('Name (German)'), 'Gateway')
-    await u.type(screen.getByLabelText('Colour'), '#1F6FEB')
 
     const attributes = attributesRegion()
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
@@ -132,15 +130,14 @@ describe('ProductTypeEditorPage', () => {
 
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
-    // The new type continues on its edit page (D84).
-    expect(await screen.findByText('Product type created.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Edit product type' })).toBeInTheDocument()
+    // The new category continues on its edit page (D84).
+    expect(await screen.findByText('Category created.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit category' })).toBeInTheDocument()
     expect(screen.getByLabelText('Key')).toHaveValue('gateway')
-    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/categories')
     expect(posted).toEqual({
       key: 'gateway',
       name: { en: 'Gateway', de: 'Gateway' },
-      color: '#1f6feb',
       isActive: true,
       attributes: [
         {
@@ -167,7 +164,6 @@ describe('ProductTypeEditorPage', () => {
     expect(within(basics).getByLabelText('Key')).toHaveValue('dimmer_actuator')
     expect(within(basics).getByLabelText('Name (German)')).toHaveValue('Dimmaktor')
     expect(within(basics).getByLabelText('Description (English)')).toHaveValue('DIN rail dimmer')
-    expect(within(basics).getByLabelText('Colour')).toHaveValue('#1f6feb')
 
     // Collapsed rows summarise what they define.
     const attributes = attributesRegion()
@@ -207,7 +203,6 @@ describe('ProductTypeEditorPage', () => {
         key: existing.key,
         name: existing.name,
         description: existing.description,
-        color: '#1f6feb',
         isActive: true,
         attributes: [
           { ...existing.attributes[0] },
@@ -220,30 +215,6 @@ describe('ProductTypeEditorPage', () => {
     ])
     // Instance attributes have no scope.
     expect(puts[0].instanceAttributes[0]).not.toHaveProperty('scope')
-  })
-
-  it('removes the colour', async () => {
-    const u = userEvent.setup()
-    const { puts } = await openEditor()
-
-    await u.clear(screen.getByLabelText('Colour'))
-    await u.click(screen.getByRole('button', { name: 'Update' }))
-
-    await waitFor(() => expect(puts).toHaveLength(1))
-    expect(puts[0]).not.toHaveProperty('color')
-  })
-
-  it('checks the colour format', async () => {
-    const u = userEvent.setup()
-    const { puts } = await openEditor()
-
-    await u.clear(screen.getByLabelText('Colour'))
-    await u.type(screen.getByLabelText('Colour'), 'blue')
-    await u.click(screen.getByRole('button', { name: 'Update' }))
-
-    expect(screen.getByLabelText('Colour')).toHaveAccessibleDescription('Enter a colour as #rrggbb, e.g. #1f6feb.')
-    expect(screen.getByLabelText('Colour')).toHaveFocus()
-    expect(puts).toHaveLength(0)
   })
 
   it('shows server field errors at the row and option they belong to, opens those rows and focuses the first', async () => {
@@ -347,7 +318,7 @@ describe('ProductTypeEditorPage', () => {
 
   it('shows a taken key at the Key field', async () => {
     const u = userEvent.setup()
-    await openEditor(undefined, () => problem(409, { code: 'product_type.key_taken', params: { key: 'dimmer_actuator' } }))
+    await openEditor(undefined, () => problem(409, { code: 'category.key_taken', params: { key: 'dimmer_actuator' } }))
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
@@ -359,13 +330,13 @@ describe('ProductTypeEditorPage', () => {
   it('checks the obvious rules before saving, with the limits in the messages', async () => {
     let called = false
     server.use(
-      http.post('/api/product-types', () => {
+      http.post('/api/categories', () => {
         called = true
         return HttpResponse.json(existing, { status: 201 })
       }),
     )
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/new' })
+    renderRoutes(routes, { me: adminMe, route: '/catalog/categories/new' })
 
     await u.type(await screen.findByLabelText('Key'), 'Bad Key')
     await u.type(screen.getByLabelText('Name (German)'), 'x'.repeat(101))
@@ -599,11 +570,11 @@ describe('ProductTypeEditorPage', () => {
     expect(within(colour).getByRole('button', { name: 'Add option' })).toHaveFocus()
   })
 
-  it('reloads after someone else changed the product type', async () => {
+  it('reloads after someone else changed the category', async () => {
     let version = existing
     const { puts } = editHandlers(
       () => version,
-      () => (puts.length === 1 ? problem(409, { code: 'product_type.stale' }) : HttpResponse.json(version)),
+      () => (puts.length === 1 ? problem(409, { code: 'category.stale' }) : HttpResponse.json(version)),
     )
     const u = userEvent.setup()
     renderRoutes(routes, { me: adminMe, route: editRoute })
@@ -614,7 +585,7 @@ describe('ProductTypeEditorPage', () => {
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Someone else changed this product type in the meantime.')
+    expect(alert).toHaveTextContent('Someone else changed this category in the meantime.')
     await u.click(within(alert).getByRole('button', { name: 'Reload' }))
 
     await waitFor(() => expect(screen.getByLabelText('Name (English)')).toHaveValue('Their dimmer'))
@@ -637,7 +608,7 @@ describe('ProductTypeEditorPage', () => {
       me: adminMe,
       route: editRoute,
       appClient: true,
-      prepare: (client) => client.setQueryData(getGetProductTypeQueryKey(existing.id), existing),
+      prepare: (client) => client.setQueryData(getGetCategoryQueryKey(existing.id), existing),
     })
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
@@ -714,7 +685,7 @@ describe('ProductTypeEditorPage', () => {
     const u = userEvent.setup()
     await openEditor()
 
-    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/categories')
     await u.type(screen.getByLabelText('Name (German)'), ' neu')
     expect(screen.queryByRole('link', { name: 'Back to list' })).not.toBeInTheDocument()
     await u.click(screen.getByRole('link', { name: 'Cancel' }))
@@ -730,14 +701,15 @@ describe('ProductTypeEditorPage', () => {
     expect(await screen.findByText('list page')).toBeInTheDocument()
   })
 
-  it('shows the product type read-only without catalog.write', async () => {
-    server.use(http.get('/api/product-types/:id', () => HttpResponse.json({ ...existing, can: { update: false, delete: false } })))
+  it('shows the category read-only without catalog.write', async () => {
+    server.use(http.get('/api/categories/:id', () => HttpResponse.json({ ...existing, can: { update: false, delete: false } })))
     renderRoutes(routes, { me: userMe, route: editRoute })
 
     expect(await screen.findByRole('heading', { name: 'Dimmer actuator' })).toBeInTheDocument()
-    expect(screen.getByText('You can view this product type but not change it.')).toBeInTheDocument()
+    expect(screen.getByText('You can view this category but not change it.')).toBeInTheDocument()
     expect(within(region('Basics')).getByLabelText('Key')).toBeDisabled()
-    expect(within(region('Basics')).getByLabelText('Colour')).toBeDisabled()
+    // Categories have no colour (product types do).
+    expect(within(region('Basics')).queryByLabelText('Colour')).not.toBeInTheDocument()
     // Everything is shown, nothing can be changed.
     const attributes = attributesRegion()
     expect(own(group('Attribute 1', attributes), 'Key')).toBeDisabled()
@@ -745,33 +717,33 @@ describe('ProductTypeEditorPage', () => {
     expect(
       screen.queryByRole('button', { name: /update|add attribute|remove|move|duplicate|insert|expand|collapse/i }),
     ).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/categories')
   })
 
   it('does not offer creating to users without catalog.write', async () => {
-    renderRoutes(appRoutes, { me: userMe, route: '/catalog/product-types/new' })
+    renderRoutes(appRoutes, { me: userMe, route: '/catalog/categories/new' })
 
     expect(await screen.findByText('You do not have permission to see this page.')).toBeInTheDocument()
   })
 
-  it('shows when the product type does not exist', async () => {
-    server.use(http.get('/api/product-types/:id', () => problem(404, { code: 'product_type.not_found' })))
+  it('shows when the category does not exist', async () => {
+    server.use(http.get('/api/categories/:id', () => problem(404, { code: 'category.not_found' })))
     renderRoutes(routes, { me: adminMe, route: editRoute })
 
-    expect(await screen.findByRole('heading', { name: 'Product type not found' })).toBeInTheDocument()
-    expect(screen.getByText('This product type does not exist (anymore).')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+    expect(await screen.findByRole('heading', { name: 'Category not found' })).toBeInTheDocument()
+    expect(screen.getByText('This category does not exist (anymore).')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/categories')
   })
 
   it('shows an invalid id in the URL as not found', async () => {
     server.use(
-      http.get('/api/product-types/:id', () =>
+      http.get('/api/categories/:id', () =>
         problem(422, { code: 'validation.failed', fields: [{ location: 'path.id', code: 'validation.invalid' }] }),
       ),
     )
-    renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/not-a-uuid' })
+    renderRoutes(routes, { me: adminMe, route: '/catalog/categories/not-a-uuid' })
 
-    expect(await screen.findByRole('heading', { name: 'Product type not found' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Edit product type' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Category not found' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Edit category' })).not.toBeInTheDocument()
   })
 })

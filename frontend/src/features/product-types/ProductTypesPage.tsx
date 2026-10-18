@@ -2,12 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { ProductType } from '@/api/generated/model'
 import {
-  getGetProductTypeQueryKey,
   getListProductTypesQueryKey,
   getListProductTypesQueryOptions,
   useDeleteProductType,
@@ -28,16 +26,16 @@ import {
   Loading,
   Page,
   RowAction,
-  TextLink,
   TypeBadge,
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { listPath } from './ProductTypeEditorPage'
+import { ProductTypeFormDialog } from './ProductTypeFormDialog'
 
 /** Tries of a move whose save meets a list changed meanwhile (see move). */
 const moveAttempts = 3
 
+/** catalog/product-types: the systems and product lines (Zigbee, KNX, …), edited in a dialog. */
 export function ProductTypesPage() {
   const { t } = useTranslation('productTypes')
   const { t: tCommon } = useTranslation()
@@ -50,7 +48,14 @@ export function ProductTypesPage() {
   const reorder = useReorderProductTypes()
   const [moving, setMoving] = useState(false)
   const [moveError, setMoveError] = useState<unknown>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<ProductType | null>(null)
   const [deleting, setDeleting] = useState<ProductType | null>(null)
+
+  const openForm = (item: ProductType | null) => {
+    setEditing(item)
+    setFormOpen(true)
+  }
 
   // Each delete starts without the previous attempt's error.
   const openDelete = (item: ProductType | null) => {
@@ -65,7 +70,6 @@ export function ProductTypesPage() {
     } catch {
       return // shown by ErrorMessage via remove.error
     }
-    queryClient.removeQueries({ queryKey: getGetProductTypeQueryKey(deleting.id) })
     await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
     setDeleting(null)
   }
@@ -75,7 +79,7 @@ export function ProductTypesPage() {
   // fetched fresh (D29). If the item or its neighbour is gone, nothing is
   // sent. If another type was created or deleted between the fetch and the
   // save (order_mismatch), the move is still well defined: it is applied to
-  // the list fetched again, a few times at most.
+  // the list fetched again, a few times at most (D92).
   const move = async (item: ProductType, neighbour: ProductType, direction: 'up' | 'down') => {
     setMoving(true)
     setMoveError(null)
@@ -109,13 +113,12 @@ export function ProductTypesPage() {
     {
       header: t('field.name'),
       cell: (p) => (
-        <TypeBadge color={p.color}>
-          <TextLink to={`${listPath}/${p.id}`}>{localized(p.name)}</TextLink>
+        <TypeBadge color={p.color} abbreviation={p.abbreviation} wrap>
+          {localized(p.name)}
         </TypeBadge>
       ),
     },
     { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code> },
-    { header: t('field.attributeCount'), cell: (p) => p.attributes.length, className: 'tabular-nums' },
     {
       header: t('field.status'),
       cell: (p) => (
@@ -140,9 +143,7 @@ export function ProductTypesPage() {
           disabled={index === rows.length - 1 || moving}
           onClick={() => void move(p, rows[index + 1], 'down')}
         />
-        {p.can.update && (
-          <RowAction to={`${listPath}/${p.id}`} icon={<Pencil />} label={tCommon('action.edit')} />
-        )}
+        {p.can.update && <RowAction onClick={() => openForm(p)} icon={<Pencil />} label={tCommon('action.edit')} />}
         {p.can.delete && (
           <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
@@ -152,10 +153,8 @@ export function ProductTypesPage() {
 
   // Without catalog.write the page is read-only.
   const createButton = canWrite ? (
-    <Button asChild>
-      <Link to={`${listPath}/new`}>
-        <Plus /> {t('new')}
-      </Link>
+    <Button onClick={() => openForm(null)}>
+      <Plus /> {t('new')}
     </Button>
   ) : undefined
 
@@ -176,6 +175,8 @@ export function ProductTypesPage() {
           empty={<EmptyState title={t('empty')} action={createButton} />}
         />
       )}
+
+      <ProductTypeFormDialog open={formOpen} onOpenChange={setFormOpen} item={editing} />
 
       <ConfirmDialog
         open={deleting !== null}

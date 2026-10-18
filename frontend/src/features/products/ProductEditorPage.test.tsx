@@ -11,7 +11,21 @@ import { server } from '@/test/server'
 import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
-import { black, dimmer, dimmerType, gatewayType, ids, inactiveType, ivory, problem, types } from './test-fixtures'
+import {
+  black,
+  categories,
+  dimmer,
+  dimmerCategory,
+  gatewayCategory,
+  ids,
+  inactiveCategory,
+  ivory,
+  knxType,
+  legacyType,
+  problem,
+  types,
+  zigbeeType,
+} from './test-fixtures'
 
 const routes = [
   { path: '/catalog/products', element: <p>list page</p> },
@@ -33,6 +47,7 @@ function editHandlers(item: () => Product = () => dimmer, respond?: () => Respon
   const puts: ProductUpdate[] = []
   server.use(
     http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+    http.get('/api/categories', () => HttpResponse.json({ items: categories })),
     http.get('/api/products/:id', () => HttpResponse.json(item())),
     http.put('/api/products/:id', async ({ request }) => {
       puts.push((await request.json()) as ProductUpdate)
@@ -59,6 +74,7 @@ describe('ProductEditorPage', () => {
     const created = { ...dimmer, id: ids.id(299), variants: [] }
     server.use(
       http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+      http.get('/api/categories', () => HttpResponse.json({ items: categories })),
       http.post('/api/products', async ({ request }) => {
         posted = (await request.json()) as ProductInput
         return HttpResponse.json(created, { status: 201 })
@@ -69,14 +85,14 @@ describe('ProductEditorPage', () => {
     renderRoutes(routes, { me: adminMe, route: '/catalog/products/new' })
 
     expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument()
-    expect(attributes()).toHaveTextContent('Choose a product type to fill in its attributes.')
-    // Only active types are offered for a new product.
-    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual([
-      'Choose a product type',
-      'Dimmer actuator',
-      'Gateway',
-    ])
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
+    expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
+    // Only active types and categories are offered for a new product; types with their badge.
+    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual(['Choose a product type', 'ZBZigbee', 'KNX'])
+    expect(await optionTexts(u, screen.getByLabelText('Category'))).toEqual(['Choose a category', 'Dimmer actuators', 'Gateways'])
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Zigbee')
+    // The attributes come from the category.
+    expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
+    await chooseOption(u, screen.getByLabelText('Category'), 'Dimmer actuators')
     await u.type(screen.getByLabelText('Model number'), ' M1 ')
     await u.type(screen.getByLabelText('Name (English)'), 'Dimmer')
 
@@ -101,7 +117,8 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByText('Product created. Add its variants below.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
     expect(posted).toEqual({
-      productTypeId: dimmerType.id,
+      productTypeId: zigbeeType.id,
+      categoryId: dimmerCategory.id,
       modelNumber: 'M1',
       name: { en: 'Dimmer' },
       attributes: {
@@ -156,7 +173,8 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(puts).toEqual([
       {
-        productTypeId: dimmerType.id,
+        productTypeId: zigbeeType.id,
+        categoryId: dimmerCategory.id,
         modelNumber: dimmer.modelNumber,
         name: dimmer.name,
         description: dimmer.description,
@@ -276,18 +294,22 @@ describe('ProductEditorPage', () => {
     expect(puts[0].attributes).toEqual({ ...dimmer.attributes, power: 450, legacy_flag: true })
   })
 
-  it('re-renders the attributes for a new product type and keeps the old values as no longer in the schema', async () => {
+  it('re-renders the attributes for a new category and keeps the old values as no longer in the schema', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
 
     await u.clear(inAttributes('Power'))
     await u.type(inAttributes('Power'), '250')
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
+    // Another product type changes nothing about the attributes.
+    await chooseOption(u, screen.getByLabelText('Product type'), 'KNX')
+    expect(inAttributes('Power')).toHaveValue('250')
+    expect(screen.queryByText(/You changed the category/)).not.toBeInTheDocument()
+    await chooseOption(u, screen.getByLabelText('Category'), 'Gateways')
 
-    expect(screen.getByText(/You changed the product type/)).toHaveTextContent(
-      "Its variants' values are never refused or removed by the change: values that do not match the new type are flagged on the variants.",
+    expect(screen.getByText(/You changed the category/)).toHaveTextContent(
+      "Its variants' values are never refused or removed by the change: values that do not match the new category are flagged on the variants.",
     )
-    // A required yes/no of the new type starts as "no".
+    // A required yes/no of the new category starts as "no".
     expect(inAttributes('Managed')).not.toBeChecked()
     expect(within(attributes()).queryByLabelText('Power')).not.toBeInTheDocument()
     expect(inAttributes('Series')).toHaveValue('Pro')
@@ -304,17 +326,18 @@ describe('ProductEditorPage', () => {
     ])
     await u.click(within(extra).getByRole('button', { name: 'Remove dali' }))
 
-    // Back to the old type: its inputs again, with the values as edited.
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
+    // Back to the old category: its inputs again, with the values as edited.
+    await chooseOption(u, screen.getByLabelText('Category'), 'Dimmer actuators')
     expect(inAttributes('Power')).toHaveValue('250')
     expect(inAttributes('DALI')).toBeChecked()
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
+    await chooseOption(u, screen.getByLabelText('Category'), 'Gateways')
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     await waitFor(() => expect(puts).toHaveLength(1))
     const { dali: _removed, series: _series, ...stale } = dimmer.attributes as Record<string, unknown>
-    expect(puts[0].productTypeId).toBe(gatewayType.id)
-    // Stale values are sent back as stored (the edited power was an input of the old type only).
+    expect(puts[0].productTypeId).toBe(knxType.id)
+    expect(puts[0].categoryId).toBe(gatewayCategory.id)
+    // Stale values are sent back as stored (the edited power was an input of the old category only).
     expect(puts[0].attributes).toEqual({ series: 'Pro', ports: 8, managed: false, ...stale })
   })
 
@@ -488,24 +511,25 @@ describe('ProductEditorPage', () => {
     expect(puts[0].attributes).toEqual(zero.attributes)
   })
 
-  it('offers the current inactive type to an existing product only', async () => {
+  it('offers the current inactive type and category to an existing product only', async () => {
     const u = userEvent.setup()
-    await openEditor(() => ({ ...dimmer, productTypeId: inactiveType.id, attributes: {} }))
+    await openEditor(() => ({ ...dimmer, productTypeId: legacyType.id, categoryId: inactiveCategory.id, attributes: {} }))
 
-    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual([
-      'Dimmer actuator',
-      'Gateway',
-      'Legacy (inactive)',
-    ])
+    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual(['ZBZigbee', 'KNX', 'Legacy (inactive)'])
     expect(screen.getByLabelText('Product type')).toHaveTextContent('Legacy (inactive)')
+    expect(await optionTexts(u, screen.getByLabelText('Category'))).toEqual(['Dimmer actuators', 'Gateways', 'Retired (inactive)'])
+    expect(screen.getByLabelText('Category')).toHaveTextContent('Retired (inactive)')
+    // The inactive category has no attributes.
+    expect(attributes()).toHaveTextContent('This category defines no attributes here.')
   })
 
-  it('shows errors of the type, model number and conflicts at their place', async () => {
+  it('shows errors of the type, category, model number and conflicts at their place', async () => {
     let respond = () =>
       problem(422, {
         code: 'validation.failed',
         fields: [
           { location: 'body.productTypeId', code: 'product.type_inactive' },
+          { location: 'body.categoryId', code: 'product.category_not_found' },
           { location: 'body.modelNumber', code: 'validation.control_chars' },
         ],
       })
@@ -514,6 +538,7 @@ describe('ProductEditorPage', () => {
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(screen.getByLabelText('Product type')).toHaveAccessibleDescription('This product type is inactive. Choose an active product type.'))
+    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription('The selected category no longer exists.')
     expect(screen.getByLabelText('Model number')).toHaveAccessibleDescription(
       'Control characters (such as tabs, line breaks or invisible characters) are not allowed.',
     )
@@ -523,10 +548,10 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Someone else changed this at the same time. Please try again.')
   })
 
-  it('names the variants whose values no longer match, after a type change too', async () => {
+  it('names the variants whose values no longer match, after a category change too', async () => {
     const flagged: Product = {
       ...dimmer,
-      productTypeId: gatewayType.id,
+      categoryId: gatewayCategory.id,
       variantsWithProblems: 2,
       variants: [
         { ...ivory, staleAttributes: { colour: 'white' } },
@@ -544,7 +569,7 @@ describe('ProductEditorPage', () => {
     )
     expect(region('Variants')).not.toHaveTextContent('no longer match')
 
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
+    await chooseOption(u, screen.getByLabelText('Category'), 'Gateways')
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
@@ -559,6 +584,7 @@ describe('ProductEditorPage', () => {
     let gets = 0
     server.use(
       http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+      http.get('/api/categories', () => HttpResponse.json({ items: categories })),
       http.get('/api/products/:id', () => {
         gets++
         return HttpResponse.json(product)
@@ -680,6 +706,7 @@ describe('ProductEditorPage', () => {
   ])('shows not found when the product %s', async (_, respond) => {
     server.use(
       http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+      http.get('/api/categories', () => HttpResponse.json({ items: categories })),
       http.get('/api/products/:id', respond),
     )
     renderRoutes(routes, { me: adminMe, route: editRoute })

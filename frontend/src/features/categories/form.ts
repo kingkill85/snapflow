@@ -5,9 +5,9 @@ import {
   AttributeDefinitionItemType,
   AttributeDefinitionScope,
   AttributeDefinitionType,
+  type Category,
+  type CategoryInput,
   type InstanceAttributeDefinition,
-  type ProductType,
-  type ProductTypeInput,
 } from '@/api/generated/model'
 import { parseDecimal } from '@/catalog/decimal'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
@@ -23,10 +23,9 @@ export const limits = { key: 64, unit: 16, name: 100, description: 2000, label: 
 const maxSafeInteger = Number.MAX_SAFE_INTEGER
 
 const keyPattern = /^[a-z][a-z0-9_]*$/
-const colorPattern = /^(#[0-9a-fA-F]{6})?$/
 
 const tooLong = (max: number) => errorKey('validation.too_long', { max })
-const key = (format: 'product_type.key_format' | 'attribute.key_format') =>
+const key = (format: 'category.key_format' | 'attribute.key_format') =>
   z.string().max(limits.key, tooLong(limits.key)).regex(keyPattern, errorKey(format))
 
 const text = (max: number) => z.object({ en: z.string().max(max, tooLong(max)), de: z.string().max(max, tooLong(max)) })
@@ -154,10 +153,9 @@ const schemaList = z
 
 export const formSchema = z
   .object({
-    key: key('product_type.key_format'),
+    key: key('category.key_format'),
     name: requiredText(limits.name, 'validation.required'),
     description: text(limits.description),
-    color: z.string().trim().regex(colorPattern, errorKey('product_type.color_format')),
     isActive: z.boolean(),
     attributes: schemaList,
     instanceAttributes: schemaList,
@@ -166,7 +164,7 @@ export const formSchema = z
 
 export type FormValues = z.infer<typeof formSchema>
 export type AttributeValues = FormValues['attributes'][number]
-/** The two attribute schemas of a product type. */
+/** The two attribute schemas of a category. */
 export type SchemaName = 'attributes' | 'instanceAttributes'
 
 /**
@@ -176,7 +174,7 @@ export type SchemaName = 'attributes' | 'instanceAttributes'
  */
 export function editorFields(v: FormValues): ApiFieldMap {
   const map: Record<string, string> = {}
-  for (const name of ['key', 'name.en', 'name.de', 'description.en', 'description.de', 'color']) map[name] = name
+  for (const name of ['key', 'name.en', 'name.de', 'description.en', 'description.de']) map[name] = name
   for (const schema of ['attributes', 'instanceAttributes'] as const) {
     map[schema] = `${schema}.root`
     v[schema].forEach((a, i) => {
@@ -236,13 +234,12 @@ const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition)
   options: (a.options ?? []).map((o) => ({ key: o.key, label: textValues(o.label) })),
 })
 
-/** The form's values for a product type, or for a new one. */
-export function toFormValues(item: ProductType | null): FormValues {
+/** The form's values for a category, or for a new one. */
+export function toFormValues(item: Category | null): FormValues {
   return {
     key: item?.key ?? '',
     name: textValues(item?.name),
     description: textValues(item?.description),
-    color: item?.color ?? '',
     isActive: item?.isActive ?? true,
     attributes: (item?.attributes ?? []).map(toAttributeValues),
     instanceAttributes: (item?.instanceAttributes ?? []).map(toAttributeValues),
@@ -273,14 +270,12 @@ const toInstanceDefinition = (a: AttributeValues): InstanceAttributeDefinition =
 const toDefinition = (a: AttributeValues): AttributeDefinition => ({ ...toInstanceDefinition(a), scope: a.scope })
 
 /** The API body for the form's values: only what applies to each attribute's type. */
-export function toInput(v: FormValues): ProductTypeInput {
+export function toInput(v: FormValues): CategoryInput {
   const description = optionalLocalized(v.description)
-  const color = v.color.trim().toLowerCase()
   return {
     key: v.key,
     name: localized(v.name),
     ...(description ? { description } : {}),
-    ...(color ? { color } : {}),
     isActive: v.isActive,
     attributes: v.attributes.map(toDefinition),
     instanceAttributes: v.instanceAttributes.map(toInstanceDefinition),
