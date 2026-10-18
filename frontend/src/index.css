@@ -20,6 +20,17 @@
 }
 
 @layer base {
+  /* Native controls (select popups, checkboxes, scrollbars) follow the theme. */
+  :root {
+    color-scheme: light dark;
+  }
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) {
       --color-canvas: oklch(0.16 0.01 260);
@@ -29,6 +40,10 @@
       --color-line: oklch(0.3 0.01 260);
       --color-primary: oklch(0.68 0.17 262);
       --color-success: oklch(0.72 0.14 150);
+      /* Light accents need dark text on them (WCAG AA contrast). */
+      --color-primary-ink: oklch(0.16 0.01 260);
+      --color-danger: oklch(0.7 0.19 25);
+      --color-danger-ink: oklch(0.16 0.01 260);
     }
   }
   :root[data-theme='dark'] {
@@ -39,6 +54,9 @@
     --color-line: oklch(0.3 0.01 260);
     --color-primary: oklch(0.68 0.17 262);
     --color-success: oklch(0.72 0.14 150);
+    --color-primary-ink: oklch(0.16 0.01 260);
+    --color-danger: oklch(0.7 0.19 25);
+    --color-danger-ink: oklch(0.16 0.01 260);
   }
 
   body {

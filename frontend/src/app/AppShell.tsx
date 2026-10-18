@@ -36,9 +36,10 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <span className="font-semibold">{t('app.name')}</span>
-          <nav className="flex flex-1 gap-1 overflow-x-auto">
+        {/* Phones: brand and account on top, the navigation scrolls below. */}
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 px-4 sm:px-6 lg:h-14 lg:flex-nowrap lg:gap-x-6">
+          <span className="flex h-14 items-center font-semibold lg:h-auto">{t('app.name')}</span>
+          <nav className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-t border-line px-4 py-2 sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6 lg:order-none lg:mx-0 lg:w-auto lg:flex-1 lg:border-0 lg:p-0">
             {features
               .filter((f) => f.nav && (!f.permission || can(f.permission)))
               .map((f) => (
@@ -47,20 +48,22 @@ export function AppShell() {
                 </NavLink>
               ))}
           </nav>
-          <Select
-            aria-label={t('language.label')}
-            className="w-28"
-            value={i18n.resolvedLanguage}
-            onChange={(e) => void i18n.changeLanguage(e.target.value)}
-            options={languages.map((lng) => ({ value: lng, label: t(`language.${lng}`) }))}
-          />
-          <NavLink to="/profile" className={navLinkClass} title={t('account.profile')}>
-            <span className="block leading-tight">{me.fullName || me.email}</span>
-            <span className="block text-xs leading-tight text-muted">{me.tenantName}</span>
-          </NavLink>
-          <Button variant="ghost" size="sm" onClick={() => void signOut()}>
-            <LogOut /> {t('action.signOut')}
-          </Button>
+          <div className="ml-auto flex min-w-0 items-center gap-2 lg:gap-4">
+            <Select
+              aria-label={t('language.label')}
+              className="w-24 shrink-0 sm:w-28"
+              value={i18n.resolvedLanguage}
+              onChange={(e) => void i18n.changeLanguage(e.target.value)}
+              options={languages.map((lng) => ({ value: lng, label: t(`language.${lng}`) }))}
+            />
+            <NavLink to="/profile" className={(state) => cn(navLinkClass(state), 'min-w-0 max-w-48')} title={t('account.profile')}>
+              <span className="block truncate leading-tight">{me.fullName || me.email}</span>
+              <span className="block truncate text-xs leading-tight text-muted">{me.tenantName}</span>
+            </NavLink>
+            <Button variant="ghost" size="sm" className="shrink-0 px-2 sm:px-3" title={t('action.signOut')} onClick={() => void signOut()}>
+              <LogOut /> <span className="sr-only sm:not-sr-only">{t('action.signOut')}</span>
+            </Button>
+          </div>
         </div>
       </header>
       <main className="flex-1">

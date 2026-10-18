@@ -5,7 +5,7 @@ export DATABASE_URL
 DEV_ADMIN_EMAIL ?= admin@snapflow.local
 DEV_ADMIN_PASSWORD ?= snapflow-dev
 
-.PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend lint lint-backend lint-frontend check feature
+.PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend e2e lint lint-backend lint-frontend check feature
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -35,6 +35,17 @@ test-backend:
 
 test-frontend:
 	cd frontend && npx vitest run
+
+# The end-to-end database, dropped and recreated on every run. Playwright
+# starts its own backend (:8001, on this database) and frontend (:5174), so the
+# development servers and database are never touched.
+E2E_DB := snapflow_e2e
+
+e2e: ## End-to-end tests in Chromium against a fresh database (needs Docker); args="--ui" etc.
+	docker compose up -d --wait db
+	docker compose exec -T db psql -U snapflow -d postgres -v ON_ERROR_STOP=1 \
+		-c 'DROP DATABASE IF EXISTS $(E2E_DB) WITH (FORCE)' -c 'CREATE DATABASE $(E2E_DB)'
+	cd frontend && npx playwright test -c e2e $(args)
 
 lint: lint-backend lint-frontend ## Run all linters and type checks
 

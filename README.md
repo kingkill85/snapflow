@@ -26,6 +26,15 @@ docker compose --profile app up --build   # http://localhost:8000
 
 Set `POSTGRES_PASSWORD` for anything beyond local use, and `ADMIN_EMAIL` + `ADMIN_PASSWORD` for the first start: the server creates that admin when no active admin exists. Other settings: `DISTRIBUTOR_NAME` (name of the distributor tenant on first start, default "Distributor"), `COOKIE_SECURE=false` (only for plain HTTP on a host other than localhost) and `TRUSTED_PROXIES` (comma-separated CIDRs or addresses of reverse proxies whose `X-Forwarded-For` header determines the client address for login rate limits; empty by default, i.e. the header is ignored). If no active admin exists and `ADMIN_EMAIL` belongs to an existing user, that user is promoted to admin with `ADMIN_PASSWORD`.
 
+## End-to-end tests
+
+```bash
+make e2e                       # needs Docker; recreates the database snapflow_e2e every run
+make e2e args="--ui"           # Playwright UI mode; any Playwright CLI arguments work, e.g. args="users.spec.ts"
+```
+
+Playwright (Chromium from the Nix shell, `PLAYWRIGHT_BROWSERS_PATH`) starts its own backend on :8001 against `snapflow_e2e` and serves a production build of the frontend on :5174, so the development servers and database are never touched. Specs live in `frontend/e2e/specs/`; seed data through the `api` fixture, test behaviour through the UI. The `@playwright/test` version in `frontend/package.json` must equal nixpkgs' `playwright-driver` version (`echo $PLAYWRIGHT_DRIVER_VERSION`); bump both together when updating `flake.lock`. Report: `cd frontend && npx playwright show-report e2e/playwright-report`; screenshots of key pages in light/dark mode and at phone width land in `frontend/e2e/screenshots/`.
+
 ## Adding a feature
 
 ```bash
