@@ -1,0 +1,17 @@
+-- name: List[[.Plural]] :many
+SELECT * FROM [[.Table]] ORDER BY created_at;
+
+-- name: Get[[.Type]] :one
+SELECT * FROM [[.Table]] WHERE id = $1;
+
+-- name: Create[[.Type]] :one
+INSERT INTO [[.Table]] (name) VALUES ($1)
+RETURNING *;
+
+-- name: Update[[.Type]] :one
+UPDATE [[.Table]] SET name = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: Delete[[.Type]] :execrows
+DELETE FROM [[.Table]] WHERE id = $1;

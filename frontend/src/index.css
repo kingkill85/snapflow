@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Components use these semantic names (bg-surface, text-muted,
+ * border-line, ...) instead of raw colours, so the look changes in one place.
+ */
+@theme {
+  --color-canvas: oklch(0.985 0 0);
+  --color-surface: oklch(1 0 0);
+  --color-ink: oklch(0.21 0.01 260);
+  --color-muted: oklch(0.55 0.02 260);
+  --color-line: oklch(0.92 0.005 260);
+  --color-primary: oklch(0.55 0.2 262);
+  --color-primary-ink: oklch(0.99 0 0);
+  --color-danger: oklch(0.58 0.22 27);
+  --color-danger-ink: oklch(0.99 0 0);
+  --color-focus: oklch(0.7 0.15 262);
+  --radius-control: 0.5rem;
+}
+
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --color-canvas: oklch(0.16 0.01 260);
+      --color-surface: oklch(0.2 0.01 260);
+      --color-ink: oklch(0.95 0.005 260);
+      --color-muted: oklch(0.7 0.02 260);
+      --color-line: oklch(0.3 0.01 260);
+      --color-primary: oklch(0.68 0.17 262);
+    }
+  }
+  :root[data-theme='dark'] {
+    --color-canvas: oklch(0.16 0.01 260);
+    --color-surface: oklch(0.2 0.01 260);
+    --color-ink: oklch(0.95 0.005 260);
+    --color-muted: oklch(0.7 0.02 260);
+    --color-line: oklch(0.3 0.01 260);
+    --color-primary: oklch(0.68 0.17 262);
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+}

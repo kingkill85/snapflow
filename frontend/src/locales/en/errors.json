@@ -1,0 +1,12 @@
+{
+  "server": { "error": "Something went wrong. Please try again.", "database_unavailable": "The database is not reachable." },
+  "network": { "unavailable": "No connection to the server." },
+  "request": { "not_found": "Not found.", "conflict": "This conflicts with existing data.", "bad": "The request was invalid.", "failed": "The request failed." },
+  "auth": { "required": "Please log in.", "forbidden": "You are not allowed to do this." },
+  "validation": { "failed": "Please check the highlighted fields.", "required": "This field is required.", "invalid": "This value is invalid." },
+  "function_type": {
+    "not_found": "This function type no longer exists.",
+    "key_taken": "The key \"{{key}}\" is already used.",
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter."
+  }
+}

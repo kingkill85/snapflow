@@ -1,0 +1,16 @@
+{
+  "title": "Funktionstypen",
+  "description": "Das gemeinsame Vokabular von Bedarf und Angebot: Lasten brauchen einen Funktionstyp, Modulkanäle liefern ihn.",
+  "empty": "Noch keine Funktionstypen.",
+  "new": "Neuer Funktionstyp",
+  "edit": "Funktionstyp bearbeiten",
+  "deleteTitle": "Funktionstyp löschen",
+  "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
+  "field": {
+    "key": "Schlüssel",
+    "name": "Name",
+    "keyHint": "z. B. dimmer, switching, blind",
+    "nameEn": "Name (Englisch)",
+    "nameDe": "Name (Deutsch)"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "title": "Function types",
+  "description": "The shared vocabulary of demand and supply: loads need a function type, module channels provide one.",
+  "empty": "No function types yet.",
+  "new": "New function type",
+  "edit": "Edit function type",
+  "deleteTitle": "Delete function type",
+  "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
+  "field": {
+    "key": "Key",
+    "name": "Name",
+    "keyHint": "e.g. dimmer, switching, blind",
+    "nameEn": "Name (English)",
+    "nameDe": "Name (German)"
+  }
+}

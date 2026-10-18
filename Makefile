@@ -1,0 +1,50 @@
+# All commands run inside the Nix dev shell (`nix develop` or direnv).
+DATABASE_URL ?= postgres://snapflow:snapflow@localhost:5432/snapflow?sslmode=disable
+export DATABASE_URL
+
+.PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend lint lint-backend lint-frontend check feature
+
+help: ## Show this help
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
+
+db: ## Start Postgres for development
+	docker compose up -d --wait db
+
+dev-backend: ## Run the backend on :8000 (needs `make db`)
+	cd backend && go run ./cmd/snapflow serve
+
+dev-frontend: ## Run the frontend on :5173 with the API proxied
+	cd frontend && npm run dev
+
+generate: sqlc api ## Regenerate all generated code
+
+sqlc: ## Generate Go code from SQL queries
+	cd backend && sqlc generate
+
+api: ## Export OpenAPI and regenerate the TypeScript client
+	cd backend && go run ./cmd/snapflow openapi > ../api/openapi.json
+	cd frontend && npx orval
+
+test: test-backend test-frontend ## Run all tests
+
+test-backend:
+	cd backend && go test ./...
+
+test-frontend:
+	cd frontend && npx vitest run
+
+lint: lint-backend lint-frontend ## Run all linters and type checks
+
+lint-backend:
+	cd backend && golangci-lint run ./...
+
+lint-frontend:
+	cd frontend && npm run lint && npx tsc -b
+
+check: generate lint test ## Everything CI runs; fails if generated code is stale
+	git diff --exit-code -- backend/internal/features api frontend/src/api
+
+feature: ## Scaffold a feature: make feature name=product_types
+	@test -n "$(name)" || (echo "usage: make feature name=<snake_case_plural>" && exit 1)
+	cd backend && go run ./cmd/scaffold $(name)
+	$(MAKE) generate

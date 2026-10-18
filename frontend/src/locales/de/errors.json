@@ -1,0 +1,12 @@
+{
+  "server": { "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen.", "database_unavailable": "Die Datenbank ist nicht erreichbar." },
+  "network": { "unavailable": "Keine Verbindung zum Server." },
+  "request": { "not_found": "Nicht gefunden.", "conflict": "Das widerspricht vorhandenen Daten.", "bad": "Die Anfrage war ungültig.", "failed": "Die Anfrage ist fehlgeschlagen." },
+  "auth": { "required": "Bitte anmelden.", "forbidden": "Dafür fehlt die Berechtigung." },
+  "validation": { "failed": "Bitte die markierten Felder prüfen.", "required": "Dieses Feld ist erforderlich.", "invalid": "Dieser Wert ist ungültig." },
+  "function_type": {
+    "not_found": "Dieser Funktionstyp existiert nicht mehr.",
+    "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "app": { "name": "SnapFlow" },
+  "nav": { "catalog": "Katalog" },
+  "action": {
+    "create": "Erstellen",
+    "update": "Aktualisieren",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten"
+  },
+  "state": { "loading": "Wird geladen…" },
+  "language": { "label": "Sprache", "en": "English", "de": "Deutsch" }
+}

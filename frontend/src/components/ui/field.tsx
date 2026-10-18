@@ -1,0 +1,42 @@
+import * as LabelPrimitive from '@radix-ui/react-label'
+import { type ComponentProps, useId } from 'react'
+
+import { cn } from '@/lib/cn'
+
+export function Input({ className, ...props }: ComponentProps<'input'>) {
+  return (
+    <input
+      className={cn(
+        'h-9 w-full rounded-control border border-line bg-surface px-3 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 aria-invalid:border-danger',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+type FieldProps = ComponentProps<'input'> & {
+  label: string
+  error?: string
+  hint?: string
+}
+
+/** Label + input + hint/error, wired for accessibility. */
+export function Field({ label, error, hint, id, ...props }: FieldProps) {
+  const generated = useId()
+  const inputId = id ?? generated
+  const messageId = `${inputId}-message`
+  return (
+    <div className="space-y-1.5">
+      <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
+        {label}
+      </LabelPrimitive.Root>
+      <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={messageId} {...props} />
+      {(error || hint) && (
+        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
+          {error ?? hint}
+        </p>
+      )}
+    </div>
+  )
+}

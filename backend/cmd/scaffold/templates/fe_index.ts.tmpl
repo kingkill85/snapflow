@@ -1,0 +1,9 @@
+import type { FeatureModule } from '@/app/feature'
+
+import { [[.Plural]]Page } from './[[.Plural]]Page'
+
+export const [[.NS]]Feature: FeatureModule = {
+  path: 'catalog/[[.URL]]',
+  element: [[.Plural]]Page,
+  nav: { section: 'catalog', namespace: '[[.NS]]', labelKey: 'title' },
+}

@@ -1,0 +1,66 @@
+package [[.Pkg]]_test
+
+import (
+	"net/http"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/danielgtaylor/huma/v2/humatest"
+
+	"github.com/kingkill85/snapflow/backend/internal/features/[[.Pkg]]"
+	"github.com/kingkill85/snapflow/backend/internal/features/[[.Pkg]]/store"
+	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
+)
+
+func TestMain(m *testing.M) { os.Exit(testdb.Run(m)) }
+
+func newAPI(t *testing.T) humatest.TestAPI {
+	t.Helper()
+	apperr.Install()
+	_, api := humatest.New(t)
+	[[.Pkg]].Register(api, [[.Pkg]].NewService(store.New(testdb.Pool(t))))
+	return api
+}
+
+func sample() map[string]any {
+	return map[string]any{"name": map[string]string{"en": "Sample", "de": "Beispiel"}}
+}
+
+func TestCreateAndList(t *testing.T) {
+	api := newAPI(t)
+
+	if resp := api.Post("/api/[[.URL]]", sample()); resp.Code != http.StatusCreated {
+		t.Fatalf("create: got %d: %s", resp.Code, resp.Body)
+	}
+	resp := api.Get("/api/[[.URL]]")
+	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"en":"Sample"`) {
+		t.Fatalf("list: got %d: %s", resp.Code, resp.Body)
+	}
+}
+
+func TestEnglishNameRequired(t *testing.T) {
+	api := newAPI(t)
+
+	resp := api.Post("/api/[[.URL]]", map[string]any{"name": map[string]string{"de": "Beispiel"}})
+	if resp.Code != http.StatusUnprocessableEntity || !strings.Contains(resp.Body.String(), "validation.required") {
+		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+}
+
+func TestNotFound(t *testing.T) {
+	api := newAPI(t)
+	const missing = "/api/[[.URL]]/00000000-0000-0000-0000-000000000001"
+
+	codes := map[string]int{
+		"get":    api.Get(missing).Code,
+		"update": api.Put(missing, sample()).Code,
+		"delete": api.Delete(missing).Code,
+	}
+	for name, code := range codes {
+		if code != http.StatusNotFound {
+			t.Errorf("%s: got %d", name, code)
+		}
+	}
+}

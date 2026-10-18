@@ -1,0 +1,106 @@
+package [[.Pkg]]
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
+)
+
+const tag = "[[.URL]]"
+
+type idParam struct {
+	ID uuid.UUID `path:"id" format:"uuid"`
+}
+
+type updateInput struct {
+	ID   uuid.UUID `path:"id" format:"uuid"`
+	Body [[.Type]]Input
+}
+
+type itemOutput struct {
+	Body [[.Type]]
+}
+
+type [[.Type]]List struct {
+	Items [][[.Type]] `json:"items"`
+}
+
+type listOutput struct {
+	Body [[.Type]]List
+}
+
+// Register adds the [[.Lower]] endpoints. Handlers only translate HTTP to
+// service calls; all rules live in Service.
+func Register(api huma.API, svc *Service) {
+	huma.Register(api, huma.Operation{
+		OperationID: "list[[.Plural]]",
+		Method:      http.MethodGet,
+		Path:        "/api/[[.URL]]",
+		Summary:     "List [[.LowerPlural]]",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, _ *struct{}) (*listOutput, error) {
+		items, err := svc.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := &listOutput{}
+		out.Body.Items = items
+		return out, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get[[.Type]]",
+		Method:      http.MethodGet,
+		Path:        "/api/[[.URL]]/{id}",
+		Summary:     "Get a [[.Lower]]",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *idParam) (*itemOutput, error) {
+		item, err := svc.Get(ctx, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return &itemOutput{Body: item}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "create[[.Type]]",
+		Method:        http.MethodPost,
+		Path:          "/api/[[.URL]]",
+		Summary:       "Create a [[.Lower]]",
+		Tags:          []string{tag},
+		DefaultStatus: http.StatusCreated,
+	}, func(ctx context.Context, in *struct{ Body [[.Type]]Input }) (*itemOutput, error) {
+		item, err := svc.Create(ctx, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &itemOutput{Body: item}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "update[[.Type]]",
+		Method:      http.MethodPut,
+		Path:        "/api/[[.URL]]/{id}",
+		Summary:     "Update a [[.Lower]]",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *updateInput) (*itemOutput, error) {
+		item, err := svc.Update(ctx, in.ID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &itemOutput{Body: item}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "delete[[.Type]]",
+		Method:        http.MethodDelete,
+		Path:          "/api/[[.URL]]/{id}",
+		Summary:       "Delete a [[.Lower]]",
+		Tags:          []string{tag},
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *idParam) (*struct{}, error) {
+		return nil, svc.Delete(ctx, in.ID)
+	})
+}

@@ -1,0 +1,27 @@
+# One entry per feature. `make feature` appends new entries below the marker.
+version: "2"
+overrides:
+  go:
+    overrides:
+      - db_type: uuid
+        go_type: github.com/google/uuid.UUID
+      - db_type: timestamptz
+        go_type: time.Time
+      # Translatable columns are listed one by one; other jsonb stays []byte.
+      - column: function_types.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      # scaffold:overrides
+sql:
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/functiontypes/queries.sql
+    gen:
+      go: &go
+        package: store
+        out: internal/features/functiontypes/store
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+  # scaffold:sqlc
