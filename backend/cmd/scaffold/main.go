@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/format"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -248,8 +249,14 @@ func wire(n names) error {
 		if !strings.Contains(s, e.marker) {
 			return fmt.Errorf("%s: marker %q not found", e.path, strings.TrimSpace(e.marker))
 		}
-		s = strings.Replace(s, e.marker, e.text+e.marker, 1)
-		if err := os.WriteFile(e.path, []byte(s), 0o644); err != nil {
+		out := []byte(strings.Replace(s, e.marker, e.text+e.marker, 1))
+		if strings.HasSuffix(e.path, ".go") {
+			// gofmt sorts the imports the new feature was inserted into.
+			if out, err = format.Source(out); err != nil {
+				return fmt.Errorf("%s: %w", e.path, err)
+			}
+		}
+		if err := os.WriteFile(e.path, out, 0o644); err != nil {
 			return err
 		}
 		fmt.Println("wire  ", e.path)
