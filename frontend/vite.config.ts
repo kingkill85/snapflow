@@ -19,5 +19,8 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // The longest form tests take about 3 s alone and more while `make check`
+    // runs the Go tests and linters next to them; 5 s (the default) is too tight.
+    testTimeout: 15_000,
   },
 })

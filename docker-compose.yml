@@ -1,5 +1,8 @@
 # Production-like stack: `docker compose up --build`.
 # For development only the database is needed: `make db`.
+# A fixed project name, so every checkout (also a git worktree) uses the same database container.
+name: snapflow
+
 services:
   db:
     image: postgres:17-alpine
@@ -16,6 +19,27 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # The server of the Go tests (`make test-backend`): each test package gets
+  # its own database on it. In memory and without fsync, as nothing on it is kept.
+  testdb:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: snapflow
+      POSTGRES_PASSWORD: snapflow
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off", "-c", "max_connections=500"]
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${TEST_DB_PORT:-55432}:5432"
+    healthcheck:
+      # Over TCP: during initialisation the server only listens on its socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U snapflow -d postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
 
   app:
     build: .

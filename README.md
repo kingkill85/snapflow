@@ -29,11 +29,17 @@ Set `POSTGRES_PASSWORD` for anything beyond local use, and `ADMIN_EMAIL` + `ADMI
 ## End-to-end tests
 
 ```bash
-make e2e                       # needs Docker; recreates the database snapflow_e2e every run
+make e2e                       # needs Docker; recreates this checkout's e2e database every run
 make e2e args="--ui"           # Playwright UI mode; any Playwright CLI arguments work, e.g. args="users.spec.ts"
+make e2e-visual                # the full layout matrix (widths x light/dark x en/de) with screenshots
+E2E_SLOT=3 make e2e            # pick the slot (ports and database) yourself
 ```
 
-Playwright (Chromium from the Nix shell, `PLAYWRIGHT_BROWSERS_PATH`) starts its own backend on :8001 against `snapflow_e2e` and serves a production build of the frontend on :5174, so the development servers and database are never touched. Specs live in `frontend/e2e/specs/`; seed data through the `api` fixture, test behaviour through the UI. The `@playwright/test` version in `frontend/package.json` must equal nixpkgs' `playwright-driver` version (`echo $PLAYWRIGHT_DRIVER_VERSION`); bump both together when updating `flake.lock`. Report: `cd frontend && npx playwright show-report e2e/playwright-report`; screenshots of key pages in light/dark mode and at phone width land in `frontend/e2e/screenshots/`.
+Playwright (Chromium from the Nix shell, `PLAYWRIGHT_BROWSERS_PATH`) starts its own backend and serves a production build of the frontend, against its own database, so the development servers and database are never touched. Specs live in `frontend/e2e/specs/`; seed data through the `api` fixture, test behaviour through the UI; specs run in parallel (half the CPU cores, 4 in CI, `E2E_WORKERS` overrides), so they only rely on data they create. The `@playwright/test` version in `frontend/package.json` must equal nixpkgs' `playwright-driver` version (`echo $PLAYWRIGHT_DRIVER_VERSION`); bump both together when updating `flake.lock`. Report: `cd frontend && npx playwright show-report e2e/playwright-report`.
+
+- **Slots.** Each run uses a slot, so checkouts (git worktrees, parallel agents) never share ports or a database: slot 0 is backend :8001, frontend :5174, database `snapflow_e2e`; slot n (1-99) is :20000+10n, :20001+10n, `snapflow_e2e_n`. `E2E_SLOT` picks one; unset, CI uses 0 and a local checkout a slot derived from its path (`cd frontend && node e2e/env.ts` prints it). Only an e2e database is ever dropped.
+- **Default run vs. visual.** `make e2e` runs a slim layout smoke (phone 390 and desktop 1280 in light mode, every list at 1280 px in English and German). The rest of the matrix is tagged `@visual` and runs with `make e2e-visual`, which also saves screenshots of key pages to `frontend/e2e/screenshots/`. CI runs it on pull requests labelled `visual` or by hand (workflow_dispatch); the default run happens on every pull request, in two shards.
+- **Builds.** The backend is built once per run with `go build` (incremental) and started as a binary; the frontend production build in `frontend/e2e/.dist` is reused while its inputs are unchanged (`E2E_REBUILD=1` forces a rebuild). `E2E_REUSE_SERVERS=1` uses servers you started yourself.
 
 ## Adding a feature
 

@@ -3,3 +3,6 @@ test-results/
 playwright-report/
 screenshots/
 .dist/
+blob-report/
+all-blob-reports/
+.bin/
