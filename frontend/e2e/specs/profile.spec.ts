@@ -1,4 +1,4 @@
-import { expect, signIn, test, unique, uniqueEmail } from '../fixtures'
+import { accountButton, expect, signIn, signOut, test, unique, uniqueEmail } from '../fixtures'
 
 // The profile page, for a user of each kind (here: a plain user).
 test('change name and email', async ({ api, sessionFor }) => {
@@ -7,8 +7,8 @@ test('change name and email', async ({ api, sessionFor }) => {
   await page.goto('/profile')
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
   await expect(page.getByText('User · E2E Distributor')).toBeVisible()
-  const header = page.getByRole('banner').getByRole('link', { name: new RegExp(user.fullName) })
-  await expect(header).toBeVisible()
+  const header = accountButton(page)
+  await expect(header).toHaveAccessibleName(`Account: ${user.fullName}`)
 
   const name = unique('New Name')
   const email = uniqueEmail('changed')
@@ -16,18 +16,18 @@ test('change name and email', async ({ api, sessionFor }) => {
   await page.getByLabel('Email').fill(email)
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByRole('status')).toHaveText('Saved.')
-  await expect(page.getByRole('banner').getByRole('link', { name: new RegExp(name) })).toBeVisible()
+  await expect(header).toHaveAccessibleName(`Account: ${name}`)
 
   await page.reload()
   await expect(page.getByLabel('Full name')).toHaveValue(name)
   await expect(page.getByLabel('Email')).toHaveValue(email)
 
   // The new email signs in, the old one no longer does.
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await signOut(page)
   await signIn(page, user.email, user.password)
   await expect(page.getByRole('alert')).toHaveText('Email or password is wrong.')
   await signIn(page, email, user.password)
-  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+  await expect(accountButton(page)).toBeVisible()
 })
 
 test('an email used by someone else is refused', async ({ api, sessionFor }) => {

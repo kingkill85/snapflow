@@ -12,7 +12,7 @@ export function RolesPage() {
 
   if (matrix.isPending || matrix.isError) {
     return (
-      <Page title={t('title')} description={t('description')}>
+      <Page width="wide" title={t('title')} description={t('description')}>
         {matrix.isPending ? <Loading /> : <ErrorMessage error={matrix.error} />}
       </Page>
     )
@@ -41,7 +41,7 @@ export function RolesPage() {
   ]
 
   return (
-    <Page title={t('title')} description={t('description')}>
+    <Page width="wide" title={t('title')} description={t('description')}>
       <DataTable rows={matrix.data.permissions} rowKey={(p) => p} columns={columns} empty={<EmptyState title="" />} />
     </Page>
   )

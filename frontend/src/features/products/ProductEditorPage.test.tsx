@@ -8,6 +8,7 @@ import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
 import { black, dimmer, dimmerType, gatewayType, ids, inactiveType, ivory, problem, types } from './test-fixtures'
@@ -70,12 +71,12 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument()
     expect(attributes()).toHaveTextContent('Choose a product type to fill in its attributes.')
     // Only active types are offered for a new product.
-    expect(within(screen.getByLabelText('Product type')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual([
       'Choose a product type',
       'Dimmer actuator',
       'Gateway',
     ])
-    await u.selectOptions(screen.getByLabelText('Product type'), dimmerType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
     await u.type(screen.getByLabelText('Model number'), ' M1 ')
     await u.type(screen.getByLabelText('Name (English)'), 'Dimmer')
 
@@ -83,7 +84,7 @@ describe('ProductEditorPage', () => {
     await u.type(inAttributes('Power'), '12.5')
     await u.type(inAttributes('Width'), '4')
     await u.click(inAttributes('DALI'))
-    await u.selectOptions(inAttributes('Bus system'), 'knx')
+    await chooseOption(u, inAttributes('Bus system'), 'KNX')
     const loads = within(attributes()).getByRole('group', { name: 'Loads' })
     await u.click(within(loads).getByLabelText('Motor'))
     await u.click(within(loads).getByLabelText('LED'))
@@ -118,6 +119,7 @@ describe('ProductEditorPage', () => {
   })
 
   it('renders one input per attribute type with its unit, bounds and required mark', async () => {
+    const u = userEvent.setup()
     await openEditor()
 
     expect(inAttributes('Series')).toHaveValue('Pro')
@@ -133,8 +135,8 @@ describe('ProductEditorPage', () => {
     expect(width).toHaveAccessibleDescription('Required · 1 to 12 · Whole number')
     expect(inAttributes('DALI')).toBeChecked()
     const bus = inAttributes('Bus system')
-    expect(bus).toHaveValue('zigbee')
-    expect(within(bus).getAllByRole('option').map((o) => o.textContent)).toEqual(['Not set', 'Zigbee', 'KNX'])
+    expect(bus).toHaveTextContent('Zigbee')
+    expect(await optionTexts(u, bus)).toEqual(['Not set', 'Zigbee', 'KNX'])
     const loads = within(attributes()).getByRole('group', { name: 'Loads' })
     expect(within(loads).getByLabelText('LED')).toBeChecked()
     expect(within(loads).getByLabelText('Halogen')).not.toBeChecked()
@@ -172,7 +174,7 @@ describe('ProductEditorPage', () => {
     await u.clear(inAttributes('Series'))
     await u.clear(inAttributes('Power'))
     await u.click(inAttributes('DALI'))
-    await u.selectOptions(inAttributes('Bus system'), '')
+    await chooseOption(u, inAttributes('Bus system'), 'Not set')
     await u.click(within(attributes()).getByLabelText('LED'))
     await u.click(within(attributes()).getByLabelText('Motor'))
     await u.click(within(attributes()).getByRole('button', { name: 'Remove DALI' }))
@@ -280,7 +282,7 @@ describe('ProductEditorPage', () => {
 
     await u.clear(inAttributes('Power'))
     await u.type(inAttributes('Power'), '250')
-    await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
 
     expect(screen.getByText(/You changed the product type/)).toHaveTextContent(
       "Its variants' values are never refused or removed by the change: values that do not match the new type are flagged on the variants.",
@@ -303,10 +305,10 @@ describe('ProductEditorPage', () => {
     await u.click(within(extra).getByRole('button', { name: 'Remove dali' }))
 
     // Back to the old type: its inputs again, with the values as edited.
-    await u.selectOptions(screen.getByLabelText('Product type'), dimmerType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
     expect(inAttributes('Power')).toHaveValue('250')
     expect(inAttributes('DALI')).toBeChecked()
-    await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     await waitFor(() => expect(puts).toHaveLength(1))
@@ -403,8 +405,8 @@ describe('ProductEditorPage', () => {
     const { puts } = await openEditor(() => ({ ...dimmer, attributes: { ...dimmer.attributes, bus_system: 'can', loads: ['led', 'dimmer2'] } }))
 
     const bus = inAttributes('Bus system')
-    expect(bus).toHaveValue('can')
-    expect(within(bus).getAllByRole('option').map((o) => o.textContent)).toEqual(['Not set', 'Zigbee', 'KNX', 'can (not an option)'])
+    expect(bus).toHaveTextContent('can (not an option)')
+    expect(await optionTexts(u, bus)).toEqual(['Not set', 'Zigbee', 'KNX', 'can (not an option)'])
     const loads = within(attributes()).getByRole('group', { name: 'Loads' })
     expect(within(loads).getByLabelText('dimmer2 (not an option)')).toBeChecked()
 
@@ -416,7 +418,7 @@ describe('ProductEditorPage', () => {
     // The form restarted from the saved version.
     await screen.findByText('Saved.')
     const reloaded = within(attributes()).getByRole('group', { name: 'Loads' })
-    await u.selectOptions(inAttributes('Bus system'), '')
+    await chooseOption(u, inAttributes('Bus system'), 'Not set')
     await u.click(within(reloaded).getByLabelText('dimmer2 (not an option)'))
     expect(within(reloaded).queryByLabelText('dimmer2 (not an option)')).not.toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Update' }))
@@ -487,14 +489,15 @@ describe('ProductEditorPage', () => {
   })
 
   it('offers the current inactive type to an existing product only', async () => {
+    const u = userEvent.setup()
     await openEditor(() => ({ ...dimmer, productTypeId: inactiveType.id, attributes: {} }))
 
-    expect(within(screen.getByLabelText('Product type')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual([
       'Dimmer actuator',
       'Gateway',
       'Legacy (inactive)',
     ])
-    expect(screen.getByLabelText('Product type')).toHaveValue(inactiveType.id)
+    expect(screen.getByLabelText('Product type')).toHaveTextContent('Legacy (inactive)')
   })
 
   it('shows errors of the type, model number and conflicts at their place', async () => {
@@ -541,7 +544,7 @@ describe('ProductEditorPage', () => {
     )
     expect(region('Variants')).not.toHaveTextContent('no longer match')
 
-    await u.selectOptions(screen.getByLabelText('Product type'), gatewayType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Gateway')
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()

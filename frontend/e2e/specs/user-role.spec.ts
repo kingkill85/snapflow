@@ -1,4 +1,4 @@
-import { expect, nav, row, test, unique } from '../fixtures'
+import { expect, navEntries, navigate, row, test, unique } from '../fixtures'
 
 // What a plain user sees.
 test('a user sees the catalog read-only and the roles, nothing to manage', async ({ api, sessionFor }) => {
@@ -10,14 +10,15 @@ test('a user sees the catalog read-only and the roles, nothing to manage', async
   const page = await sessionFor(user)
   await page.goto('/')
   await expect(page).toHaveURL(/\/catalog\/function-types$/)
-  await expect(nav(page).getByRole('link')).toHaveText(['Function types', 'Product types', 'Products', 'Roles'])
+  // A section with one page is a plain link.
+  expect(await navEntries(page)).toEqual({ Catalog: ['Products', 'Product types', 'Function types'], Roles: ['Roles'] })
 
   await expect(row(page, key)).toContainText(name)
   await expect(page.getByRole('button', { name: 'New function type' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0)
 
-  await nav(page).getByRole('link', { name: 'Roles' }).click()
+  await navigate(page, 'Administration', 'Roles')
   await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible()
   await expect(page.getByRole('columnheader')).toHaveText(['Permission', 'Admin', 'Tenant admin', 'User'])
   const manageUsers = row(page, 'Manage users')

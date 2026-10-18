@@ -10,7 +10,7 @@ import {
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
 import { useCan } from '@/app/session'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
+import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { FunctionTypeFormDialog } from './FunctionTypeFormDialog'
@@ -59,17 +59,13 @@ export function FunctionTypesPage() {
 
   const rowActions = (ft: FunctionType) => (
     <>
-      <Button size="sm" variant="secondary" onClick={() => openForm(ft)}>
-        <Pencil /> {tCommon('action.edit')}
-      </Button>
-      <Button size="sm" variant="danger" onClick={() => openDelete(ft)}>
-        <Trash2 /> {tCommon('action.delete')}
-      </Button>
+      <RowAction onClick={() => openForm(ft)} icon={<Pencil />} label={tCommon('action.edit')} />
+      <RowAction variant="danger" onClick={() => openDelete(ft)} icon={<Trash2 />} label={tCommon('action.delete')} />
     </>
   )
 
   return (
-    <Page title={t('title')} description={t('description')} actions={createButton}>
+    <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (

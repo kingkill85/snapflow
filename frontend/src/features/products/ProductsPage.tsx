@@ -28,6 +28,7 @@ import {
   lastPageOffset,
   Loading,
   Page,
+  RowAction,
   Pagination,
   SelectField,
   TextLink,
@@ -152,10 +153,10 @@ export function ProductsPage() {
 
   const typeOptions = [
     { value: '', label: t('allTypes') },
-    ...(types.data?.items ?? []).map((pt) => ({
-      value: pt.id,
-      label: pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) }),
-    })),
+    ...(types.data?.items ?? []).map((pt) => {
+      const label = pt.isActive ? localized(pt.name) : t('field.inactiveType', { name: localized(pt.name) })
+      return { value: pt.id, label, content: <TypeBadge color={pt.color}>{label}</TypeBadge> }
+    }),
   ]
 
   const columns: Column<ProductListItem>[] = [
@@ -167,13 +168,19 @@ export function ProductsPage() {
           {p.modelNumber}
         </TextLink>
       ),
-      className: 'whitespace-nowrap',
+      // Long model numbers wrap after a hyphen rather than widen the table (D95).
+      className: 'min-w-32',
     },
     // On narrow screens the table scrolls instead of breaking names word by word.
     { header: t('column.name'), cell: (p) => localized(p.name), className: 'min-w-48' },
     {
       header: t('column.type'),
-      cell: (p) => <TypeBadge color={p.productType.color}>{localized(p.productType.name)}</TypeBadge>,
+      cell: (p) => (
+        <TypeBadge color={p.productType.color} wrap>
+          {localized(p.productType.name)}
+        </TypeBadge>
+      ),
+      className: 'min-w-36',
     },
     { header: t('column.variants'), cell: (p) => p.variantCount, className: 'text-right tabular-nums' },
     {
@@ -181,26 +188,26 @@ export function ProductsPage() {
       cell: (p) => range(p.priceMin, p.priceMax) || t('noPrice'),
       className: 'text-right whitespace-nowrap tabular-nums',
     },
+    // The problems badge sits next to the status instead of a mostly empty column (D95).
     {
       header: t('column.status'),
-      cell: (p) => <StatusBadge available={p.available} isActive={p.isActive} unavailableHint={t('unavailableHint')} />,
+      cell: (p) => (
+        <span className="inline-flex items-center gap-1.5">
+          <StatusBadge available={p.available} isActive={p.isActive} unavailableHint={t('unavailableHint')} />
+          <ProblemsBadge count={p.attributeErrors + p.staleAttributes} />
+        </span>
+      ),
+      className: 'whitespace-nowrap',
     },
-    { header: t('column.problems'), cell: (p) => <ProblemsBadge count={p.attributeErrors + p.staleAttributes} /> },
   ]
 
   const rowActions = (p: ProductListItem) => (
     <>
       {p.can.update && (
-        <Button asChild size="sm" variant="secondary">
-          <Link to={productPath(p.id)} state={linkState}>
-            <Pencil /> {tCommon('action.edit')}
-          </Link>
-        </Button>
+        <RowAction to={productPath(p.id)} state={linkState} icon={<Pencil />} label={tCommon('action.edit')} />
       )}
       {p.can.delete && (
-        <Button size="sm" variant="danger" onClick={() => openDelete(p)}>
-          <Trash2 /> {tCommon('action.delete')}
-        </Button>
+        <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
       )}
     </>
   )
@@ -216,7 +223,7 @@ export function ProductsPage() {
   const filtered = search !== '' || productTypeId !== '' || showInactive
 
   return (
-    <Page title={t('title')} description={t('description')} actions={createButton}>
+    <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
       <div className="grid items-end gap-4 sm:grid-cols-3">
         <Field
           type="search"
@@ -226,7 +233,7 @@ export function ProductsPage() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <SelectField label={t('typeFilter')} value={productTypeId} options={typeOptions} onChange={(e) => chooseType(e.target.value)} />
+        <SelectField label={t('typeFilter')} value={productTypeId} options={typeOptions} onValueChange={chooseType} />
         <div className="sm:pb-2">
           <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setFilters({ inactive: e.target.checked ? '1' : '' })} />
         </div>

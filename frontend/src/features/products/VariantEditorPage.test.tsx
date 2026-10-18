@@ -7,6 +7,7 @@ import type { AddonList, Product, Variant, VariantInput, VariantSearchItem, Vari
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { chooseOption, optionTexts } from '@/test/select'
 
 import { black, dimmer, gatewayType, ids, ivory, problem, types } from './test-fixtures'
 import { VariantEditorPage } from './VariantEditorPage'
@@ -97,7 +98,7 @@ describe('VariantEditorPage', () => {
     // Only the variant attributes of the type.
     const attributes = region('Attributes')
     expect(within(attributes).queryByLabelText('Width')).not.toBeInTheDocument()
-    await u.selectOptions(within(attributes).getByLabelText('Colour'), 'black')
+    await chooseOption(u, within(attributes).getByLabelText('Colour'), 'Black')
     await u.click(within(attributes).getByLabelText('Gloss'))
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
@@ -409,13 +410,13 @@ describe('VariantEditorPage', () => {
 
     // The type filter offers the type names and starts again at the first page.
     const typeFilter = within(addons).getByLabelText('Product type')
-    expect(within(typeFilter).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect(await optionTexts(u, typeFilter)).toEqual([
       'All product types',
       'Dimmer actuator',
       'Gateway',
       'Legacy (inactive)',
     ])
-    await u.selectOptions(typeFilter, gatewayType.id)
+    await chooseOption(u, typeFilter, 'Gateway')
     expect(await within(results).findByText('3 variants shown')).toBeInTheDocument()
     expect(searched[searched.length - 1]).toEqual({ productTypeId: gatewayType.id, limit: '20', offset: '0' })
     expect(within(results).queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()

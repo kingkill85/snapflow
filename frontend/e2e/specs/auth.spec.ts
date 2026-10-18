@@ -1,5 +1,5 @@
 import { admin } from '../env'
-import { expect, nav, signIn, test, uniqueEmail } from '../fixtures'
+import { accountButton, expect, nav, signIn, signOut, test, uniqueEmail } from '../fixtures'
 
 // Login, redirects, sign out and the login rate limit.
 test.describe('signed out', () => {
@@ -27,14 +27,14 @@ test.describe('signed out', () => {
     await signIn(page, user.email, user.password)
     await expect(page).toHaveURL(/\/catalog\/function-types$/)
     await expect(page.getByRole('heading', { name: 'Function types' })).toBeVisible()
-    await expect(page.getByRole('link', { name: new RegExp(user.fullName) })).toBeVisible()
+    await expect(accountButton(page)).toHaveAccessibleName(`Account: ${user.fullName}`)
   })
 
   test('emails are case-insensitive', async ({ page, api }) => {
     const user = await api.createUser()
     await page.goto('/login')
     await signIn(page, user.email.toUpperCase(), user.password)
-    await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+    await expect(accountButton(page)).toBeVisible()
   })
 
   test('a deep link opened while signed out is honoured after login', async ({ page }) => {
@@ -79,7 +79,7 @@ test('sign out returns to the login page and protected pages need a login again'
   const page = await sessionFor(user)
   await page.goto('/admin/users')
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await signOut(page)
   await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
 

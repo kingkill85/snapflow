@@ -10,7 +10,7 @@ import {
 } from '@/api/generated/[[.URL]]/[[.URL]]'
 import type { [[.Type]] } from '@/api/generated/model'
 import { useCan } from '@/app/session'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
+import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { [[.Type]]FormDialog } from './[[.Type]]FormDialog'
@@ -59,17 +59,13 @@ export function [[.Plural]]Page() {
 
   const rowActions = (item: [[.Type]]) => (
     <>
-      <Button size="sm" variant="secondary" onClick={() => openForm(item)}>
-        <Pencil /> {tCommon('action.edit')}
-      </Button>
-      <Button size="sm" variant="danger" onClick={() => openDelete(item)}>
-        <Trash2 /> {tCommon('action.delete')}
-      </Button>
+      <RowAction onClick={() => openForm(item)} icon={<Pencil />} label={tCommon('action.edit')} />
+      <RowAction variant="danger" onClick={() => openDelete(item)} icon={<Trash2 />} label={tCommon('action.delete')} />
     </>
   )
 
   return (
-    <Page title={t('title')} actions={createButton}>
+    <Page width="wide" title={t('title')} actions={createButton}>
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (

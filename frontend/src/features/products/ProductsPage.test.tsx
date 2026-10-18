@@ -8,6 +8,7 @@ import i18n from '@/i18n'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { chooseOption, optionTexts } from '@/test/select'
 
 import { ProductEditorPage } from './ProductEditorPage'
 import { ProductsPage } from './ProductsPage'
@@ -114,13 +115,13 @@ describe('ProductsPage', () => {
 
     // Inactive types are offered too.
     const typeSelect = screen.getByLabelText('Product type')
-    expect(within(typeSelect).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect(await optionTexts(u, typeSelect)).toEqual([
       'All product types',
       'Dimmer actuator',
       'Gateway',
       'Legacy (inactive)',
     ])
-    await u.selectOptions(typeSelect, gatewayType.id)
+    await chooseOption(u, typeSelect, 'Gateway')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', productTypeId: gatewayType.id, limit: '50', offset: '0' }))
 
     await u.click(screen.getByLabelText('Show inactive'))
@@ -128,7 +129,7 @@ describe('ProductsPage', () => {
       expect(last()).toEqual({ search: 'dim 4', productTypeId: gatewayType.id, includeInactive: 'true', limit: '50', offset: '0' }),
     )
 
-    await u.selectOptions(typeSelect, '')
+    await chooseOption(u, typeSelect, 'All product types')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', includeInactive: 'true', limit: '50', offset: '0' }))
   })
 
@@ -140,14 +141,15 @@ describe('ProductsPage', () => {
     renderRoutes(routes, { me: adminMe, route: '/catalog/products' })
     const checkbox = await screen.findByLabelText('Show inactive')
     const typeSelect = screen.getByLabelText('Product type')
+    await userEvent.setup().click(typeSelect)
+    const gateway = await screen.findByRole('option', { name: 'Gateway' })
 
     // Not through act(), which would finish the navigation first: what the
     // user sees right after the click.
     checkbox.click()
     expect(checkbox).toBeChecked()
-    ;(typeSelect as HTMLSelectElement).value = gatewayType.id
-    typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    expect(typeSelect).toHaveValue(gatewayType.id)
+    gateway.click()
+    expect(typeSelect).toHaveTextContent('Gateway')
     await waitFor(() => expect(checkbox).toBeChecked())
   })
 
@@ -239,13 +241,13 @@ describe('ProductsPage', () => {
 
     await screen.findByRole('link', { name: 'M485/DIM.4' })
     expect(screen.getByLabelText('Show inactive')).not.toBeChecked()
-    await u.selectOptions(screen.getByLabelText('Product type'), inactiveType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Legacy (inactive)')
 
     await waitFor(() => expect(last()).toEqual({ productTypeId: inactiveType.id, includeInactive: 'true', limit: '50', offset: '0' }))
     expect(screen.getByLabelText('Show inactive')).toBeChecked()
 
     // An active type leaves the checkbox as it is.
-    await u.selectOptions(screen.getByLabelText('Product type'), dimmerType.id)
+    await chooseOption(u, screen.getByLabelText('Product type'), 'Dimmer actuator')
     await waitFor(() => expect(last()).toEqual({ productTypeId: dimmerType.id, includeInactive: 'true', limit: '50', offset: '0' }))
   })
 

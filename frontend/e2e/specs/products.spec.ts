@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { type Locator, type Page } from '@playwright/test'
 
 import { admin } from '../env'
-import { type Api, type Attribute, expect, nav, type ProductType, row, type StoredFile, test, unique, uniqueKey } from '../fixtures'
+import { chooseLanguage, chooseOption, expect, navigate, optionTexts, row, test, type Api, type Attribute, type ProductType, type StoredFile, unique, uniqueKey } from '../fixtures'
 
 // Products, variants, add-ons and images (step 1c). Products and product types
 // are global and other specs run in parallel, so every spec seeds its own
@@ -84,7 +84,7 @@ async function expectImage(image: Locator, fileId: string) {
 /** Opens the list filtered by a product type (through the filter, as a user would). */
 async function openListOfType(page: Page, type: ProductType) {
   await page.goto(listPath)
-  await page.getByLabel('Product type').selectOption({ label: type.name.en })
+  await chooseOption(page.getByLabel('Product type'), type.name.en)
   await expect(page).toHaveURL(new RegExp(`type=${type.id}`))
 }
 
@@ -107,7 +107,7 @@ test('an admin creates a product with every kind of attribute; the values persis
   await page.getByRole('link', { name: 'New product' }).first().click()
   await expect(page.getByRole('heading', { name: 'New product', level: 1 })).toBeVisible()
   await expect(attributes(page)).toContainText('Choose a product type to fill in its attributes.')
-  await basics(page).getByLabel('Product type').selectOption({ label: type.name.en })
+  await chooseOption(basics(page).getByLabel('Product type'), type.name.en)
   await basics(page).getByLabel('Model number').fill(model)
   await basics(page).getByLabel('Name (English)').fill(name)
   await basics(page).getByLabel('Name (German)').fill(`${name} DE`)
@@ -120,7 +120,7 @@ test('an admin creates a product with every kind of attribute; the values persis
   await attrs.getByLabel('Power').fill('2.5')
   await attrs.getByLabel('Width').fill('4')
   await attrs.getByLabel('Dimmable').check()
-  await attrs.getByLabel('Colour').selectOption({ label: 'White' })
+  await chooseOption(attrs.getByLabel('Colour'), 'White')
   const protocols = attrs.getByRole('group', { name: 'Protocols' })
   await protocols.getByLabel('KNX').check()
   await protocols.getByLabel('Matter').check()
@@ -155,14 +155,14 @@ test('an admin creates a product with every kind of attribute; the values persis
   await expect(attrs.getByLabel('Power')).toHaveValue('2.5')
   await expect(attrs.getByLabel('Width')).toHaveValue('4')
   await expect(attrs.getByLabel('Dimmable')).toBeChecked()
-  await expect(attrs.getByLabel('Colour')).toHaveValue('white')
+  await expect(attrs.getByLabel('Colour')).toHaveText('White')
   await expect(protocols.getByLabel('KNX')).toBeChecked()
   await expect(protocols.getByLabel('Zigbee')).not.toBeChecked()
   await expect(protocols.getByLabel('Matter')).toBeChecked()
   await expect(attrs.getByRole('button', { name: 'Remove smart' })).toBeVisible()
 
   // An edit: back to "not set" for the colour, one tag less.
-  await attrs.getByLabel('Colour').selectOption({ label: 'Not set' })
+  await chooseOption(attrs.getByLabel('Colour'), 'Not set')
   await attrs.getByRole('button', { name: 'Remove smart' }).click()
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
@@ -182,18 +182,18 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
   const type = await api.createProductType({ name: { en: unique('Actuator'), de: unique('Aktor') }, attributes: everyKind })
   const model = modelNumber()
   await page.goto(listPath)
-  await page.getByLabel('Language').selectOption({ label: 'Deutsch' })
+  await chooseLanguage(page, 'Deutsch')
   await expect(page.getByRole('heading', { name: 'Produkte', level: 1 })).toBeVisible()
 
   await page.getByRole('link', { name: 'Neues Produkt' }).first().click()
   const grunddaten = region(page, 'Grunddaten')
-  await grunddaten.getByLabel('Produkttyp').selectOption({ label: type.name.de! })
+  await chooseOption(grunddaten.getByLabel('Produkttyp'), type.name.de!)
   await grunddaten.getByLabel('Modellnummer').fill(model)
   await grunddaten.getByLabel('Name (Englisch)').fill(unique('Dimmer'))
   const attrs = region(page, 'Attribute')
   await attrs.getByLabel('Modellname').fill('DA-2')
   await attrs.getByLabel('Leistung').fill('2,5')
-  await expect(attrs.getByLabel('Farbe').locator('option')).toHaveText(['Nicht gesetzt', 'Weiß', 'Schwarz'])
+  expect(await optionTexts(attrs.getByLabel('Farbe'))).toEqual(['Nicht gesetzt', 'Weiß', 'Schwarz'])
   await page.getByRole('button', { name: 'Erstellen' }).click()
   await expect(page.getByText('Produkt erstellt. Fügen Sie unten seine Varianten hinzu.')).toBeVisible()
   const id = page.url().split('/').pop()!
@@ -377,7 +377,7 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   await expect(results(page).getByRole('listitem').first()).toBeVisible()
   await expect(results(page)).toContainText(/\d+ variants? shown/)
 
-  await addons(page).getByLabel('Product type').selectOption({ label: accessoryType.name.en })
+  await chooseOption(addons(page).getByLabel('Product type'), accessoryType.name.en)
   await expect(results(page).getByRole('listitem')).toHaveCount(20)
   await expect(results(page)).toContainText('20 variants shown')
   await results(page).getByRole('button', { name: 'Show more' }).click()
@@ -409,7 +409,7 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   const confirm = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
   await confirm.getByRole('button', { name: 'Stay' }).click()
   await expect(confirm).toBeHidden()
-  await nav(page).getByRole('link', { name: 'Products' }).click()
+  await navigate(page, 'Catalog', 'Products')
   await confirm.getByRole('button', { name: 'Stay' }).click()
   await expect(page).toHaveURL(new RegExp(`/variants/${variant.id}$`))
 
@@ -511,8 +511,7 @@ test('after a schema change the product shows its stale and invalid values', asy
   await row(page, product.modelNumber).getByRole('link', { name: product.modelNumber }).click()
   await expect(page.getByText("Some stored values do not match the product type's current attributes.")).toBeVisible()
   const attrs = attributes(page)
-  await expect(attrs.getByLabel('Colour')).toHaveValue('black')
-  await expect(attrs.getByLabel('Colour').locator('option:checked')).toHaveText('black (not an option)')
+  await expect(attrs.getByLabel('Colour')).toHaveText('black (not an option)')
   await expect(attrs.getByLabel('Colour')).toHaveAccessibleDescription(/not one of the allowed options/)
   const protocols = attrs.getByRole('group', { name: 'Protocols' })
   await expect(protocols.getByLabel('bus (not an option)')).toBeChecked()
@@ -523,7 +522,7 @@ test('after a schema change the product shows its stale and invalid values', asy
   // Fixed: the stale value removed, a valid choice, the unknown list item unticked.
   await extra.getByRole('button', { name: 'Remove legacy' }).click()
   await expect(extra).toContainText('Removed on save')
-  await attrs.getByLabel('Colour').selectOption({ label: 'Anthracite' })
+  await chooseOption(attrs.getByLabel('Colour'), 'Anthracite')
   // Unticked, it is gone (it is not an option to tick again).
   await protocols.getByLabel('bus (not an option)').click()
   await expect(protocols.getByLabel('bus (not an option)')).toHaveCount(0)
@@ -547,7 +546,7 @@ test("changing a product's type flags its variants", async ({ page, api }) => {
   await api.createVariant(product.id, { name: { en: 'Clean' } })
 
   await page.goto(`${listPath}/${product.id}`)
-  await basics(page).getByLabel('Product type').selectOption({ label: to.name.en })
+  await chooseOption(basics(page).getByLabel('Product type'), to.name.en)
   await expect(page.getByText('You changed the product type.')).toBeVisible()
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
@@ -577,8 +576,9 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   await page.goto(`${listPath}/new`)
   // A new product cannot use an inactive type (D78).
   const typeSelect = basics(page).getByLabel('Product type')
-  await expect(typeSelect.locator('option', { hasText: type.name.en })).toHaveCount(1)
-  await expect(typeSelect.locator('option', { hasText: inactive.name.en })).toHaveCount(0)
+  const offered = await optionTexts(typeSelect)
+  expect(offered).toContain(type.name.en)
+  expect(offered.filter((o) => o.includes(inactive.name.en))).toEqual([])
 
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(typeSelect).toHaveAccessibleDescription('This field is required.')
@@ -587,7 +587,7 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   await expect(basics(page).getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
 
   // The server: invisible characters in the model number, a required attribute.
-  await typeSelect.selectOption({ label: type.name.en })
+  await chooseOption(typeSelect, type.name.en)
   await basics(page).getByLabel('Model number').fill(`Zero​Width-${taken.modelNumber}`)
   await basics(page).getByLabel('Name (English)').fill(unique('Valid'))
   await page.getByRole('button', { name: 'Create' }).click()
@@ -701,7 +701,7 @@ test('the list searches, filters by type and shows inactive products; the filter
 
   // The type filter; the inactive product only with Show inactive.
   await page.getByLabel('Search').fill('')
-  await page.getByLabel('Product type').selectOption({ label: type.name.en })
+  await chooseOption(page.getByLabel('Product type'), type.name.en)
   await expect(page.getByRole('row')).toHaveCount(3)
   await expect(row(page, p3.modelNumber)).toHaveCount(0)
   await page.getByLabel('Show inactive').check()
@@ -717,7 +717,7 @@ test('the list searches, filters by type and shows inactive products; the filter
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(filtered)
   await expect(page.getByLabel('Search')).toHaveValue(word)
-  await expect(page.getByLabel('Product type')).toHaveValue(type.id)
+  await expect(page.getByLabel('Product type')).toContainText(type.name.en)
 
   // Cancel after a change asks first, then returns to the filtered list.
   await row(page, p1.modelNumber).getByRole('link', { name: 'Edit' }).click()
@@ -739,7 +739,7 @@ test('the list searches, filters by type and shows inactive products; the filter
   await expect(page.getByLabel('Search')).toHaveValue(sku)
 
   // The navigation link opens the bare list.
-  await nav(page).getByRole('link', { name: 'Products' }).click()
+  await navigate(page, 'Catalog', 'Products')
   await expect(page).toHaveURL(new RegExp(`${listPath}$`))
   await expect(page.getByLabel('Search')).toHaveValue('')
 })
@@ -792,7 +792,7 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
   await expect(variantRows(page).getByRole('button', { name: 'Edit' })).toBeDisabled()
   await expect(variants(page).getByRole('button', { name: 'Add variant' })).toBeDisabled()
 
-  await nav(page).getByRole('link', { name: 'Product types' }).click()
+  await navigate(page, 'Catalog', 'Product types')
   const confirm = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
   await confirm.getByRole('button', { name: 'Stay' }).click()
   await expect(page).toHaveURL(new RegExp(`/catalog/products/${product.id}$`))
@@ -834,7 +834,7 @@ for (const role of ['user', 'tenant_admin'] as const) {
     const page = await sessionFor(account)
 
     await page.goto('/')
-    await nav(page).getByRole('link', { name: 'Products' }).click()
+    await navigate(page, 'Catalog', 'Products')
     await expect(page.getByRole('heading', { name: 'Products', level: 1 })).toBeVisible()
     await page.getByLabel('Search').fill(product.modelNumber)
     await expect(row(page, product.modelNumber)).toContainText('$27.50')

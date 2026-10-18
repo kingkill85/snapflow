@@ -3,7 +3,11 @@
     "name": "SnapFlow"
   },
   "nav": {
-    "catalog": "Katalog"
+    "catalog": "Katalog",
+    "projects": "Projekte",
+    "admin": "Verwaltung",
+    "main": "Hauptnavigation",
+    "menu": "Menü"
   },
   "action": {
     "create": "Erstellen",
@@ -33,7 +37,9 @@
     "add": "Hinzufügen",
     "remove": "Entfernen",
     "keep": "Behalten",
-    "undo": "Rückgängig"
+    "undo": "Rückgängig",
+    "signOutEverywhere": "Überall abmelden",
+    "close": "Schließen"
   },
   "state": {
     "loading": "Wird geladen…",
@@ -48,7 +54,9 @@
     "none": "Keine"
   },
   "account": {
-    "profile": "Profil"
+    "profile": "Profil",
+    "title": "Konto",
+    "menu": "Konto: {{name}}"
   },
   "role": {
     "admin": "Admin",
@@ -86,5 +94,11 @@
   },
   "option": {
     "unknown": "{{value}} (keine Option)"
+  },
+  "theme": {
+    "label": "Farbschema",
+    "system": "System",
+    "light": "Hell",
+    "dark": "Dunkel"
   }
 }

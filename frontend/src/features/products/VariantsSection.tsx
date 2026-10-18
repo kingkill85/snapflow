@@ -23,6 +23,7 @@ import {
   ErrorMessage,
   IconButton,
   Notice,
+  RowAction,
   Section,
   TextLink,
   Thumbnail,
@@ -150,20 +151,12 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
         />
         {v.can.update &&
           (locked ? (
-            <Button size="sm" variant="secondary" disabled title={t('variants.saveFirst')}>
-              <Pencil /> {tCommon('action.edit')}
-            </Button>
+            <RowAction disabled title={t('variants.saveFirst')} icon={<Pencil />} label={tCommon('action.edit')} />
           ) : (
-            <Button asChild size="sm" variant="secondary">
-              <Link to={variantPath(product.id, v.id)} state={linkState}>
-                <Pencil /> {tCommon('action.edit')}
-              </Link>
-            </Button>
+            <RowAction to={variantPath(product.id, v.id)} state={linkState} icon={<Pencil />} label={tCommon('action.edit')} />
           ))}
         {v.can.delete && (
-          <Button size="sm" variant="danger" onClick={() => openDelete(v)}>
-            <Trash2 /> {tCommon('action.delete')}
-          </Button>
+          <RowAction variant="danger" onClick={() => openDelete(v)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
       </>
     )

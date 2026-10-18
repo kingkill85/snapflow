@@ -12,7 +12,7 @@ import {
   type MoveAction,
   RepeaterControls,
   RepeaterItem,
-  SelectField,
+  FormSelectField,
   TextareaField,
   useFieldError,
   useRepeaterFocus,
@@ -204,27 +204,30 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
         <Field label={t('field.labelDe')} error={errorAt(`${path}.label.de`)} {...register(`${path}.label.de`)} />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
-        <SelectField
+        <FormSelectField
+          control={form.control}
+          name={`${path}.type`}
           label={t('field.type')}
           options={Object.values(AttributeDefinitionType).map((v) => ({ value: v, label: t(`type.${v}`) }))}
           error={errorAt(`${path}.type`)}
-          {...register(`${path}.type`)}
         />
         {type === 'list' && (
-          <SelectField
+          <FormSelectField
+            control={form.control}
+            name={`${path}.itemType`}
             label={t('field.itemType')}
             options={Object.values(AttributeDefinitionItemType).map((v) => ({ value: v, label: t(`type.${v}`) }))}
             error={errorAt(`${path}.itemType`)}
-            {...register(`${path}.itemType`)}
           />
         )}
         {name === 'attributes' && (
-          <SelectField
+          <FormSelectField
+            control={form.control}
+            name={`${path}.scope`}
             label={t('field.scope')}
             hint={t('scope.hint')}
             options={Object.values(AttributeDefinitionScope).map((v) => ({ value: v, label: t(`scope.${v}`) }))}
             error={errorAt(`${path}.scope`)}
-            {...register(`${path}.scope`)}
           />
         )}
         <Field label={t('field.unit')} hint={t('field.unitHint')} error={errorAt(`${path}.unit`)} {...register(`${path}.unit`)} />

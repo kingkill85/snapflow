@@ -1,5 +1,5 @@
 import { admin } from '../env'
-import { expect, row, signIn, test, unique, uniqueEmail } from '../fixtures'
+import { accountButton, chooseOption, expect, optionTexts, row, signIn, test, unique, uniqueEmail } from '../fixtures'
 
 // Admin: user management.
 test.beforeEach(async ({ page }) => {
@@ -18,9 +18,9 @@ test('create a tenant admin in a partner tenant and filter by tenant', async ({ 
   const dialog = page.getByRole('dialog', { name: 'New user' })
   await dialog.getByLabel('Email').fill(email)
   await dialog.getByLabel('Full name').fill(name)
-  await expect(dialog.getByLabel('Role').locator('option')).toHaveText(['Admin', 'Tenant admin', 'User'])
-  await dialog.getByLabel('Role').selectOption({ label: 'Tenant admin' })
-  await dialog.getByLabel('Tenant').selectOption({ label: tenant.name })
+  expect(await optionTexts(dialog.getByLabel('Role'))).toEqual(['Admin', 'Tenant admin', 'User'])
+  await chooseOption(dialog.getByLabel('Role'), 'Tenant admin')
+  await chooseOption(dialog.getByLabel('Tenant'), tenant.name)
   await dialog.getByLabel('Password').fill('partner-password')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog).toBeHidden()
@@ -31,24 +31,25 @@ test('create a tenant admin in a partner tenant and filter by tenant', async ({ 
   await expect(created).toContainText('Tenant admin')
   await expect(created).toContainText('Active')
 
-  await page.getByLabel('Tenant').selectOption({ label: tenant.name })
+  await chooseOption(page.getByLabel('Tenant'), tenant.name)
   await expect(page.getByRole('row')).toHaveCount(2) // header + the new user
   await expect(created).toBeVisible()
   await expect(row(page, other.email)).toHaveCount(0)
 
   // New users are preselected in the filtered tenant.
   await page.getByRole('button', { name: 'New user' }).click()
-  await expect(dialog.getByLabel('Tenant')).toHaveValue(tenant.id)
+  await expect(dialog.getByLabel('Tenant')).toContainText(tenant.name)
   await dialog.getByRole('button', { name: 'Cancel' }).click()
 
-  await page.getByLabel('Tenant').selectOption({ label: 'All tenants' })
+  await chooseOption(page.getByLabel('Tenant'), 'All tenants')
   await expect(row(page, other.email)).toBeVisible()
 
   // The new tenant admin can sign in.
   await page.context().clearCookies()
   await page.goto('/login')
   await signIn(page, email, 'partner-password')
-  await expect(page.getByRole('link', { name: new RegExp(name) })).toContainText(tenant.name)
+  await expect(accountButton(page)).toHaveAccessibleName(`Account: ${name}`)
+  await expect(accountButton(page)).toContainText(tenant.name)
 })
 
 test('form validation: missing password, short password, taken email', async ({ page, api }) => {
@@ -75,10 +76,10 @@ test('edit a user: role and name', async ({ page, api }) => {
   await row(page, user.email).getByRole('button', { name: 'Edit' }).click()
   const dialog = page.getByRole('dialog', { name: 'Edit user' })
   await expect(dialog.getByLabel('Email')).toHaveValue(user.email)
-  await expect(dialog.getByLabel('Role')).toHaveValue('user')
+  await expect(dialog.getByLabel('Role')).toHaveText('User')
   const name = unique('Edited')
   await dialog.getByLabel('Full name').fill(name)
-  await dialog.getByLabel('Role').selectOption({ label: 'Tenant admin' })
+  await chooseOption(dialog.getByLabel('Role'), 'Tenant admin')
   await dialog.getByRole('button', { name: 'Update' }).click()
   await expect(dialog).toBeHidden()
   await expect(row(page, user.email)).toContainText(name)

@@ -21,8 +21,7 @@
     "type": "Produkttyp",
     "variants": "Varianten",
     "price": "Preis",
-    "status": "Status",
-    "problems": "Probleme"
+    "status": "Status"
   },
   "problems_one": "{{count}} Attributwert muss geprüft werden",
   "problems_other": "{{count}} Attributwerte müssen geprüft werden",

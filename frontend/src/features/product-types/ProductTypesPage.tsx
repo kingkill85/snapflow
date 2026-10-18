@@ -27,6 +27,7 @@ import {
   IconButton,
   Loading,
   Page,
+  RowAction,
   TextLink,
   TypeBadge,
 } from '@/components/ui'
@@ -140,16 +141,10 @@ export function ProductTypesPage() {
           onClick={() => void move(p, rows[index + 1], 'down')}
         />
         {p.can.update && (
-          <Button asChild size="sm" variant="secondary">
-            <Link to={`${listPath}/${p.id}`}>
-              <Pencil /> {tCommon('action.edit')}
-            </Link>
-          </Button>
+          <RowAction to={`${listPath}/${p.id}`} icon={<Pencil />} label={tCommon('action.edit')} />
         )}
         {p.can.delete && (
-          <Button size="sm" variant="danger" onClick={() => openDelete(p)}>
-            <Trash2 /> {tCommon('action.delete')}
-          </Button>
+          <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
       </>
     )
@@ -165,7 +160,7 @@ export function ProductTypesPage() {
   ) : undefined
 
   return (
-    <Page title={t('title')} description={t('description')} actions={createButton}>
+    <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
       <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
       <ErrorMessage error={moveError} />
       {list.isPending ? (
