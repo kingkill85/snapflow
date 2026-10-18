@@ -4,17 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
@@ -76,6 +80,10 @@ type plan struct {
 	entries []*entry
 	issues  []ImportIssue
 	counts  ImportCounts
+	// scope is what the plan read of the catalog (scopeToken).
+	scope catalogScope
+	// images are the files stored for the pictures, by part name.
+	images map[string]uuid.UUID
 }
 
 type planInput struct {
@@ -84,9 +92,11 @@ type planInput struct {
 	types      []producttypes.ProductType
 	categories []categories.Category
 	catalog    []products.CatalogProduct
-	// storeImage stores a picture and returns its file; an *apperr.Error
-	// means the picture is not usable (import.image_invalid).
-	storeImage func(data []byte) (uuid.UUID, error)
+	// storeImage stores a picture (reading its bytes) and returns its
+	// file; an *apperr.Error means the picture is not usable
+	// (import.image_invalid). It is called once per picture part, from
+	// several goroutines at once.
+	storeImage func(img importsrc.Image) (uuid.UUID, error)
 }
 
 type rowData struct {
@@ -123,9 +133,14 @@ type planner struct {
 	entries []*entry
 	counts  ImportCounts
 	images  map[string]*storedImage // by picture part name
+	// counted are the pictures counted in Images.Files.
+	counted map[string]bool
 	// fatal is an error storing a picture that is not the picture's fault
 	// (the disk, say): the preview fails.
 	fatal error
+	scope catalogScope
+	// attrKeys are the mapped attribute keys, sorted.
+	attrKeys []string
 	// new categories by key
 	newCategories map[string]*entry
 	typeByID      map[uuid.UUID]producttypes.ProductType
@@ -141,8 +156,9 @@ type planner struct {
 }
 
 type storedImage struct {
-	id  uuid.UUID
-	err error
+	id   uuid.UUID
+	err  error
+	done bool
 }
 
 // fieldIndex is where each target is mapped (-1: not mapped).
@@ -154,7 +170,7 @@ type fieldIndex struct {
 }
 
 func buildPlan(in planInput, loc string) (*plan, error) {
-	p := &planner{planInput: in, images: map[string]*storedImage{}, newCategories: map[string]*entry{},
+	p := &planner{planInput: in, images: map[string]*storedImage{}, counted: map[string]bool{}, newCategories: map[string]*entry{},
 		typeByID: map[uuid.UUID]producttypes.ProductType{}, categoryByID: map[uuid.UUID]categories.Category{},
 		rowsWithErrs: map[int]bool{}, skusInFile: map[string]bool{}, skuOwners: map[string]*products.CatalogVariant{}}
 	for _, t := range in.types {
@@ -197,11 +213,13 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 			p.idx.vname[t.locale] = i
 		case tAttribute:
 			p.idx.attrs[t.key] = i
+			p.attrKeys = append(p.attrKeys, t.key)
 		case tAddonRequired, tAddonOptional:
 			p.idx.addons = append(p.idx.addons, i)
 		}
 	}
 
+	slices.Sort(p.attrKeys)
 	var data []importsrc.Row
 	for _, r := range in.table.Rows {
 		switch {
@@ -219,6 +237,9 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 	if len(data) == 0 {
 		return nil, apperr.New(http.StatusUnprocessableEntity, "import.no_rows", "the file has no data rows")
 	}
+	if len(data) > MaxRows {
+		return nil, apperr.New(http.StatusUnprocessableEntity, "import.too_many_rows", "the sheet has too many rows").With("max", MaxRows)
+	}
 	if err := p.resolveConstants(loc); err != nil {
 		return nil, err
 	}
@@ -226,6 +247,7 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 	p.counts.Unmapped = p.unmapped()
 
 	groups := p.group(data)
+	p.storeImages(data)
 	for _, g := range groups {
 		p.planProduct(g)
 	}
@@ -237,6 +259,7 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 		return nil, p.fatal
 	}
 
+	p.linkIssues()
 	p.counts.RowsSkipped = len(p.rowsWithErrs)
 	for _, is := range p.issues {
 		if is.Severity == "error" {
@@ -257,7 +280,37 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 			ordered = append(ordered, e)
 		}
 	}
-	return &plan{entries: ordered, issues: p.issues, counts: p.counts}, nil
+	images := map[string]uuid.UUID{}
+	for name, s := range p.images {
+		if s.err == nil && s.done {
+			images[name] = s.id
+		}
+	}
+	p.scope.normalize()
+	return &plan{entries: ordered, issues: p.issues, counts: p.counts, scope: p.scope, images: images}, nil
+}
+
+// linkIssues gives each row issue the diff item of its row (its variant, or
+// its product when no variant was planned), so the preview can link them.
+func (p *planner) linkIssues() {
+	seqs := map[int]int{}
+	for _, e := range p.entries {
+		switch {
+		case e.item.Entity == "product":
+			for _, r := range e.item.Rows {
+				if _, ok := seqs[r]; !ok {
+					seqs[r] = e.item.Seq
+				}
+			}
+		case e.item.Entity == "variant" && e.row != nil:
+			seqs[e.row.row.Number] = e.item.Seq
+		}
+	}
+	for i := range p.issues {
+		if is := &p.issues[i]; is.Row > 0 && is.ItemSeq == 0 {
+			is.ItemSeq = seqs[is.Row]
+		}
+	}
 }
 
 // skipUnusedCategories skips new categories whose products are all
@@ -400,6 +453,11 @@ func (p *planner) group(data []importsrc.Row) []*group {
 		rd := &rowData{row: r}
 		rd.model = products.BusinessKey(products.CollapseSpace(p.cell(r, p.idx.model)))
 		rd.modelKey = products.MatchKey(rd.model)
+		if p.idx.sku >= 0 {
+			if sku := products.MatchKey(p.cell(r, p.idx.sku)); sku != "" {
+				p.scope.SKUKeys = append(p.scope.SKUKeys, sku)
+			}
+		}
 		if rd.model == "" {
 			p.issue("error", rd, p.idx.model, "validation.required", nil)
 			continue
@@ -409,6 +467,7 @@ func (p *planner) group(data []importsrc.Row) []*group {
 			g = &group{key: rd.modelKey, model: rd.model, present: map[string]bool{}, matched: map[uuid.UUID]bool{}}
 			byKey[rd.modelKey] = g
 			groups = append(groups, g)
+			p.scope.ModelKeys = append(p.scope.ModelKeys, rd.modelKey)
 		}
 		g.rows = append(g.rows, rd)
 	}
@@ -473,10 +532,18 @@ func (p *planner) findCategory(value string) (categories.Category, bool) {
 // that CreateMissingCategories creates.
 func (p *planner) resolveConstants(loc string) error {
 	errs := []apperr.FieldError{}
+	if p.mapping.CategoryID != nil {
+		p.scope.CategoryIDs = append(p.scope.CategoryIDs, *p.mapping.CategoryID)
+	}
+	if p.mapping.ProductTypeID != nil {
+		p.scope.TypeIDs = append(p.scope.TypeIDs, *p.mapping.ProductTypeID)
+	}
 	if i := p.idx.ptype; i >= 0 && p.cols[i].constant {
 		value := products.CollapseSpace(p.cols[i].value)
+		p.scope.TypeValues = append(p.scope.TypeValues, value)
 		if t, ok := p.findType(value); ok {
 			p.constType = &t
+			p.scope.TypeIDs = append(p.scope.TypeIDs, t.ID)
 		} else {
 			errs = append(errs, apperr.Field(fmt.Sprintf("%s.fields[%d].value", loc, i), "import.product_type_unknown",
 				"no such product type; create it first").With("value", value))
@@ -484,8 +551,10 @@ func (p *planner) resolveConstants(loc string) error {
 	}
 	if i := p.idx.category; i >= 0 && p.cols[i].constant {
 		value := products.CollapseSpace(p.cols[i].value)
+		p.scope.CategoryValues = append(p.scope.CategoryValues, value)
 		if c, ok := p.findCategory(value); ok {
 			p.constCategory = &c
+			p.scope.CategoryIDs = append(p.scope.CategoryIDs, c.ID)
 		} else if !p.mapping.CreateMissingCategories || categoryKey(value) == "" {
 			errs = append(errs, apperr.Field(fmt.Sprintf("%s.fields[%d].value", loc, i), "import.category_unknown",
 				"no such category").With("value", value))
@@ -513,7 +582,9 @@ func (p *planner) resolveType(rd *rowData) (producttypes.ProductType, bool) {
 		p.issue("error", rd, p.idx.ptype, "validation.required", nil)
 		return producttypes.ProductType{}, false
 	}
+	p.scope.TypeValues = append(p.scope.TypeValues, value)
 	if t, ok := p.findType(value); ok {
+		p.scope.TypeIDs = append(p.scope.TypeIDs, t.ID)
 		return t, true
 	}
 	p.issue("error", rd, p.idx.ptype, "import.product_type_unknown", map[string]any{"value": value})
@@ -536,7 +607,9 @@ func (p *planner) resolveCategory(rd *rowData) (categories.Category, int, bool) 
 		p.issue("error", rd, p.idx.category, "validation.required", nil)
 		return categories.Category{}, 0, false
 	}
+	p.scope.CategoryValues = append(p.scope.CategoryValues, value)
 	if c, ok := p.findCategory(value); ok {
+		p.scope.CategoryIDs = append(p.scope.CategoryIDs, c.ID)
 		return c, 0, true
 	}
 	key := categoryKey(value)
@@ -644,9 +717,9 @@ func (p *planner) planProduct(g *group) {
 	for _, i := range p.idx.pdesc {
 		productFields = append(productFields, i)
 	}
-	for key, i := range p.idx.attrs {
+	for _, key := range p.attrKeys {
 		if def, found := findAttr(cat.Attributes, key); found && def.Scope != attrschema.ScopeVariant {
-			productFields = append(productFields, i)
+			productFields = append(productFields, p.idx.attrs[key])
 		}
 	}
 	slices.Sort(productFields)
@@ -707,6 +780,13 @@ func (p *planner) planProduct(g *group) {
 	for _, r := range g.rows {
 		p.planVariant(g, r)
 	}
+	if !g.skipped && !slices.ContainsFunc(g.rows, func(r *rowData) bool { return !r.failed }) {
+		// Every row has errors: the product is not written either (its
+		// variants are skipped with their rows).
+		g.skipped = true
+		e.item.Skipped = true
+		p.markRows(g)
+	}
 	if !g.skipped && g.existing != nil {
 		for i := range g.existing.Variants {
 			v := &g.existing.Variants[i]
@@ -758,13 +838,17 @@ func findAttr(schema attrschema.Schema, key string) (attrschema.AttributeDefinit
 }
 
 // applyAttributes sets the mapped attributes of one scope from a row:
-// parsed leniently (D32), blank cells remove the value. Keys the
-// category's schema lacks are errors (D31: imports reject unknown keys).
+// parsed leniently (D32), blank cells remove the value. A value for a key
+// the category's schema lacks is an error (D31: imports reject unknown
+// keys); a blank cell of such a column is nothing to import (a constant
+// always counts).
 func (p *planner) applyAttributes(r *rowData, c categories.Category, scope attrschema.Scope, values attrschema.Values) {
-	for key, i := range p.idx.attrs {
+	for _, key := range p.attrKeys {
+		i := p.idx.attrs[key]
 		def, found := findAttr(c.Attributes, key)
 		if !found {
-			if scope == attrschema.ScopeProduct { // reported once per row
+			blank := !p.cols[i].constant && strings.TrimSpace(p.cell(r.row, i)) == ""
+			if scope == attrschema.ScopeProduct && !blank { // reported once per row
 				p.issue("error", r, i, "attribute.unknown", nil)
 			}
 			continue
@@ -863,6 +947,12 @@ func (p *planner) planVariant(g *group, r *rowData) {
 			p.issue("error", r, p.idx.price, "variant.price_format", nil)
 			priceReported = true
 		default:
+			if rounded, ok := roundPrice(price); ok && !p.cols[p.idx.price].constant {
+				// A computed price (32.725 shown as 32,73): to the cent,
+				// half up, with a warning.
+				p.issue("warning", r, p.idx.price, "import.price_rounded", map[string]any{"value": raw, "rounded": rounded})
+				price = rounded
+			}
 			after.Price = price
 		}
 	}
@@ -933,12 +1023,13 @@ func (p *planner) ownImage(r *rowData, report bool) *uuid.UUID {
 		s := p.images[img.Name]
 		if s == nil {
 			s = &storedImage{}
-			if img.TooLarge {
-				s.err = apperr.New(http.StatusRequestEntityTooLarge, "file.too_large", "")
-			} else {
-				s.id, s.err = p.storeImage(img.Data)
-			}
 			p.images[img.Name] = s
+		}
+		if !s.done {
+			p.store(img, s)
+		}
+		if !p.counted[img.Name] {
+			p.counted[img.Name] = true
 			var ae *apperr.Error
 			switch {
 			case s.err == nil:
@@ -964,8 +1055,59 @@ func (p *planner) ownImage(r *rowData, report bool) *uuid.UUID {
 	return nil
 }
 
+// store stores one picture (or notes why it cannot be).
+func (p *planner) store(img importsrc.Image, s *storedImage) {
+	if img.TooLarge {
+		s.err = importsrc.ErrImageTooLarge(files.MaxSize)
+	} else {
+		s.id, s.err = p.storeImage(img)
+	}
+	s.done = true
+}
+
+// storeImages stores the first picture of each data row (the one a variant
+// most likely takes) up front, several at once: decoding and re-encoding
+// pictures is most of a preview's time. The files service bounds the memory
+// of the decodes running at once (files.DecodeBudget). Pictures needed
+// later (a row's first picture was refused) are stored when needed.
+func (p *planner) storeImages(data []importsrc.Row) {
+	if p.idx.image < 0 {
+		return
+	}
+	col := p.cols[p.idx.image].index
+	var jobs []importsrc.Image
+	for _, r := range data {
+		for _, img := range r.Images {
+			if col >= 0 && img.Column != col {
+				continue
+			}
+			if p.images[img.Name] == nil {
+				p.images[img.Name] = &storedImage{}
+				jobs = append(jobs, img)
+			}
+			break
+		}
+	}
+	work := make(chan importsrc.Image)
+	var wg sync.WaitGroup
+	for range min(len(jobs), max(2, min(runtime.GOMAXPROCS(0), 8))) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for img := range work {
+				p.store(img, p.images[img.Name]) // each entry has one writer
+			}
+		}()
+	}
+	for _, img := range jobs {
+		work <- img
+	}
+	close(work)
+	wg.Wait()
+}
+
 // planDeactivations deactivates the products of the import's scope that
-// the file does not list (D136): the pairs of product type and category the
+// the file does not list (D123): the pairs of product type and category the
 // file's rows have (also rows with errors, as far as both resolved), or the
 // profile's fixed pair. Products of other systems or other categories are
 // never touched.
@@ -981,6 +1123,9 @@ func (p *planner) planDeactivations(groups []*group) {
 		if g.catSeq == 0 && g.pt.ID != uuid.Nil && g.cat.ID != uuid.Nil {
 			scope[pair{g.pt.ID, g.cat.ID}] = true
 		}
+	}
+	for k := range scope {
+		p.scope.Pairs = append(p.scope.Pairs, [2]uuid.UUID{k.typeID, k.categoryID})
 	}
 	for i := range p.catalog {
 		c := &p.catalog[i]
@@ -1003,16 +1148,21 @@ func (p *planner) planDeactivations(groups []*group) {
 // planAddons resolves each row's add-on references, by variant SKU (or
 // model number and variant name), ignoring case and repeated white space:
 // first among the file's variants, then in the catalog. Unresolved
-// references are warnings (D141).
+// references are warnings (D128).
 func (p *planner) planAddons() {
 	if len(p.idx.addons) == 0 {
 		return
 	}
+	// A key that two variants have (an SKU equal to another variant's
+	// model number and name, say) resolves to the first, with a warning.
+	ambiguous := map[string]bool{}
 	inFile := map[string]*entry{}
 	for _, e := range p.entries {
 		for _, k := range e.matchKeys {
-			if _, taken := inFile[k]; !taken {
+			if other, taken := inFile[k]; !taken {
 				inFile[k] = e
+			} else if other != e {
+				ambiguous[k] = true
 			}
 		}
 	}
@@ -1026,9 +1176,11 @@ func (p *planner) planAddons() {
 		for _, v := range c.Variants {
 			label := variantLabel(c.ModelNumber, v.SKU, v.Name)
 			labels[v.ID] = label
-			for _, k := range []string{products.MatchKey(v.SKU), products.MatchKey(c.ModelNumber + " " + v.Name["en"])} {
-				if _, taken := inCatalog[k]; !taken && k != "" {
+			for _, k := range catalogKeys(c.ModelNumber, v) {
+				if other, taken := inCatalog[k]; !taken {
 					inCatalog[k] = catalogRef{v.ID, label}
+				} else if other.id != v.ID {
+					ambiguous["catalog:"+k] = true
 				}
 			}
 		}
@@ -1047,6 +1199,11 @@ func (p *planner) planAddons() {
 			required := p.targets[f].kind == tAddonRequired
 			var a planAddon
 			key := products.MatchKey(ref)
+			p.scope.RefKeys = append(p.scope.RefKeys, key)
+			_, inFileKey := inFile[key]
+			if ambiguous[key] || (!inFileKey && ambiguous["catalog:"+key]) {
+				p.issue("warning", e.row, f, "import.addon_ambiguous", map[string]any{"ref": ref})
+			}
 			if target := inFile[key]; target != nil {
 				switch {
 				case target == e:
@@ -1103,6 +1260,34 @@ func (p *planner) planAddons() {
 			e.item.Status = "changed"
 		}
 	}
+}
+
+// catalogKeys are the keys an add-on reference finds a catalog variant by:
+// its SKU, its model number and name, and for a "Standard" variant the
+// model number alone (D128).
+func catalogKeys(model string, v products.CatalogVariant) []string {
+	keys := []string{products.MatchKey(model + " " + v.Name[i18n.DefaultLocale])}
+	if sku := products.MatchKey(v.SKU); sku != "" {
+		keys = append([]string{sku}, keys...)
+	}
+	if nameKey(v.Name[i18n.DefaultLocale]) == nameKey(StandardVariantName) {
+		keys = append(keys, products.MatchKey(model))
+	}
+	return keys
+}
+
+// roundPrice rounds a decimal with more than two decimals to the cent, half
+// up ("32.725" is "32.73"); ok is false when there is nothing to round.
+func roundPrice(s string) (string, bool) {
+	i := strings.IndexByte(s, '.')
+	if i < 0 || len(s)-i-1 <= 2 || strings.HasPrefix(s, "-") {
+		return s, false
+	}
+	r, ok := new(big.Rat).SetString(s)
+	if !ok {
+		return s, false
+	}
+	return r.FloatString(2), true // halves away from zero: up for prices
 }
 
 func (a planAddon) identity() string {
@@ -1203,7 +1388,7 @@ func status(exists bool, changes int) string {
 
 // productChanges lists the fields that differ between the stored product
 // (nil for a new one) and its state after the import, comparing normalised
-// values (D135: re-importing the same file changes nothing).
+// values (D122: re-importing the same file changes nothing).
 func (p *planner) productChanges(before *products.CatalogProduct, after products.ProductInput, pt producttypes.ProductType, cat categories.Category, catSeq int) []ImportFieldChange {
 	var b products.CatalogProduct
 	if before != nil {

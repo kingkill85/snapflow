@@ -51,9 +51,14 @@ SELECT count(*) FROM import_runs;
 -- name: SetRunPreview :one
 UPDATE import_runs
 SET state = 'previewed', profile_id = $2, profile_name = $3, mapping = $4, all_or_nothing = $5,
-    catalog_token = $6, counts = $7, error = NULL, previewed_at = now(), updated_at = now()
+    catalog_token = $6, catalog_scope = $7, counts = $8, images = $9, error = NULL, previewed_at = now(), updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- DeleteRun removes a run with its items, issues and change log; its file
+-- stays (unreferenced files are kept, D58).
+-- name: DeleteRun :execrows
+DELETE FROM import_runs WHERE id = $1;
 
 -- name: SetRunState :one
 UPDATE import_runs
@@ -71,13 +76,24 @@ DELETE FROM import_items WHERE run_id = $1;
 -- name: InsertItems :copyfrom
 INSERT INTO import_items (run_id, seq, entity, status, skipped, item, plan) VALUES ($1, $2, $3, $4, $5, $6, $7);
 
--- ListItems pages the diff; empty filters match everything.
+-- ListItems pages the diff; empty filters match everything. changed_only
+-- leaves out unchanged items; file_row keeps the items of that file row;
+-- search is an ILIKE pattern over model number, SKU, category key and every
+-- name, or (search_row) a file row number.
 -- name: ListItems :many
 SELECT seq, item FROM import_items
 WHERE run_id = $1
   AND (sqlc.arg(entity)::text = '' OR entity = sqlc.arg(entity))
   AND (sqlc.arg(status)::text = '' OR status = sqlc.arg(status))
   AND (NOT sqlc.arg(only_skipped)::boolean OR skipped)
+  AND (NOT sqlc.arg(changed_only)::boolean OR status <> 'unchanged')
+  AND (sqlc.narg(file_row)::integer IS NULL OR item -> 'rows' @> to_jsonb(sqlc.narg(file_row)::integer))
+  AND (sqlc.arg(search)::text = ''
+       OR item ->> 'modelNumber' ILIKE sqlc.arg(search)
+       OR item ->> 'sku' ILIKE sqlc.arg(search)
+       OR item ->> 'key' ILIKE sqlc.arg(search)
+       OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(item -> 'name', '{}')) n WHERE n.value ILIKE sqlc.arg(search))
+       OR (sqlc.narg(search_row)::integer IS NOT NULL AND item -> 'rows' @> to_jsonb(sqlc.narg(search_row)::integer)))
 ORDER BY seq
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
@@ -86,7 +102,15 @@ SELECT count(*) FROM import_items
 WHERE run_id = $1
   AND (sqlc.arg(entity)::text = '' OR entity = sqlc.arg(entity))
   AND (sqlc.arg(status)::text = '' OR status = sqlc.arg(status))
-  AND (NOT sqlc.arg(only_skipped)::boolean OR skipped);
+  AND (NOT sqlc.arg(only_skipped)::boolean OR skipped)
+  AND (NOT sqlc.arg(changed_only)::boolean OR status <> 'unchanged')
+  AND (sqlc.narg(file_row)::integer IS NULL OR item -> 'rows' @> to_jsonb(sqlc.narg(file_row)::integer))
+  AND (sqlc.arg(search)::text = ''
+       OR item ->> 'modelNumber' ILIKE sqlc.arg(search)
+       OR item ->> 'sku' ILIKE sqlc.arg(search)
+       OR item ->> 'key' ILIKE sqlc.arg(search)
+       OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(item -> 'name', '{}')) n WHERE n.value ILIKE sqlc.arg(search))
+       OR (sqlc.narg(search_row)::integer IS NOT NULL AND item -> 'rows' @> to_jsonb(sqlc.narg(search_row)::integer)));
 
 -- name: ListPlan :many
 SELECT seq, entity, status, skipped, item, plan FROM import_items WHERE run_id = $1 ORDER BY seq;
@@ -124,7 +148,14 @@ SELECT count(*) FROM import_changes WHERE run_id = $1;
 -- name: AllChanges :many
 SELECT * FROM import_changes WHERE run_id = $1 ORDER BY seq;
 
--- LockImports serialises applies and undos of all runs until the
--- transaction ends.
--- name: LockImports :exec
-SELECT pg_advisory_xact_lock(sqlc.arg(lock_key)::bigint);
+-- BumpImportLock is the first statement of every apply and undo
+-- (REPEATABLE READ): it serialises them on the import_lock row, and since it
+-- changes the row, a waiting one fails with a serialization error once the
+-- first commits, so database.InTx runs it again with a fresh snapshot
+-- (D146). An upsert, so a missing row (an emptied table) is created; under
+-- REPEATABLE READ ON CONFLICT DO UPDATE fails the same way on a row changed
+-- after the snapshot.
+-- name: BumpImportLock :one
+INSERT INTO import_lock (id, generation) VALUES (true, 1)
+ON CONFLICT (id) DO UPDATE SET generation = import_lock.generation + 1
+RETURNING generation;

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
 
 const tag = "imports"
@@ -40,8 +41,7 @@ type targetsInput struct {
 type targetsOutput struct{ Body []ImportTarget }
 
 type uploadForm struct {
-	File      huma.FormFile `form:"file" required:"true" doc:".xlsx workbook or UTF-8 .csv (; or , separated), at most 50 MB"`
-	ProfileID string        `form:"profileId" required:"false" doc:"Preview at once with this profile"`
+	File huma.FormFile `form:"file" required:"true" doc:".xlsx workbook or UTF-8 .csv (; or , separated), at most 50 MB"`
 }
 
 type uploadInput struct {
@@ -76,6 +76,9 @@ type itemsInput struct {
 	Entity      string    `query:"entity" enum:"category,product,variant," doc:"Only items of this entity"`
 	Status      string    `query:"status" enum:"new,changed,unchanged,deactivate," doc:"Only items with this status"`
 	OnlySkipped bool      `query:"skipped" doc:"Only items of rows with errors"`
+	ChangedOnly bool      `query:"changedOnly" doc:"Leave out unchanged items"`
+	Search      string    `query:"search" maxLength:"200" doc:"Model number, SKU, category key or name (substring, ignoring case), or a file row number"`
+	Row         int       `query:"row" minimum:"0" maximum:"1000000" doc:"Only the items of this file row (issues link here with their row)"`
 	Limit       int       `query:"limit" default:"50" minimum:"1" maximum:"500" doc:"Page size, 1-500"`
 	Offset      int       `query:"offset" default:"0" minimum:"0" maximum:"1073741824" doc:"Rows to skip"`
 }
@@ -195,29 +198,22 @@ func Register(api huma.API, svc *Service) {
 		OperationID: "createImport", Method: http.MethodPost, Path: "/api/imports",
 		Summary: "Upload a file to import",
 		Description: "Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content " +
-			"(415 import.file_type), at most 50 MB (413 import.too_large), 20 000 rows (422 import.too_many_rows) and " +
-			"5 000 pictures (422 import.too_many_images). Creates a run in state uploaded; with `profileId` it is previewed at once.",
+			"(415 import.file_type), at most 50 MB (413 import.too_large), 21 000 rows with content (422 import.too_many_rows; " +
+			"the preview allows 20 000 data rows), 1 000 columns (422 import.too_many_columns), 5 000 pictures " +
+			"(422 import.too_many_images) of together 256 MB (422 import.images_too_large). Creates a run in state uploaded; " +
+			"preview it with a profile or mapping next.",
 		Tags: []string{tag}, DefaultStatus: http.StatusCreated, Middlewares: huma.Middlewares{limitBody},
 	}, func(ctx context.Context, in *uploadInput) (*runOutput, error) {
-		form := in.RawBody.Data()
-		f := form.File
+		f := in.RawBody.Data().File
 		defer func() { _ = f.Close() }()
 		if f.Size > MaxFileSize {
 			return nil, ErrTooLarge()
-		}
-		var profileID *uuid.UUID
-		if form.ProfileID != "" {
-			id, err := uuid.Parse(form.ProfileID)
-			if err != nil {
-				return nil, apperr.Invalid("body.profileId", "validation.invalid", "not a uuid")
-			}
-			profileID = &id
 		}
 		data, err := io.ReadAll(io.LimitReader(f, MaxFileSize+1))
 		if err != nil {
 			return nil, err
 		}
-		run, err := svc.Upload(ctx, f.Filename, data, profileID)
+		run, err := svc.Upload(ctx, f.Filename, data)
 		if err != nil {
 			return nil, err
 		}
@@ -233,6 +229,16 @@ func Register(api huma.API, svc *Service) {
 			return nil, err
 		}
 		return &runOutput{Body: run}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "deleteImport", Method: http.MethodDelete, Path: "/api/imports/{id}",
+		Summary: "Delete an import run",
+		Description: "Removes the run with its preview, issues and change log; its file is no longer referenced. " +
+			"An applied run must be undone first (409 import.state).",
+		Tags: []string{tag}, DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *idParam) (*struct{}, error) {
+		return nil, svc.DeleteRun(ctx, in.ID)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -267,7 +273,8 @@ func Register(api huma.API, svc *Service) {
 		Summary: "List a preview's changes", Description: "The diff in apply order: categories to create, then each product with its variants, then products to deactivate.",
 		Tags: []string{tag},
 	}, func(ctx context.Context, in *itemsInput) (*itemsOutput, error) {
-		page, err := svc.Items(ctx, in.ID, ImportItemFilter{Entity: in.Entity, Status: in.Status, OnlySkipped: in.OnlySkipped, Limit: in.Limit, Offset: in.Offset})
+		page, err := svc.Items(ctx, in.ID, ImportItemFilter{Entity: in.Entity, Status: in.Status, OnlySkipped: in.OnlySkipped,
+			ChangedOnly: in.ChangedOnly, Search: in.Search, Row: in.Row, Limit: in.Limit, Offset: in.Offset})
 		if err != nil {
 			return nil, err
 		}
@@ -288,9 +295,10 @@ func Register(api huma.API, svc *Service) {
 	huma.Register(api, huma.Operation{
 		OperationID: "applyImport", Method: http.MethodPost, Path: "/api/imports/{id}/apply",
 		Summary: "Apply a previewed import",
-		Description: "Writes the previewed diff in one transaction. 409 import.stale if the catalog changed since the preview " +
-			"(preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. " +
-			"A write that fails rolls everything back: the run comes back in state failed with `error`.",
+		Description: "Writes the previewed diff in one transaction. 409 import.stale if the part of the catalog the preview read " +
+			"changed since (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows " +
+			"have errors. A write that fails rolls everything back: the run comes back in state failed with `error`. " +
+			"The apply runs to its end even if the client disconnects (at most 10 minutes); the run's state shows the result.",
 		Tags: []string{tag},
 	}, func(ctx context.Context, in *applyInput) (*runOutput, error) {
 		body := ImportApplyInput{}
@@ -333,6 +341,15 @@ func Register(api huma.API, svc *Service) {
 // limitBody refuses uploads that announce more than maxRequestBytes and
 // caps chunked ones (see files.limitBody), answering import.too_large.
 func limitBody(ctx huma.Context, next func(huma.Context)) {
+	// The permission first: nobody without it gets a body parsed (and
+	// multipart parts spilled to disk).
+	if _, err := auth.Require(ctx.Context(), auth.PermCatalogWrite); err != nil {
+		var ae *apperr.Error
+		if errors.As(err, &ae) {
+			writeProblem(ctx, ae)
+			return
+		}
+	}
 	r, w := humachi.Unwrap(ctx)
 	if r.ContentLength > maxRequestBytes {
 		writeProblem(ctx, ErrTooLarge())

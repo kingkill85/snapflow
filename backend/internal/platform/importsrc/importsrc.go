@@ -1,6 +1,6 @@
 // Package importsrc reads import files into tables: sheets of rows of text
 // cells, with the pictures anchored to each row. It is the extension point
-// for import sources (D132): an adapter turns its format into a Table; the
+// for import sources (D119): an adapter turns its format into a Table; the
 // import pipeline (features/imports) maps the table to the catalog. XLSX
 // and CSV exist; supplier APIs or JSON feeds would be further adapters.
 //
@@ -27,25 +27,44 @@ const (
 	KindCSV  Kind = "csv"
 )
 
-// Limits bound what a source reads.
+// Limits bound what a source reads; zero means no limit.
 type Limits struct {
 	// MaxRows is the most rows with content a sheet may have.
 	MaxRows int
+	// MaxColumns is the most columns a row may use (a cell with content in
+	// a column beyond is import.too_many_columns).
+	MaxColumns int
 	// MaxImages is the most pictures a sheet may anchor.
 	MaxImages int
 	// MaxImageBytes is the largest picture read; larger ones come back
-	// with TooLarge set and no data.
+	// with TooLarge set and cannot be read.
 	MaxImageBytes int
+	// MaxImageTotal is the most bytes all distinct pictures of a sheet may
+	// have together (import.images_too_large).
+	MaxImageTotal int64
 }
 
-// Source is an opened import file.
+// Options tell a source about the file's layout, where known.
+type Options struct {
+	// HeaderRow is the header row of a CSV file (1 first; 0 unknown): its
+	// delimiter is detected on that line.
+	HeaderRow int
+}
+
+// Source is an opened import file. Close it when done.
 type Source interface {
 	Kind() Kind
 	// Sheets lists the sheet names in workbook order (one unnamed sheet
 	// for CSV).
 	Sheets() []string
-	// Table reads a sheet; "" is the first sheet.
+	// Table reads a sheet; "" is the first sheet. Picture bytes are not
+	// read (ImageData reads them).
 	Table(sheet string) (*Table, error)
+	// ImageData reads a picture's bytes by its Image.Name (at most
+	// Limits.MaxImageBytes). Safe for concurrent use.
+	ImageData(name string) ([]byte, error)
+	// Close releases what the source holds.
+	Close() error
 }
 
 // Table is one sheet.
@@ -101,20 +120,21 @@ type Image struct {
 	Column int
 	// TwoCell is true for a two-cell anchor (moves and sizes with cells).
 	TwoCell bool
-	Data    []byte
-	// TooLarge is set instead of Data for pictures above
-	// Limits.MaxImageBytes.
+	// Size is the picture's size in bytes.
+	Size int64
+	// TooLarge is set for pictures above Limits.MaxImageBytes (they cannot
+	// be read).
 	TooLarge bool
 }
 
 // Open detects the format by extension and content and opens the file.
-func Open(name string, data []byte, limits Limits) (Source, error) {
+func Open(name string, data []byte, limits Limits, opts Options) (Source, error) {
 	kind, err := Detect(name, data)
 	if err != nil {
 		return nil, err
 	}
 	if kind == KindCSV {
-		return openCSV(data, limits)
+		return openCSV(data, limits, opts)
 	}
 	return openXLSX(data, limits)
 }
@@ -153,6 +173,20 @@ func errTooManyRows(max int) *apperr.Error {
 
 func errTooManyImages(max int) *apperr.Error {
 	return apperr.New(http.StatusUnprocessableEntity, "import.too_many_images", "the sheet has too many pictures").With("max", max)
+}
+
+func errTooManyColumns(max int) *apperr.Error {
+	return apperr.New(http.StatusUnprocessableEntity, "import.too_many_columns", "a row has too many columns").With("max", max)
+}
+
+func errImagesTooLarge(max int64) *apperr.Error {
+	return apperr.New(http.StatusUnprocessableEntity, "import.images_too_large", "the pictures are too large together").With("maxMb", max>>20)
+}
+
+// ErrImageTooLarge reports a picture above max bytes
+// (Limits.MaxImageBytes).
+func ErrImageTooLarge(max int) *apperr.Error {
+	return apperr.New(http.StatusRequestEntityTooLarge, "file.too_large", "the picture is too large").With("maxMb", max>>20)
 }
 
 // ErrSheetNotFound reports a sheet name the file does not have.

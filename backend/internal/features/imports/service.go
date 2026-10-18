@@ -1,4 +1,4 @@
-// Package imports is the catalog import (D132): a file (XLSX or CSV, read by
+// Package imports is the catalog import (D119): a file (XLSX or CSV, read by
 // platform/importsrc) is mapped by a saved profile to products, variants,
 // add-ons and images; a preview computes the diff against the catalog with
 // row errors and warnings; apply writes exactly that diff in one
@@ -9,15 +9,13 @@ package imports
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -36,20 +34,26 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/importsrc"
 )
 
-// Limits of an import (D137).
+// Limits of an import (D124, D148).
 const (
-	MaxFileSize   = 50 << 20
-	MaxRows       = 20_000
-	MaxImages     = 5_000
+	MaxFileSize = 50 << 20
+	// MaxRows is the most data rows (from the first data row on).
+	MaxRows = 20_000
+	// MaxLeadingRows is how many rows with content a file may have above
+	// MaxRows in all (title, header and other rows above the data); the file
+	// is read before a mapping says where the data starts.
+	MaxLeadingRows = 1_000
+	// MaxColumns is the most columns a row may use.
+	MaxColumns = 1_000
+	MaxImages  = 5_000
+	// MaxImageBytes is how many bytes the distinct pictures of a sheet may
+	// have together.
+	MaxImageBytes = 256 << 20
 	MaxPageSize   = 500
 	maxNameLength = 255
 	// sourceRows is how many data rows the source preview shows by default.
 	sourceRows = 5
 )
-
-// importLockKey serialises applies and undos (pg_advisory_xact_lock).
-// Advisory lock keys must be unique in the app.
-const importLockKey int64 = 0x5f_69_6d_70_6f_72_74 // "_import"
 
 // DB is the database the service runs on; *pgxpool.Pool implements it.
 type DB interface {
@@ -78,7 +82,7 @@ func (s *Service) inTx(ctx context.Context, opts pgx.TxOptions, fn func(tx pgx.T
 // ---------------------------------------------------------------- profiles
 
 // Profiles lists the saved profiles by name. When there are none, the
-// starter profile for SnapFlow 1 workbooks is created first (D134).
+// starter profile for SnapFlow 1 workbooks is created first (D121).
 func (s *Service) Profiles(ctx context.Context) ([]ImportProfile, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
@@ -283,13 +287,14 @@ func ErrTooLarge() *apperr.Error {
 }
 
 func limits() importsrc.Limits {
-	return importsrc.Limits{MaxRows: MaxRows, MaxImages: MaxImages, MaxImageBytes: files.MaxSize}
+	return importsrc.Limits{MaxRows: MaxRows + MaxLeadingRows, MaxColumns: MaxColumns, MaxImages: MaxImages,
+		MaxImageBytes: files.MaxSize, MaxImageTotal: MaxImageBytes}
 }
 
 // Upload stores an import file (XLSX or UTF-8 CSV by extension and
-// content, at most MaxFileSize) as a new run. With a profile it is
-// previewed at once.
-func (s *Service) Upload(ctx context.Context, name string, data []byte, profileID *uuid.UUID) (ImportRun, error) {
+// content, at most MaxFileSize) as a new run (state uploaded). The client
+// previews it with a profile or mapping next (D136).
+func (s *Service) Upload(ctx context.Context, name string, data []byte) (ImportRun, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
 		return ImportRun{}, err
@@ -302,12 +307,18 @@ func (s *Service) Upload(ctx context.Context, name string, data []byte, profileI
 		name = ""
 	}
 	name = truncate(name, maxNameLength)
-	src, err := importsrc.Open(name, data, limits())
+	src, err := importsrc.Open(name, data, limits(), importsrc.Options{})
 	if err != nil {
 		return ImportRun{}, err
 	}
+	defer func() { _ = src.Close() }()
 	if len(src.Sheets()) == 0 {
 		return ImportRun{}, importsrc.ErrUnreadable()
+	}
+	// Read the first sheet now, so a file over the limits is refused at
+	// once rather than at its first preview.
+	if _, err := src.Table(""); err != nil {
+		return ImportRun{}, err
 	}
 	user, err := s.users.Me(ctx)
 	if err != nil {
@@ -333,10 +344,28 @@ func (s *Service) Upload(ctx context.Context, name string, data []byte, profileI
 	if err != nil {
 		return ImportRun{}, err
 	}
-	if profileID != nil {
-		return s.Preview(ctx, row.ID, ImportPreviewInput{ProfileID: profileID})
-	}
 	return runOut(row)
+}
+
+// DeleteRun removes a run with its diff, issues and change log; the stored
+// file is no longer referenced by it (files are kept, D58). An applied run
+// must be undone first (409 import.state): its change log is what undo
+// needs (D150).
+func (s *Service) DeleteRun(ctx context.Context, id uuid.UUID) error {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return err
+	}
+	return s.inTx(ctx, pgx.TxOptions{}, func(_ pgx.Tx, q *store.Queries) error {
+		run, err := q.LockRun(ctx, id)
+		if err != nil {
+			return notFound(err)
+		}
+		if run.State == StateApplied {
+			return errState(run.State)
+		}
+		_, err = q.DeleteRun(ctx, id)
+		return err
+	})
 }
 
 // ImportRun returns a run.
@@ -396,10 +425,11 @@ func (s *Service) Source(ctx context.Context, id uuid.UUID, sheet string, header
 	if err != nil {
 		return ImportSourcePreview{}, err
 	}
-	src, table, err := s.open(ctx, row, sheet)
+	src, table, err := s.open(ctx, row, sheet, headerRow)
 	if err != nil {
 		return ImportSourcePreview{}, err
 	}
+	defer func() { _ = src.Close() }()
 	if rows <= 0 {
 		rows = sourceRows
 	}
@@ -457,7 +487,23 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 	if row.State != StateUploaded && row.State != StatePreviewed && row.State != StateFailed {
 		return ImportRun{}, errState(row.State)
 	}
-	types, cats, err := s.refs(ctx)
+	// Product types, categories and the catalog from one snapshot.
+	var (
+		types   []producttypes.ProductType
+		cats    []categories.Category
+		catalog []products.CatalogProduct
+	)
+	err = database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
+		var err error
+		if types, err = s.types.WithTx(tx).List(ctx, true); err != nil {
+			return err
+		}
+		if cats, err = s.cats.WithTx(tx).List(ctx, true); err != nil {
+			return err
+		}
+		catalog, err = s.products.WithTx(tx).Catalog(ctx)
+		return err
+	})
 	if err != nil {
 		return ImportRun{}, err
 	}
@@ -482,17 +528,29 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 	if len(errs) > 0 {
 		return ImportRun{}, apperr.Validation(errs...)
 	}
-	_, table, err := s.open(ctx, row, mapping.Sheet)
+	src, table, err := s.open(ctx, row, mapping.Sheet, mapping.HeaderRow)
 	if err != nil {
 		return ImportRun{}, err
 	}
-	catalog, err := s.products.Catalog(ctx)
-	if err != nil {
-		return ImportRun{}, err
+	defer func() { _ = src.Close() }()
+	// Pictures stored by an earlier preview of the run are not read again
+	// (the same part name in the same file is the same picture).
+	known := map[string]uuid.UUID{}
+	if len(row.Images) > 0 {
+		if err := json.Unmarshal(row.Images, &known); err != nil {
+			return ImportRun{}, err
+		}
 	}
 	pl, err := buildPlan(planInput{
 		mapping: mapping, table: table, types: types, categories: cats, catalog: catalog,
-		storeImage: func(data []byte) (uuid.UUID, error) {
+		storeImage: func(img importsrc.Image) (uuid.UUID, error) {
+			if id, ok := known[img.Name]; ok {
+				return id, nil
+			}
+			data, err := src.ImageData(img.Name)
+			if err != nil {
+				return uuid.Nil, err
+			}
 			f, err := s.files.UploadBytes(ctx, data)
 			return f.ID, err
 		},
@@ -500,7 +558,20 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 	if err != nil {
 		return ImportRun{}, err
 	}
-	token, err := catalogToken(types, cats, catalog)
+	for name, id := range known {
+		if _, ok := pl.images[name]; !ok {
+			pl.images[name] = id
+		}
+	}
+	token, err := scopeToken(types, cats, catalog, pl.scope)
+	if err != nil {
+		return ImportRun{}, err
+	}
+	scopeJSON, err := json.Marshal(pl.scope)
+	if err != nil {
+		return ImportRun{}, err
+	}
+	imagesJSON, err := json.Marshal(pl.images)
 	if err != nil {
 		return ImportRun{}, err
 	}
@@ -542,7 +613,7 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 		}
 		row, err = q.SetRunPreview(ctx, store.SetRunPreviewParams{
 			ID: id, ProfileID: in.ProfileID, ProfileName: profileName, Mapping: mappingJSON,
-			AllOrNothing: mapping.AllOrNothing, CatalogToken: token, Counts: counts,
+			AllOrNothing: mapping.AllOrNothing, CatalogToken: token, CatalogScope: scopeJSON, Counts: counts, Images: imagesJSON,
 		})
 		return err
 	})
@@ -552,18 +623,19 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 	return runOut(row)
 }
 
-// open reads the sheet of a run's file.
-func (s *Service) open(ctx context.Context, row store.ImportRun, sheet string) (importsrc.Source, *importsrc.Table, error) {
+// open reads the sheet of a run's file; the caller closes the source.
+func (s *Service) open(ctx context.Context, row store.ImportRun, sheet string, headerRow int) (importsrc.Source, *importsrc.Table, error) {
 	_, data, err := s.files.ReadAll(ctx, row.FileID, MaxFileSize)
 	if err != nil {
 		return nil, nil, err
 	}
-	src, err := importsrc.Open(row.FileName, data, limits())
+	src, err := importsrc.Open(row.FileName, data, limits(), importsrc.Options{HeaderRow: headerRow})
 	if err != nil {
 		return nil, nil, err
 	}
 	table, err := src.Table(sheet)
 	if err != nil {
+		_ = src.Close()
 		return nil, nil, err
 	}
 	return src, table, nil
@@ -574,8 +646,15 @@ type ImportItemFilter struct {
 	Entity      string
 	Status      string
 	OnlySkipped bool
-	Limit       int
-	Offset      int
+	// ChangedOnly leaves out unchanged items.
+	ChangedOnly bool
+	// Row keeps the items of this file row (0: any).
+	Row int
+	// Search matches model number, SKU, category key and names (substring,
+	// ignoring case) or, if it is a number, a file row.
+	Search string
+	Limit  int
+	Offset int
 }
 
 // Items pages a run's previewed diff in plan order.
@@ -589,12 +668,34 @@ func (s *Service) Items(ctx context.Context, id uuid.UUID, f ImportItemFilter) (
 	if _, err := s.getRun(ctx, s.q, id); err != nil {
 		return ImportItemPage{}, err
 	}
-	rows, err := s.q.ListItems(ctx, store.ListItemsParams{RunID: id, Entity: f.Entity, Status: f.Status, OnlySkipped: f.OnlySkipped,
-		RowLimit: int32(f.Limit), RowOffset: int32(f.Offset)}) //nolint:gosec // checked
-	if err != nil {
-		return ImportItemPage{}, err
+	var fileRow, searchRow *int32
+	if f.Row > 0 {
+		r := int32(min(f.Row, maxRowNumber)) //nolint:gosec // bounded
+		fileRow = &r
 	}
-	total, err := s.q.CountItems(ctx, store.CountItemsParams{RunID: id, Entity: f.Entity, Status: f.Status, OnlySkipped: f.OnlySkipped})
+	search := strings.TrimSpace(f.Search)
+	if n, err := strconv.Atoi(search); err == nil && n > 0 && n <= maxRowNumber {
+		r := int32(n) //nolint:gosec // bounded
+		searchRow = &r
+	}
+	pattern := likePattern(search)
+	var (
+		rows  []store.ListItemsRow
+		total int64
+	)
+	err := database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		var err error
+		rows, err = q.ListItems(ctx, store.ListItemsParams{RunID: id, Entity: f.Entity, Status: f.Status, OnlySkipped: f.OnlySkipped,
+			ChangedOnly: f.ChangedOnly, FileRow: fileRow, Search: pattern, SearchRow: searchRow,
+			RowLimit: int32(f.Limit), RowOffset: int32(f.Offset)}) //nolint:gosec // checked
+		if err != nil {
+			return err
+		}
+		total, err = q.CountItems(ctx, store.CountItemsParams{RunID: id, Entity: f.Entity, Status: f.Status, OnlySkipped: f.OnlySkipped,
+			ChangedOnly: f.ChangedOnly, FileRow: fileRow, Search: pattern, SearchRow: searchRow})
+		return err
+	})
 	if err != nil {
 		return ImportItemPage{}, err
 	}
@@ -782,45 +883,11 @@ func issueRows(runID uuid.UUID, issues []ImportIssue, first int) ([]store.Insert
 	return out, nil
 }
 
-// catalogToken identifies the catalog state a preview was computed on:
-// every product type, category, product and variant with its version, and
-// every add-on link (which have no version of their own, D56). Any change
-// to the catalog changes the token (D138).
-func catalogToken(types []producttypes.ProductType, cats []categories.Category, catalog []products.CatalogProduct) (string, error) {
-	type version struct {
-		ID        uuid.UUID `json:"i"`
-		UpdatedAt time.Time `json:"u"`
+// likePattern turns a search into an ILIKE substring pattern ("" for none),
+// with the LIKE wildcards matched literally.
+func likePattern(search string) string {
+	if search == "" {
+		return ""
 	}
-	type variant struct {
-		version
-		Addons []products.AddonInput `json:"a,omitempty"`
-	}
-	type product struct {
-		version
-		Variants []variant `json:"v,omitempty"`
-	}
-	state := struct {
-		Types      []version `json:"t"`
-		Categories []version `json:"c"`
-		Products   []product `json:"p"`
-	}{Types: []version{}, Categories: []version{}, Products: []product{}}
-	for _, t := range types {
-		state.Types = append(state.Types, version{t.ID, t.UpdatedAt})
-	}
-	for _, c := range cats {
-		state.Categories = append(state.Categories, version{c.ID, c.UpdatedAt})
-	}
-	for _, p := range catalog {
-		pv := product{version: version{p.ID, p.UpdatedAt}}
-		for _, v := range p.Variants {
-			pv.Variants = append(pv.Variants, variant{version{v.ID, v.UpdatedAt}, v.Addons})
-		}
-		state.Products = append(state.Products, pv)
-	}
-	data, err := json.Marshal(state)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
+	return "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search) + "%"
 }

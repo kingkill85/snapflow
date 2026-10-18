@@ -77,3 +77,23 @@ func NewNested(tx pgx.Tx) *Nested { return &Nested{Tx: tx} }
 func (n *Nested) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
 	return n.Begin(ctx)
 }
+
+// Joined returns tx for services whose transactions should join it without
+// savepoints: Begin (and so a Nested built on it) returns tx itself, whose
+// Commit and Rollback do nothing; the outer transaction commits or rolls
+// back everything. A failing statement then aborts the outer transaction,
+// so only a caller that gives up at the first error may use it (an
+// all-or-nothing import, which saves the two round trips of a savepoint
+// per write).
+func Joined(tx pgx.Tx) pgx.Tx {
+	if j, ok := tx.(joined); ok {
+		return j
+	}
+	return joined{tx}
+}
+
+type joined struct{ pgx.Tx }
+
+func (j joined) Begin(context.Context) (pgx.Tx, error) { return j, nil }
+func (joined) Commit(context.Context) error            { return nil }
+func (joined) Rollback(context.Context) error          { return nil }

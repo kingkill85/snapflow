@@ -12,6 +12,14 @@ import (
 
 type Querier interface {
 	AllChanges(ctx context.Context, runID uuid.UUID) ([]ImportChange, error)
+	// BumpImportLock is the first statement of every apply and undo
+	// (REPEATABLE READ): it serialises them on the import_lock row, and since it
+	// changes the row, a waiting one fails with a serialization error once the
+	// first commits, so database.InTx runs it again with a fresh snapshot
+	// (D146). An upsert, so a missing row (an emptied table) is created; under
+	// REPEATABLE READ ON CONFLICT DO UPDATE fails the same way on a row changed
+	// after the snapshot.
+	BumpImportLock(ctx context.Context) (int64, error)
 	CountChanges(ctx context.Context, runID uuid.UUID) (int64, error)
 	CountIssues(ctx context.Context, arg CountIssuesParams) (int64, error)
 	CountItems(ctx context.Context, arg CountItemsParams) (int64, error)
@@ -24,6 +32,9 @@ type Querier interface {
 	DeleteIssues(ctx context.Context, runID uuid.UUID) error
 	DeleteItems(ctx context.Context, runID uuid.UUID) error
 	DeleteProfile(ctx context.Context, id uuid.UUID) (int64, error)
+	// DeleteRun removes a run with its items, issues and change log; its file
+	// stays (unreferenced files are kept, D58).
+	DeleteRun(ctx context.Context, id uuid.UUID) (int64, error)
 	GetProfile(ctx context.Context, id uuid.UUID) (ImportProfile, error)
 	GetRun(ctx context.Context, id uuid.UUID) (ImportRun, error)
 	InsertChanges(ctx context.Context, arg []InsertChangesParams) (int64, error)
@@ -31,7 +42,10 @@ type Querier interface {
 	InsertItems(ctx context.Context, arg []InsertItemsParams) (int64, error)
 	ListChanges(ctx context.Context, arg ListChangesParams) ([]ImportChange, error)
 	ListIssues(ctx context.Context, arg ListIssuesParams) ([][]byte, error)
-	// ListItems pages the diff; empty filters match everything.
+	// ListItems pages the diff; empty filters match everything. changed_only
+	// leaves out unchanged items; file_row keeps the items of that file row;
+	// search is an ILIKE pattern over model number, SKU, category key and every
+	// name, or (search_row) a file row number.
 	ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error)
 	ListPlan(ctx context.Context, runID uuid.UUID) ([]ListPlanRow, error)
 	// Import profiles, runs, their previewed items and issues, and the change log.
@@ -39,9 +53,6 @@ type Querier interface {
 	// products, categories and files services (product types are only read).
 	ListProfiles(ctx context.Context) ([]ImportProfile, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]ImportRun, error)
-	// LockImports serialises applies and undos of all runs until the
-	// transaction ends.
-	LockImports(ctx context.Context, lockKey int64) error
 	LockRun(ctx context.Context, id uuid.UUID) (ImportRun, error)
 	MaxIssueSeq(ctx context.Context, runID uuid.UUID) (int32, error)
 	ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)

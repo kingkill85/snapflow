@@ -669,7 +669,7 @@ export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, 
 
 
 /**
- * Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content (415 import.file_type), at most 50 MB (413 import.too_large), 20 000 rows (422 import.too_many_rows) and 5 000 pictures (422 import.too_many_images). Creates a run in state uploaded; with `profileId` it is previewed at once.
+ * Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content (415 import.file_type), at most 50 MB (413 import.too_large), 21 000 rows with content (422 import.too_many_rows; the preview allows 20 000 data rows), 1 000 columns (422 import.too_many_columns), 5 000 pictures (422 import.too_many_images) of together 256 MB (422 import.images_too_large). Creates a run in state uploaded; preview it with a profile or mapping next.
  * @summary Upload a file to import
  */
 export const createImport = (
@@ -680,9 +680,6 @@ export const createImport = (
       const formData = new FormData();
 if(createImportBody?.file !== undefined) {
  formData.append(`file`, createImportBody.file);
- }
-if(createImportBody?.profileId !== undefined) {
- formData.append(`profileId`, createImportBody.profileId instanceof Blob ? createImportBody.profileId : new Blob([createImportBody.profileId], { type: 'text/plain' }));
  }
 
       return apiClient<ImportRun>(
@@ -742,6 +739,72 @@ export const useCreateImport = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getCreateImportMutationOptions(options), queryClient);
+    }
+    /**
+ * Removes the run with its preview, issues and change log; its file is no longer referenced. An applied run must be undone first (409 import.state).
+ * @summary Delete an import run
+ */
+export const deleteImport = (
+    id: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<void>(
+      {url: `/api/imports/${id}`, method: 'DELETE', signal
+    },
+      );
+    }
+
+
+
+
+export const getDeleteImportMutationKey = () => ['deleteImport'] as const;
+
+export const getDeleteImportMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteImport>>, TError,DeleteImportMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteImport>>, TError,DeleteImportMutationVariables, TContext> => {
+
+const mutationKey = getDeleteImportMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteImport>>, DeleteImportMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteImport(id,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteImportMutationResult = NonNullable<Awaited<ReturnType<typeof deleteImport>>>
+
+    export type DeleteImportMutationError = ErrorType<Error>
+    export type DeleteImportMutationVariables = {id: string}
+
+    /**
+ * @summary Delete an import run
+ */
+export const useDeleteImport = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteImport>>, TError,DeleteImportMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteImport>>,
+        TError,
+        DeleteImportMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteImportMutationOptions(options), queryClient);
     }
     /**
  * @summary Get an import run
@@ -836,7 +899,7 @@ export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TErr
 
 
 /**
- * Writes the previewed diff in one transaction. 409 import.stale if the catalog changed since the preview (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. A write that fails rolls everything back: the run comes back in state failed with `error`.
+ * Writes the previewed diff in one transaction. 409 import.stale if the part of the catalog the preview read changed since (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. A write that fails rolls everything back: the run comes back in state failed with `error`. The apply runs to its end even if the client disconnects (at most 10 minutes); the run's state shows the result.
  * @summary Apply a previewed import
  */
 export const applyImport = (

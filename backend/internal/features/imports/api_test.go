@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -334,8 +335,10 @@ func TestRowErrors(t *testing.T) {
 	if run.Counts.Errors != 7 || run.Counts.Warnings != 1 || run.Counts.RowsSkipped != 6 {
 		t.Errorf("counts %+v", run.Counts)
 	}
-	// T-1 White and black, T-2 with its variant, T-3 Red, T-4 Red.
-	if skipped := items(t, api, run.ID.String(), "skipped=true"); len(skipped) != 6 {
+	// T-1 White and black, T-2 with its variant, T-3 and T-4 with their
+	// only variant (every row of theirs has errors: the product is not
+	// created either).
+	if skipped := items(t, api, run.ID.String(), "skipped=true"); len(skipped) != 8 {
 		t.Errorf("skipped items %d", len(skipped))
 	}
 	p := assertError(t, api.Post("/api/imports/"+run.ID.String()+"/apply", api.Admin.Cookie, map[string]any{}), http.StatusUnprocessableEntity, "import.has_errors")
@@ -350,13 +353,10 @@ func TestRowErrors(t *testing.T) {
 		t.Fatalf("applied %+v", applied)
 	}
 	cat := catalog(t, api)
-	// T-1 with Black and Green; T-3 (bad price) and T-4 (SKU taken) without
-	// variants; T-2 (no name) skipped.
-	if len(cat) != 3 || len(cat["T-1"].Variants) != 2 || len(cat["T-3"].Variants) != 0 || len(cat["T-4"].Variants) != 0 {
+	// T-1 with Black and Green; T-2 (no name), T-3 (bad price) and T-4
+	// (SKU used twice) skipped.
+	if len(cat) != 1 || len(cat["T-1"].Variants) != 2 {
 		t.Errorf("catalog %+v", cat)
-	}
-	if _, ok := cat["T-2"]; ok {
-		t.Error("T-2 was written")
 	}
 }
 
@@ -368,13 +368,15 @@ func TestApplyFailure(t *testing.T) {
 	run := upload(t, api, "a.xlsx", workbook(t, v1Rows(t)), profile)
 	defer imports.SetFailHook(func(it imports.ImportItem) error {
 		if it.ModelNumber == "T-1" && it.Entity == "variant" {
-			return apperr.Conflict("variant.sku_taken", "injected").With("sku", it.SKU)
+			// Not an error that means the catalog changed (those are
+			// import.stale): a write the services refuse.
+			return apperr.New(http.StatusUnprocessableEntity, "variant.price_format", "injected").With("sku", it.SKU)
 		}
 		return nil
 	})()
 
 	failed := apply(t, api, run.ID.String(), nil)
-	if failed.State != imports.StateFailed || failed.Error == nil || failed.Error.Code != "variant.sku_taken" ||
+	if failed.State != imports.StateFailed || failed.Error == nil || failed.Error.Code != "variant.price_format" ||
 		failed.Error.Params["sku"] != "T-1 Ivory White" || !reflect.DeepEqual(failed.Error.Rows, []int{7}) || !failed.Can.Preview || failed.Can.Apply {
 		t.Fatalf("failed run %+v %+v", failed, failed.Error)
 	}
@@ -395,7 +397,7 @@ func TestApplyFailure(t *testing.T) {
 	}
 	found := false
 	for _, is := range issues(t, api, run.ID.String()) {
-		found = found || (is.Code == "variant.sku_taken" && is.Row == 7 && is.ModelNumber == "T-1")
+		found = found || (is.Code == "variant.price_format" && is.Row == 7 && is.ModelNumber == "T-1" && is.ItemSeq != 0)
 	}
 	if !found {
 		t.Error("the skipped product has no issue")
@@ -410,11 +412,14 @@ func TestStalePreview(t *testing.T) {
 	api := apptest.New(t)
 	profile := starterID(t, api)
 	run := upload(t, api, "a.xlsx", workbook(t, v1Rows(t)), profile)
-	newCategory(t, api, "other", "", nil)
+	// A category the file names, created since (the run would create it).
+	newCategory(t, api, "frames", "", nil)
 	assertError(t, api.Post("/api/imports/"+run.ID.String()+"/apply", api.Admin.Cookie, map[string]any{}), http.StatusConflict, "import.stale")
-	// A product type is part of the catalog state too.
+	// A product type the profile's value matches (by its abbreviation) is
+	// part of what a preview reads; others are not.
 	preview(t, api, run.ID.String(), map[string]any{"profileId": profile})
 	newProductType(t, api, "knx", "KNX")
+	newProductType(t, api, "zigbee_3", "ZIGBEE")
 	assertError(t, api.Post("/api/imports/"+run.ID.String()+"/apply", api.Admin.Cookie, map[string]any{}), http.StatusConflict, "import.stale")
 	if r := decode[imports.ImportRun](t, api.Get("/api/imports/"+run.ID.String(), api.Admin.Cookie)); r.State != imports.StatePreviewed {
 		t.Errorf("state %s", r.State)
@@ -543,7 +548,7 @@ func TestPermissions(t *testing.T) {
 			api.Post("/api/imports/"+run.ID.String()+"/preview", s.Cookie, map[string]any{"mapping": imports.StarterMapping()}),
 			api.Post("/api/imports/"+run.ID.String()+"/apply", s.Cookie, map[string]any{}),
 			api.Post("/api/imports/"+run.ID.String()+"/undo", s.Cookie, map[string]any{}),
-			uploadRaw(api, s.Cookie, "a.xlsx", workbook(t, v1Rows(t)), ""),
+			uploadRaw(api, s.Cookie, "a.xlsx", workbook(t, v1Rows(t))),
 		} {
 			if code := resp.Result().StatusCode; code != http.StatusForbidden {
 				t.Errorf("%s %s: got %d", s.Email, resp.Result().Request.URL, code)
@@ -553,7 +558,7 @@ func TestPermissions(t *testing.T) {
 	for _, resp := range []interface{ Result() *http.Response }{
 		api.Get("/api/imports"),
 		api.Get("/api/import-profiles"),
-		uploadRaw(api, "", "a.xlsx", workbook(t, v1Rows(t)), ""),
+		uploadRaw(api, "", "a.xlsx", workbook(t, v1Rows(t))),
 	} {
 		if code := resp.Result().StatusCode; code != http.StatusUnauthorized {
 			t.Errorf("anonymous: got %d", code)
@@ -563,30 +568,49 @@ func TestPermissions(t *testing.T) {
 
 func TestLimitsAndFileTypes(t *testing.T) {
 	api := apptest.New(t)
-	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xls", []byte("\xd0\xcf\x11\xe0 legacy"), ""), http.StatusUnsupportedMediaType, "import.file_type")
-	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.txt", []byte("a;b\n"), ""), http.StatusUnsupportedMediaType, "import.file_type")
-	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xlsx", []byte("a;b\n"), ""), http.StatusUnsupportedMediaType, "import.file_type")
-	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xlsx", append([]byte("PK\x03\x04"), make([]byte, 64)...), ""), http.StatusUnprocessableEntity, "import.unreadable")
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xls", []byte("\xd0\xcf\x11\xe0 legacy")), http.StatusUnsupportedMediaType, "import.file_type")
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.txt", []byte("a;b\n")), http.StatusUnsupportedMediaType, "import.file_type")
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xlsx", []byte("a;b\n")), http.StatusUnsupportedMediaType, "import.file_type")
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xlsx", append([]byte("PK\x03\x04"), make([]byte, 64)...)), http.StatusUnprocessableEntity, "import.unreadable")
 
 	big := make([]byte, imports.MaxFileSize+1)
-	p := assertError(t, uploadRaw(api, api.Admin.Cookie, "a.csv", big, ""), http.StatusRequestEntityTooLarge, "import.too_large")
+	p := assertError(t, uploadRaw(api, api.Admin.Cookie, "a.csv", big), http.StatusRequestEntityTooLarge, "import.too_large")
 	if p.Params["maxMb"] != 50.0 {
 		t.Errorf("params %v", p.Params)
 	}
 
-	lines := []string{"Model;Price"}
+	// The row limit counts data rows (from the first data row): a title,
+	// a blank line and the header row above 20 000 data rows are fine.
+	pt := newProductType(t, api, "knx", "KNX")
+	cat := newCategory(t, api, "dimmer", "", nil)
+	lines := []string{"Price list", "", "Model;Name;Price"}
 	for i := range imports.MaxRows {
-		lines = append(lines, "M-"+strconv.Itoa(i)+";1")
+		lines = append(lines, "M-"+strconv.Itoa(i)+";N;1")
 	}
-	p = assertError(t, uploadRaw(api, api.Admin.Cookie, "a.csv", csvFile(lines...), ""), http.StatusUnprocessableEntity, "import.too_many_rows")
-	if p.Params["max"] != float64(imports.MaxRows) {
-		t.Errorf("params %v", p.Params)
-	}
-	// Exactly the limit is fine (the header row counts).
-	run := upload(t, api, "a.csv", csvFile(lines[:imports.MaxRows]...), "")
+	run := upload(t, api, "a.csv", csvFile(lines...), "")
 	if run.State != imports.StateUploaded || run.SourceKind != "csv" {
 		t.Errorf("run %+v", run)
 	}
+	mapping := map[string]any{"sourceKind": "csv", "headerRow": 3, "dataStartRow": 4, "productTypeId": pt.ID, "categoryId": cat.ID,
+		"fields": []any{map[string]any{"target": "product.modelNumber", "column": "Model"}, map[string]any{"target": "product.name.en", "column": "Name"},
+			map[string]any{"target": "variant.price", "column": "Price"}}}
+	if run = preview(t, api, run.ID.String(), map[string]any{"mapping": mapping}); run.Counts.Rows != imports.MaxRows {
+		t.Errorf("rows %d", run.Counts.Rows)
+	}
+	// One data row more: refused by the preview.
+	run = upload(t, api, "b.csv", csvFile(append(lines, "M-x;N;1")...), "")
+	p = assertError(t, api.Post("/api/imports/"+run.ID.String()+"/preview", api.Admin.Cookie, map[string]any{"mapping": mapping}),
+		http.StatusUnprocessableEntity, "import.too_many_rows")
+	if p.Params["max"] != float64(imports.MaxRows) {
+		t.Errorf("params %v", p.Params)
+	}
+	// Far more rows than any mapping allows: refused at upload.
+	for i := range imports.MaxLeadingRows {
+		lines = append(lines, "X-"+strconv.Itoa(i)+";N;1")
+	}
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "c.csv", csvFile(lines...)), http.StatusUnprocessableEntity, "import.too_many_rows")
+	wide := "Model" + strings.Repeat(";", imports.MaxColumns) + "x"
+	assertError(t, uploadRaw(api, api.Admin.Cookie, "d.csv", csvFile(wide)), http.StatusUnprocessableEntity, "import.too_many_columns")
 
 	// A file without data rows.
 	run = upload(t, api, "b.csv", csvFile("Model;Price"), "")
@@ -842,14 +866,15 @@ func TestStarterNeedsZigbee(t *testing.T) {
 	for _, p := range decode[[]imports.ImportProfile](t, api.Get("/api/import-profiles", api.Admin.Cookie)) {
 		profile = p.ID.String()
 	}
-	p := assertError(t, uploadRaw(api, api.Admin.Cookie, "a.xlsx", workbook(t, v1Rows(t)), profile), http.StatusUnprocessableEntity, "validation.failed")
+	run := upload(t, api, "a.xlsx", workbook(t, v1Rows(t)), "")
+	p := assertError(t, api.Post("/api/imports/"+run.ID.String()+"/preview", api.Admin.Cookie, map[string]any{"profileId": profile}),
+		http.StatusUnprocessableEntity, "validation.failed")
 	if !reflect.DeepEqual(fieldCodes(p), []string{"mapping.fields[0].value import.product_type_unknown"}) || p.Fields[0].Params["value"] != "zigbee" {
 		t.Errorf("fields %+v", p.Fields)
 	}
 	// Created afterwards, the same run previews.
-	runs := decode[imports.ImportRunPage](t, api.Get("/api/imports?limit=1", api.Admin.Cookie))
 	newProductType(t, api, "zigbee", "ZB")
-	if run := preview(t, api, runs.Items[0].ID.String(), map[string]any{"profileId": profile}); run.Counts.Errors != 0 {
+	if run := preview(t, api, run.ID.String(), map[string]any{"profileId": profile}); run.Counts.Errors != 0 {
 		t.Errorf("counts %+v", run.Counts)
 	}
 }
@@ -1003,7 +1028,9 @@ func TestRealWorkbook(t *testing.T) {
 	}
 	api := apptest.New(t)
 	profile := starterID(t, api)
+	start := time.Now()
 	run := upload(t, api, "workbook.xlsx", data, profile)
+	t.Logf("upload and first preview: %v", time.Since(start))
 	c := run.Counts
 	t.Logf("first import: %+v", *c)
 	for _, is := range issues(t, api, run.ID.String()) {
@@ -1043,7 +1070,9 @@ func TestRealWorkbook(t *testing.T) {
 	if required != 284 || optional != 96 {
 		t.Errorf("add-ons: %d required, %d optional", required, optional)
 	}
+	start = time.Now()
 	again := upload(t, api, "workbook.xlsx", data, profile)
+	t.Logf("re-import upload and preview: %v", time.Since(start))
 	c = again.Counts
 	t.Logf("re-import: %+v", *c)
 	if c.Products.Unchanged != 79 || c.Variants.Unchanged != 205 || c.Addons.Unchanged != 380 || c.Images.Unchanged != 201 || c.Products.New+c.Products.Changed+c.Variants.New+c.Variants.Changed != 0 {

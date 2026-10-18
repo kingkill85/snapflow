@@ -97,7 +97,9 @@ func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
 }
 
 // UploadBytes is Upload for an image already in memory (e.g. one taken from
-// an imported workbook).
+// an imported workbook). An image uploaded before (the same bytes, by their
+// SHA-256 in file_sources) returns the file it became without decoding it
+// again (D149).
 func (s *Service) UploadBytes(ctx context.Context, data []byte) (File, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return File{}, err
@@ -105,6 +107,27 @@ func (s *Service) UploadBytes(ctx context.Context, data []byte) (File, error) {
 	if len(data) > MaxSize {
 		return File{}, ErrTooLarge()
 	}
+	source := sha256.Sum256(data)
+	sourceSum := hex.EncodeToString(source[:])
+	row, err := s.q.FileBySource(ctx, sourceSum)
+	switch {
+	case err == nil:
+		return fromRow(row), nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return File{}, err
+	}
+	f, err := s.process(ctx, data)
+	if err != nil {
+		return File{}, err
+	}
+	if err := s.q.AddFileSource(ctx, store.AddFileSourceParams{SourceSha256: sourceSum, FileID: f.ID}); err != nil {
+		return File{}, err
+	}
+	return f, nil
+}
+
+// process checks, decodes and re-encodes an image and stores it.
+func (s *Service) process(ctx context.Context, data []byte) (File, error) {
 	contentType := sniff(data)
 	if contentType == "" {
 		return File{}, errType()

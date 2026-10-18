@@ -270,14 +270,16 @@ type ImportItemPage struct {
 
 // ImportIssue is a row error or warning.
 type ImportIssue struct {
-	Severity    string         `json:"severity" enum:"error,warning"`
-	Row         int            `json:"row" doc:"File row; 0 for the whole file"`
-	Column      string         `json:"column,omitempty" doc:"Column letter"`
-	Header      string         `json:"header,omitempty"`
-	Target      string         `json:"target,omitempty" doc:"Mapping target of the column"`
-	ModelNumber string         `json:"modelNumber,omitempty"`
-	Code        string         `json:"code" doc:"Error code, translated like API errors"`
-	Params      map[string]any `json:"params,omitempty"`
+	Severity    string `json:"severity" enum:"error,warning"`
+	Row         int    `json:"row" doc:"File row; 0 for the whole file"`
+	Column      string `json:"column,omitempty" doc:"Column letter"`
+	Header      string `json:"header,omitempty"`
+	Target      string `json:"target,omitempty" doc:"Mapping target of the column"`
+	ModelNumber string `json:"modelNumber,omitempty"`
+	// ItemSeq links the issue to the diff (GET …/items?row=…).
+	ItemSeq int            `json:"itemSeq,omitempty" doc:"The diff item of the row (its variant; its product when no variant was planned); 0 for none"`
+	Code    string         `json:"code" doc:"Error code, translated like API errors"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 type ImportIssuePage struct {

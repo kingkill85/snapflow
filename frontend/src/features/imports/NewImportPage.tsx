@@ -70,7 +70,7 @@ export function NewImportPage() {
       void navigate(runPath(run.id), { state })
     } catch (e) {
       if (!controller.signal.aborted) {
-        if (e instanceof ApiError && ['import.file_type', 'import.too_large', 'import.unreadable', 'import.too_many_rows', 'import.too_many_images'].includes(e.code)) setFileError(e)
+        if (e instanceof ApiError && ['import.file_type', 'import.too_large', 'import.unreadable', 'import.too_many_rows', 'import.too_many_columns', 'import.too_many_images', 'import.images_too_large'].includes(e.code)) setFileError(e)
         else setError(e)
       }
     } finally {

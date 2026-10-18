@@ -11,6 +11,20 @@ import (
 	"github.com/google/uuid"
 )
 
+const addFileSource = `-- name: AddFileSource :exec
+INSERT INTO file_sources (source_sha256, file_id) VALUES ($1, $2) ON CONFLICT (source_sha256) DO NOTHING
+`
+
+type AddFileSourceParams struct {
+	SourceSha256 string
+	FileID       uuid.UUID
+}
+
+func (q *Queries) AddFileSource(ctx context.Context, arg AddFileSourceParams) error {
+	_, err := q.db.Exec(ctx, addFileSource, arg.SourceSha256, arg.FileID)
+	return err
+}
+
 const createFile = `-- name: CreateFile :one
 INSERT INTO files (sha256, content_type, size, width, height)
 VALUES ($1, $2, $3, $4, $5)
@@ -36,6 +50,27 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, e
 		arg.Width,
 		arg.Height,
 	)
+	var i File
+	err := row.Scan(
+		&i.ID,
+		&i.Sha256,
+		&i.ContentType,
+		&i.Size,
+		&i.Width,
+		&i.Height,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const fileBySource = `-- name: FileBySource :one
+SELECT f.id, f.sha256, f.content_type, f.size, f.width, f.height, f.created_at FROM file_sources s JOIN files f ON f.id = s.file_id WHERE s.source_sha256 = $1
+`
+
+// FileBySource returns the file an uploaded image became (file_sources),
+// by the SHA-256 of the uploaded bytes.
+func (q *Queries) FileBySource(ctx context.Context, sourceSha256 string) (File, error) {
+	row := q.db.QueryRow(ctx, fileBySource, sourceSha256)
 	var i File
 	err := row.Scan(
 		&i.ID,

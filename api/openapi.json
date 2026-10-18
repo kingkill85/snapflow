@@ -1163,6 +1163,11 @@
           "header": {
             "type": "string"
           },
+          "itemSeq": {
+            "description": "The diff item of the row (its variant; its product when no variant was planned); 0 for none",
+            "format": "int64",
+            "type": "integer"
+          },
           "modelNumber": {
             "type": "string"
           },
@@ -4521,7 +4526,7 @@
         ]
       },
       "post": {
-        "description": "Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content (415 import.file_type), at most 50 MB (413 import.too_large), 20 000 rows (422 import.too_many_rows) and 5 000 pictures (422 import.too_many_images). Creates a run in state uploaded; with `profileId` it is previewed at once.",
+        "description": "Multipart field `file`: an .xlsx workbook or a UTF-8 .csv, recognised by extension and content (415 import.file_type), at most 50 MB (413 import.too_large), 21 000 rows with content (422 import.too_many_rows; the preview allows 20 000 data rows), 1 000 columns (422 import.too_many_columns), 5 000 pictures (422 import.too_many_images) of together 256 MB (422 import.images_too_large). Creates a run in state uploaded; preview it with a profile or mapping next.",
         "operationId": "createImport",
         "requestBody": {
           "content": {
@@ -4529,9 +4534,6 @@
               "encoding": {
                 "file": {
                   "contentType": "application/octet-stream"
-                },
-                "profileId": {
-                  "contentType": "text/plain"
                 }
               },
               "schema": {
@@ -4541,10 +4543,6 @@
                     "contentMediaType": "application/octet-stream",
                     "description": ".xlsx workbook or UTF-8 .csv (; or , separated), at most 50 MB",
                     "format": "binary",
-                    "type": "string"
-                  },
-                  "profileId": {
-                    "description": "Preview at once with this profile",
                     "type": "string"
                   }
                 },
@@ -4585,6 +4583,40 @@
       }
     },
     "/api/imports/{id}": {
+      "delete": {
+        "description": "Removes the run with its preview, issues and change log; its file is no longer referenced. An applied run must be undone first (409 import.state).",
+        "operationId": "deleteImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete an import run",
+        "tags": [
+          "imports"
+        ]
+      },
       "get": {
         "operationId": "getImport",
         "parameters": [
@@ -4628,7 +4660,7 @@
     },
     "/api/imports/{id}/apply": {
       "post": {
-        "description": "Writes the previewed diff in one transaction. 409 import.stale if the catalog changed since the preview (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. A write that fails rolls everything back: the run comes back in state failed with `error`.",
+        "description": "Writes the previewed diff in one transaction. 409 import.stale if the part of the catalog the preview read changed since (preview again), 409 import.state unless previewed, 422 import.has_errors with all or nothing while rows have errors. A write that fails rolls everything back: the run comes back in state failed with `error`. The apply runs to its end even if the client disconnects (at most 10 minutes); the run's state shows the result.",
         "operationId": "applyImport",
         "parameters": [
           {
@@ -4888,6 +4920,40 @@
             "schema": {
               "description": "Only items of rows with errors",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "Leave out unchanged items",
+            "explode": false,
+            "in": "query",
+            "name": "changedOnly",
+            "schema": {
+              "description": "Leave out unchanged items",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Model number, SKU, category key or name (substring, ignoring case), or a file row number",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Model number, SKU, category key or name (substring, ignoring case), or a file row number",
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the items of this file row (issues link here with their row)",
+            "explode": false,
+            "in": "query",
+            "name": "row",
+            "schema": {
+              "description": "Only the items of this file row (issues link here with their row)",
+              "format": "int64",
+              "maximum": 1000000,
+              "minimum": 0,
+              "type": "integer"
             }
           },
           {

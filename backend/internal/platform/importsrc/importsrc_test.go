@@ -88,7 +88,7 @@ func TestXLSX(t *testing.T) {
 			Images: [][]byte{green, blue}, OneCell: []bool{true, false}},
 		{Category: "Panels", Name: "Tile", Model: "T-1", Style: "", Price: "007"},
 	})
-	src, err := importsrc.Open("catalog.xlsx", data, limits)
+	src, err := importsrc.Open("catalog.xlsx", data, limits, importsrc.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,11 +124,18 @@ func TestXLSX(t *testing.T) {
 	if tile.Cell(12) != "F-1  Ivory White" || tile.Cell(16) != "" || tile.Cell(17) != "GW-1 White" {
 		t.Errorf("add-ons %q", tile.Cells)
 	}
-	if len(gw.Images) != 1 || !bytes.Equal(gw.Images[0].Data, red) || gw.Images[0].Column != 3 || !gw.Images[0].TwoCell {
+	read := func(img importsrc.Image) []byte {
+		b, err := src.ImageData(img.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	if len(gw.Images) != 1 || !bytes.Equal(read(gw.Images[0]), red) || gw.Images[0].Column != 3 || !gw.Images[0].TwoCell || gw.Images[0].Size != int64(len(red)) {
 		t.Errorf("gateway image %+v", gw.Images)
 	}
-	if len(tile.Images) != 2 || !bytes.Equal(tile.Images[0].Data, blue) || !tile.Images[0].TwoCell ||
-		!bytes.Equal(tile.Images[1].Data, green) || tile.Images[1].TwoCell {
+	if len(tile.Images) != 2 || !bytes.Equal(read(tile.Images[0]), blue) || !tile.Images[0].TwoCell ||
+		!bytes.Equal(read(tile.Images[1]), green) || tile.Images[1].TwoCell {
 		t.Errorf("tile images: two-cell anchor must come first: %+v", tile.Images)
 	}
 	if len(standard.Images) != 0 {
@@ -151,7 +158,7 @@ func TestXLSXLimits(t *testing.T) {
 	}
 	data := importsrctest.V1Workbook(t, rows)
 	open := func(l importsrc.Limits) error {
-		src, err := importsrc.Open("a.xlsx", data, l)
+		src, err := importsrc.Open("a.xlsx", data, l, importsrc.Options{})
 		if err != nil {
 			return err
 		}
@@ -169,13 +176,16 @@ func TestXLSXLimits(t *testing.T) {
 		t.Errorf("within limits: %v", err)
 	}
 	// Pictures above the byte limit come back marked, without data.
-	src, _ := importsrc.Open("a.xlsx", data, importsrc.Limits{MaxImageBytes: 10})
+	src, _ := importsrc.Open("a.xlsx", data, importsrc.Limits{MaxImageBytes: 10}, importsrc.Options{})
 	table, err := src.Table("")
-	if err != nil || !table.Rows[1].Images[0].TooLarge || table.Rows[1].Images[0].Data != nil {
+	if err != nil || !table.Rows[1].Images[0].TooLarge {
 		t.Errorf("too large: %v %+v", err, table.Rows[1].Images)
 	}
+	if _, err := src.ImageData(table.Rows[1].Images[0].Name); err == nil || code(t, err) != "file.too_large" {
+		t.Errorf("reading a picture above the limit: %v", err)
+	}
 	// A damaged workbook.
-	if _, err := importsrc.Open("a.xlsx", append([]byte("PK\x03\x04"), make([]byte, 100)...), limits); err == nil || code(t, err) != "import.unreadable" {
+	if _, err := importsrc.Open("a.xlsx", append([]byte("PK\x03\x04"), make([]byte, 100)...), limits, importsrc.Options{}); err == nil || code(t, err) != "import.unreadable" {
 		t.Errorf("damaged: %v", err)
 	}
 }
@@ -190,7 +200,7 @@ func TestXLSXColumnA(t *testing.T) {
 	_ = f.SetCellValue("Sheet1", "C2", 2.5)
 	var buf bytes.Buffer
 	_ = f.Write(&buf)
-	src, err := importsrc.Open("a.xlsx", buf.Bytes(), limits)
+	src, err := importsrc.Open("a.xlsx", buf.Bytes(), limits, importsrc.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +226,7 @@ func TestCSV(t *testing.T) {
 		}},
 	}
 	for _, c := range cases {
-		src, err := importsrc.Open("a.csv", []byte(c.data), limits)
+		src, err := importsrc.Open("a.csv", []byte(c.data), limits, importsrc.Options{})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -235,14 +245,14 @@ func TestCSV(t *testing.T) {
 			t.Errorf("%s: kind %s sheets %q", c.name, src.Kind(), src.Sheets())
 		}
 	}
-	src, _ := importsrc.Open("a.csv", []byte("a\n"), limits)
+	src, _ := importsrc.Open("a.csv", []byte("a\n"), limits, importsrc.Options{})
 	if _, err := src.Table("Sheet1"); err == nil || code(t, err) != "import.sheet_not_found" {
 		t.Errorf("sheet: %v", err)
 	}
-	if _, err := importsrc.Open("a.csv", []byte("a\nb\nc\n"), importsrc.Limits{MaxRows: 2}); err == nil || code(t, err) != "import.too_many_rows" {
+	if _, err := importsrc.Open("a.csv", []byte("a\nb\nc\n"), importsrc.Limits{MaxRows: 2}, importsrc.Options{}); err == nil || code(t, err) != "import.too_many_rows" {
 		t.Errorf("rows: %v", err)
 	}
-	if _, err := importsrc.Open("a.csv", []byte("a;\"b\nc"), limits); err != nil {
+	if _, err := importsrc.Open("a.csv", []byte("a;\"b\nc"), limits, importsrc.Options{}); err != nil {
 		// An unterminated quote is read leniently up to the end.
 		t.Errorf("lazy quotes: %v", err)
 	}
@@ -259,7 +269,7 @@ func TestRealWorkbook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := importsrc.Open(p, data, importsrc.Limits{MaxRows: 20000, MaxImages: 5000, MaxImageBytes: 10 << 20})
+	src, err := importsrc.Open(p, data, importsrc.Limits{MaxRows: 20000, MaxImages: 5000, MaxImageBytes: 10 << 20}, importsrc.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,5 +288,55 @@ func TestRealWorkbook(t *testing.T) {
 	}
 	if table.Rows[0].Number != 3 || table.Rows[0].Cell(1) != "Category" || withImage != 201 || len(media) != 77 {
 		t.Errorf("first row %d %q, rows with pictures %d, media %d", table.Rows[0].Number, table.Rows[0].Cell(1), withImage, len(media))
+	}
+}
+
+// The delimiter: a title line with commas above a ";" table does not
+// decide it; a known header row does; "sep=" sets it and is no row.
+func TestCSVDelimiter(t *testing.T) {
+	cells := func(data string, opts importsrc.Options) map[int][]string {
+		t.Helper()
+		src, err := importsrc.Open("a.csv", []byte(data), limits, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = src.Close() }()
+		tbl, _ := src.Table("")
+		out := map[int][]string{}
+		for _, r := range tbl.Rows {
+			out[r.Number] = r.Cells
+		}
+		return out
+	}
+	title := "Preisliste Zigbee, Stand 2026\n\nModel;Name;Price\nM-1;Dimmer, white;1,50\n"
+	want := map[int][]string{1: {"Preisliste Zigbee, Stand 2026"}, 3: {"Model", "Name", "Price"}, 4: {"M-1", "Dimmer, white", "1,50"}}
+	if got := cells(title, importsrc.Options{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("title line: %v", got)
+	}
+	if got := cells(title, importsrc.Options{HeaderRow: 3}); !reflect.DeepEqual(got, want) {
+		t.Errorf("header row: %v", got)
+	}
+	// Lines above the header row do not count; the header row breaks ties.
+	if got := cells("a,b,c\nx,y,z\nm;n\n1;2\n", importsrc.Options{HeaderRow: 3}); !reflect.DeepEqual(got, map[int][]string{1: {"a,b,c"}, 2: {"x,y,z"}, 3: {"m", "n"}, 4: {"1", "2"}}) {
+		t.Errorf("from the header row: %v", got)
+	}
+	if got := cells("a,b,c\n1;2;3\n", importsrc.Options{HeaderRow: 1}); !reflect.DeepEqual(got, map[int][]string{1: {"a", "b", "c"}, 2: {"1;2;3"}}) {
+		t.Errorf("tie, header row: %v", got)
+	}
+	if got := cells("a,b,c\n1;2;3\n", importsrc.Options{}); !reflect.DeepEqual(got, map[int][]string{1: {"a,b,c"}, 2: {"1", "2", "3"}}) {
+		t.Errorf("tie: %v", got)
+	}
+	if got := cells("sep=,\nModel,Price\nM-1,\"1,5\"\n", importsrc.Options{}); !reflect.DeepEqual(got, map[int][]string{1: {"Model", "Price"}, 2: {"M-1", "1,5"}}) {
+		t.Errorf("sep line: %v", got)
+	}
+	if got := cells("a\nb\n", importsrc.Options{}); !reflect.DeepEqual(got, map[int][]string{1: {"a"}, 2: {"b"}}) {
+		t.Errorf("one column: %v", got)
+	}
+	wide := "a" + strings.Repeat(";", 1000) + "x\n"
+	if _, err := importsrc.Open("a.csv", []byte(wide), importsrc.Limits{MaxColumns: 1000}, importsrc.Options{}); err == nil || code(t, err) != "import.too_many_columns" {
+		t.Errorf("columns: %v", err)
+	}
+	if _, err := importsrc.Open("a.csv", []byte("a"+strings.Repeat(";", 1000)+"\n"), importsrc.Limits{MaxColumns: 1000}, importsrc.Options{}); err != nil {
+		t.Errorf("empty columns beyond the limit: %v", err)
 	}
 }

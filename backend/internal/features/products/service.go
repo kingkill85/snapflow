@@ -218,15 +218,15 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 	if err != nil {
 		return Product{}, err
 	}
-	row, err := s.createProduct(ctx, in)
+	row, err := s.createProduct(ctx, in, Known{})
 	if err != nil {
 		return Product{}, err
 	}
 	return s.detail(ctx, actor, row)
 }
 
-func (s *Service) createProduct(ctx context.Context, in ProductInput) (store.Product, error) {
-	in, err := s.validateProduct(ctx, in, nil)
+func (s *Service) createProduct(ctx context.Context, in ProductInput, known Known) (store.Product, error) {
+	in, err := s.validateProduct(ctx, in, nil, known)
 	if err != nil {
 		return store.Product{}, err
 	}
@@ -256,7 +256,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 	if err != nil {
 		return Product{}, err
 	}
-	row, err := s.updateProduct(ctx, id, in, false)
+	row, err := s.updateProduct(ctx, id, in, false, Known{})
 	if err != nil {
 		return Product{}, err
 	}
@@ -265,7 +265,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 
 // updateProduct validates and writes an update; raw writes in as it is
 // (undoing an import restores a state that existed).
-func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpdate, raw bool) (store.Product, error) {
+func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpdate, raw bool, known Known) (store.Product, error) {
 	current, err := s.q.GetProduct(ctx, id)
 	if err != nil {
 		return store.Product{}, notFound(err, "product.not_found")
@@ -274,7 +274,7 @@ func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpd
 		return store.Product{}, errProductStale()
 	}
 	if !raw {
-		in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current)
+		in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current, known)
 		if err != nil {
 			return store.Product{}, err
 		}
@@ -329,28 +329,35 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // validateProduct checks a create (current nil) or an update of current.
-func (s *Service) validateProduct(ctx context.Context, in ProductInput, current *store.Product) (ProductInput, error) {
+// The product type and category are read unless known has them.
+func (s *Service) validateProduct(ctx context.Context, in ProductInput, current *store.Product, known Known) (ProductInput, error) {
 	var existing *Existing
 	if current != nil {
 		existing = &Existing{ProductTypeID: current.ProductTypeID, CategoryID: current.CategoryID, Attributes: current.Attributes}
 	}
-	var ptp *producttypes.ProductType
-	pt, err := s.types.Get(ctx, in.ProductTypeID)
-	switch {
-	case hasCode(err, "product_type.not_found"):
-	case err != nil:
-		return in, err
-	default:
-		ptp = &pt
+	ptp := known.Type
+	if ptp == nil || ptp.ID != in.ProductTypeID {
+		ptp = nil
+		pt, err := s.types.Get(ctx, in.ProductTypeID)
+		switch {
+		case hasCode(err, "product_type.not_found"):
+		case err != nil:
+			return in, err
+		default:
+			ptp = &pt
+		}
 	}
-	var cp *categories.Category
-	c, err := s.cats.Get(ctx, in.CategoryID)
-	switch {
-	case hasCode(err, "category.not_found"):
-	case err != nil:
-		return in, err
-	default:
-		cp = &c
+	cp := known.Category
+	if cp == nil || cp.ID != in.CategoryID {
+		cp = nil
+		c, err := s.cats.Get(ctx, in.CategoryID)
+		switch {
+		case hasCode(err, "category.not_found"):
+		case err != nil:
+			return in, err
+		default:
+			cp = &c
+		}
 	}
 	// nil reports the type or category as not found (and skips the
 	// attribute checks without a category).
@@ -416,24 +423,36 @@ func (s *Service) CreateVariant(ctx context.Context, productID uuid.UUID, in Var
 	if err != nil {
 		return Variant{}, err
 	}
-	product, row, err := s.createVariant(ctx, productID, in)
+	product, row, err := s.createVariant(ctx, productID, in, Known{})
 	if err != nil {
 		return Variant{}, err
 	}
 	return s.variantDetail(ctx, actor, product, row)
 }
 
-func (s *Service) createVariant(ctx context.Context, productID uuid.UUID, in VariantInput) (store.Product, store.ProductVariant, error) {
-	var row store.ProductVariant
-	product, err := s.q.GetProduct(ctx, productID)
-	if err != nil {
-		return product, row, notFound(err, "product.not_found")
+// createVariant validates and writes a new variant. With a known category
+// (the product's, read by the caller in the same transaction) the product is
+// not read first and the returned product is empty; LockProduct still finds
+// a missing product.
+func (s *Service) createVariant(ctx context.Context, productID uuid.UUID, in VariantInput, known Known) (store.Product, store.ProductVariant, error) {
+	var (
+		row     store.ProductVariant
+		product store.Product
+		err     error
+	)
+	c := known.Category
+	if c == nil {
+		product, err = s.q.GetProduct(ctx, productID)
+		if err != nil {
+			return product, row, notFound(err, "product.not_found")
+		}
+		cat, err := s.cats.Get(ctx, product.CategoryID)
+		if err != nil {
+			return product, row, err
+		}
+		c = &cat
 	}
-	c, err := s.cats.Get(ctx, product.CategoryID)
-	if err != nil {
-		return product, row, err
-	}
-	in, err = s.validateVariant(ctx, c, in, nil)
+	in, err = s.validateVariant(ctx, *c, in, nil)
 	if err != nil {
 		return product, row, err
 	}
@@ -441,6 +460,7 @@ func (s *Service) createVariant(ctx context.Context, productID uuid.UUID, in Var
 		if _, err := q.LockProduct(ctx, productID); err != nil {
 			return err
 		}
+		var err error
 		row, err = q.CreateVariant(ctx, store.CreateVariantParams{
 			ProductID: productID, Name: in.Name, Sku: strPtr(in.SKU), Price: in.Price,
 			ImageFileID: in.ImageFileID, Attributes: in.Attributes, IsActive: in.IsActive,
@@ -460,7 +480,7 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if err != nil {
 		return Variant{}, err
 	}
-	product, row, err := s.updateVariant(ctx, productID, id, in, false)
+	product, row, err := s.updateVariant(ctx, productID, id, in, false, Known{})
 	if err != nil {
 		return Variant{}, err
 	}
@@ -468,8 +488,10 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 }
 
 // updateVariant validates and writes an update; raw writes in as it is
-// (undoing an import restores a state that existed).
-func (s *Service) updateVariant(ctx context.Context, productID, id uuid.UUID, in VariantUpdate, raw bool) (store.Product, store.ProductVariant, error) {
+// (undoing an import restores a state that existed). With a known category
+// (the product's) the product is not read and the returned product is
+// empty.
+func (s *Service) updateVariant(ctx context.Context, productID, id uuid.UUID, in VariantUpdate, raw bool, known Known) (store.Product, store.ProductVariant, error) {
 	var (
 		product store.Product
 		row     store.ProductVariant
@@ -481,16 +503,22 @@ func (s *Service) updateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
 		return product, row, errVariantStale()
 	}
-	product, err = s.q.GetProduct(ctx, productID)
-	if err != nil {
-		return product, row, notFound(err, "variant.not_found")
+	if raw || known.Category == nil {
+		product, err = s.q.GetProduct(ctx, productID)
+		if err != nil {
+			return product, row, notFound(err, "variant.not_found")
+		}
 	}
 	if !raw {
-		c, err := s.cats.Get(ctx, product.CategoryID)
-		if err != nil {
-			return product, row, err
+		c := known.Category
+		if c == nil {
+			cat, err := s.cats.Get(ctx, product.CategoryID)
+			if err != nil {
+				return product, row, err
+			}
+			c = &cat
 		}
-		in.VariantInput, err = s.validateVariant(ctx, c, in.VariantInput, current.Attributes)
+		in.VariantInput, err = s.validateVariant(ctx, *c, in.VariantInput, current.Attributes)
 		if err != nil {
 			return product, row, err
 		}
@@ -684,6 +712,9 @@ func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (Va
 // one transaction. Every add-on must exist, differ from the variant and
 // appear once; all problems are reported together. Cycles are allowed.
 //
+// The list's version (CatalogVariant.AddonsUpdatedAt) moves on; the
+// variant's updatedAt does not (D56).
+//
 // Lock order: the product (KEY SHARE, like LockProduct's callers take the
 // product first), the variant (NO KEY UPDATE), then the add-on variants (KEY
 // SHARE, in id order). Replaces never wait for each other's add-on locks, and
@@ -718,7 +749,7 @@ func (s *Service) replaceAddons(ctx context.Context, productID, variantID uuid.U
 		if _, err := q.ShareProduct(ctx, productID); err != nil {
 			return notFound(err, "variant.not_found")
 		}
-		if _, err := q.LockVariantForAddons(ctx, store.LockVariantForAddonsParams{ID: variantID, ProductID: productID}); err != nil {
+		if _, err := q.TouchVariantAddons(ctx, store.TouchVariantAddonsParams{ID: variantID, ProductID: productID}); err != nil {
 			return notFound(err, "variant.not_found")
 		}
 		ids := make([]uuid.UUID, len(list))

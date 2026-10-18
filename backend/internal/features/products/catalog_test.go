@@ -136,14 +136,14 @@ func TestWithTxSavepoints(t *testing.T) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	inTx := svc.WithTx(tx)
-	if _, err := inTx.CreateProductRow(ctx, in("m-1")); code(err) != "product.model_number_taken" {
+	if _, err := inTx.CreateProductRow(ctx, in("m-1"), products.Known{}); code(err) != "product.model_number_taken" {
 		t.Fatalf("duplicate: %v", err)
 	}
-	created, err := inTx.CreateProductRow(ctx, in("M-2"))
+	created, err := inTx.CreateProductRow(ctx, in("M-2"), products.Known{})
 	if err != nil {
 		t.Fatalf("the outer transaction must still work: %v", err)
 	}
-	v, err := inTx.CreateVariantRow(ctx, created.ID, products.VariantInput{Name: i18n.Text{"en": "A"}, Price: "1", IsActive: true})
+	v, err := inTx.CreateVariantRow(ctx, created.ID, products.VariantInput{Name: i18n.Text{"en": "A"}, Price: "1", IsActive: true}, products.Known{})
 	if err != nil {
 		t.Fatal(err)
 	}

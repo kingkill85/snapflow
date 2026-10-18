@@ -13,6 +13,8 @@ export interface ImportIssue {
   /** Column letter */
   column?: string;
   header?: string;
+  /** The diff item of the row (its variant; its product when no variant was planned); 0 for none */
+  itemSeq?: number;
   modelNumber?: string;
   params?: ImportIssueParams;
   /** File row; 0 for the whole file */

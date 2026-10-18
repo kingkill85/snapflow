@@ -21,6 +21,21 @@ status?: ListImportItemsStatus;
  */
 skipped?: boolean;
 /**
+ * Leave out unchanged items
+ */
+changedOnly?: boolean;
+/**
+ * Model number, SKU, category key or name (substring, ignoring case), or a file row number
+ * @maxLength 200
+ */
+search?: string;
+/**
+ * Only the items of this file row (issues link here with their row)
+ * @minimum 0
+ * @maximum 1000000
+ */
+row?: number;
+/**
  * Page size, 1-500
  * @minimum 1
  * @maximum 500

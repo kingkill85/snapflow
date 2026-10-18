@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,10 +28,18 @@ import (
 // names.
 const MaxConflicts = 50
 
+// ApplyTimeout bounds an apply or undo. They run detached from the request
+// (a client that disconnects or a proxy that times out does not roll them
+// back; the run's state shows the result, D151).
+const ApplyTimeout = 10 * time.Minute
+
 // applyTx runs apply and undo: REPEATABLE READ, so a concurrent change to
 // anything they write aborts them (40001) instead of being overwritten;
 // database.InTx runs them again, and the catalog token check then reports
-// the preview as stale.
+// the preview as stale. Their first statement updates the import_lock row
+// (BumpImportLock): that serialises them, and a waiting one gets a
+// serialization error once the first commits, so it runs again on a fresh
+// snapshot (D146).
 var applyTx = pgx.TxOptions{IsoLevel: pgx.RepeatableRead}
 
 // ImportApplyInput are the options of an apply.
@@ -40,13 +51,41 @@ type ImportApplyInput struct {
 // failTestHook lets tests make a write fail (export_test.go).
 var failTestHook func(item ImportItem) error
 
+// undoTestHook lets tests act between undo's checks and its writes.
+var undoTestHook func()
+
 // errRolledBack ends an apply transaction whose write failed (all or
 // nothing); the run is then marked failed.
 var errRolledBack = errors.New("imports: apply rolled back")
 
+func errStale() error {
+	return apperr.Conflict("import.stale", "the catalog changed since the preview; preview again")
+}
+
+// staleError reports an error of a write that means the catalog changed
+// under the preview (D147): a version moved on, something is gone, or a
+// unique key was taken since. The preview checked all of these, so the run
+// goes back to the preview (409 import.stale) instead of failing.
+func staleError(err error) bool {
+	var ae *apperr.Error
+	if !errors.As(err, &ae) {
+		return false
+	}
+	codes := []string{ae.Code}
+	for _, f := range ae.Fields {
+		codes = append(codes, f.Code)
+	}
+	for _, c := range codes {
+		if strings.HasSuffix(c, ".stale") || strings.HasSuffix(c, "not_found") || strings.HasSuffix(c, "_taken") {
+			return true
+		}
+	}
+	return false
+}
+
 // Apply writes a previewed run's diff in one transaction, through the
-// category and product services (all their rules apply). The catalog
-// must still be in the state the preview saw (import.stale otherwise: run
+// category and product services (all their rules apply). The part of the
+// catalog the preview read must be unchanged (import.stale otherwise: run
 // the preview again). With all or nothing (the default), a preview with
 // row errors is refused (import.has_errors) and a write that fails rolls
 // everything back and marks the run failed; otherwise items with errors
@@ -56,6 +95,8 @@ func (s *Service) Apply(ctx context.Context, id uuid.UUID, in ImportApplyInput) 
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return ImportRun{}, err
 	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ApplyTimeout)
+	defer cancel()
 	var (
 		row     store.ImportRun
 		failure *ImportRunError
@@ -63,7 +104,7 @@ func (s *Service) Apply(ctx context.Context, id uuid.UUID, in ImportApplyInput) 
 	)
 	err := s.inTx(ctx, applyTx, func(tx pgx.Tx, q *store.Queries) error {
 		failure = nil
-		if err := q.LockImports(ctx, importLockKey); err != nil {
+		if _, err := q.BumpImportLock(ctx); err != nil {
 			return err
 		}
 		run, err := q.LockRun(ctx, id)
@@ -80,7 +121,8 @@ func (s *Service) Apply(ctx context.Context, id uuid.UUID, in ImportApplyInput) 
 		if err := json.Unmarshal(run.Counts, &counts); err != nil || counts.Preview == nil {
 			return fmt.Errorf("imports: run %s counts: %w", id, err)
 		}
-		if err := s.checkToken(ctx, s.types.WithTx(tx), s.cats.WithTx(tx), s.products.WithTx(tx), run.CatalogToken); err != nil {
+		types, cats, err := s.checkToken(ctx, tx, run)
+		if err != nil {
 			return err
 		}
 		if allOrNothing && counts.Preview.Errors > 0 {
@@ -90,14 +132,18 @@ func (s *Service) Apply(ctx context.Context, id uuid.UUID, in ImportApplyInput) 
 		if err != nil {
 			return err
 		}
-		ex := &executor{ctx: ctx, tx: tx, s: s, allOrNothing: allOrNothing, preview: *counts.Preview,
-			categories: map[int]uuid.UUID{}, products: map[int]uuid.UUID{}, variants: map[int]uuid.UUID{}, failed: map[int]bool{}}
+		ex := newExecutor(ctx, tx, s, allOrNothing, *counts.Preview, types, cats)
 		if err := ex.load(planRows); err != nil {
 			return err
 		}
 		if err := ex.run(); err != nil {
 			var ae *apperr.Error
-			if allOrNothing && errors.As(err, &ae) && !apperr.IsRetryable(err) {
+			switch {
+			case apperr.IsRetryable(err):
+				return err
+			case staleError(err):
+				return errStale()
+			case allOrNothing && errors.As(err, &ae):
 				failure = &ImportRunError{Code: ae.Code, Params: ae.Params, Rows: ex.failedRows, Field: ex.failedField}
 				if len(ae.Fields) > 0 {
 					failure.Code, failure.Params, failure.Field = ae.Fields[0].Code, ae.Fields[0].Params, ae.Fields[0].Location
@@ -156,28 +202,35 @@ func (s *Service) Apply(ctx context.Context, id uuid.UUID, in ImportApplyInput) 
 	return runOut(row)
 }
 
-// checkToken compares the catalog with the preview's snapshot.
-func (s *Service) checkToken(ctx context.Context, types *producttypes.Service, cats *categories.Service, prods *products.Service, want string) error {
-	typeList, err := types.List(ctx, true)
+// checkToken compares the part of the catalog the preview read with its
+// token (import.stale if it changed) and returns the product types and
+// categories read.
+func (s *Service) checkToken(ctx context.Context, tx pgx.Tx, run store.ImportRun) (map[uuid.UUID]producttypes.ProductType, map[uuid.UUID]categories.Category, error) {
+	typeList, err := s.types.WithTx(tx).List(ctx, true)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	catList, err := cats.List(ctx, true)
+	catList, err := s.cats.WithTx(tx).List(ctx, true)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	catalog, err := prods.Catalog(ctx)
+	catalog, err := s.products.WithTx(tx).Catalog(ctx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	token, err := catalogToken(typeList, catList, catalog)
+	var scope catalogScope
+	if err := json.Unmarshal(run.CatalogScope, &scope); err != nil {
+		return nil, nil, err
+	}
+	scope.normalize()
+	token, err := scopeToken(typeList, catList, catalog, scope)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	if token != want {
-		return apperr.Conflict("import.stale", "the catalog changed since the preview; preview again")
+	if token != run.CatalogToken {
+		return nil, nil, errStale()
 	}
-	return nil
+	return typesByID(typeList), categoriesByID(catList), nil
 }
 
 type planned struct {
@@ -197,14 +250,42 @@ type executor struct {
 	allOrNothing bool
 	preview      ImportCounts
 	items        []*planned
+	// The services on the apply's transaction: all or nothing, without
+	// savepoints (the first error ends the apply anyway); otherwise each unit
+	// gets a savepoint.
+	cats  *categories.Service
+	prods *products.Service
+	// Product types and categories as read in the transaction, and the
+	// categories the run creates (by item seq).
+	types      map[uuid.UUID]producttypes.ProductType
+	categories map[uuid.UUID]categories.Category
+	created    map[int]categories.Category
 	// ids of what the run created, by item seq
-	categories, products, variants map[int]uuid.UUID
-	failed                         map[int]bool
-	changes                        []changeRecord
-	issues                         []ImportIssue
-	applied                        ImportCounts
-	failedRows                     []int
-	failedField                    string
+	products, variants map[int]uuid.UUID
+	// productCategory is the category of a product item after the import.
+	productCategory map[int]uuid.UUID
+	failed          map[int]bool
+	// rowSeq is the item of each file row (for issues).
+	rowSeq      map[int]int
+	changes     []changeRecord
+	issues      []ImportIssue
+	applied     ImportCounts
+	failedRows  []int
+	failedField string
+}
+
+func newExecutor(ctx context.Context, tx pgx.Tx, s *Service, allOrNothing bool, preview ImportCounts,
+	types map[uuid.UUID]producttypes.ProductType, cats map[uuid.UUID]categories.Category,
+) *executor {
+	ex := &executor{ctx: ctx, tx: tx, s: s, allOrNothing: allOrNothing, preview: preview, types: types, categories: cats,
+		created: map[int]categories.Category{}, products: map[int]uuid.UUID{}, variants: map[int]uuid.UUID{},
+		productCategory: map[int]uuid.UUID{}, failed: map[int]bool{}, rowSeq: map[int]int{}}
+	direct := tx
+	if allOrNothing {
+		direct = database.Joined(tx)
+	}
+	ex.cats, ex.prods = s.cats.WithTx(direct), s.products.WithTx(direct)
+	return ex
 }
 
 type changeRecord struct {
@@ -223,6 +304,11 @@ func (ex *executor) load(rows []store.ListPlanRow) error {
 			return err
 		}
 		ex.items = append(ex.items, p)
+		for _, row := range p.item.Rows {
+			if _, ok := ex.rowSeq[row]; !ok || p.entity == "variant" {
+				ex.rowSeq[row] = p.seq
+			}
+		}
 	}
 	return nil
 }
@@ -245,16 +331,21 @@ func (ex *executor) run() error {
 	return ex.addons()
 }
 
-// unit writes one unit in a savepoint; with skipping, a failing unit is
-// rolled back and reported.
+// unit writes one unit. Without all or nothing a unit that writes gets a
+// savepoint, and a failing one is rolled back and reported at all its rows;
+// a unit without writes (everything unchanged) needs none.
 func (ex *executor) unit(unit []*planned) error {
 	var (
 		changes []changeRecord
 		applied ImportCounts
 		ids     = map[int]uuid.UUID{}
 	)
-	err := database.InTx(ex.ctx, database.NewNested(ex.tx), pgx.TxOptions{}, func(sp pgx.Tx) error {
-		cats, prods := ex.s.cats.WithTx(sp), ex.s.products.WithTx(sp)
+	writes := false
+	for _, it := range unit {
+		writes = writes || (it.status != "unchanged" && !it.skipped)
+	}
+	write := func(cats *categories.Service, prods *products.Service) error {
+		var batch []*planned // new variants, all or nothing: one statement
 		for _, it := range unit {
 			if it.skipped || ex.failed[it.plan.CategorySeq] || ex.failed[it.plan.ProductSeq] {
 				ex.failed[it.seq] = true // its dependants are skipped too
@@ -266,6 +357,12 @@ func (ex *executor) unit(unit []*planned) error {
 					return err
 				}
 			}
+			if ex.allOrNothing && it.entity == "variant" && it.status == "new" {
+				count(&applied.Variants, it.status)
+				countImage(&applied, it.plan)
+				batch = append(batch, it)
+				continue
+			}
 			change, err := ex.write(cats, prods, it, ids, &applied)
 			if err != nil {
 				ex.failedRows = it.item.Rows
@@ -275,23 +372,60 @@ func (ex *executor) unit(unit []*planned) error {
 				changes = append(changes, *change)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		var ae *apperr.Error
-		if ex.allOrNothing || !errors.As(err, &ae) || apperr.IsRetryable(err) {
+		if len(batch) == 0 {
+			return nil
+		}
+		p := batch[0].plan
+		productID := ex.productOf(p, ids)
+		in := make([]products.VariantInput, len(batch))
+		for i, it := range batch {
+			in[i] = *it.plan.Variant
+		}
+		known := ex.variantKnown(p)
+		known.NewProduct = p.ProductID == nil // created in this unit
+		created, failed, err := prods.CreateVariantRows(ex.ctx, productID, in, known)
+		if err != nil {
+			if failed >= 0 {
+				ex.failedRows = batch[failed].item.Rows
+			} else {
+				ex.failedRows = batch[0].item.Rows
+			}
 			return err
 		}
-		// Skip the unit; report the error at its rows.
+		for i, it := range batch {
+			ids[it.seq] = created[i].ID
+			changes = append(changes, changeRecord{entity: "variant", action: "create", id: created[i].ID,
+				label: variantLabel(it.item.ModelNumber, it.item.SKU, it.item.Name), after: created[i]})
+		}
+		return nil
+	}
+	var err error
+	if ex.allOrNothing || !writes {
+		err = write(ex.cats, ex.prods)
+	} else {
+		err = database.InTx(ex.ctx, database.NewNested(ex.tx), pgx.TxOptions{}, func(sp pgx.Tx) error {
+			return write(ex.s.cats.WithTx(sp), ex.s.products.WithTx(sp))
+		})
+	}
+	if err != nil {
+		var ae *apperr.Error
+		if ex.allOrNothing || !errors.As(err, &ae) || apperr.IsRetryable(err) || staleError(err) {
+			return err
+		}
+		// Skip the unit; report the error at every row of it.
+		rows := map[int]bool{}
 		for _, it := range unit {
 			ex.failed[it.seq] = true
+			for _, r := range it.item.Rows {
+				rows[r] = true
+			}
 		}
 		code, params := ae.Code, ae.Params
 		if len(ae.Fields) > 0 {
 			code, params = ae.Fields[0].Code, ae.Fields[0].Params
 		}
-		for _, row := range ex.failedRows {
-			ex.issues = append(ex.issues, ImportIssue{Severity: "error", Row: row, ModelNumber: unit[0].item.ModelNumber, Code: code, Params: params})
+		for _, row := range slices.Sorted(maps.Keys(rows)) {
+			ex.issues = append(ex.issues, ImportIssue{Severity: "error", Row: row, ModelNumber: unit[0].item.ModelNumber, Code: code, Params: params, ItemSeq: ex.rowSeq[row]})
 		}
 		ex.applied.Errors++
 		return nil
@@ -299,7 +433,7 @@ func (ex *executor) unit(unit []*planned) error {
 	for seq, id := range ids {
 		switch kindOf(unit, seq) {
 		case "category":
-			ex.categories[seq] = id
+			// ex.created is set by write
 		case "product":
 			ex.products[seq] = id
 		case "variant":
@@ -345,8 +479,33 @@ func count(c *ImportCounter, status string) {
 	}
 }
 
+// category returns a category by id, or the one the run created for seq.
+func (ex *executor) category(id uuid.UUID, seq int) *categories.Category {
+	if seq != 0 {
+		if c, ok := ex.created[seq]; ok {
+			return &c
+		}
+		return nil
+	}
+	if c, ok := ex.categories[id]; ok {
+		return &c
+	}
+	return nil
+}
+
+// variantKnown is what a variant write of the plan entry may skip reading:
+// its product's category after the import.
+func (ex *executor) variantKnown(p planEntry) products.Known {
+	var known products.Known
+	if id, ok := ex.productCategory[p.ProductSeq]; ok {
+		known.Category = ex.category(id, 0)
+	}
+	return known
+}
+
 // write applies one item and returns its change log entry (nil when
-// nothing was written). Created ids go to ids by seq.
+// nothing was written). Created ids go to ids by seq. The writes get the
+// product type and category the transaction already read (products.Known).
 func (ex *executor) write(cats *categories.Service, prods *products.Service, it *planned, ids map[int]uuid.UUID, applied *ImportCounts) (*changeRecord, error) {
 	ctx, p := ex.ctx, it.plan
 	switch it.entity {
@@ -356,11 +515,15 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 			return nil, err
 		}
 		ids[it.seq] = c.ID
+		ex.created[it.seq] = c
 		applied.Categories.New++
 		return &changeRecord{entity: "category", action: "create", id: c.ID, label: c.Key, after: categoryState(c)}, nil
 
 	case "product":
 		count(&applied.Products, it.status)
+		if p.Product != nil {
+			ex.productCategory[it.seq] = p.Product.CategoryID
+		}
 		switch it.status {
 		case "unchanged":
 			ids[it.seq] = *p.ID
@@ -374,14 +537,19 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 		}
 		in := *p.Product
 		if p.CategorySeq != 0 {
-			id, ok := ex.categories[p.CategorySeq]
+			c, ok := ex.created[p.CategorySeq]
 			if !ok {
 				return nil, nil
 			}
-			in.CategoryID = id
+			in.CategoryID = c.ID
+			ex.productCategory[it.seq] = c.ID
+		}
+		known := products.Known{Category: ex.category(in.CategoryID, p.CategorySeq)}
+		if t, ok := ex.types[in.ProductTypeID]; ok {
+			known.Type = &t
 		}
 		if it.status == "new" {
-			after, err := prods.CreateProductRow(ctx, in)
+			after, err := prods.CreateProductRow(ctx, in, known)
 			if err != nil {
 				return nil, err
 			}
@@ -389,7 +557,7 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 			return &changeRecord{entity: "product", action: "create", id: after.ID, label: after.ModelNumber, after: after}, nil
 		}
 		ids[it.seq] = *p.ID
-		after, err := prods.UpdateProductRow(ctx, *p.ID, products.ProductUpdate{ProductInput: in, ExpectedUpdatedAt: p.ExpectedUpdatedAt})
+		after, err := prods.UpdateProductRow(ctx, *p.ID, products.ProductUpdate{ProductInput: in, ExpectedUpdatedAt: p.ExpectedUpdatedAt}, known)
 		if err != nil {
 			return nil, err
 		}
@@ -399,6 +567,7 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 		count(&applied.Variants, it.status)
 		productID := ex.productOf(p, ids)
 		label := variantLabel(it.item.ModelNumber, it.item.SKU, it.item.Name)
+		known := ex.variantKnown(p)
 		switch it.status {
 		case "unchanged":
 			ids[it.seq] = *p.ID
@@ -411,7 +580,7 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 			}
 			return &changeRecord{entity: "variant", action: "deactivate", id: after.ID, label: label, before: p.BeforeVariant, after: after}, nil
 		case "new":
-			after, err := prods.CreateVariantRow(ctx, productID, *p.Variant)
+			after, err := prods.CreateVariantRow(ctx, productID, *p.Variant, known)
 			if err != nil {
 				return nil, err
 			}
@@ -424,7 +593,7 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 		if onlyAddons(it.item.Changes) {
 			return nil, nil // the add-on phase writes them
 		}
-		after, err := prods.UpdateVariantRow(ctx, productID, *p.ID, products.VariantUpdate{VariantInput: *p.Variant, ExpectedUpdatedAt: p.ExpectedUpdatedAt})
+		after, err := prods.UpdateVariantRow(ctx, productID, *p.ID, products.VariantUpdate{VariantInput: *p.Variant, ExpectedUpdatedAt: p.ExpectedUpdatedAt}, known)
 		if err != nil {
 			return nil, err
 		}
@@ -475,8 +644,14 @@ type addonState struct {
 }
 
 // addons replaces the add-on lists that change, once every variant exists.
-// Links to variants that were skipped are left out.
+// Links to variants that were skipped are left out (with a warning). All or
+// nothing, the lists are written together in a few statements.
 func (ex *executor) addons() error {
+	var (
+		batch      []products.VariantAddons
+		batchItems []*planned
+		batchDone  []changeRecord
+	)
 	for _, it := range ex.items {
 		p := it.plan
 		if it.entity != "variant" || p.Addons == nil || it.skipped || ex.failed[it.seq] || ex.failed[p.ProductSeq] {
@@ -497,6 +672,13 @@ func (ex *executor) addons() error {
 			if id == nil {
 				created, ok := ex.variants[a.Seq]
 				if !ok {
+					// Its unit failed (skipped): the link is left out.
+					for _, row := range it.item.Rows {
+						ex.issues = append(ex.issues, ImportIssue{Severity: "warning", Row: row, ModelNumber: it.item.ModelNumber, Target: "addon",
+							Code: "import.addon_skipped", Params: map[string]any{"ref": a.Label}, ItemSeq: it.seq})
+						ex.applied.Warnings++
+					}
+					ex.applied.Addons.Unresolved++
 					continue
 				}
 				id = &created
@@ -508,27 +690,6 @@ func (ex *executor) addons() error {
 		if p.BeforeVariant != nil {
 			before = p.BeforeVariant.Addons
 		}
-		countLinks(&ex.applied.Addons, before, list)
-		err := database.InTx(ex.ctx, database.NewNested(ex.tx), pgx.TxOptions{}, func(sp pgx.Tx) error {
-			if failTestHook != nil {
-				if err := failTestHook(ImportItem{Entity: "addons", Rows: it.item.Rows, ModelNumber: it.item.ModelNumber}); err != nil {
-					return err
-				}
-			}
-			return ex.s.products.WithTx(sp).SetAddons(ex.ctx, productID, variantID, list)
-		})
-		if err != nil {
-			var ae *apperr.Error
-			if ex.allOrNothing || !errors.As(err, &ae) || apperr.IsRetryable(err) {
-				ex.failedRows = it.item.Rows
-				return err
-			}
-			for _, row := range it.item.Rows {
-				ex.issues = append(ex.issues, ImportIssue{Severity: "error", Row: row, ModelNumber: it.item.ModelNumber, Target: "addon", Code: ae.Code, Params: ae.Params})
-			}
-			ex.applied.Errors++
-			continue
-		}
 		var beforeState *addonState
 		if p.BeforeVariant != nil {
 			beforeRefs := []ImportAddonRef{}
@@ -538,10 +699,57 @@ func (ex *executor) addons() error {
 			}
 			beforeState = &addonState{ProductID: productID, Addons: nonNil(before), Refs: beforeRefs}
 		}
-		ex.changes = append(ex.changes, changeRecord{entity: "addons", action: "update", id: variantID,
+		change := changeRecord{entity: "addons", action: "update", id: variantID,
 			label: variantLabel(it.item.ModelNumber, it.item.SKU, it.item.Name), before: beforeState,
-			after: addonState{ProductID: productID, Addons: list, Refs: refs}})
+			after: addonState{ProductID: productID, Addons: list, Refs: refs}}
+		if ex.allOrNothing {
+			if failTestHook != nil {
+				if err := failTestHook(ImportItem{Entity: "addons", Rows: it.item.Rows, ModelNumber: it.item.ModelNumber}); err != nil {
+					ex.failedRows = it.item.Rows
+					return err
+				}
+			}
+			batch = append(batch, products.VariantAddons{ProductID: productID, VariantID: variantID, Addons: list})
+			batchItems, batchDone = append(batchItems, it), append(batchDone, change)
+			countLinks(&ex.applied.Addons, before, list)
+			continue
+		}
+		setAddons := func(prods *products.Service) error {
+			if failTestHook != nil {
+				if err := failTestHook(ImportItem{Entity: "addons", Rows: it.item.Rows, ModelNumber: it.item.ModelNumber}); err != nil {
+					return err
+				}
+			}
+			return prods.SetAddons(ex.ctx, productID, variantID, list)
+		}
+		err := database.InTx(ex.ctx, database.NewNested(ex.tx), pgx.TxOptions{}, func(sp pgx.Tx) error {
+			return setAddons(ex.s.products.WithTx(sp))
+		})
+		if err != nil {
+			var ae *apperr.Error
+			if ex.allOrNothing || !errors.As(err, &ae) || apperr.IsRetryable(err) || staleError(err) {
+				ex.failedRows = it.item.Rows
+				return err
+			}
+			for _, row := range it.item.Rows {
+				ex.issues = append(ex.issues, ImportIssue{Severity: "error", Row: row, ModelNumber: it.item.ModelNumber, Target: "addon", Code: ae.Code, Params: ae.Params, ItemSeq: it.seq})
+			}
+			ex.applied.Errors++
+			continue
+		}
+		countLinks(&ex.applied.Addons, before, list)
+		ex.changes = append(ex.changes, change)
 	}
+	if len(batch) == 0 {
+		return nil
+	}
+	if failed, err := ex.prods.SetAddonLists(ex.ctx, batch); err != nil {
+		if failed >= 0 {
+			ex.failedRows = batchItems[failed].item.Rows
+		}
+		return err
+	}
+	ex.changes = append(ex.changes, batchDone...)
 	return nil
 }
 
@@ -653,9 +861,11 @@ func (s *Service) Undo(ctx context.Context, id uuid.UUID) (ImportRun, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return ImportRun{}, err
 	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ApplyTimeout)
+	defer cancel()
 	var row store.ImportRun
 	err := s.inTx(ctx, applyTx, func(tx pgx.Tx, q *store.Queries) error {
-		if err := q.LockImports(ctx, importLockKey); err != nil {
+		if _, err := q.BumpImportLock(ctx); err != nil {
 			return err
 		}
 		run, err := q.LockRun(ctx, id)
@@ -669,14 +879,18 @@ func (s *Service) Undo(ctx context.Context, id uuid.UUID) (ImportRun, error) {
 		if err != nil {
 			return err
 		}
-		u, err := newUndo(ctx, s.cats.WithTx(tx), s.products.WithTx(tx), rows)
+		// One transaction that gives up at the first error: the services
+		// join it without savepoints.
+		joined := database.Joined(tx)
+		u, err := newUndo(ctx, s.cats.WithTx(joined), s.products.WithTx(joined), rows)
 		if err != nil {
 			return err
 		}
 		if conflicts := u.conflicts(); len(conflicts) > 0 {
-			shown := conflicts[:min(len(conflicts), MaxConflicts)]
-			return apperr.Conflict("import.undo_conflict", "entities changed since the import").
-				With("count", len(conflicts)).With("entities", shown)
+			return errUndoConflict(conflicts)
+		}
+		if undoTestHook != nil {
+			undoTestHook()
 		}
 		if err := u.revert(); err != nil {
 			return err
@@ -688,6 +902,12 @@ func (s *Service) Undo(ctx context.Context, id uuid.UUID) (ImportRun, error) {
 		return ImportRun{}, err
 	}
 	return runOut(row)
+}
+
+func errUndoConflict(conflicts []ImportConflict) error {
+	shown := conflicts[:min(len(conflicts), MaxConflicts)]
+	return apperr.Conflict("import.undo_conflict", "entities changed since the import").
+		With("count", len(conflicts)).With("entities", shown)
 }
 
 type undoChange struct {
@@ -831,6 +1051,42 @@ func (u *undo) conflicts() []ImportConflict {
 			}
 		}
 	}
+	// A model number or SKU that undo restores and that another product or
+	// variant, which the run did not touch, has taken since.
+	touched := map[uuid.UUID]bool{}
+	for _, c := range u.changes {
+		touched[c.EntityID] = true
+	}
+	models, skus := map[string]*products.CatalogProduct{}, map[string]*products.CatalogVariant{}
+	for _, p := range u.products {
+		models[products.MatchKey(p.ModelNumber)] = p
+	}
+	for _, v := range u.variants {
+		if v.SKU != "" {
+			skus[products.MatchKey(v.SKU)] = v
+		}
+	}
+	for _, c := range u.changes {
+		if c.before == nil || (c.Entity != "product" && c.Entity != "variant") {
+			continue
+		}
+		if c.Entity == "product" {
+			var before products.CatalogProduct
+			if json.Unmarshal(c.before, &before) == nil {
+				if owner := models[products.MatchKey(before.ModelNumber)]; owner != nil && owner.ID != c.EntityID && !touched[owner.ID] {
+					conflict("product", owner.ID, owner.ModelNumber)
+				}
+			}
+			continue
+		}
+		var before products.CatalogVariant
+		if json.Unmarshal(c.before, &before) == nil && before.SKU != "" {
+			if owner := skus[products.MatchKey(before.SKU)]; owner != nil && owner.ID != c.EntityID && !touched[owner.ID] {
+				p := u.products[owner.ProductID]
+				conflict("variant", owner.ID, variantLabel(p.ModelNumber, owner.SKU, owner.Name))
+			}
+		}
+	}
 	for _, p := range u.products {
 		for _, v := range p.Variants {
 			if u.createdVariants[v.ID] != nil || u.addonLists[v.ID] != nil {
@@ -855,6 +1111,7 @@ func sameProduct(a, b products.CatalogProduct) bool {
 
 func sameVariant(a, b products.CatalogVariant) bool {
 	a.UpdatedAt, b.UpdatedAt, a.Addons, b.Addons, a.SortOrder, b.SortOrder = time.Time{}, time.Time{}, nil, nil, 0, 0
+	a.AddonsUpdatedAt, b.AddonsUpdatedAt = time.Time{}, time.Time{}
 	return sameJSON(a, b)
 }
 
@@ -913,6 +1170,13 @@ func (u *undo) revert() error {
 			err = u.cats.Delete(ctx, c.EntityID)
 		}
 		if err != nil {
+			var ae *apperr.Error
+			if errors.As(err, &ae) && !apperr.IsRetryable(err) && (strings.HasSuffix(ae.Code, "_taken") || strings.HasSuffix(ae.Code, ".stale")) {
+				// Something it restores is in use again (checked above as far
+				// as the catalog shows it): the entity is in conflict.
+				entity := c.Entity
+				return errUndoConflict([]ImportConflict{{Entity: entity, ID: c.EntityID, Label: c.Label}})
+			}
 			return err
 		}
 	}

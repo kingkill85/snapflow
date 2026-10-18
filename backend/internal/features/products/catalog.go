@@ -9,7 +9,9 @@ package products
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -55,7 +57,24 @@ type CatalogVariant struct {
 	SortOrder   int32             `json:"sortOrder"`
 	IsActive    bool              `json:"isActive"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
-	Addons      []AddonInput      `json:"addons,omitempty"`
+	// AddonsUpdatedAt is the version of the add-on list (ReplaceAddons
+	// moves it, not UpdatedAt: D56).
+	AddonsUpdatedAt time.Time    `json:"addonsUpdatedAt"`
+	Addons          []AddonInput `json:"addons,omitempty"`
+}
+
+// Known are the product type and category of a lean write that the caller
+// has read in the same transaction (an import reads them all once), so the
+// write does not read them again. A nil field, or one with another id than
+// the input's, is read as usual. For variant writes Category must be the
+// product's category.
+type Known struct {
+	Type     *producttypes.ProductType
+	Category *categories.Category
+	// NewProduct says the variants' product was created in the same
+	// transaction: nobody else sees it, so CreateVariantRows does not lock
+	// it first.
+	NewProduct bool
 }
 
 // Existing describes the stored product a save changes (nil for a create).
@@ -270,11 +289,11 @@ func foundVariant(row store.ProductVariant, err error) (CatalogVariant, bool, er
 
 // CreateProductRow is Create returning the written row (no variants)
 // instead of the full response.
-func (s *Service) CreateProductRow(ctx context.Context, in ProductInput) (CatalogProduct, error) {
+func (s *Service) CreateProductRow(ctx context.Context, in ProductInput, known Known) (CatalogProduct, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return CatalogProduct{}, err
 	}
-	row, err := s.createProduct(ctx, in)
+	row, err := s.createProduct(ctx, in, known)
 	if err != nil {
 		return CatalogProduct{}, err
 	}
@@ -282,11 +301,11 @@ func (s *Service) CreateProductRow(ctx context.Context, in ProductInput) (Catalo
 }
 
 // UpdateProductRow is Update returning the written row.
-func (s *Service) UpdateProductRow(ctx context.Context, id uuid.UUID, in ProductUpdate) (CatalogProduct, error) {
+func (s *Service) UpdateProductRow(ctx context.Context, id uuid.UUID, in ProductUpdate, known Known) (CatalogProduct, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return CatalogProduct{}, err
 	}
-	row, err := s.updateProduct(ctx, id, in, false)
+	row, err := s.updateProduct(ctx, id, in, false, known)
 	if err != nil {
 		return CatalogProduct{}, err
 	}
@@ -309,7 +328,7 @@ func (s *Service) RestoreProduct(ctx context.Context, p CatalogProduct, expected
 			Attributes: p.Attributes, IsActive: p.IsActive,
 		},
 		ExpectedUpdatedAt: expectedUpdatedAt,
-	}, true)
+	}, true, Known{})
 	if err != nil {
 		return CatalogProduct{}, err
 	}
@@ -340,11 +359,11 @@ func (s *Service) SetProductActive(ctx context.Context, id uuid.UUID, active boo
 }
 
 // CreateVariantRow is CreateVariant returning the written row.
-func (s *Service) CreateVariantRow(ctx context.Context, productID uuid.UUID, in VariantInput) (CatalogVariant, error) {
+func (s *Service) CreateVariantRow(ctx context.Context, productID uuid.UUID, in VariantInput, known Known) (CatalogVariant, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return CatalogVariant{}, err
 	}
-	_, row, err := s.createVariant(ctx, productID, in)
+	_, row, err := s.createVariant(ctx, productID, in, known)
 	if err != nil {
 		return CatalogVariant{}, err
 	}
@@ -352,11 +371,11 @@ func (s *Service) CreateVariantRow(ctx context.Context, productID uuid.UUID, in 
 }
 
 // UpdateVariantRow is UpdateVariant returning the written row.
-func (s *Service) UpdateVariantRow(ctx context.Context, productID, id uuid.UUID, in VariantUpdate) (CatalogVariant, error) {
+func (s *Service) UpdateVariantRow(ctx context.Context, productID, id uuid.UUID, in VariantUpdate, known Known) (CatalogVariant, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return CatalogVariant{}, err
 	}
-	_, row, err := s.updateVariant(ctx, productID, id, in, false)
+	_, row, err := s.updateVariant(ctx, productID, id, in, false, known)
 	if err != nil {
 		return CatalogVariant{}, err
 	}
@@ -374,7 +393,7 @@ func (s *Service) RestoreVariant(ctx context.Context, v CatalogVariant, expected
 			Name: v.Name, SKU: v.SKU, Price: v.Price, ImageFileID: v.ImageFileID, Attributes: v.Attributes, IsActive: v.IsActive,
 		},
 		ExpectedUpdatedAt: expectedUpdatedAt,
-	}, true)
+	}, true, Known{})
 	if err != nil {
 		return CatalogVariant{}, err
 	}
@@ -410,6 +429,162 @@ func (s *Service) SetAddons(ctx context.Context, productID, variantID uuid.UUID,
 	return s.replaceAddons(ctx, productID, variantID, list)
 }
 
+// CreateVariantRows is CreateVariantRow for several new variants of one
+// product, written in one statement in the given order (at the end of the
+// product's order). Each is validated like CreateVariant; failed is the
+// index of the input that was refused (-1 for an error of the write).
+func (s *Service) CreateVariantRows(ctx context.Context, productID uuid.UUID, in []VariantInput, known Known) (created []CatalogVariant, failed int, err error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return nil, -1, err
+	}
+	c := known.Category
+	if c == nil {
+		product, err := s.q.GetProduct(ctx, productID)
+		if err != nil {
+			return nil, -1, notFound(err, "product.not_found")
+		}
+		cat, err := s.cats.Get(ctx, product.CategoryID)
+		if err != nil {
+			return nil, -1, err
+		}
+		c = &cat
+	}
+	params := store.CreateVariantsParams{ProductID: productID}
+	for i := range in {
+		v, err := s.validateVariant(ctx, *c, in[i], nil)
+		if err != nil {
+			return nil, i, err
+		}
+		name, err := json.Marshal(v.Name)
+		if err != nil {
+			return nil, i, err
+		}
+		attrs, err := json.Marshal(v.Attributes)
+		if err != nil {
+			return nil, i, err
+		}
+		image := ""
+		if v.ImageFileID != nil {
+			image = v.ImageFileID.String()
+		}
+		params.Names, params.Skus, params.Prices = append(params.Names, name), append(params.Skus, v.SKU), append(params.Prices, v.Price)
+		params.ImageFileIds, params.Attributes, params.Active = append(params.ImageFileIds, image), append(params.Attributes, attrs), append(params.Active, v.IsActive)
+	}
+	var rows []store.ProductVariant
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		if !known.NewProduct {
+			if _, err := q.LockProduct(ctx, productID); err != nil {
+				return err
+			}
+		}
+		var err error
+		rows, err = q.CreateVariants(ctx, params)
+		return err
+	})
+	if err != nil {
+		return nil, -1, mapVariantErr(err, VariantInput{}, "product.not_found")
+	}
+	byName := make(map[string]store.ProductVariant, len(rows))
+	for _, r := range rows {
+		byName[strings.ToLower(r.Name[i18n.DefaultLocale])] = r
+	}
+	created = make([]CatalogVariant, len(in))
+	for i, v := range in {
+		created[i] = catalogVariant(byName[strings.ToLower(strings.TrimSpace(v.Name[i18n.DefaultLocale]))])
+	}
+	return created, -1, nil
+}
+
+// VariantAddons is a variant's new add-on list (SetAddonLists).
+type VariantAddons struct {
+	ProductID, VariantID uuid.UUID
+	Addons               []AddonInput
+}
+
+// SetAddonLists is SetAddons for many variants in one transaction and a
+// few statements (the same checks and locks, each kind for all lists at
+// once). failed is the index of the list that was refused (-1 for an error
+// that is not one list's).
+func (s *Service) SetAddonLists(ctx context.Context, lists []VariantAddons) (failed int, err error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return -1, err
+	}
+	if len(lists) == 0 {
+		return -1, nil
+	}
+	productIDs := make([]uuid.UUID, 0, len(lists))
+	variantIDs := make([]uuid.UUID, 0, len(lists))
+	ofVariant := make([]uuid.UUID, 0, len(lists))
+	targets := []uuid.UUID{}
+	for i, l := range lists {
+		if len(l.Addons) > MaxAddons {
+			return i, apperr.Validation(apperr.Field("body.addons", "validation.too_many",
+				fmt.Sprintf("at most %d add-ons", MaxAddons)).With("max", MaxAddons))
+		}
+		productIDs = append(productIDs, l.ProductID)
+		variantIDs, ofVariant = append(variantIDs, l.VariantID), append(ofVariant, l.ProductID)
+		for _, a := range l.Addons {
+			targets = append(targets, a.AddonVariantID)
+		}
+	}
+	failed = -1
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		failed = -1
+		shared, err := q.ShareProducts(ctx, productIDs)
+		if err != nil {
+			return err
+		}
+		touched, err := q.TouchVariantsAddons(ctx, store.TouchVariantsAddonsParams{Ids: variantIDs, ProductIds: ofVariant})
+		if err != nil {
+			return err
+		}
+		found, err := q.ExistingVariantIDs(ctx, targets)
+		if err != nil {
+			return err
+		}
+		has := func(list []uuid.UUID) map[uuid.UUID]bool {
+			m := make(map[uuid.UUID]bool, len(list))
+			for _, id := range list {
+				m[id] = true
+			}
+			return m
+		}
+		products, variants, exists := has(shared), has(touched), has(found)
+		params := store.InsertAddonListsParams{}
+		for i, l := range lists {
+			if !products[l.ProductID] || !variants[l.VariantID] {
+				failed = i
+				return apperr.NotFound("variant.not_found")
+			}
+			var errs []apperr.FieldError
+			seen := map[uuid.UUID]bool{}
+			for j, a := range l.Addons {
+				loc := fmt.Sprintf("body.addons[%d].addonVariantId", j)
+				switch id := a.AddonVariantID; {
+				case id == l.VariantID:
+					errs = append(errs, apperr.Field(loc, "addon.self", "a variant cannot be its own add-on"))
+				case seen[id]:
+					errs = append(errs, apperr.Field(loc, "addon.duplicate", "this add-on is listed twice"))
+				case !exists[id]:
+					errs = append(errs, apperr.Field(loc, "addon.variant_not_found", "no such variant"))
+				}
+				seen[a.AddonVariantID] = true
+				params.VariantIds, params.AddonIds = append(params.VariantIds, l.VariantID), append(params.AddonIds, a.AddonVariantID)
+				params.Required, params.SortOrders = append(params.Required, a.Required), append(params.SortOrders, int32(j+1)) //nolint:gosec // at most MaxAddons
+			}
+			if len(errs) > 0 {
+				failed = i
+				return apperr.Validation(errs...)
+			}
+		}
+		if err := q.DeleteAddonsOf(ctx, variantIDs); err != nil {
+			return err
+		}
+		return q.InsertAddonLists(ctx, params)
+	})
+	return failed, err
+}
+
 func catalogProduct(r store.Product) CatalogProduct {
 	p := CatalogProduct{
 		ID: r.ID, ProductTypeID: r.ProductTypeID, CategoryID: r.CategoryID, ModelNumber: r.ModelNumber, Name: r.Name,
@@ -428,7 +603,7 @@ func catalogVariant(r store.ProductVariant) CatalogVariant {
 	v := CatalogVariant{
 		ID: r.ID, ProductID: r.ProductID, Name: r.Name, SKU: deref(r.Sku), Price: formatPrice(r.Price),
 		ImageFileID: r.ImageFileID, Attributes: r.Attributes, SortOrder: r.SortOrder, IsActive: r.IsActive,
-		UpdatedAt: r.UpdatedAt,
+		UpdatedAt: r.UpdatedAt, AddonsUpdatedAt: r.AddonsUpdatedAt,
 	}
 	if v.Attributes == nil {
 		v.Attributes = attrschema.Values{}

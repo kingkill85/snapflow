@@ -82,7 +82,7 @@ func (q *Queries) CatalogProducts(ctx context.Context) ([]Product, error) {
 }
 
 const catalogVariants = `-- name: CatalogVariants :many
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants ORDER BY product_id, sort_order, id
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants ORDER BY product_id, sort_order, id
 `
 
 func (q *Queries) CatalogVariants(ctx context.Context) ([]ProductVariant, error) {
@@ -106,6 +106,7 @@ func (q *Queries) CatalogVariants(ctx context.Context) ([]ProductVariant, error)
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AddonsUpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -235,7 +236,7 @@ const createVariant = `-- name: CreateVariant :one
 INSERT INTO product_variants (product_id, name, sku, price, image_file_id, attributes, is_active, sort_order)
 VALUES ($1, $2, $3, $7::numeric, $4, $5, $6,
         (SELECT coalesce(max(sort_order), 0) + 1 FROM product_variants WHERE product_id = $1))
-RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at
+RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at
 `
 
 type CreateVariantParams struct {
@@ -273,8 +274,76 @@ func (q *Queries) CreateVariant(ctx context.Context, arg CreateVariantParams) (P
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
+}
+
+const createVariants = `-- name: CreateVariants :many
+
+INSERT INTO product_variants (product_id, name, sku, price, image_file_id, attributes, is_active, sort_order)
+SELECT $1::uuid, ($2::jsonb[])[i], NULLIF(($3::text[])[i], ''),
+       ($4::text[])[i]::numeric, NULLIF(($5::text[])[i], '')::uuid,
+       ($6::jsonb[])[i], ($7::boolean[])[i],
+       (SELECT coalesce(max(sort_order), 0) FROM product_variants WHERE product_id = $1::uuid) + i
+FROM generate_subscripts($2::jsonb[], 1) AS i
+ORDER BY i
+RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at
+`
+
+type CreateVariantsParams struct {
+	ProductID    uuid.UUID
+	Names        [][]byte
+	Skus         []string
+	Prices       []string
+	ImageFileIds []string
+	Attributes   [][]byte
+	Active       []bool
+}
+
+// Batch writes for the import (all or nothing): one statement for many rows.
+// CreateVariants adds variants at the end of a product's order, in the
+// given order (the caller holds LockProduct). Empty SKUs and image ids are
+// NULL.
+func (q *Queries) CreateVariants(ctx context.Context, arg CreateVariantsParams) ([]ProductVariant, error) {
+	rows, err := q.db.Query(ctx, createVariants,
+		arg.ProductID,
+		arg.Names,
+		arg.Skus,
+		arg.Prices,
+		arg.ImageFileIds,
+		arg.Attributes,
+		arg.Active,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProductVariant{}
+	for rows.Next() {
+		var i ProductVariant
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Name,
+			&i.Sku,
+			&i.Price,
+			&i.ImageFileID,
+			&i.Attributes,
+			&i.SortOrder,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AddonsUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deleteAddons = `-- name: DeleteAddons :exec
@@ -283,6 +352,15 @@ DELETE FROM variant_addons WHERE variant_id = $1
 
 func (q *Queries) DeleteAddons(ctx context.Context, variantID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteAddons, variantID)
+	return err
+}
+
+const deleteAddonsOf = `-- name: DeleteAddonsOf :exec
+DELETE FROM variant_addons WHERE variant_id = ANY ($1::uuid[])
+`
+
+func (q *Queries) DeleteAddonsOf(ctx context.Context, variantIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAddonsOf, variantIds)
 	return err
 }
 
@@ -364,7 +442,7 @@ func (q *Queries) FindProductByModelNumber(ctx context.Context, modelNumber stri
 }
 
 const findVariantByName = `-- name: FindVariantByName :one
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE product_id = $1 AND lower(name ->> 'en') = lower($2::text)
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants WHERE product_id = $1 AND lower(name ->> 'en') = lower($2::text)
 `
 
 type FindVariantByNameParams struct {
@@ -387,12 +465,13 @@ func (q *Queries) FindVariantByName(ctx context.Context, arg FindVariantByNamePa
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
 }
 
 const findVariantBySKU = `-- name: FindVariantBySKU :one
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE lower(sku) = lower($1::text)
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants WHERE lower(sku) = lower($1::text)
 `
 
 func (q *Queries) FindVariantBySKU(ctx context.Context, sku string) (ProductVariant, error) {
@@ -410,6 +489,7 @@ func (q *Queries) FindVariantBySKU(ctx context.Context, sku string) (ProductVari
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
 }
@@ -443,7 +523,7 @@ func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (Product, error)
 }
 
 const getVariant = `-- name: GetVariant :one
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE id = $1 AND product_id = $2
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants WHERE id = $1 AND product_id = $2
 `
 
 type GetVariantParams struct {
@@ -466,8 +546,34 @@ func (q *Queries) GetVariant(ctx context.Context, arg GetVariantParams) (Product
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
+}
+
+const insertAddonLists = `-- name: InsertAddonLists :exec
+INSERT INTO variant_addons (variant_id, addon_variant_id, required, sort_order)
+SELECT ($1::uuid[])[i], ($2::uuid[])[i], ($3::boolean[])[i], ($4::integer[])[i]
+FROM generate_subscripts($1::uuid[], 1) AS i
+`
+
+type InsertAddonListsParams struct {
+	VariantIds []uuid.UUID
+	AddonIds   []uuid.UUID
+	Required   []bool
+	SortOrders []int32
+}
+
+// InsertAddonLists links many lists at once; sort_orders are each list's
+// positions (1..n).
+func (q *Queries) InsertAddonLists(ctx context.Context, arg InsertAddonListsParams) error {
+	_, err := q.db.Exec(ctx, insertAddonLists,
+		arg.VariantIds,
+		arg.AddonIds,
+		arg.Required,
+		arg.SortOrders,
+	)
+	return err
 }
 
 const insertAddons = `-- name: InsertAddons :exec
@@ -637,7 +743,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]P
 }
 
 const listVariants = `-- name: ListVariants :many
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE product_id = $1 ORDER BY sort_order, id
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants WHERE product_id = $1 ORDER BY sort_order, id
 `
 
 func (q *Queries) ListVariants(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error) {
@@ -661,6 +767,7 @@ func (q *Queries) ListVariants(ctx context.Context, productID uuid.UUID) ([]Prod
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AddonsUpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -673,7 +780,7 @@ func (q *Queries) ListVariants(ctx context.Context, productID uuid.UUID) ([]Prod
 }
 
 const listVariantsOfProducts = `-- name: ListVariantsOfProducts :many
-SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at FROM product_variants WHERE product_id = ANY ($1::uuid[])
+SELECT id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at FROM product_variants WHERE product_id = ANY ($1::uuid[])
 ORDER BY product_id, sort_order, id
 `
 
@@ -698,6 +805,7 @@ func (q *Queries) ListVariantsOfProducts(ctx context.Context, productIds []uuid.
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AddonsUpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -720,28 +828,6 @@ func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, err
 	var id_2 uuid.UUID
 	err := row.Scan(&id_2)
 	return id_2, err
-}
-
-const lockVariantForAddons = `-- name: LockVariantForAddons :one
-SELECT id FROM product_variants WHERE id = $1 AND product_id = $2 FOR NO KEY UPDATE
-`
-
-type LockVariantForAddonsParams struct {
-	ID        uuid.UUID
-	ProductID uuid.UUID
-}
-
-// LockVariantForAddons serialises add-on replaces of one variant (after
-// ShareProduct). NO KEY UPDATE does not conflict with the KEY SHARE locks
-// other replaces take on their add-on variants, so replaces of two variants
-// that point at each other do not wait for each other. Deadlocks with
-// deletes (which lock the add-on variants FOR UPDATE in their own order)
-// remain possible; inTx retries those.
-func (q *Queries) LockVariantForAddons(ctx context.Context, arg LockVariantForAddonsParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, lockVariantForAddons, arg.ID, arg.ProductID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
 }
 
 const lockVariantIDs = `-- name: LockVariantIDs :many
@@ -913,7 +999,7 @@ const setVariantActive = `-- name: SetVariantActive :one
 UPDATE product_variants
 SET is_active = $3, updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND product_id = $2 AND updated_at = $4
-RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at
+RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at
 `
 
 type SetVariantActiveParams struct {
@@ -943,6 +1029,7 @@ func (q *Queries) SetVariantActive(ctx context.Context, arg SetVariantActivePara
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
 }
@@ -971,6 +1058,94 @@ func (q *Queries) ShareProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 	var id_2 uuid.UUID
 	err := row.Scan(&id_2)
 	return id_2, err
+}
+
+const shareProducts = `-- name: ShareProducts :many
+SELECT id FROM products WHERE id = ANY ($1::uuid[]) ORDER BY id FOR KEY SHARE
+`
+
+// ShareProducts is ShareProduct for many products, in id order.
+func (q *Queries) ShareProducts(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, shareProducts, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const touchVariantAddons = `-- name: TouchVariantAddons :one
+UPDATE product_variants SET addons_updated_at = greatest(now(), addons_updated_at + interval '1 microsecond')
+WHERE id = $1 AND product_id = $2
+RETURNING id
+`
+
+type TouchVariantAddonsParams struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+}
+
+// TouchVariantAddons bumps the version of a variant's add-on list
+// (addons_updated_at, not updated_at: an add-on edit does not make the
+// variant form stale, D56) and so serialises add-on replaces of one variant
+// (after ShareProduct). Updating a non-key column takes a NO KEY UPDATE lock,
+// which does not conflict with the KEY SHARE locks other replaces take on
+// their add-on variants, so replaces of two variants that point at each
+// other do not wait for each other. Because the row changes, a REPEATABLE
+// READ transaction (an import) that writes the same list after a replace
+// committed fails with a serialization error instead of merging the lists.
+// Deadlocks with deletes (which lock the add-on variants FOR UPDATE in their
+// own order) remain possible; inTx retries those.
+func (q *Queries) TouchVariantAddons(ctx context.Context, arg TouchVariantAddonsParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, touchVariantAddons, arg.ID, arg.ProductID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const touchVariantsAddons = `-- name: TouchVariantsAddons :many
+UPDATE product_variants v SET addons_updated_at = greatest(now(), v.addons_updated_at + interval '1 microsecond')
+FROM generate_subscripts($1::uuid[], 1) AS i
+WHERE v.id = ($1::uuid[])[i] AND v.product_id = ($2::uuid[])[i]
+RETURNING v.id
+`
+
+type TouchVariantsAddonsParams struct {
+	Ids        []uuid.UUID
+	ProductIds []uuid.UUID
+}
+
+// TouchVariantsAddons is TouchVariantAddons for many variants (ids with
+// their product_ids); it returns the ids found.
+func (q *Queries) TouchVariantsAddons(ctx context.Context, arg TouchVariantsAddonsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, touchVariantsAddons, arg.Ids, arg.ProductIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateProduct = `-- name: UpdateProduct :one
@@ -1028,7 +1203,7 @@ UPDATE product_variants
 SET name = $3, sku = $4, price = $8::numeric, image_file_id = $5, attributes = $6, is_active = $7,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND product_id = $2 AND updated_at = $9
-RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at
+RETURNING id, product_id, name, sku, price, image_file_id, attributes, sort_order, is_active, created_at, updated_at, addons_updated_at
 `
 
 type UpdateVariantParams struct {
@@ -1068,6 +1243,7 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (P
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddonsUpdatedAt,
 	)
 	return i, err
 }

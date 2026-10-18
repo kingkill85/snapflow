@@ -85,7 +85,7 @@ func process(data []byte, contentType string, orientation, maxWidth int) ([]byte
 	if contentType == TypePNG {
 		dst := image.NewNRGBA(rect) // 8 bits per channel, transparency kept
 		resample(dst, src)
-		err = (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&buf, dst)
+		err = (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, dst)
 		sw, sh = dst.Rect.Dx(), dst.Rect.Dy()
 	} else {
 		dst := image.NewRGBA(rect)

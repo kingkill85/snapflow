@@ -67,14 +67,11 @@ func fieldCodes(p problem) []string {
 }
 
 // uploadRaw posts a file to /api/imports.
-func uploadRaw(api *apptest.API, cookie, name string, data []byte, profileID string) *httptest.ResponseRecorder {
+func uploadRaw(api *apptest.API, cookie, name string, data []byte) *httptest.ResponseRecorder {
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)
 	part, _ := w.CreateFormFile("file", name)
 	_, _ = part.Write(data)
-	if profileID != "" {
-		_ = w.WriteField("profileId", profileID)
-	}
 	_ = w.Close()
 	return api.Post("/api/imports", cookie, "Content-Type: "+w.FormDataContentType(), &body)
 }
@@ -82,9 +79,13 @@ func uploadRaw(api *apptest.API, cookie, name string, data []byte, profileID str
 // upload uploads and previews with a profile ("" uploads only).
 func upload(t *testing.T, api *apptest.API, name string, data []byte, profileID string) imports.ImportRun {
 	t.Helper()
-	resp := uploadRaw(api, api.Admin.Cookie, name, data, profileID)
+	resp := uploadRaw(api, api.Admin.Cookie, name, data)
 	expect(t, resp, http.StatusCreated)
-	return decode[imports.ImportRun](t, resp)
+	run := decode[imports.ImportRun](t, resp)
+	if profileID != "" {
+		return preview(t, api, run.ID.String(), map[string]any{"profileId": profileID})
+	}
+	return run
 }
 
 func preview(t *testing.T, api *apptest.API, runID string, body any) imports.ImportRun {

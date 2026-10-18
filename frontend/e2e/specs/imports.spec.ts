@@ -41,27 +41,17 @@ async function ensureZigbee(api: Api) {
   expect([201, 409]).toContain(res.status())
 }
 
-/** Uploads a file on the new-import page, with a profile or without. */
 /**
- * Applies the previewed run. Specs running alongside change the catalog,
- * which makes the preview stale (import.stale, the token covers the whole
- * catalog): preview again, as a user would, and apply once more, until the
- * catalog held still between the two.
+ * Applies the previewed run with one click: the preview is stale only if
+ * the part of the catalog it read changed (D147), which specs running
+ * alongside never touch.
  */
 async function applyImport(page: Page) {
-  const applied = page.getByText(/The import was applied on/)
-  const again = page.getByRole('button', { name: 'Preview again' })
-  await expect(async () => {
-    if (await again.isVisible()) {
-      await again.click()
-      await expect(again).toBeHidden()
-    }
-    await page.getByRole('button', { name: 'Apply import' }).click()
-    await expect(applied.or(again)).toBeVisible()
-    await expect(applied).toBeVisible({ timeout: 100 })
-  }).toPass({ timeout: 60_000 })
+  await page.getByRole('button', { name: 'Apply import' }).click()
+  await expect(page.getByText(/The import was applied on/)).toBeVisible()
 }
 
+/** Uploads a file on the new-import page, with a profile or without. */
 async function upload(page: Page, file: string, profile?: string) {
   await page.goto('/catalog/imports/new')
   const chooser = page.waitForEvent('filechooser')
@@ -80,8 +70,6 @@ const target = (page: Page, column: string): Locator => page.getByRole('combobox
 test.describe.configure({ mode: 'serial' })
 
 test('a SnapFlow 1 workbook imports with the starter profile; importing it again changes nothing; undo removes it', async ({ page, api }) => {
-  // Applying may need a few rounds while other specs change the catalog (applyImport).
-  test.setTimeout(120_000)
   await ensureZigbee(api)
   await page.goto('/')
   await navigate(page, 'Catalog', 'Import')
@@ -136,8 +124,6 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
 })
 
 test('a CSV is mapped by hand, saved as a profile and imported into a fixed product type and category', async ({ page, api }) => {
-  // Applying may need a few rounds while other specs change the catalog (applyImport).
-  test.setTimeout(120_000)
   const { type, category } = await api.createKind(
     { name: { en: unique('CSV dimmers') }, attributes: [{ key: 'width_te', label: { en: 'Width' }, type: 'integer', scope: 'product' }] },
     { name: { en: unique('CSV system') } },

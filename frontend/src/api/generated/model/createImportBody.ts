@@ -8,6 +8,4 @@
 export type CreateImportBody = {
   /** .xlsx workbook or UTF-8 .csv (; or , separated), at most 50 MB */
   file: string;
-  /** Preview at once with this profile */
-  profileId?: Blob | globalThis.File | string;
 };

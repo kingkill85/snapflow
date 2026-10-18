@@ -36,6 +36,11 @@ type File struct {
 	CreatedAt   time.Time
 }
 
+type FileSource struct {
+	SourceSha256 string
+	FileID       uuid.UUID
+}
+
 type FunctionType struct {
 	ID        uuid.UUID
 	Key       string
@@ -72,6 +77,11 @@ type ImportItem struct {
 	Plan    []byte
 }
 
+type ImportLock struct {
+	ID         bool
+	Generation int64
+}
+
 type ImportProfile struct {
 	ID        uuid.UUID
 	Name      string
@@ -101,6 +111,8 @@ type ImportRun struct {
 	AppliedAt    *time.Time
 	UndoneAt     *time.Time
 	UpdatedAt    time.Time
+	CatalogScope []byte
+	Images       []byte
 }
 
 type Product struct {
@@ -129,17 +141,18 @@ type ProductType struct {
 }
 
 type ProductVariant struct {
-	ID          uuid.UUID
-	ProductID   uuid.UUID
-	Name        i18n.Text
-	Sku         *string
-	Price       string
-	ImageFileID *uuid.UUID
-	Attributes  attrschema.Values
-	SortOrder   int32
-	IsActive    bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID              uuid.UUID
+	ProductID       uuid.UUID
+	Name            i18n.Text
+	Sku             *string
+	Price           string
+	ImageFileID     *uuid.UUID
+	Attributes      attrschema.Values
+	SortOrder       int32
+	IsActive        bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AddonsUpdatedAt time.Time
 }
 
 type Session struct {

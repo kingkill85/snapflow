@@ -25,7 +25,7 @@ const (
 	maxRowNumber         = 1_000_000
 )
 
-// StarterProfileName is the profile created when none exists (D134).
+// StarterProfileName is the profile created when none exists (D121).
 const StarterProfileName = "SnapFlow 1 workbook"
 
 // StarterProductType is the key of the product type (system) the starter

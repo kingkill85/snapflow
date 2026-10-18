@@ -45,6 +45,26 @@ func (q *Queries) AllChanges(ctx context.Context, runID uuid.UUID) ([]ImportChan
 	return items, nil
 }
 
+const bumpImportLock = `-- name: BumpImportLock :one
+INSERT INTO import_lock (id, generation) VALUES (true, 1)
+ON CONFLICT (id) DO UPDATE SET generation = import_lock.generation + 1
+RETURNING generation
+`
+
+// BumpImportLock is the first statement of every apply and undo
+// (REPEATABLE READ): it serialises them on the import_lock row, and since it
+// changes the row, a waiting one fails with a serialization error once the
+// first commits, so database.InTx runs it again with a fresh snapshot
+// (D146). An upsert, so a missing row (an emptied table) is created; under
+// REPEATABLE READ ON CONFLICT DO UPDATE fails the same way on a row changed
+// after the snapshot.
+func (q *Queries) BumpImportLock(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, bumpImportLock)
+	var generation int64
+	err := row.Scan(&generation)
+	return generation, err
+}
+
 const countChanges = `-- name: CountChanges :one
 SELECT count(*) FROM import_changes WHERE run_id = $1
 `
@@ -79,6 +99,14 @@ WHERE run_id = $1
   AND ($2::text = '' OR entity = $2)
   AND ($3::text = '' OR status = $3)
   AND (NOT $4::boolean OR skipped)
+  AND (NOT $5::boolean OR status <> 'unchanged')
+  AND ($6::integer IS NULL OR item -> 'rows' @> to_jsonb($6::integer))
+  AND ($7::text = ''
+       OR item ->> 'modelNumber' ILIKE $7
+       OR item ->> 'sku' ILIKE $7
+       OR item ->> 'key' ILIKE $7
+       OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(item -> 'name', '{}')) n WHERE n.value ILIKE $7)
+       OR ($8::integer IS NOT NULL AND item -> 'rows' @> to_jsonb($8::integer)))
 `
 
 type CountItemsParams struct {
@@ -86,6 +114,10 @@ type CountItemsParams struct {
 	Entity      string
 	Status      string
 	OnlySkipped bool
+	ChangedOnly bool
+	FileRow     *int32
+	Search      string
+	SearchRow   *int32
 }
 
 func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, error) {
@@ -94,6 +126,10 @@ func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, 
 		arg.Entity,
 		arg.Status,
 		arg.OnlySkipped,
+		arg.ChangedOnly,
+		arg.FileRow,
+		arg.Search,
+		arg.SearchRow,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -162,7 +198,7 @@ func (q *Queries) CreateProfileIfMissing(ctx context.Context, arg CreateProfileI
 const createRun = `-- name: CreateRun :one
 INSERT INTO import_runs (file_id, file_name, file_size, source_kind, user_id, user_name, state)
 VALUES ($1, $2, $3, $4, $5, $6, 'uploaded')
-RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at
+RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images
 `
 
 type CreateRunParams struct {
@@ -205,6 +241,8 @@ func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (ImportRun
 		&i.AppliedAt,
 		&i.UndoneAt,
 		&i.UpdatedAt,
+		&i.CatalogScope,
+		&i.Images,
 	)
 	return i, err
 }
@@ -239,6 +277,20 @@ func (q *Queries) DeleteProfile(ctx context.Context, id uuid.UUID) (int64, error
 	return result.RowsAffected(), nil
 }
 
+const deleteRun = `-- name: DeleteRun :execrows
+DELETE FROM import_runs WHERE id = $1
+`
+
+// DeleteRun removes a run with its items, issues and change log; its file
+// stays (unreferenced files are kept, D58).
+func (q *Queries) DeleteRun(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRun, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getProfile = `-- name: GetProfile :one
 SELECT id, name, mapping, created_at, updated_at FROM import_profiles WHERE id = $1
 `
@@ -257,7 +309,7 @@ func (q *Queries) GetProfile(ctx context.Context, id uuid.UUID) (ImportProfile, 
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at FROM import_runs WHERE id = $1
+SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images FROM import_runs WHERE id = $1
 `
 
 func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ImportRun, error) {
@@ -284,6 +336,8 @@ func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ImportRun, error) {
 		&i.AppliedAt,
 		&i.UndoneAt,
 		&i.UpdatedAt,
+		&i.CatalogScope,
+		&i.Images,
 	)
 	return i, err
 }
@@ -400,8 +454,16 @@ WHERE run_id = $1
   AND ($2::text = '' OR entity = $2)
   AND ($3::text = '' OR status = $3)
   AND (NOT $4::boolean OR skipped)
+  AND (NOT $5::boolean OR status <> 'unchanged')
+  AND ($6::integer IS NULL OR item -> 'rows' @> to_jsonb($6::integer))
+  AND ($7::text = ''
+       OR item ->> 'modelNumber' ILIKE $7
+       OR item ->> 'sku' ILIKE $7
+       OR item ->> 'key' ILIKE $7
+       OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(item -> 'name', '{}')) n WHERE n.value ILIKE $7)
+       OR ($8::integer IS NOT NULL AND item -> 'rows' @> to_jsonb($8::integer)))
 ORDER BY seq
-LIMIT $6 OFFSET $5
+LIMIT $10 OFFSET $9
 `
 
 type ListItemsParams struct {
@@ -409,6 +471,10 @@ type ListItemsParams struct {
 	Entity      string
 	Status      string
 	OnlySkipped bool
+	ChangedOnly bool
+	FileRow     *int32
+	Search      string
+	SearchRow   *int32
 	RowOffset   int32
 	RowLimit    int32
 }
@@ -418,13 +484,20 @@ type ListItemsRow struct {
 	Item []byte
 }
 
-// ListItems pages the diff; empty filters match everything.
+// ListItems pages the diff; empty filters match everything. changed_only
+// leaves out unchanged items; file_row keeps the items of that file row;
+// search is an ILIKE pattern over model number, SKU, category key and every
+// name, or (search_row) a file row number.
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
 	rows, err := q.db.Query(ctx, listItems,
 		arg.RunID,
 		arg.Entity,
 		arg.Status,
 		arg.OnlySkipped,
+		arg.ChangedOnly,
+		arg.FileRow,
+		arg.Search,
+		arg.SearchRow,
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -521,7 +594,7 @@ func (q *Queries) ListProfiles(ctx context.Context) ([]ImportProfile, error) {
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at FROM import_runs ORDER BY created_at DESC, id LIMIT $2 OFFSET $1
+SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images FROM import_runs ORDER BY created_at DESC, id LIMIT $2 OFFSET $1
 `
 
 type ListRunsParams struct {
@@ -559,6 +632,8 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]ImportRun
 			&i.AppliedAt,
 			&i.UndoneAt,
 			&i.UpdatedAt,
+			&i.CatalogScope,
+			&i.Images,
 		); err != nil {
 			return nil, err
 		}
@@ -570,19 +645,8 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]ImportRun
 	return items, nil
 }
 
-const lockImports = `-- name: LockImports :exec
-SELECT pg_advisory_xact_lock($1::bigint)
-`
-
-// LockImports serialises applies and undos of all runs until the
-// transaction ends.
-func (q *Queries) LockImports(ctx context.Context, lockKey int64) error {
-	_, err := q.db.Exec(ctx, lockImports, lockKey)
-	return err
-}
-
 const lockRun = `-- name: LockRun :one
-SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at FROM import_runs WHERE id = $1 FOR UPDATE
+SELECT id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images FROM import_runs WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ImportRun, error) {
@@ -609,6 +673,8 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ImportRun, error) 
 		&i.AppliedAt,
 		&i.UndoneAt,
 		&i.UpdatedAt,
+		&i.CatalogScope,
+		&i.Images,
 	)
 	return i, err
 }
@@ -638,9 +704,9 @@ func (q *Queries) ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
 const setRunPreview = `-- name: SetRunPreview :one
 UPDATE import_runs
 SET state = 'previewed', profile_id = $2, profile_name = $3, mapping = $4, all_or_nothing = $5,
-    catalog_token = $6, counts = $7, error = NULL, previewed_at = now(), updated_at = now()
+    catalog_token = $6, catalog_scope = $7, counts = $8, images = $9, error = NULL, previewed_at = now(), updated_at = now()
 WHERE id = $1
-RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at
+RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images
 `
 
 type SetRunPreviewParams struct {
@@ -650,7 +716,9 @@ type SetRunPreviewParams struct {
 	Mapping      []byte
 	AllOrNothing bool
 	CatalogToken string
+	CatalogScope []byte
 	Counts       []byte
+	Images       []byte
 }
 
 func (q *Queries) SetRunPreview(ctx context.Context, arg SetRunPreviewParams) (ImportRun, error) {
@@ -661,7 +729,9 @@ func (q *Queries) SetRunPreview(ctx context.Context, arg SetRunPreviewParams) (I
 		arg.Mapping,
 		arg.AllOrNothing,
 		arg.CatalogToken,
+		arg.CatalogScope,
 		arg.Counts,
+		arg.Images,
 	)
 	var i ImportRun
 	err := row.Scan(
@@ -685,6 +755,8 @@ func (q *Queries) SetRunPreview(ctx context.Context, arg SetRunPreviewParams) (I
 		&i.AppliedAt,
 		&i.UndoneAt,
 		&i.UpdatedAt,
+		&i.CatalogScope,
+		&i.Images,
 	)
 	return i, err
 }
@@ -696,7 +768,7 @@ SET state = $2, counts = $3, error = $4, all_or_nothing = $5,
     undone_at = CASE WHEN $2 = 'undone' THEN now() ELSE undone_at END,
     updated_at = now()
 WHERE id = $1
-RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at
+RETURNING id, profile_id, profile_name, file_id, file_name, file_size, source_kind, user_id, user_name, state, mapping, all_or_nothing, catalog_token, counts, error, created_at, previewed_at, applied_at, undone_at, updated_at, catalog_scope, images
 `
 
 type SetRunStateParams struct {
@@ -737,6 +809,8 @@ func (q *Queries) SetRunState(ctx context.Context, arg SetRunStateParams) (Impor
 		&i.AppliedAt,
 		&i.UndoneAt,
 		&i.UpdatedAt,
+		&i.CatalogScope,
+		&i.Images,
 	)
 	return i, err
 }
