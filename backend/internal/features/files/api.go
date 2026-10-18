@@ -20,9 +20,6 @@ import (
 
 const tag = "files"
 
-// maxRequestBytes bounds an upload request: the file plus multipart overhead.
-const maxRequestBytes = MaxSize + 64<<10
-
 type uploadForm struct {
 	File huma.FormFile `form:"file" required:"true" doc:"JPEG, PNG or WebP image, at most 10 MB"`
 }
@@ -54,7 +51,7 @@ func Register(api huma.API, svc *Service) {
 			"The same stored bytes always give the same file.",
 		Tags:          []string{tag},
 		DefaultStatus: http.StatusCreated,
-		Middlewares:   huma.Middlewares{limitBody},
+		Middlewares:   huma.Middlewares{LimitUpload(auth.PermCatalogWrite, MaxSize)},
 	}, func(ctx context.Context, in *uploadInput) (*fileOutput, error) {
 		f := in.RawBody.Data().File
 		defer func() { _ = f.Close() }()
@@ -88,29 +85,36 @@ func Register(api huma.API, svc *Service) {
 		if err != nil {
 			return nil, err
 		}
-		return &huma.StreamResponse{Body: func(hctx huma.Context) {
-			defer func() { _ = contents.Close() }()
-			etag := `"` + file.SHA256 + `"`
-			hctx.SetHeader("ETag", etag)
-			hctx.SetHeader("Cache-Control", "private, max-age=31536000, immutable")
-			hctx.SetHeader("X-Content-Type-Options", "nosniff")
-			if matches(hctx.Header("If-None-Match"), etag) {
-				hctx.SetStatus(http.StatusNotModified)
-				return
-			}
-			hctx.SetHeader("Content-Type", file.ContentType)
-			hctx.SetHeader("Content-Length", strconv.FormatInt(file.Size, 10))
-			disposition := "inline"
-			if !strings.HasPrefix(file.ContentType, "image/") {
-				disposition = "attachment" // e.g. an import workbook: never rendered
-			}
-			hctx.SetHeader("Content-Disposition", disposition)
-			hctx.SetStatus(http.StatusOK)
-			if _, err := io.Copy(hctx.BodyWriter(), contents); err != nil {
-				slog.WarnContext(ctx, "files: send", "id", file.ID, "error", err)
-			}
-		}}, nil
+		return Stream(ctx, file, contents), nil
 	})
+}
+
+// Stream sends a file opened with Open or OpenReferenced (and closes it).
+// Contents never change: the ETag is the SHA-256, responses may be cached
+// privately for a year, If-None-Match gives 304.
+func Stream(ctx context.Context, file File, contents io.ReadSeekCloser) *huma.StreamResponse {
+	return &huma.StreamResponse{Body: func(hctx huma.Context) {
+		defer func() { _ = contents.Close() }()
+		etag := `"` + file.SHA256 + `"`
+		hctx.SetHeader("ETag", etag)
+		hctx.SetHeader("Cache-Control", "private, max-age=31536000, immutable")
+		hctx.SetHeader("X-Content-Type-Options", "nosniff")
+		if matches(hctx.Header("If-None-Match"), etag) {
+			hctx.SetStatus(http.StatusNotModified)
+			return
+		}
+		hctx.SetHeader("Content-Type", file.ContentType)
+		hctx.SetHeader("Content-Length", strconv.FormatInt(file.Size, 10))
+		disposition := "inline"
+		if !strings.HasPrefix(file.ContentType, "image/") {
+			disposition = "attachment" // e.g. an import workbook: never rendered
+		}
+		hctx.SetHeader("Content-Disposition", disposition)
+		hctx.SetStatus(http.StatusOK)
+		if _, err := io.Copy(hctx.BodyWriter(), contents); err != nil {
+			slog.WarnContext(ctx, "files: send", "id", file.ID, "error", err)
+		}
+	}}
 }
 
 // matches reports whether an If-None-Match header lists etag (or is "*").
@@ -124,37 +128,41 @@ func matches(header, etag string) bool {
 	return false
 }
 
-// limitBody refuses uploads that announce more than maxRequestBytes before
-// anything is read, and caps the body for those that do not announce their
-// size (chunked; multipart parts are buffered to disk, so an unbounded body
-// would fill it). It parses the multipart form itself so that a body cut off
-// by the cap is 413 file.too_large, not a generic form error; huma then uses
-// the parsed form.
-func limitBody(ctx huma.Context, next func(huma.Context)) {
-	// The permission first: nobody without it gets a body parsed (and
-	// multipart parts spilled to disk).
-	if _, err := auth.Require(ctx.Context(), auth.PermCatalogWrite); err != nil {
-		var ae *apperr.Error
-		if errors.As(err, &ae) {
-			writeProblem(ctx, ae)
+// LimitUpload returns a middleware for an upload of at most maxBytes that
+// needs perm: it refuses uploads that announce more than maxBytes plus
+// multipart overhead before anything is read, and caps the body for those
+// that do not announce their size (chunked; multipart parts are buffered to
+// disk, so an unbounded body would fill it). It parses the multipart form
+// itself so that a body cut off by the cap is 413 file.too_large, not a
+// generic form error; huma then uses the parsed form.
+func LimitUpload(perm auth.Permission, maxBytes int) func(huma.Context, func(huma.Context)) {
+	maxRequest := int64(maxBytes) + 64<<10
+	return func(ctx huma.Context, next func(huma.Context)) {
+		// The permission first: nobody without it gets a body parsed (and
+		// multipart parts spilled to disk).
+		if _, err := auth.Require(ctx.Context(), perm); err != nil {
+			var ae *apperr.Error
+			if errors.As(err, &ae) {
+				writeProblem(ctx, ae)
+				return
+			}
+		}
+		r, w := humachi.Unwrap(ctx)
+		if r.ContentLength > maxRequest {
+			writeProblem(ctx, ErrTooLargeMax(maxBytes))
 			return
 		}
-	}
-	r, w := humachi.Unwrap(ctx)
-	if r.ContentLength > maxRequestBytes {
-		writeProblem(ctx, ErrTooLarge())
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
-	if err := r.ParseMultipartForm(humachi.MultipartMaxMemory); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			writeProblem(ctx, ErrTooLarge())
-			return
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequest)
+		if err := r.ParseMultipartForm(humachi.MultipartMaxMemory); err != nil {
+			var tooLarge *http.MaxBytesError
+			if errors.As(err, &tooLarge) {
+				writeProblem(ctx, ErrTooLargeMax(maxBytes))
+				return
+			}
+			// Anything else (not multipart, malformed) is reported by huma.
 		}
-		// Anything else (not multipart, malformed) is reported by huma.
+		next(ctx)
 	}
-	next(ctx)
 }
 
 // writeProblem writes an error before the operation runs (huma.WriteErr would

@@ -40,15 +40,40 @@ const (
 	MaxMegapixels = 25
 	// DecodeBudget bounds the memory of all image decodes running at once,
 	// in bytes (decodeCost: decoded source plus 8-bit target). The largest
-	// single image needs at most 300 MB: a 25 MP 16-bit PNG decodes to
+	// catalog image needs at most 300 MB: a 25 MP 16-bit PNG decodes to
 	// 8 bytes per pixel (200 MB) plus a 4-byte target of up to 25 MP (100 MB,
 	// a tall image is not scaled); a 25 MP CMYK JPEG 100 MB plus twice its
 	// target when it is turned upright (200 MB). Typical photos (8-bit YCbCr,
 	// scaled to 1600 px) need well under 100 MB, so several run in parallel;
 	// a large one waits until the budget is free. Encoded output and request
-	// buffers (each upload at most MaxSize) come on top.
-	DecodeBudget = 300 << 20
+	// buffers (each upload at most MaxSize) come on top. A floorplan
+	// (FloorplanImage) needs at most 390 MB: a 40 MP 16-bit PNG (320 MB) plus
+	// a 4096 px target (64 MB).
+	DecodeBudget = 400 << 20
 )
+
+// ImageLimits bound an image upload and say how it is stored.
+type ImageLimits struct {
+	// MaxSize is the largest accepted upload, in bytes.
+	MaxSize int
+	// MaxMegapixels bounds the pixel count, so decoding cannot exhaust memory.
+	MaxMegapixels int64
+	// MaxWidth and MaxLongSide (0: none) bound the stored image; larger ones
+	// are scaled down to fit.
+	MaxWidth, MaxLongSide int
+	// ReencodeWebP stores WebP re-encoded as PNG (scaled, without metadata)
+	// instead of as uploaded.
+	ReencodeWebP bool
+}
+
+// CatalogImage are the limits of catalog images (variant images): 10 MB,
+// 25 MP, stored at most 1600 px wide, WebP as uploaded.
+var CatalogImage = ImageLimits{MaxSize: MaxSize, MaxMegapixels: MaxMegapixels, MaxWidth: MaxWidth}
+
+// FloorplanImage are the limits of plan images (D80 amended in 2b): 20 MB,
+// 40 MP, stored at most 4096 px on the long side; WebP is re-encoded as PNG,
+// so no metadata of a customer's house (EXIF GPS) is kept.
+var FloorplanImage = ImageLimits{MaxSize: 20 << 20, MaxMegapixels: 40, MaxLongSide: 4096, ReencodeWebP: true}
 
 // Scope is where a file belongs: the catalog (Tenant nil) or one tenant.
 type Scope struct {
@@ -119,14 +144,19 @@ func (s *Service) WithTx(tx pgx.Tx) *Service {
 // upright and scaled down to MaxWidth (process); WebP is stored as
 // uploaded. Uploading the same stored bytes again returns the existing file.
 func (s *Service) Upload(ctx context.Context, scope Scope, r io.Reader) (File, error) {
+	return s.UploadImage(ctx, scope, r, CatalogImage)
+}
+
+// UploadImage is Upload with other limits (e.g. FloorplanImage).
+func (s *Service) UploadImage(ctx context.Context, scope Scope, r io.Reader, lim ImageLimits) (File, error) {
 	if err := scope.authorize(ctx); err != nil {
 		return File{}, err
 	}
-	data, err := io.ReadAll(io.LimitReader(r, MaxSize+1))
+	data, err := io.ReadAll(io.LimitReader(r, int64(lim.MaxSize)+1))
 	if err != nil {
 		return File{}, err
 	}
-	return s.UploadBytes(ctx, scope, data)
+	return s.UploadImageBytes(ctx, scope, data, lim)
 }
 
 // UploadBytes is Upload for an image already in memory (e.g. one taken from
@@ -134,11 +164,18 @@ func (s *Service) Upload(ctx context.Context, scope Scope, r io.Reader) (File, e
 // SHA-256 in file_sources) returns the file it became without decoding it
 // again (D149); each scope remembers its own sources.
 func (s *Service) UploadBytes(ctx context.Context, scope Scope, data []byte) (File, error) {
+	return s.UploadImageBytes(ctx, scope, data, CatalogImage)
+}
+
+// UploadImageBytes is UploadBytes with other limits. The sources a scope
+// remembers do not record the limits: a scope uses one kind of limits
+// (catalog: CatalogImage, tenants: FloorplanImage).
+func (s *Service) UploadImageBytes(ctx context.Context, scope Scope, data []byte, lim ImageLimits) (File, error) {
 	if err := scope.authorize(ctx); err != nil {
 		return File{}, err
 	}
-	if len(data) > MaxSize {
-		return File{}, ErrTooLarge()
+	if len(data) > lim.MaxSize {
+		return File{}, ErrTooLargeMax(lim.MaxSize)
 	}
 	source := sha256.Sum256(data)
 	sourceSum := hex.EncodeToString(source[:])
@@ -149,7 +186,7 @@ func (s *Service) UploadBytes(ctx context.Context, scope Scope, data []byte) (Fi
 	case !errors.Is(err, pgx.ErrNoRows):
 		return File{}, err
 	}
-	f, err := s.process(ctx, scope, data)
+	f, err := s.process(ctx, scope, data, lim)
 	if err != nil {
 		return File{}, err
 	}
@@ -160,7 +197,7 @@ func (s *Service) UploadBytes(ctx context.Context, scope Scope, data []byte) (Fi
 }
 
 // process checks, decodes and re-encodes an image and stores it.
-func (s *Service) process(ctx context.Context, scope Scope, data []byte) (File, error) {
+func (s *Service) process(ctx context.Context, scope Scope, data []byte, lim ImageLimits) (File, error) {
 	contentType := sniff(data)
 	if contentType == "" {
 		return File{}, errType()
@@ -169,16 +206,16 @@ func (s *Service) process(ctx context.Context, scope Scope, data []byte) (File, 
 	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
 		return File{}, errType()
 	}
-	if int64(cfg.Width)*int64(cfg.Height) > MaxMegapixels*1_000_000 {
+	if int64(cfg.Width)*int64(cfg.Height) > lim.MaxMegapixels*1_000_000 {
 		return File{}, apperr.New(http.StatusUnprocessableEntity, "file.too_many_pixels", "the image has too many pixels").
-			With("megapixels", MaxMegapixels)
+			With("megapixels", lim.MaxMegapixels)
 	}
 	orientation := orientationOf(data, contentType)
-	cost := min(decodeCost(cfg, contentType, orientation, MaxWidth), DecodeBudget)
+	cost := min(decodeCost(cfg, contentType, orientation, lim), DecodeBudget)
 	if err := s.decoding.Acquire(ctx, cost); err != nil {
 		return File{}, err
 	}
-	data, width, height, err := process(data, contentType, orientation, MaxWidth)
+	data, contentType, width, height, err := process(data, contentType, orientation, lim)
 	s.decoding.Release(cost)
 	if err != nil {
 		return File{}, errType() // the header was fine, the image data is not
@@ -242,8 +279,22 @@ func (s *Service) Open(ctx context.Context, id uuid.UUID) (File, io.ReadSeekClos
 	if err != nil {
 		return File{}, nil, err
 	}
+	return s.open(ctx, id, func(tenant *uuid.UUID) bool { return tenant == nil || actor.SeesTenant(*tenant) })
+}
+
+// OpenReferenced is Open for a file another feature references from a row
+// the caller has been checked to see (a plan's image): it skips the file's
+// own scope, which may be another tenant's after the project moved there.
+func (s *Service) OpenReferenced(ctx context.Context, id uuid.UUID) (File, io.ReadSeekCloser, error) {
+	if _, err := auth.Require(ctx); err != nil {
+		return File{}, nil, err
+	}
+	return s.open(ctx, id, func(*uuid.UUID) bool { return true })
+}
+
+func (s *Service) open(ctx context.Context, id uuid.UUID, sees func(tenant *uuid.UUID) bool) (File, io.ReadSeekCloser, error) {
 	row, err := s.q.GetFile(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.TenantID != nil && !actor.SeesTenant(*row.TenantID)) {
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !sees(row.TenantID)) {
 		return File{}, nil, apperr.NotFound("file.not_found")
 	}
 	if err != nil {
@@ -276,9 +327,12 @@ func (s *Service) Exists(ctx context.Context, scope Scope, id uuid.UUID) (bool, 
 }
 
 // ErrTooLarge reports an upload above MaxSize.
-func ErrTooLarge() *apperr.Error {
+func ErrTooLarge() *apperr.Error { return ErrTooLargeMax(MaxSize) }
+
+// ErrTooLargeMax reports an upload above maxBytes.
+func ErrTooLargeMax(maxBytes int) *apperr.Error {
 	return apperr.New(http.StatusRequestEntityTooLarge, "file.too_large", "the file is too large").
-		With("maxMb", MaxSize>>20)
+		With("maxMb", maxBytes>>20)
 }
 
 func errType() *apperr.Error {
