@@ -47,6 +47,21 @@ describe('ProjectPage', () => {
     expect(screen.getByLabelText('Version')).toHaveTextContent('V1')
     expect(screen.getByText('No plans yet.')).toBeInTheDocument()
     expect(screen.queryByRole('status', { name: /completed/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Project notes')).toBeInTheDocument()
+    expect(screen.getByText('Gate code 1234')).toBeInTheDocument()
+    expect(screen.queryByText('Version notes')).not.toBeInTheDocument()
+    expect(screen.queryByText('Archived')).not.toBeInTheDocument()
+  })
+
+  it('labels the version notes and marks an archived tenant', async () => {
+    serveProject({ ...villa, notes: '', tenant: { id: villa.tenantId, name: 'Acme', archived: true }, versions: [version(1, { notes: 'Cheaper offer' })] })
+    renderWithProviders(routes, { route: `/projects/${villa.id}` })
+
+    expect(await screen.findByText('Version notes')).toBeInTheDocument()
+    expect(screen.getByText('Cheaper offer')).toBeInTheDocument()
+    expect(screen.queryByText('Project notes')).not.toBeInTheDocument()
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(screen.getByText('Archived')).toBeInTheDocument()
   })
 
   it('shows the version of the URL and switches versions', async () => {

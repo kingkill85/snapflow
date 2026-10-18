@@ -5,7 +5,7 @@
   "new": "Neuer Mandant",
   "edit": "Mandant bearbeiten",
   "deleteTitle": "Mandant löschen",
-  "deleteMessage": "\"{{name}}\" mit allen Benutzern löschen? Das kann nicht rückgängig gemacht werden.",
+  "deleteMessage": "„{{name}}“ mit allen Benutzern löschen? Das kann nicht rückgängig gemacht werden.",
   "distributor": "Distributor",
   "partner": "Partner",
   "field": {
@@ -22,7 +22,7 @@
   "archived": "Archiviert",
   "restore": "Wiederherstellen",
   "archiveTitle": "Mandant archivieren",
-  "archiveMessage_one": "\"{{name}}\" hat {{count}} Projekt und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
-  "archiveMessage_other": "\"{{name}}\" hat {{count}} Projekte und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archiveMessage_one": "„{{name}}“ hat {{count}} Projekt und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archiveMessage_other": "„{{name}}“ hat {{count}} Projekte und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
   "archive": "Archivieren"
 }

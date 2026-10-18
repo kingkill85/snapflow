@@ -91,14 +91,14 @@ async function seed(api: Api) {
 
   // Tenants: one archived (with a project), one to archive, one to delete.
   const archived = await api.createTenant(unique('Archived Partner Elektro GmbH'))
-  await api.createProject({ tenantId: archived.id, name: `Altprojekt ${tag}` })
+  const oldProject = await api.createProject({ tenantId: archived.id, name: `Altprojekt ${tag}` })
   const archivedRes = await api.ctx.delete(`/api/tenants/${archived.id}`)
   expect(archivedRes.ok(), await archivedRes.text()).toBe(true)
   const toArchive = await api.createTenant(unique('Partner with projects'))
   await api.createProject({ tenantId: toArchive.id, name: `Partnerprojekt ${tag}` })
   const toDelete = await api.createTenant(unique('Partner without projects'))
 
-  return { tag, main, v2, withRetired, single, completed, cancelled, archived, toArchive, toDelete }
+  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete }
 }
 
 for (const lang of ['en', 'de'] as const) {
@@ -194,6 +194,7 @@ for (const lang of ['en', 'de'] as const) {
         { name: 'page-single-version', path: `/projects/${s.single.id}` },
         { name: 'page-completed', path: `/projects/${s.completed.id}` },
         { name: 'page-cancelled', path: `/projects/${s.cancelled.id}` },
+        { name: 'page-archived-tenant', path: `/projects/${s.oldProject.id}` },
         {
           name: 'tenants-archived',
           path: '/admin/tenants',

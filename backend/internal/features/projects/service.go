@@ -942,7 +942,7 @@ func (s *Service) tenantRefs(ctx context.Context, actor auth.Actor, ids []uuid.U
 		return nil, err
 	}
 	for id, t := range found {
-		out[id] = &ProjectTenant{ID: t.ID, Name: t.Name}
+		out[id] = &ProjectTenant{ID: t.ID, Name: t.Name, Archived: t.ArchivedAt != nil}
 	}
 	return out, nil
 }

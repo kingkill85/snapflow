@@ -6,6 +6,8 @@
  */
 
 export interface ProjectTenant {
+  /** The tenant is archived (deleted, kept for its projects) */
+  archived: boolean;
   id: string;
   name: string;
 }

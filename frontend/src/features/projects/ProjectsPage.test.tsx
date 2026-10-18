@@ -58,6 +58,17 @@ describe('ProjectsPage', () => {
     expect(await screen.findByText(`at /projects/${villa.id}`)).toBeInTheDocument()
   })
 
+  it('marks projects of an archived tenant', async () => {
+    serveList([villaRow, { ...villaRow, id: 'p2', name: 'Old Barn', tenant: { id: 't-old', name: 'Old', archived: true } }])
+    renderWithProviders(routes, { route: '/projects' })
+
+    const oldRow = (await screen.findByText('Old Barn')).closest('[role="row"]') as HTMLElement
+    expect(within(oldRow).getByText('Old')).toBeInTheDocument()
+    expect(within(oldRow).getByText('Archived')).toBeInTheDocument()
+    const villaRowEl = screen.getByText('Villa Müller').closest('[role="row"]') as HTMLElement
+    expect(within(villaRowEl).queryByText('Archived')).not.toBeInTheDocument()
+  })
+
   it('filters by search, status and tenant through the URL', async () => {
     const queries = serveList()
     const user = userEvent.setup()

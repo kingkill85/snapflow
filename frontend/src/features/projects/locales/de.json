@@ -10,6 +10,7 @@
   "statusFilter": "Status",
   "tenantFilter": "Mandant",
   "archivedTenant": "{{name}} (archiviert)",
+  "tenantArchived": "Archiviert",
   "allTenants": "Alle Mandanten",
   "deleteTitle": "Projekt löschen",
   "deleteMessage": "Projekt {{name}} mit allen Versionen löschen? Das kann nicht rückgängig gemacht werden.",
@@ -69,7 +70,9 @@
     },
     "reopen": "Wieder öffnen",
     "notFound": "Dieses Projekt gibt es nicht oder Sie können es nicht sehen.",
-    "backToList": "Alle Projekte"
+    "backToList": "Alle Projekte",
+    "projectNotes": "Projektnotizen",
+    "versionNotes": "Versionsnotizen"
   },
   "version": {
     "newTitle": "Neue Version",

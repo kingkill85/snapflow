@@ -381,6 +381,16 @@ func TestTenants(t *testing.T) {
 		t.Errorf("version tenant: %s %v", versionTenant, err)
 	}
 	wantCode(t, api.Get("/api/projects/"+p.ID.String(), acmeUser.Cookie), http.StatusNotFound, "project.not_found")
+
+	// Deleting a tenant with projects archives it; its projects say so.
+	wantCode(t, api.Delete("/api/tenants/"+other.String(), api.Admin.Cookie), http.StatusNoContent, "")
+	page = decode[projects.ProjectPage](t, api.Get("/api/projects?tenantId="+other.String(), api.Admin.Cookie))
+	if page.Total != 2 || !page.Items[0].Tenant.Archived {
+		t.Errorf("archived tenant: %+v", page.Items[0].Tenant)
+	}
+	if got := decode[projects.Project](t, api.Get("/api/projects/"+own.ID.String(), api.Admin.Cookie)); got.Tenant == nil || got.Tenant.Archived {
+		t.Errorf("active tenant: %+v", got.Tenant)
+	}
 }
 
 // Parallel creates in one tenant get distinct, gapless numbers.

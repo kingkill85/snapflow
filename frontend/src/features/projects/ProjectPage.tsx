@@ -17,6 +17,7 @@ import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page,
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
 import { ProjectFormDialog } from './ProjectFormDialog'
 import { ProjectStatusBadge } from './StatusBadge'
+import { TenantName } from './TenantName'
 import { VersionFormDialog } from './VersionFormDialog'
 
 /** /projects/:id and /projects/:id/versions/:versionId: a project with its versions (2a: the shell for plans). */
@@ -119,8 +120,9 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
     >
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <ProjectStatusBadge status={project.status} />
-        {project.tenant && <span>{project.tenant.name}</span>}
+        {project.tenant && <TenantName tenant={project.tenant} />}
       </div>
+      {project.notes && <Notes label={t('page.projectNotes')} text={project.notes} />}
 
       {project.status !== 'active' && (
         <Notice tone="warning">
@@ -171,7 +173,7 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
           )}
         </div>
       )}
-      {version?.notes && <p className="text-sm whitespace-pre-line text-muted">{version.notes}</p>}
+      {version?.notes && <Notes label={t('page.versionNotes')} text={version.notes} />}
 
       {/* Plans arrive in 2b (the floorplan editor), which adds the action here. */}
       <EmptyState title={t('page.noPlans')} />
@@ -198,5 +200,15 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
         error={<ErrorMessage error={removeVersion.error} />}
       />
     </Page>
+  )
+}
+
+/** Notes with a small label above them. */
+function Notes({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="space-y-0.5 text-sm">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="whitespace-pre-line">{text}</p>
+    </div>
   )
 }

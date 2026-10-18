@@ -46,8 +46,9 @@ type ProjectActions struct {
 
 // TenantRef names a project's tenant; only for callers who see every tenant.
 type ProjectTenant struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Archived bool      `json:"archived" doc:"The tenant is archived (deleted, kept for its projects)"`
 }
 
 // Customer is the customer a project is for. Empty strings are no value.

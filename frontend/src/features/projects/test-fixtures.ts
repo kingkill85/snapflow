@@ -57,7 +57,7 @@ export const version = (n: number, over: Partial<ProjectVersion> = {}): ProjectV
 export const villa: Project = {
   id: id(300),
   tenantId: acmeId,
-  tenant: { id: acmeId, name: 'Acme' },
+  tenant: { id: acmeId, name: 'Acme', archived: false },
   number: '2026-0001',
   name: 'Villa Müller',
   status: 'active',
@@ -77,7 +77,7 @@ export const villa: Project = {
 export const villaRow: ProjectListItem = {
   id: villa.id,
   tenantId: acmeId,
-  tenant: { id: acmeId, name: 'Acme' },
+  tenant: { id: acmeId, name: 'Acme', archived: false },
   number: villa.number,
   name: villa.name,
   customerName: 'Max Müller',

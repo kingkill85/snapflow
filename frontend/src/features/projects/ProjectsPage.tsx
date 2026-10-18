@@ -28,6 +28,7 @@ import {
 import { fresh, projectPath, useFormatDate } from './paths'
 import { ProjectFormDialog } from './ProjectFormDialog'
 import { ProjectStatusBadge } from './StatusBadge'
+import { TenantName } from './TenantName'
 
 /** Rows per page. */
 export const pageSize = 50
@@ -144,7 +145,7 @@ export function ProjectsPage() {
       ),
       className: 'min-w-40',
     },
-    ...(allTenants ? [{ header: t('column.tenant'), cell: (p: ProjectListItem) => p.tenant?.name ?? '' }] : []),
+    ...(allTenants ? [{ header: t('column.tenant'), cell: (p: ProjectListItem) => (p.tenant ? <TenantName tenant={p.tenant} /> : '') }] : []),
     { header: t('column.status'), cell: (p) => <ProjectStatusBadge status={p.status} /> },
     { header: t('column.versions'), cell: (p) => p.versionCount, className: 'text-right tabular-nums' },
     { header: t('column.updated'), cell: (p) => formatDate(p.updatedAt), className: 'whitespace-nowrap' },

@@ -173,7 +173,7 @@
     "archived": "Dieser Mandant ist archiviert. Stellen Sie ihn wieder her, bevor Sie ihn aktivieren.",
     "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden.",
     "has_projects": "Dieser archivierte Mandant hat noch Projekte ({{count}}) und kann nicht gelöscht werden.",
-    "name_taken": "Ein Mandant namens \"{{name}}\" existiert bereits.",
+    "name_taken": "Ein Mandant namens „{{name}}“ existiert bereits.",
     "not_found": "Dieser Mandant existiert nicht mehr."
   },
   "user": {

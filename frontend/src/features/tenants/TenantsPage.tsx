@@ -128,6 +128,8 @@ export function TenantsPage() {
             : t('deleteMessage', { name: deleting?.name })
         }
         confirmLabel={deleting && deleting.projectCount > 0 ? t('archive') : tCommon('action.delete')}
+        // Archiving can be undone (Restore): no solid danger button (D184).
+        confirmVariant={deleting && deleting.projectCount > 0 ? 'primary' : 'danger'}
         pending={remove.isPending}
         onConfirm={() => void confirmDelete()}
         error={<ErrorMessage error={remove.error} />}

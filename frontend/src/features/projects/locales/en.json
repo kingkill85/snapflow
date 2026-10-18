@@ -10,6 +10,7 @@
   "statusFilter": "Status",
   "tenantFilter": "Tenant",
   "archivedTenant": "{{name}} (archived)",
+  "tenantArchived": "Archived",
   "allTenants": "All tenants",
   "deleteTitle": "Delete project",
   "deleteMessage": "Delete project {{name}} with all its versions? This cannot be undone.",
@@ -69,7 +70,9 @@
     },
     "reopen": "Reopen",
     "notFound": "This project does not exist or you cannot see it.",
-    "backToList": "All projects"
+    "backToList": "All projects",
+    "projectNotes": "Project notes",
+    "versionNotes": "Version notes"
   },
   "version": {
     "newTitle": "New version",

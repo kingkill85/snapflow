@@ -177,6 +177,9 @@ describe('TenantsPage', () => {
     await user.click(await screen.findByRole('button', { name: /delete/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Archive tenant' })
     expect(dialog).toHaveTextContent('"Acme" has 3 projects, so it is archived instead of deleted')
+    // Archiving can be undone: the primary button, not the solid danger one (D184).
+    expect(within(dialog).getByRole('button', { name: 'Archive' })).toHaveClass('bg-primary')
+    expect(within(dialog).getByRole('button', { name: 'Archive' })).not.toHaveClass('bg-danger')
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
     await waitFor(() => expect(deleted).toBe(true))
   })
