@@ -12,13 +12,16 @@ import (
 
 type Querier interface {
 	AddFileSource(ctx context.Context, arg AddFileSourceParams) error
-	// CreateFile stores a file's metadata, or returns the existing row when the
-	// same bytes were stored before (the no-op update makes RETURNING see it).
+	// CreateFile stores a file's metadata in its scope (tenant_id NULL: the
+	// catalog), or returns the existing row when the same bytes were stored in
+	// that scope before (the no-op update makes RETURNING see it).
 	CreateFile(ctx context.Context, arg CreateFileParams) (File, error)
-	// FileBySource returns the file an uploaded image became (file_sources),
-	// by the SHA-256 of the uploaded bytes.
-	FileBySource(ctx context.Context, sourceSha256 string) (File, error)
-	FileExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// FileBySource returns the file an uploaded image became (file_sources) in
+	// a scope, by the SHA-256 of the uploaded bytes.
+	FileBySource(ctx context.Context, arg FileBySourceParams) (File, error)
+	// FileExists reports whether a file exists in a scope (tenant_id NULL: the
+	// catalog).
+	FileExists(ctx context.Context, arg FileExistsParams) (bool, error)
 	GetFile(ctx context.Context, id uuid.UUID) (File, error)
 }
 

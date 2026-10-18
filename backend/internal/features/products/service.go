@@ -607,7 +607,7 @@ func (s *Service) ReorderVariants(ctx context.Context, productID uuid.UUID, ids 
 func (s *Service) validateVariant(ctx context.Context, c categories.Category, in VariantInput, previous attrschema.Values) (VariantInput, error) {
 	in, errs := NormalizeVariant(c, in, previous, "body")
 	if in.ImageFileID != nil {
-		exists, err := s.files.Exists(ctx, *in.ImageFileID)
+		exists, err := s.files.Exists(ctx, files.Catalog, *in.ImageFileID)
 		if err != nil {
 			return in, err
 		}

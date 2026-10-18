@@ -1,8 +1,11 @@
 // Package files stores uploaded files (variant images first). Contents live
 // on disk under STORAGE_DIR, addressed by their SHA-256, so the same bytes
-// are stored once; the files table holds their metadata. Every download
-// needs a login. Other features reference files by id and check them with
-// Exists; unreferenced files are kept (a cleanup job comes later).
+// are stored once; the files table holds their metadata. Every file has a
+// scope (D79): the catalog, readable by every logged-in user, or one tenant,
+// readable only by that tenant and callers with tenants.access_all (others
+// get 404). The same bytes give one file per scope. Other features reference
+// files by id and check them with Exists in their scope; unreferenced files
+// are kept (a cleanup job comes later).
 package files
 
 import (
@@ -47,15 +50,45 @@ const (
 	DecodeBudget = 300 << 20
 )
 
+// Scope is where a file belongs: the catalog (Tenant nil) or one tenant.
+type Scope struct {
+	Tenant *uuid.UUID
+}
+
+// Catalog is the scope of catalog files (variant images, import workbooks).
+var Catalog = Scope{}
+
+// TenantScope is the scope of one tenant's files (e.g. floorplans).
+func TenantScope(id uuid.UUID) Scope { return Scope{Tenant: &id} }
+
+// authorize checks that the caller may store files in the scope: catalog
+// files need catalog.write, tenant files projects.write in a tenant the
+// caller sees.
+func (sc Scope) authorize(ctx context.Context) error {
+	if sc.Tenant == nil {
+		_, err := auth.Require(ctx, auth.PermCatalogWrite)
+		return err
+	}
+	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
+	if err != nil {
+		return err
+	}
+	if !actor.SeesTenant(*sc.Tenant) {
+		return apperr.New(http.StatusForbidden, "file.tenant_forbidden", "you cannot store files of another tenant")
+	}
+	return nil
+}
+
 type File struct {
-	ID          uuid.UUID `json:"id"`
-	ContentType string    `json:"contentType" example:"image/jpeg"`
-	Size        int64     `json:"size" doc:"Bytes as stored (after downscaling)"`
-	Width       int       `json:"width,omitempty" doc:"Pixels, for images"`
-	Height      int       `json:"height,omitempty" doc:"Pixels, for images"`
-	SHA256      string    `json:"sha256" doc:"Hex SHA-256 of the stored bytes; also the download's ETag"`
-	URL         string    `json:"url" doc:"Download path (needs a login)" example:"/api/files/3f2c…"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          uuid.UUID  `json:"id"`
+	TenantID    *uuid.UUID `json:"tenantId,omitempty" doc:"The tenant the file belongs to; absent for catalog files"`
+	ContentType string     `json:"contentType" example:"image/jpeg"`
+	Size        int64      `json:"size" doc:"Bytes as stored (after downscaling)"`
+	Width       int        `json:"width,omitempty" doc:"Pixels, for images"`
+	Height      int        `json:"height,omitempty" doc:"Pixels, for images"`
+	SHA256      string     `json:"sha256" doc:"Hex SHA-256 of the stored bytes; also the download's ETag"`
+	URL         string     `json:"url" doc:"Download path (needs a login)" example:"/api/files/3f2c…"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 type Service struct {
@@ -85,23 +118,23 @@ func (s *Service) WithTx(tx pgx.Tx) *Service {
 // PNG are always re-encoded (8 bits per channel, no metadata), turned
 // upright and scaled down to MaxWidth (process); WebP is stored as
 // uploaded. Uploading the same stored bytes again returns the existing file.
-func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
-	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+func (s *Service) Upload(ctx context.Context, scope Scope, r io.Reader) (File, error) {
+	if err := scope.authorize(ctx); err != nil {
 		return File{}, err
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MaxSize+1))
 	if err != nil {
 		return File{}, err
 	}
-	return s.UploadBytes(ctx, data)
+	return s.UploadBytes(ctx, scope, data)
 }
 
 // UploadBytes is Upload for an image already in memory (e.g. one taken from
 // an imported workbook). An image uploaded before (the same bytes, by their
 // SHA-256 in file_sources) returns the file it became without decoding it
-// again (D149).
-func (s *Service) UploadBytes(ctx context.Context, data []byte) (File, error) {
-	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+// again (D149); each scope remembers its own sources.
+func (s *Service) UploadBytes(ctx context.Context, scope Scope, data []byte) (File, error) {
+	if err := scope.authorize(ctx); err != nil {
 		return File{}, err
 	}
 	if len(data) > MaxSize {
@@ -109,25 +142,25 @@ func (s *Service) UploadBytes(ctx context.Context, data []byte) (File, error) {
 	}
 	source := sha256.Sum256(data)
 	sourceSum := hex.EncodeToString(source[:])
-	row, err := s.q.FileBySource(ctx, sourceSum)
+	row, err := s.q.FileBySource(ctx, store.FileBySourceParams{SourceSha256: sourceSum, TenantID: scope.Tenant})
 	switch {
 	case err == nil:
 		return fromRow(row), nil
 	case !errors.Is(err, pgx.ErrNoRows):
 		return File{}, err
 	}
-	f, err := s.process(ctx, data)
+	f, err := s.process(ctx, scope, data)
 	if err != nil {
 		return File{}, err
 	}
-	if err := s.q.AddFileSource(ctx, store.AddFileSourceParams{SourceSha256: sourceSum, FileID: f.ID}); err != nil {
+	if err := s.q.AddFileSource(ctx, store.AddFileSourceParams{TenantID: scope.Tenant, SourceSha256: sourceSum, FileID: f.ID}); err != nil {
 		return File{}, err
 	}
 	return f, nil
 }
 
 // process checks, decodes and re-encodes an image and stores it.
-func (s *Service) process(ctx context.Context, data []byte) (File, error) {
+func (s *Service) process(ctx context.Context, scope Scope, data []byte) (File, error) {
 	contentType := sniff(data)
 	if contentType == "" {
 		return File{}, errType()
@@ -152,29 +185,29 @@ func (s *Service) process(ctx context.Context, data []byte) (File, error) {
 	}
 
 	w, h := int32(width), int32(height) //nolint:gosec // bounded by MaxMegapixels
-	return s.put(ctx, data, contentType, &w, &h)
+	return s.put(ctx, scope, data, contentType, &w, &h)
 }
 
 // StoreDocument stores a non-image file as it is (e.g. an import workbook
 // kept with its import run). The caller checks its type and size; the same
-// bytes give the same file.
-func (s *Service) StoreDocument(ctx context.Context, data []byte, contentType string) (File, error) {
-	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+// bytes give the same file in a scope.
+func (s *Service) StoreDocument(ctx context.Context, scope Scope, data []byte, contentType string) (File, error) {
+	if err := scope.authorize(ctx); err != nil {
 		return File{}, err
 	}
-	return s.put(ctx, data, contentType, nil, nil)
+	return s.put(ctx, scope, data, contentType, nil, nil)
 }
 
 // put stores contents (first, so a row never points to missing bytes) and
 // their metadata.
-func (s *Service) put(ctx context.Context, data []byte, contentType string, width, height *int32) (File, error) {
+func (s *Service) put(ctx context.Context, scope Scope, data []byte, contentType string, width, height *int32) (File, error) {
 	sum := sha256.Sum256(data)
 	hexSum := hex.EncodeToString(sum[:])
 	if err := s.storage.Put(hexSum, data); err != nil {
 		return File{}, fmt.Errorf("files: store: %w", err)
 	}
 	row, err := s.q.CreateFile(ctx, store.CreateFileParams{
-		Sha256: hexSum, ContentType: contentType, Size: int64(len(data)), Width: width, Height: height,
+		TenantID: scope.Tenant, Sha256: hexSum, ContentType: contentType, Size: int64(len(data)), Width: width, Height: height,
 	})
 	if err != nil {
 		return File{}, err
@@ -200,14 +233,17 @@ func (s *Service) ReadAll(ctx context.Context, id uuid.UUID, max int64) (File, [
 	return f, data, nil
 }
 
-// Open returns a file and its contents; any logged-in user may read files.
-// The caller closes the reader.
+// Open returns a file and its contents. Catalog files are read by any
+// logged-in user; a tenant's files only by that tenant and callers with
+// tenants.access_all, for everybody else they do not exist (404). The caller
+// closes the reader.
 func (s *Service) Open(ctx context.Context, id uuid.UUID) (File, io.ReadSeekCloser, error) {
-	if _, err := auth.Require(ctx); err != nil {
+	actor, err := auth.Require(ctx)
+	if err != nil {
 		return File{}, nil, err
 	}
 	row, err := s.q.GetFile(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.TenantID != nil && !actor.SeesTenant(*row.TenantID)) {
 		return File{}, nil, apperr.NotFound("file.not_found")
 	}
 	if err != nil {
@@ -224,12 +260,19 @@ func (s *Service) Open(ctx context.Context, id uuid.UUID) (File, io.ReadSeekClos
 	return fromRow(row), f, nil
 }
 
-// Exists reports whether a file exists, for features that reference files.
-func (s *Service) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
-	if _, err := auth.Require(ctx); err != nil {
+// Exists reports whether a file exists in a scope, for features that
+// reference files: a catalog product may only reference catalog files, a
+// project only its tenant's. A tenant scope the caller does not see has no
+// files for them.
+func (s *Service) Exists(ctx context.Context, scope Scope, id uuid.UUID) (bool, error) {
+	actor, err := auth.Require(ctx)
+	if err != nil {
 		return false, err
 	}
-	return s.q.FileExists(ctx, id)
+	if scope.Tenant != nil && !actor.SeesTenant(*scope.Tenant) {
+		return false, nil
+	}
+	return s.q.FileExists(ctx, store.FileExistsParams{ID: id, TenantID: scope.Tenant})
 }
 
 // ErrTooLarge reports an upload above MaxSize.
@@ -244,7 +287,7 @@ func errType() *apperr.Error {
 
 func fromRow(r store.File) File {
 	f := File{
-		ID: r.ID, ContentType: r.ContentType, Size: r.Size, SHA256: r.Sha256,
+		ID: r.ID, TenantID: r.TenantID, ContentType: r.ContentType, Size: r.Size, SHA256: r.Sha256,
 		URL: "/api/files/" + r.ID.String(), CreatedAt: r.CreatedAt,
 	}
 	if r.Width != nil {
