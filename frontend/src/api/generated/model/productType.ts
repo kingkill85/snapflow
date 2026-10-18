@@ -6,6 +6,7 @@
  */
 import type { Actions } from './actions';
 import type { AttributeDefinition } from './attributeDefinition';
+import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
 import type { ProductTypeDescription } from './productTypeDescription';
 import type { ProductTypeName } from './productTypeName';
 
@@ -15,12 +16,14 @@ export interface ProductType {
   /** Values stored on each product, or on each variant (scope) */
   attributes: AttributeDefinition[];
   can: Actions;
+  /** Badge colour, #rrggbb */
+  color?: string;
   createdAt: string;
   /** Description per locale */
   description?: ProductTypeDescription;
   id: string;
   /** Values per installed unit (bus address, MAC, ...), filled in projects */
-  instanceAttributes: AttributeDefinition[];
+  instanceAttributes: InstanceAttributeDefinition[];
   /** Inactive types are hidden from lists unless asked for */
   isActive: boolean;
   /** Stable identifier, lower snake case */
@@ -29,5 +32,6 @@ export interface ProductType {
   name: ProductTypeName;
   /** Position in the catalog, 1 first */
   sortOrder: number;
+  /** Send it back as expectedUpdatedAt when updating */
   updatedAt: string;
 }

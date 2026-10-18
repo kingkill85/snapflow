@@ -3,12 +3,15 @@ package producttypes_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
@@ -22,19 +25,22 @@ type productType struct {
 	Key                string           `json:"key"`
 	Name               map[string]any   `json:"name"`
 	Description        map[string]any   `json:"description"`
+	Color              string           `json:"color"`
 	SortOrder          int              `json:"sortOrder"`
 	IsActive           bool             `json:"isActive"`
 	Attributes         []map[string]any `json:"attributes"`
 	InstanceAttributes []map[string]any `json:"instanceAttributes"`
 	Can                auth.Actions     `json:"can"`
+	UpdatedAt          string           `json:"updatedAt"`
 }
 
 type problem struct {
 	Code   string         `json:"code"`
 	Params map[string]any `json:"params"`
 	Fields []struct {
-		Location string `json:"location"`
-		Code     string `json:"code"`
+		Location string         `json:"location"`
+		Code     string         `json:"code"`
+		Params   map[string]any `json:"params"`
 	} `json:"fields"`
 }
 
@@ -55,6 +61,12 @@ func body(key string) map[string]any {
 		"attributes":         []any{},
 		"instanceAttributes": []any{},
 	}
+}
+
+// updateBody is b as an update of pt (expectedUpdatedAt from pt).
+func updateBody(pt productType, b map[string]any) map[string]any {
+	b["expectedUpdatedAt"] = pt.UpdatedAt
+	return b
 }
 
 func create(t *testing.T, api *apptest.API, b map[string]any) productType {
@@ -123,7 +135,7 @@ func TestCRUD(t *testing.T) {
 		t.Errorf("second type got sort order %d, want 2", second.SortOrder)
 	}
 
-	upd := body("dimmer")
+	upd := updateBody(created, body("dimmer"))
 	upd["isActive"] = false
 	resp = api.Put("/api/product-types/"+created.ID, api.Admin.Cookie, upd)
 	if resp.Code != http.StatusOK {
@@ -166,7 +178,7 @@ func TestPermissions(t *testing.T) {
 		}
 		writes := map[string]*httptest.ResponseRecorder{
 			"create":  api.Post("/api/product-types", s.Cookie, body("other")),
-			"update":  api.Put(path, s.Cookie, body("gateway")),
+			"update":  api.Put(path, s.Cookie, updateBody(pt, body("gateway"))),
 			"delete":  api.Delete(path, s.Cookie),
 			"reorder": api.Put("/api/product-types/order", s.Cookie, map[string]any{"ids": []string{pt.ID}}),
 		}
@@ -194,12 +206,12 @@ func TestKey(t *testing.T) {
 	}
 
 	other := create(t, api, body("switch"))
-	resp = api.Put("/api/product-types/"+other.ID, api.Admin.Cookie, body("gateway"))
+	resp = api.Put("/api/product-types/"+other.ID, api.Admin.Cookie, updateBody(other, body("gateway")))
 	if resp.Code != http.StatusConflict || decode[problem](t, resp).Code != "product_type.key_taken" {
 		t.Errorf("update to a taken key: got %d: %s", resp.Code, resp.Body)
 	}
 
-	for _, key := range []string{"Gateway", "1gateway", "gate-way", "gate way"} {
+	for _, key := range []string{"Gateway", "1gateway", "gate-way", "gate way", "", "a" + strings.Repeat("b", 64)} {
 		resp := api.Post("/api/product-types", api.Admin.Cookie, body(key))
 		assertFields(t, resp, "body.key product_type.key_format")
 	}
@@ -251,9 +263,65 @@ func TestValidation(t *testing.T) {
 		"range": {func(b map[string]any) {
 			b["attributes"] = []any{attr(map[string]any{"type": "number", "min": 5, "max": 1})}
 		}, []string{"body.attributes[0].max attribute.range_invalid"}},
-		"instance attribute scope": {func(b map[string]any) {
+		"bounds": {func(b map[string]any) {
+			b["attributes"] = []any{
+				attr(map[string]any{"type": "integer", "min": 0.5, "max": 1e16}),
+				attr(map[string]any{"key": "b", "type": "list", "itemType": "text", "min": -1}),
+			}
+		}, []string{
+			"body.attributes[0].min attribute.bound_whole",
+			"body.attributes[0].max attribute.bound_range",
+			"body.attributes[1].min attribute.bound_negative",
+		}},
+		"impossible schemas": {func(b map[string]any) {
+			b["attributes"] = []any{
+				attr(map[string]any{"required": true, "max": 0}),
+				attr(map[string]any{"key": "b", "type": "list", "itemType": "enum", "min": 2, "options": []any{option("x", "X")}}),
+			}
+		}, []string{
+			"body.attributes[0].max attribute.required_max",
+			"body.attributes[1].min attribute.min_above_options",
+		}},
+		"instance attribute scope (not in the API schema)": {func(b map[string]any) {
 			b["instanceAttributes"] = []any{attr(map[string]any{"scope": "variant"})}
-		}, []string{"body.instanceAttributes[0].scope attribute.scope_not_allowed"}},
+		}, []string{"body.instanceAttributes[0].scope validation.invalid"}},
+		"empty scope (OpenAPI enum)": {func(b map[string]any) {
+			b["attributes"] = []any{attr(map[string]any{"scope": ""})}
+		}, []string{"body.attributes[0].scope validation.invalid"}},
+		"empty item type (OpenAPI enum)": {func(b map[string]any) {
+			b["attributes"] = []any{attr(map[string]any{"type": "list", "itemType": ""})}
+		}, []string{"body.attributes[0].itemType validation.invalid"}},
+		"unknown locales": {func(b map[string]any) {
+			b["name"] = map[string]string{"en": "Dimmer", "fr": "Variateur"}
+			b["description"] = map[string]string{"en": "x", "es": "x"}
+			b["attributes"] = []any{attr(map[string]any{"label": map[string]string{"en": "A", "it": "A"}})}
+		}, []string{
+			"body.name.fr validation.locale",
+			"body.description.es validation.locale",
+			"body.attributes[0].label.it validation.locale",
+		}},
+		"too long texts": {func(b map[string]any) {
+			b["name"] = map[string]string{"en": strings.Repeat("x", 101)}
+			b["description"] = map[string]string{"en": "x", "de": strings.Repeat("x", 2001)}
+		}, []string{"body.name.en validation.too_long", "body.description.de validation.too_long"}},
+		"colour": {func(b map[string]any) {
+			b["color"] = "#12345g"
+		}, []string{"body.color product_type.color_format"}},
+		"too many attributes": {func(b map[string]any) {
+			b["attributes"] = make([]any, 201)
+			b["instanceAttributes"] = make([]any, 201)
+			for i := range 201 {
+				b["attributes"].([]any)[i] = attr(nil)
+				b["instanceAttributes"].([]any)[i] = attr(nil)
+			}
+		}, []string{"body.attributes validation.too_many", "body.instanceAttributes validation.too_many"}},
+		"too many options": {func(b map[string]any) {
+			options := make([]any, 501)
+			for i := range options {
+				options[i] = option("x", "X")
+			}
+			b["attributes"] = []any{attr(map[string]any{"type": "enum", "options": options})}
+		}, []string{"body.attributes[0].options validation.too_many"}},
 		"all errors at once": {func(b map[string]any) {
 			b["key"] = "Bad"
 			b["attributes"] = []any{attr(map[string]any{"type": "enum"})}
@@ -364,7 +432,7 @@ func TestNotFound(t *testing.T) {
 
 	for name, resp := range map[string]*httptest.ResponseRecorder{
 		"get":    api.Get(missing, api.Admin.Cookie),
-		"update": api.Put(missing, api.Admin.Cookie, body("x")),
+		"update": api.Put(missing, api.Admin.Cookie, updateBody(productType{UpdatedAt: time.Now().Format(time.RFC3339)}, body("x"))),
 		"delete": api.Delete(missing, api.Admin.Cookie),
 	} {
 		if resp.Code != http.StatusNotFound || decode[problem](t, resp).Code != "product_type.not_found" {
@@ -385,5 +453,172 @@ func assertFields(t *testing.T, resp *httptest.ResponseRecorder, want ...string)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("fields %q\nwant %q", got, want)
+	}
+}
+
+func TestNormalisesOnSave(t *testing.T) {
+	api := apptest.New(t)
+	b := body("dimmer")
+	b["color"] = " #1F6FEB "
+	b["attributes"] = []any{
+		map[string]any{"key": "name", "label": map[string]string{"en": " Name "}, "type": "text",
+			"options": []any{map[string]any{"key": "x", "label": map[string]string{"en": "X"}}}, "itemType": "enum"},
+		map[string]any{"key": "on", "label": map[string]string{"en": "On"}, "type": "boolean", "min": 1, "max": 2},
+	}
+	got := create(t, api, b)
+	want := []map[string]any{
+		{"key": "name", "label": map[string]any{"en": "Name"}, "type": "text", "scope": "product"},
+		{"key": "on", "label": map[string]any{"en": "On"}, "type": "boolean", "scope": "product"},
+	}
+	if !reflect.DeepEqual(got.Attributes, want) {
+		t.Errorf("attributes: %v", got.Attributes)
+	}
+	if got.Color != "#1f6feb" {
+		t.Errorf("colour: %q", got.Color)
+	}
+
+	// No colour clears it.
+	resp := api.Put("/api/product-types/"+got.ID, api.Admin.Cookie, updateBody(got, body("dimmer")))
+	if updated := decode[productType](t, resp); resp.Code != http.StatusOK || updated.Color != "" {
+		t.Errorf("clear colour: got %d: %s", resp.Code, resp.Body)
+	}
+}
+
+func TestErrorParams(t *testing.T) {
+	api := apptest.New(t)
+	b := body("dimmer")
+	b["name"] = map[string]string{"en": strings.Repeat("x", 101)}
+	b["attributes"] = []any{
+		map[string]any{"key": "a", "label": map[string]string{"en": "A"}, "type": "number", "min": 5, "max": 1},
+	}
+	resp := api.Post("/api/product-types", api.Admin.Cookie, b)
+	p := decode[problem](t, resp)
+	if resp.Code != http.StatusUnprocessableEntity || len(p.Fields) != 2 {
+		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+	if !reflect.DeepEqual(p.Fields[0].Params, map[string]any{"max": 100.0}) ||
+		!reflect.DeepEqual(p.Fields[1].Params, map[string]any{"min": 5.0}) {
+		t.Errorf("params: %+v", p.Fields)
+	}
+}
+
+func TestStaleUpdate(t *testing.T) {
+	api := apptest.New(t)
+	pt := create(t, api, body("dimmer"))
+	path := "/api/product-types/" + pt.ID
+
+	first := api.Put(path, api.Admin.Cookie, updateBody(pt, body("dimmer_a")))
+	if first.Code != http.StatusOK {
+		t.Fatalf("first update: got %d: %s", first.Code, first.Body)
+	}
+	updated := decode[productType](t, first)
+	if updated.UpdatedAt == pt.UpdatedAt {
+		t.Error("updatedAt did not change")
+	}
+
+	// A second editor still holds the old version.
+	resp := api.Put(path, api.Admin.Cookie, updateBody(pt, body("dimmer_b")))
+	if resp.Code != http.StatusConflict || decode[problem](t, resp).Code != "product_type.stale" {
+		t.Fatalf("stale update: got %d: %s", resp.Code, resp.Body)
+	}
+	if got := keys(list(t, api, api.Admin.Cookie, "")); !reflect.DeepEqual(got, []string{"dimmer_a"}) {
+		t.Errorf("after stale update: %v", got)
+	}
+
+	// With the current version it works again.
+	if resp := api.Put(path, api.Admin.Cookie, updateBody(updated, body("dimmer_b"))); resp.Code != http.StatusOK {
+		t.Errorf("fresh update: got %d: %s", resp.Code, resp.Body)
+	}
+
+	// expectedUpdatedAt is required (huma reports a missing property at "body").
+	resp = api.Put(path, api.Admin.Cookie, body("dimmer_c"))
+	assertFields(t, resp, "body validation.invalid")
+
+	// Concurrent saves of the same version: exactly one wins.
+	current := decode[productType](t, api.Get(path, api.Admin.Cookie))
+	codes := make([]int, 10)
+	var wg sync.WaitGroup
+	for i := range codes {
+		wg.Go(func() {
+			codes[i] = api.Put(path, api.Admin.Cookie, updateBody(current, body("dimmer_c"))).Code
+		})
+	}
+	wg.Wait()
+	ok := 0
+	for _, c := range codes {
+		switch c {
+		case http.StatusOK:
+			ok++
+		case http.StatusConflict:
+		default:
+			t.Errorf("concurrent update: got %d", c)
+		}
+	}
+	if ok != 1 {
+		t.Errorf("%d concurrent updates succeeded, want 1 (%v)", ok, codes)
+	}
+}
+
+func TestConcurrentSortOrder(t *testing.T) {
+	api := apptest.New(t)
+	const n = 20
+	var wg sync.WaitGroup
+	results := make([]productType, n)
+	for i := range n {
+		wg.Go(func() {
+			resp := api.Post("/api/product-types", api.Admin.Cookie, body(fmt.Sprintf("type_%02d", i)))
+			if resp.Code == http.StatusCreated {
+				_ = json.Unmarshal(resp.Body.Bytes(), &results[i])
+			}
+		})
+	}
+	wg.Wait()
+	seen := map[int]bool{}
+	for i, r := range results {
+		if r.ID == "" {
+			t.Fatalf("create %d failed", i)
+		}
+		if seen[r.SortOrder] {
+			t.Errorf("sort order %d given twice", r.SortOrder)
+		}
+		seen[r.SortOrder] = true
+	}
+	for i := 1; i <= n; i++ {
+		if !seen[i] {
+			t.Errorf("sort order %d missing", i)
+		}
+	}
+
+	// Creates during reorders: every reorder sees a complete list or reports
+	// a mismatch, and sort orders stay distinct.
+	items := list(t, api, api.Admin.Cookie, "?includeInactive=true")
+	ids := make([]string, len(items))
+	for i, it := range items {
+		ids[len(items)-1-i] = it.ID
+	}
+	wg = sync.WaitGroup{}
+	reorderCodes := make([]int, 5)
+	for i := range reorderCodes {
+		wg.Go(func() {
+			reorderCodes[i] = api.Put("/api/product-types/order", api.Admin.Cookie, map[string]any{"ids": ids}).Code
+		})
+		wg.Go(func() { create(t, api, body(fmt.Sprintf("late_%d", i))) })
+	}
+	wg.Wait()
+	for _, c := range reorderCodes {
+		if c != http.StatusOK && c != http.StatusUnprocessableEntity {
+			t.Errorf("reorder: got %d", c)
+		}
+	}
+	all := list(t, api, api.Admin.Cookie, "?includeInactive=true")
+	seen = map[int]bool{}
+	for _, it := range all {
+		if seen[it.SortOrder] {
+			t.Errorf("sort order %d given twice after reorders: %v", it.SortOrder, keys(all))
+		}
+		seen[it.SortOrder] = true
+	}
+	if len(all) != n+5 {
+		t.Errorf("%d types, want %d", len(all), n+5)
 	}
 }

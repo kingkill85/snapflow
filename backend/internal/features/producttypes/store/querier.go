@@ -11,16 +11,25 @@ import (
 )
 
 type Querier interface {
-	// New types go to the end of the order.
+	// New types go to the end of the order (under LockProductTypeOrder, so two
+	// creates never get the same sort order).
 	CreateProductType(ctx context.Context, arg CreateProductTypeParams) (ProductType, error)
 	DeleteProductType(ctx context.Context, id uuid.UUID) (int64, error)
 	GetProductType(ctx context.Context, id uuid.UUID) (ProductType, error)
 	ListProductTypes(ctx context.Context, includeInactive bool) ([]ProductType, error)
-	// LockProductTypeIDs locks every product type for a reorder, so the set of
-	// ids cannot change underneath it.
+	// LockProductTypeIDs locks every product type row for a reorder, so none can
+	// be deleted or reordered underneath it; new rows are kept out by
+	// LockProductTypeOrder, which the caller takes first.
 	LockProductTypeIDs(ctx context.Context) ([]uuid.UUID, error)
+	// LockProductTypeOrder serialises everything that assigns sort orders
+	// (create, reorder) until the transaction ends.
+	LockProductTypeOrder(ctx context.Context, lockKey int64) error
+	ProductTypeExists(ctx context.Context, id uuid.UUID) (bool, error)
 	// SetProductTypeOrder gives the ids sort orders 1..n in the given order.
 	SetProductTypeOrder(ctx context.Context, ids []uuid.UUID) error
+	// UpdateProductType changes the type only if nobody else has since it was
+	// read (expected_updated_at); no row means stale or deleted. updated_at
+	// always moves forward, even for two updates within the same microsecond.
 	UpdateProductType(ctx context.Context, arg UpdateProductTypeParams) (ProductType, error)
 }
 

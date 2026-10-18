@@ -1,18 +1,43 @@
 {
   "attribute": {
+    "bound_negative": "Längen und Anzahlen können nicht negativ sein.",
+    "bound_range": "Diese Grenze muss zwischen {{min}} und {{max}} liegen.",
+    "bound_whole": "Diese Grenze muss eine ganze Zahl sein.",
+    "count": "Anzahl der Einträge: {{min}} bis {{max}}.",
+    "count_max": "Anzahl der Einträge: höchstens {{max}}.",
+    "count_min": "Anzahl der Einträge: mindestens {{min}}.",
     "item_type_required": "Wählen Sie den Typ der Listeneinträge.",
     "key_duplicate": "Dieser Schlüssel ist doppelt vergeben.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "label_required": "Eine englische Bezeichnung ist erforderlich.",
-    "option": "Das ist keine der erlaubten Optionen.",
+    "length": "Anzahl der Zeichen: {{min}} bis {{max}}.",
+    "length_max": "Anzahl der Zeichen: höchstens {{max}}.",
+    "length_min": "Anzahl der Zeichen: mindestens {{min}}.",
+    "min_above_options": "Das Minimum kann nicht über der Anzahl der Optionen ({{max}}) liegen.",
+    "option": "Das ist keine der erlaubten Optionen ({{options}}).",
     "option_key_duplicate": "Dieser Options-Schlüssel ist doppelt vergeben.",
     "options_required": "Fügen Sie mindestens eine Option hinzu.",
-    "range": "Dieser Wert liegt außerhalb des erlaubten Bereichs.",
-    "range_invalid": "Diese Grenze ist ungültig. Längen und Anzahlen sind ganze Zahlen ab 0, und das Minimum darf nicht über dem Maximum liegen.",
+    "range": "Geben Sie einen Wert zwischen {{min}} und {{max}} ein.",
+    "range_invalid": "Das Maximum darf nicht unter dem Minimum ({{min}}) liegen.",
+    "range_max": "Geben Sie einen Wert von höchstens {{max}} ein.",
+    "range_min": "Geben Sie einen Wert von mindestens {{min}} ein.",
     "required": "Dieser Wert ist erforderlich.",
-    "scope_not_allowed": "Instanz-Attribute haben keinen Geltungsbereich.",
-    "type": "Dieser Wert hat den falschen Typ.",
-    "unknown": "Dieses Attribut gibt es für diesen Produkttyp nicht."
+    "required_max": "Ein Pflichtwert braucht ein Maximum von mindestens {{min}}.",
+    "scope_name": {
+      "product": "Produkt",
+      "variant": "Variante"
+    },
+    "type": "Dieser Wert muss $t(attribute.type_name.{{expected}}) sein.",
+    "type_name": {
+      "boolean": "ja oder nein",
+      "enum": "eine der Optionen",
+      "integer": "eine ganze Zahl",
+      "list": "eine Liste",
+      "number": "eine Zahl",
+      "text": "Text"
+    },
+    "unknown": "Dieses Attribut gibt es für diesen Produkttyp nicht.",
+    "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt."
   },
   "auth": {
     "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
@@ -31,11 +56,13 @@
     "unavailable": "Keine Verbindung zum Server."
   },
   "product_type": {
+    "color_format": "Geben Sie eine Farbe als #rrggbb ein, z. B. #1f6feb.",
     "in_use": "Dieser Produkttyp wird noch von Produkten verwendet. Deaktivieren Sie ihn stattdessen.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "not_found": "Dieser Produkttyp existiert nicht mehr.",
-    "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut."
+    "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "request": {
     "bad": "Die Anfrage war ungültig.",
@@ -73,10 +100,12 @@
     "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
     "failed": "Bitte die markierten Felder prüfen.",
     "invalid": "Dieser Wert ist ungültig.",
+    "locale": "Diese Sprache wird nicht unterstützt.",
     "min_above_max": "Das Maximum darf nicht unter dem Minimum liegen.",
     "number": "Bitte eine Zahl eingeben.",
     "password_mismatch": "Die Passwörter stimmen nicht überein.",
     "required": "Dieses Feld ist erforderlich.",
-    "too_long": "Dieser Wert ist zu lang."
+    "too_long": "Dieser Wert ist zu lang (höchstens {{max}} Zeichen).",
+    "too_many": "Es sind zu viele Einträge (höchstens {{max}})."
   }
 }

@@ -26,10 +26,11 @@ type ProductType struct {
 	Key                string
 	Name               i18n.Text
 	Description        *i18n.Text
+	Color              *string
 	SortOrder          int32
 	IsActive           bool
 	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.Schema
+	InstanceAttributes attrschema.InstanceSchema
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }

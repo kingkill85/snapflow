@@ -81,7 +81,7 @@ function ProductTypeEditor({ item }: { item: ProductType | null }) {
   const submit = form.handleSubmit(async (values) => {
     const data = toInput(values)
     try {
-      if (item) await update.mutateAsync({ id: item.id, data })
+      if (item) await update.mutateAsync({ id: item.id, data: { ...data, expectedUpdatedAt: item.updatedAt } })
       else await create.mutateAsync({ data })
     } catch (error) {
       setApiFieldErrors(error, form.setError, editorFields)

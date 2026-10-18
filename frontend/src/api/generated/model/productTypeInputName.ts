@@ -6,6 +6,6 @@
  */
 
 /**
- * Display name per locale; "en" is required
+ * Display name per locale (at most 100 characters); "en" is required
  */
 export type ProductTypeInputName = {[key: string]: string};

@@ -62,11 +62,10 @@
             "type": "number"
           },
           "options": {
-            "description": "Allowed values of an enum, or of a list of enums",
+            "description": "Allowed values of an enum, or of a list of enums (at most 500)",
             "items": {
               "$ref": "#/components/schemas/AttributeOption"
             },
-            "maxItems": 500,
             "type": "array"
           },
           "required": {
@@ -74,7 +73,7 @@
             "type": "boolean"
           },
           "scope": {
-            "description": "Product attributes only: set per product (default) or per variant",
+            "description": "Set per product (default) or per variant",
             "enum": [
               "product",
               "variant"
@@ -191,6 +190,11 @@
           "location": {
             "description": "Where the error occurred, e.g. body.key",
             "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "description": "Values for the translated message, e.g. {\"max\": 100}",
+            "type": "object"
           }
         },
         "required": [
@@ -329,6 +333,87 @@
         "required": [
           "status",
           "version"
+        ],
+        "type": "object"
+      },
+      "InstanceAttributeDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Help text per locale; if set, \"en\" is required",
+            "type": "object"
+          },
+          "itemType": {
+            "description": "Type of a list's items",
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "enum"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case, unique within the schema",
+            "examples": [
+              "width_te"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale; \"en\" is required",
+            "type": "object"
+          },
+          "max": {
+            "description": "number/integer: largest value; text: longest length; list: most items",
+            "format": "double",
+            "type": "number"
+          },
+          "min": {
+            "description": "number/integer: smallest value; text: shortest length; list: fewest items",
+            "format": "double",
+            "type": "number"
+          },
+          "options": {
+            "description": "Allowed values of an enum, or of a list of enums (at most 500)",
+            "items": {
+              "$ref": "#/components/schemas/AttributeOption"
+            },
+            "type": "array"
+          },
+          "required": {
+            "description": "A value must be set (default false)",
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "boolean",
+              "enum",
+              "list"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "description": "Display only, e.g. TE, mA, W",
+            "examples": [
+              "TE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "type"
         ],
         "type": "object"
       },
@@ -479,6 +564,13 @@
           "can": {
             "$ref": "#/components/schemas/Actions"
           },
+          "color": {
+            "description": "Badge colour, #rrggbb",
+            "examples": [
+              "#1f6feb"
+            ],
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -496,7 +588,7 @@
           "instanceAttributes": {
             "description": "Values per installed unit (bus address, MAC, ...), filled in projects",
             "items": {
-              "$ref": "#/components/schemas/AttributeDefinition"
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
             },
             "type": "array"
           },
@@ -524,6 +616,7 @@
             "type": "integer"
           },
           "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
             "format": "date-time",
             "type": "string"
           }
@@ -555,42 +648,48 @@
             "type": "string"
           },
           "attributes": {
+            "description": "At most 200",
             "items": {
               "$ref": "#/components/schemas/AttributeDefinition"
             },
-            "maxItems": 200,
             "type": "array"
+          },
+          "color": {
+            "description": "Badge colour, #rrggbb (stored lower case); empty for none",
+            "examples": [
+              "#1f6feb"
+            ],
+            "type": "string"
           },
           "description": {
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Description per locale; if set, \"en\" is required",
+            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
             "type": "object"
           },
           "instanceAttributes": {
+            "description": "At most 200",
             "items": {
-              "$ref": "#/components/schemas/AttributeDefinition"
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
             },
-            "maxItems": 200,
             "type": "array"
           },
           "isActive": {
             "type": "boolean"
           },
           "key": {
+            "description": "Lower snake case, 1-64 characters",
             "examples": [
               "dimmer_actuator"
             ],
-            "maxLength": 64,
-            "minLength": 1,
             "type": "string"
           },
           "name": {
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Display name per locale; \"en\" is required",
+            "description": "Display name per locale (at most 100 characters); \"en\" is required",
             "type": "object"
           }
         },
@@ -650,6 +749,79 @@
         },
         "required": [
           "ids"
+        ],
+        "type": "object"
+      },
+      "ProductTypeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProductTypeUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "color": {
+            "description": "Badge colour, #rrggbb (stored lower case); empty for none",
+            "examples": [
+              "#1f6feb"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
+            "type": "object"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "instanceAttributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
+            },
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale (at most 100 characters); \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "name",
+          "isActive",
+          "attributes",
+          "instanceAttributes"
         ],
         "type": "object"
       },
@@ -1638,6 +1810,7 @@
         ]
       },
       "put": {
+        "description": "Fails with 409 product_type.stale if the type changed since expectedUpdatedAt.",
         "operationId": "updateProductType",
         "parameters": [
           {
@@ -1654,7 +1827,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProductTypeInput"
+                "$ref": "#/components/schemas/ProductTypeUpdate"
               }
             }
           },

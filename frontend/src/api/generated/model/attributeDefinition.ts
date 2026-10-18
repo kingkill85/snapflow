@@ -24,14 +24,11 @@ export interface AttributeDefinition {
   max?: number;
   /** number/integer: smallest value; text: shortest length; list: fewest items */
   min?: number;
-  /**
-     * Allowed values of an enum, or of a list of enums
-     * @maxItems 500
-     */
+  /** Allowed values of an enum, or of a list of enums (at most 500) */
   options?: AttributeOption[];
   /** A value must be set (default false) */
   required?: boolean;
-  /** Product attributes only: set per product (default) or per variant */
+  /** Set per product (default) or per variant */
   scope?: AttributeDefinitionScope;
   type: AttributeDefinitionType;
   /** Display only, e.g. TE, mA, W */

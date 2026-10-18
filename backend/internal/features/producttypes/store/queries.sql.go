@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
@@ -14,26 +15,29 @@ import (
 )
 
 const createProductType = `-- name: CreateProductType :one
-INSERT INTO product_types (key, name, description, is_active, attributes, instance_attributes, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+INSERT INTO product_types (key, name, description, color, is_active, attributes, instance_attributes, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+RETURNING id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
 `
 
 type CreateProductTypeParams struct {
 	Key                string
 	Name               i18n.Text
 	Description        *i18n.Text
+	Color              *string
 	IsActive           bool
 	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.Schema
+	InstanceAttributes attrschema.InstanceSchema
 }
 
-// New types go to the end of the order.
+// New types go to the end of the order (under LockProductTypeOrder, so two
+// creates never get the same sort order).
 func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypeParams) (ProductType, error) {
 	row := q.db.QueryRow(ctx, createProductType,
 		arg.Key,
 		arg.Name,
 		arg.Description,
+		arg.Color,
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
@@ -44,6 +48,7 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 		&i.Key,
 		&i.Name,
 		&i.Description,
+		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
 		&i.Attributes,
@@ -67,7 +72,7 @@ func (q *Queries) DeleteProductType(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const getProductType = `-- name: GetProductType :one
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types WHERE id = $1
+SELECT id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types WHERE id = $1
 `
 
 func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType, error) {
@@ -78,6 +83,7 @@ func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType
 		&i.Key,
 		&i.Name,
 		&i.Description,
+		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
 		&i.Attributes,
@@ -89,7 +95,7 @@ func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType
 }
 
 const listProductTypes = `-- name: ListProductTypes :many
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types
+SELECT id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM product_types
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -108,6 +114,7 @@ func (q *Queries) ListProductTypes(ctx context.Context, includeInactive bool) ([
 			&i.Key,
 			&i.Name,
 			&i.Description,
+			&i.Color,
 			&i.SortOrder,
 			&i.IsActive,
 			&i.Attributes,
@@ -129,8 +136,9 @@ const lockProductTypeIDs = `-- name: LockProductTypeIDs :many
 SELECT id FROM product_types ORDER BY id FOR UPDATE
 `
 
-// LockProductTypeIDs locks every product type for a reorder, so the set of
-// ids cannot change underneath it.
+// LockProductTypeIDs locks every product type row for a reorder, so none can
+// be deleted or reordered underneath it; new rows are kept out by
+// LockProductTypeOrder, which the caller takes first.
 func (q *Queries) LockProductTypeIDs(ctx context.Context) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, lockProductTypeIDs)
 	if err != nil {
@@ -151,6 +159,28 @@ func (q *Queries) LockProductTypeIDs(ctx context.Context) ([]uuid.UUID, error) {
 	return items, nil
 }
 
+const lockProductTypeOrder = `-- name: LockProductTypeOrder :exec
+SELECT pg_advisory_xact_lock($1::bigint)
+`
+
+// LockProductTypeOrder serialises everything that assigns sort orders
+// (create, reorder) until the transaction ends.
+func (q *Queries) LockProductTypeOrder(ctx context.Context, lockKey int64) error {
+	_, err := q.db.Exec(ctx, lockProductTypeOrder, lockKey)
+	return err
+}
+
+const productTypeExists = `-- name: ProductTypeExists :one
+SELECT EXISTS (SELECT 1 FROM product_types WHERE id = $1)
+`
+
+func (q *Queries) ProductTypeExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, productTypeExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const setProductTypeOrder = `-- name: SetProductTypeOrder :exec
 UPDATE product_types p SET sort_order = o.ord
 FROM unnest($1::uuid[]) WITH ORDINALITY AS o (id, ord)
@@ -165,10 +195,10 @@ func (q *Queries) SetProductTypeOrder(ctx context.Context, ids []uuid.UUID) erro
 
 const updateProductType = `-- name: UpdateProductType :one
 UPDATE product_types
-SET key = $2, name = $3, description = $4, is_active = $5, attributes = $6, instance_attributes = $7,
-    updated_at = now()
-WHERE id = $1
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+SET key = $2, name = $3, description = $4, color = $5, is_active = $6, attributes = $7, instance_attributes = $8,
+    updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1 AND updated_at = $9
+RETURNING id, key, name, description, color, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
 `
 
 type UpdateProductTypeParams struct {
@@ -176,20 +206,27 @@ type UpdateProductTypeParams struct {
 	Key                string
 	Name               i18n.Text
 	Description        *i18n.Text
+	Color              *string
 	IsActive           bool
 	Attributes         attrschema.Schema
-	InstanceAttributes attrschema.Schema
+	InstanceAttributes attrschema.InstanceSchema
+	ExpectedUpdatedAt  time.Time
 }
 
+// UpdateProductType changes the type only if nobody else has since it was
+// read (expected_updated_at); no row means stale or deleted. updated_at
+// always moves forward, even for two updates within the same microsecond.
 func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypeParams) (ProductType, error) {
 	row := q.db.QueryRow(ctx, updateProductType,
 		arg.ID,
 		arg.Key,
 		arg.Name,
 		arg.Description,
+		arg.Color,
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
+		arg.ExpectedUpdatedAt,
 	)
 	var i ProductType
 	err := row.Scan(
@@ -197,6 +234,7 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		&i.Key,
 		&i.Name,
 		&i.Description,
+		&i.Color,
 		&i.SortOrder,
 		&i.IsActive,
 		&i.Attributes,

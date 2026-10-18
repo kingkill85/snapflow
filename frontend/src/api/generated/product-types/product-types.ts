@@ -29,7 +29,8 @@ import type {
   ProductType,
   ProductTypeInput,
   ProductTypeList,
-  ProductTypeOrder
+  ProductTypeOrder,
+  ProductTypeUpdate
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -467,11 +468,12 @@ export function useGetProductType<TData = Awaited<ReturnType<typeof getProductTy
 
 
 /**
+ * Fails with 409 product_type.stale if the type changed since expectedUpdatedAt.
  * @summary Update a product type
  */
 export const updateProductType = (
     id: string,
-    productTypeInput: BodyType<NonReadonly<ProductTypeInput>>,
+    productTypeUpdate: BodyType<NonReadonly<ProductTypeUpdate>>,
  signal?: AbortSignal
 ) => {
 
@@ -479,7 +481,7 @@ export const updateProductType = (
       return apiClient<ProductType>(
       {url: `/api/product-types/${id}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: productTypeInput, signal
+      data: productTypeUpdate, signal
     },
       );
     }
@@ -517,9 +519,9 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateProductTypeMutationResult = NonNullable<Awaited<ReturnType<typeof updateProductType>>>
-    export type UpdateProductTypeMutationBody = BodyType<NonReadonly<ProductTypeInput>>
+    export type UpdateProductTypeMutationBody = BodyType<NonReadonly<ProductTypeUpdate>>
     export type UpdateProductTypeMutationError = ErrorType<Error>
-    export type UpdateProductTypeMutationVariables = {id: string;data: BodyType<NonReadonly<ProductTypeInput>>}
+    export type UpdateProductTypeMutationVariables = {id: string;data: BodyType<NonReadonly<ProductTypeUpdate>>}
 
     /**
  * @summary Update a product type

@@ -168,6 +168,7 @@ describe('ProductTypeEditorPage', () => {
         { ...existing.attributes[2], required: false },
       ],
       instanceAttributes: [{ key: 'bus_address', label: { en: 'Bus address' }, type: 'text', required: true }],
+      expectedUpdatedAt: existing.updatedAt,
     })
   })
 
@@ -196,7 +197,7 @@ describe('ProductTypeEditorPage', () => {
     expect(within(black).getByLabelText('Key')).toHaveAccessibleDescription('This option key is used twice.')
     expect(within(group('Option 1', group('Attribute 2', attributes))).getByLabelText('Key')).not.toHaveAccessibleDescription()
     expect(within(group('Attribute 3', attributes)).getByLabelText('Maximum items')).toHaveAccessibleDescription(
-      /This limit is invalid/,
+      /The maximum must not be below the minimum/,
     )
     const instance = screen.getByRole('region', { name: 'Instance attributes' })
     expect(own(group('Attribute 1', instance), 'Key')).toHaveAccessibleDescription('This key is used twice.')

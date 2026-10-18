@@ -39,7 +39,11 @@ overrides:
       - column: product_types.instance_attributes
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
-          type: Schema
+          type: InstanceSchema
+      - column: product_types.color
+        go_type:
+          type: string
+          pointer: true
       # scaffold:overrides
 sql:
   - engine: postgresql

@@ -13,23 +13,77 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 )
 
-// ValidateValues checks the values of one product, variant or installed unit
-// against s and returns them normalised: text trimmed, numbers as float64,
-// integers as int64, lists as []any, absent and empty values left out.
+// Unknown says what ValidateValues does with keys the schema does not have.
+type Unknown int
+
+const (
+	// UnknownReject reports them as attribute.unknown (strict, e.g. imports:
+	// a typo must not be stored silently).
+	UnknownReject Unknown = iota
+	// UnknownKeep returns them untouched as stale values, without errors
+	// (product saves: renaming an attribute must not block saving or
+	// silently delete data).
+	UnknownKeep
+)
+
+// Options control ValidateValues.
+type Options struct {
+	// Scope selects the attributes of a product schema that apply:
+	// ScopeProduct (the default when empty) or ScopeVariant. Ignored for
+	// instance schemas.
+	Scope Scope
+	// Unknown handles keys that are not in the schema.
+	Unknown Unknown
+}
+
+// ValidateValues checks the values of one product or variant against s and
+// returns them normalised: text trimmed, numbers as float64, integers as
+// int64, lists as []any, absent and empty values left out.
 //
-// scope selects the attributes that apply: ScopeProduct or ScopeVariant for a
-// product schema, "" for an instance schema (every attribute applies).
-// Values for keys that do not apply are reported as attribute.unknown.
+// Keys of attributes with the other scope are reported as
+// attribute.wrong_scope. Keys the schema does not have are reported as
+// attribute.unknown, or with UnknownKeep returned untouched in stale.
 // Errors are located at location + "." + key (list items at "key[i]").
-func ValidateValues(s Schema, scope Scope, values map[string]any, location string) (map[string]any, []apperr.FieldError) {
-	out := map[string]any{}
+func ValidateValues(s Schema, values map[string]any, location string, opts Options) (valid, stale map[string]any, errs []apperr.FieldError) {
+	scope := opts.Scope
+	if scope == "" {
+		scope = ScopeProduct
+	}
+	defs := make([]scopedDefinition, len(s))
+	for i, a := range s {
+		defs[i] = scopedDefinition{a.Definition, a.Scope}
+		if defs[i].scope == "" {
+			defs[i].scope = ScopeProduct
+		}
+	}
+	return validateValues(defs, scope, values, location, opts.Unknown)
+}
+
+// ValidateInstanceValues is ValidateValues for an installed unit; every
+// attribute of the instance schema applies (opts.Scope is ignored).
+func ValidateInstanceValues(s InstanceSchema, values map[string]any, location string, opts Options) (valid, stale map[string]any, errs []apperr.FieldError) {
+	defs := make([]scopedDefinition, len(s))
+	for i, a := range s {
+		defs[i] = scopedDefinition{Definition: a.Definition}
+	}
+	return validateValues(defs, "", values, location, opts.Unknown)
+}
+
+// scopedDefinition is a definition with its scope ("" for instances).
+type scopedDefinition struct {
+	Definition
+	scope Scope
+}
+
+func validateValues(defs []scopedDefinition, scope Scope, values map[string]any, location string, unknown Unknown) (map[string]any, map[string]any, []apperr.FieldError) {
+	valid, stale := map[string]any{}, map[string]any{}
 	var errs []apperr.FieldError
-	applies := map[string]bool{}
-	for _, d := range s {
-		if scope != "" && d.scope() != scope {
+	known := map[string]Scope{}
+	for _, d := range defs {
+		known[d.Key] = d.scope
+		if d.scope != scope {
 			continue
 		}
-		applies[d.Key] = true
 		loc := location + "." + d.Key
 		v, err := d.value(values[d.Key], loc)
 		switch {
@@ -37,35 +91,36 @@ func ValidateValues(s Schema, scope Scope, values map[string]any, location strin
 			errs = append(errs, *err)
 		case v == nil:
 			if d.Required {
-				errs = append(errs, fieldErr(loc, "attribute.required", "value is required"))
+				errs = append(errs, apperr.Field(loc, "attribute.required", "value is required"))
 			}
 		default:
-			out[d.Key] = v
+			valid[d.Key] = v
 		}
 	}
 
-	unknown := make([]string, 0)
+	others := make([]string, 0)
 	for k := range values {
-		if !applies[k] {
-			unknown = append(unknown, k)
+		if s, ok := known[k]; !ok || s != scope {
+			others = append(others, k)
 		}
 	}
-	sort.Strings(unknown)
-	for _, k := range unknown {
-		errs = append(errs, fieldErr(location+"."+k, "attribute.unknown", "no such attribute"))
+	sort.Strings(others)
+	for _, k := range others {
+		loc := location + "." + k
+		switch s, ok := known[k]; {
+		case ok:
+			errs = append(errs, apperr.Field(loc, "attribute.wrong_scope", "the attribute is set per "+string(s)).With("scope", string(s)))
+		case unknown == UnknownKeep:
+			stale[k] = values[k]
+		default:
+			errs = append(errs, apperr.Field(loc, "attribute.unknown", "no such attribute"))
+		}
 	}
-	return out, errs
-}
-
-func (d AttributeDefinition) scope() Scope {
-	if d.Scope == "" {
-		return ScopeProduct
-	}
-	return d.Scope
+	return valid, stale, errs
 }
 
 // value normalises one value; nil means absent.
-func (d AttributeDefinition) value(v any, loc string) (any, *apperr.FieldError) {
+func (d Definition) value(v any, loc string) (any, *apperr.FieldError) {
 	if v == nil {
 		return nil, nil
 	}
@@ -74,29 +129,29 @@ func (d AttributeDefinition) value(v any, loc string) (any, *apperr.FieldError) 
 		if err != nil || n == nil {
 			return nil, err
 		}
-		if !inRange(measure(d.Type, n), d.Min, d.Max) {
-			return nil, ptr(fieldErr(loc, "attribute.range", rangeDetail(d.Min, d.Max)))
+		if x, prefix, bounded := measure(d.Type, n); bounded && !inRange(x, d.Min, d.Max) {
+			return nil, ptr(rangeErr(loc, prefix, d.Min, d.Max))
 		}
 		return n, nil
 	}
 
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
-		return nil, ptr(fieldErr(loc, "attribute.type", "value must be a list"))
+		return nil, ptr(typeErr(loc, TypeList))
 	}
 	items := make([]any, 0, rv.Len())
 	for i := range rv.Len() {
 		iloc := fmt.Sprintf("%s[%d]", loc, i)
 		item := rv.Index(i).Interface()
 		if item == nil {
-			return nil, ptr(fieldErr(iloc, "attribute.required", "list items cannot be empty"))
+			return nil, ptr(apperr.Field(iloc, "attribute.required", "list items cannot be empty"))
 		}
 		n, err := scalar(d.ItemType, d.Options, item, iloc)
 		if err != nil {
 			return nil, err
 		}
 		if n == nil {
-			return nil, ptr(fieldErr(iloc, "attribute.required", "list items cannot be empty"))
+			return nil, ptr(apperr.Field(iloc, "attribute.required", "list items cannot be empty"))
 		}
 		// A list of options is a set: repeating an option adds nothing.
 		if d.ItemType == TypeEnum && slices.Contains(items, n) {
@@ -108,21 +163,18 @@ func (d AttributeDefinition) value(v any, loc string) (any, *apperr.FieldError) 
 		return nil, nil
 	}
 	if !inRange(float64(len(items)), d.Min, d.Max) {
-		return nil, ptr(fieldErr(loc, "attribute.range", rangeDetail(d.Min, d.Max)))
+		return nil, ptr(rangeErr(loc, "attribute.count", d.Min, d.Max))
 	}
 	return items, nil
 }
 
 // scalar normalises a single value of type t; nil means absent (blank text).
 func scalar(t Type, options []AttributeOption, v any, loc string) (any, *apperr.FieldError) {
-	typeErr := func(want string) *apperr.FieldError {
-		return ptr(fieldErr(loc, "attribute.type", "value must be "+want))
-	}
 	switch t {
 	case TypeText:
 		s, ok := v.(string)
 		if !ok {
-			return nil, typeErr("text")
+			return nil, ptr(typeErr(loc, t))
 		}
 		if s = strings.TrimSpace(s); s == "" {
 			return nil, nil
@@ -131,69 +183,82 @@ func scalar(t Type, options []AttributeOption, v any, loc string) (any, *apperr.
 	case TypeNumber:
 		f, ok := toFloat(v)
 		if !ok {
-			return nil, typeErr("a number")
+			return nil, ptr(typeErr(loc, t))
 		}
 		return f, nil
 	case TypeInteger:
-		i, ok := toInt(v)
+		f, ok := toWhole(v)
 		if !ok {
-			return nil, typeErr("a whole number")
+			return nil, ptr(typeErr(loc, t))
 		}
-		return i, nil
+		if math.Abs(f) > MaxSafeInteger {
+			lo, hi := float64(-MaxSafeInteger), float64(MaxSafeInteger)
+			return nil, ptr(rangeErr(loc, "attribute.range", &lo, &hi))
+		}
+		return int64(f), nil
 	case TypeBoolean:
 		b, ok := v.(bool)
 		if !ok {
-			return nil, typeErr("true or false")
+			return nil, ptr(typeErr(loc, t))
 		}
 		return b, nil
 	case TypeEnum:
 		s, ok := v.(string)
 		if !ok {
-			return nil, typeErr("an option key")
+			return nil, ptr(typeErr(loc, t))
 		}
 		s = strings.TrimSpace(s)
 		if s == "" {
 			return nil, nil
 		}
 		if !slices.ContainsFunc(options, func(o AttributeOption) bool { return o.Key == s }) {
-			return nil, ptr(fieldErr(loc, "attribute.option", "not one of the options"))
+			keys := make([]string, len(options))
+			for i, o := range options {
+				keys[i] = o.Key
+			}
+			return nil, ptr(apperr.Field(loc, "attribute.option", "not one of the options").With("options", keys))
 		}
 		return s, nil
 	default:
-		return nil, ptr(fieldErr(loc, "attribute.type", "the attribute's type is invalid"))
+		return nil, ptr(apperr.Field(loc, "validation.invalid", "the attribute's type is invalid"))
 	}
 }
 
-// measure is what Min and Max bound for a scalar: the value or the length.
-func measure(t Type, v any) float64 {
+func typeErr(loc string, expected Type) apperr.FieldError {
+	return apperr.Field(loc, "attribute.type", "value must be of type "+string(expected)).With("expected", string(expected))
+}
+
+// measure is what Min and Max bound for a scalar: the value (code prefix
+// attribute.range) or the length of a text (attribute.length).
+func measure(t Type, v any) (x float64, prefix string, bounded bool) {
 	switch x := v.(type) {
 	case string:
 		if t == TypeText {
-			return float64(utf8.RuneCountInString(x))
+			return float64(utf8.RuneCountInString(x)), "attribute.length", true
 		}
 	case float64:
-		return x
+		return x, "attribute.range", true
 	case int64:
-		return float64(x)
+		return float64(x), "attribute.range", true
 	}
-	return math.NaN() // not bounded (boolean, enum)
+	return 0, "", false // not bounded (boolean, enum)
 }
 
 func inRange(x float64, lo, hi *float64) bool {
-	if math.IsNaN(x) {
-		return true
-	}
 	return (lo == nil || x >= *lo) && (hi == nil || x <= *hi)
 }
 
-func rangeDetail(lo, hi *float64) string {
+// rangeErr reports a value outside [lo, hi]. The code says which bounds
+// exist, so every message can name them: prefix with both (params min and
+// max), prefix+"_min" with only a minimum, prefix+"_max" with only a maximum.
+func rangeErr(loc, prefix string, lo, hi *float64) apperr.FieldError {
 	switch {
 	case lo != nil && hi != nil:
-		return fmt.Sprintf("must be between %g and %g", *lo, *hi)
+		return apperr.Field(loc, prefix, fmt.Sprintf("must be between %g and %g", *lo, *hi)).With("min", *lo).With("max", *hi)
 	case lo != nil:
-		return fmt.Sprintf("must be at least %g", *lo)
+		return apperr.Field(loc, prefix+"_min", fmt.Sprintf("must be at least %g", *lo)).With("min", *lo)
 	default:
-		return fmt.Sprintf("must be at most %g", *hi)
+		return apperr.Field(loc, prefix+"_max", fmt.Sprintf("must be at most %g", *hi)).With("max", *hi)
 	}
 }
 
@@ -213,7 +278,7 @@ func toFloat(v any) (float64, bool) {
 	case json.Number:
 		var err error
 		if f, err = x.Float64(); err != nil {
-			return 0, false
+			return 0, false // not a number, or beyond float64 (e.g. 1e400)
 		}
 	default:
 		return 0, false
@@ -221,25 +286,15 @@ func toFloat(v any) (float64, bool) {
 	return f, !math.IsNaN(f) && !math.IsInf(f, 0)
 }
 
-func toInt(v any) (int64, bool) {
-	switch x := v.(type) {
-	case int:
-		return int64(x), true
-	case int32:
-		return int64(x), true
-	case int64:
-		return x, true
-	case json.Number:
+// toWhole returns v if it is a finite whole number. The caller checks the
+// range; beyond ±(2^53−1) the float64 may be rounded, but such values are
+// rejected anyway.
+func toWhole(v any) (float64, bool) {
+	if x, isNumber := v.(json.Number); isNumber {
 		if i, err := x.Int64(); err == nil {
-			return i, true
+			return float64(i), true
 		}
 	}
 	f, ok := toFloat(v)
-	// 2^63 is the first float64 above the int64 range.
-	if !ok || f != math.Trunc(f) || f < math.MinInt64 || f >= math.MaxInt64 {
-		return 0, false
-	}
-	return int64(f), true
+	return f, ok && f == math.Trunc(f)
 }
-
-func ptr[T any](v T) *T { return &v }

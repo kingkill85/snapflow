@@ -6,6 +6,8 @@ CREATE TABLE product_types (
     key                 text NOT NULL UNIQUE CHECK (key ~ '^[a-z][a-z0-9_]*$'),
     name                jsonb NOT NULL,
     description         jsonb,
+    -- Badge colour in lists and the configurator palette, e.g. '#1f6feb'.
+    color               text CHECK (color ~ '^#[0-9a-f]{6}$'),
     sort_order          integer NOT NULL,
     is_active           boolean NOT NULL DEFAULT true,
     attributes          jsonb NOT NULL DEFAULT '[]',

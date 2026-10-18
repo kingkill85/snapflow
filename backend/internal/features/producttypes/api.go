@@ -16,7 +16,7 @@ type idParam struct {
 
 type updateInput struct {
 	ID   uuid.UUID `path:"id" format:"uuid"`
-	Body ProductTypeInput
+	Body ProductTypeUpdate
 }
 
 type itemOutput struct {
@@ -111,6 +111,7 @@ func Register(api huma.API, svc *Service) {
 		Method:      http.MethodPut,
 		Path:        "/api/product-types/{id}",
 		Summary:     "Update a product type",
+		Description: "Fails with 409 product_type.stale if the type changed since expectedUpdatedAt.",
 		Tags:        []string{tag},
 	}, func(ctx context.Context, in *updateInput) (*itemOutput, error) {
 		item, err := svc.Update(ctx, in.ID, in.Body)

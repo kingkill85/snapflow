@@ -104,3 +104,13 @@ func assertContains(t *testing.T, body, want string) {
 		t.Fatalf("response %s does not contain %s", body, want)
 	}
 }
+
+func TestUnknownLocale(t *testing.T) {
+	api := apptest.New(t)
+	b := map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer", "fr": "Variateur"}}
+	resp := api.Post("/api/function-types", api.Admin.Cookie, b)
+	if resp.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+	assertContains(t, resp.Body.String(), `{"location":"body.name.fr","code":"validation.locale"`)
+}

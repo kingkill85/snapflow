@@ -6,7 +6,7 @@
  */
 
 /**
- * Product attributes only: set per product (default) or per variant
+ * Set per product (default) or per variant
  */
 export type AttributeDefinitionScope = typeof AttributeDefinitionScope[keyof typeof AttributeDefinitionScope];
 

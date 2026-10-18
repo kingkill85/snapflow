@@ -5,24 +5,24 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AttributeDefinition } from './attributeDefinition';
+import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
 import type { ProductTypeInputDescription } from './productTypeInputDescription';
 import type { ProductTypeInputName } from './productTypeInputName';
 
 export interface ProductTypeInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** @maxItems 200 */
+  /** At most 200 */
   attributes: AttributeDefinition[];
-  /** Description per locale; if set, "en" is required */
+  /** Badge colour, #rrggbb (stored lower case); empty for none */
+  color?: string;
+  /** Description per locale (at most 2000 characters); if set, "en" is required */
   description?: ProductTypeInputDescription;
-  /** @maxItems 200 */
-  instanceAttributes: AttributeDefinition[];
+  /** At most 200 */
+  instanceAttributes: InstanceAttributeDefinition[];
   isActive: boolean;
-  /**
-     * @minLength 1
-     * @maxLength 64
-     */
+  /** Lower snake case, 1-64 characters */
   key: string;
-  /** Display name per locale; "en" is required */
+  /** Display name per locale (at most 100 characters); "en" is required */
   name: ProductTypeInputName;
 }

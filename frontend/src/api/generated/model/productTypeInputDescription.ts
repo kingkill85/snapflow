@@ -6,6 +6,6 @@
  */
 
 /**
- * Description per locale; if set, "en" is required
+ * Description per locale (at most 2000 characters); if set, "en" is required
  */
 export type ProductTypeInputDescription = {[key: string]: string};

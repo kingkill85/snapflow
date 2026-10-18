@@ -1,18 +1,43 @@
 {
   "attribute": {
+    "bound_negative": "Lengths and item counts cannot be negative.",
+    "bound_range": "This limit must be between {{min}} and {{max}}.",
+    "bound_whole": "This limit must be a whole number.",
+    "count": "Number of items: {{min}} to {{max}}.",
+    "count_max": "Number of items: at most {{max}}.",
+    "count_min": "Number of items: at least {{min}}.",
     "item_type_required": "Choose the type of the list items.",
     "key_duplicate": "This key is used twice.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "label_required": "An English label is required.",
-    "option": "This is not one of the allowed options.",
+    "length": "Number of characters: {{min}} to {{max}}.",
+    "length_max": "Number of characters: at most {{max}}.",
+    "length_min": "Number of characters: at least {{min}}.",
+    "min_above_options": "The minimum cannot be above the number of options ({{max}}).",
+    "option": "This is not one of the allowed options ({{options}}).",
     "option_key_duplicate": "This option key is used twice.",
     "options_required": "Add at least one option.",
-    "range": "This value is outside the allowed range.",
-    "range_invalid": "This limit is invalid. Lengths and counts are whole numbers from 0, and the minimum must not be above the maximum.",
+    "range": "Enter a value between {{min}} and {{max}}.",
+    "range_invalid": "The maximum must not be below the minimum ({{min}}).",
+    "range_max": "Enter a value of at most {{max}}.",
+    "range_min": "Enter a value of at least {{min}}.",
     "required": "This value is required.",
-    "scope_not_allowed": "Instance attributes have no scope.",
-    "type": "This value has the wrong type.",
-    "unknown": "This attribute does not exist for this product type."
+    "required_max": "A required value needs a maximum of at least {{min}}.",
+    "scope_name": {
+      "product": "product",
+      "variant": "variant"
+    },
+    "type": "This value must be $t(attribute.type_name.{{expected}}).",
+    "type_name": {
+      "boolean": "yes or no",
+      "enum": "one of the options",
+      "integer": "a whole number",
+      "list": "a list",
+      "number": "a number",
+      "text": "text"
+    },
+    "unknown": "This attribute does not exist for this product type.",
+    "wrong_scope": "This attribute is set per $t(attribute.scope_name.{{scope}})."
   },
   "auth": {
     "account_disabled": "Your account is disabled. Please contact your administrator.",
@@ -31,11 +56,13 @@
     "unavailable": "No connection to the server."
   },
   "product_type": {
+    "color_format": "Enter a colour as #rrggbb, e.g. #1f6feb.",
     "in_use": "This product type is still used by products. Deactivate it instead.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "not_found": "This product type no longer exists.",
-    "order_mismatch": "The product types have changed in the meantime. Please reload and try again."
+    "order_mismatch": "The product types have changed in the meantime. Please reload and try again.",
+    "stale": "Someone else changed this product type in the meantime. Reload it and make your changes again."
   },
   "request": {
     "bad": "The request was invalid.",
@@ -73,10 +100,12 @@
     "email": "Enter a valid email address.",
     "failed": "Please check the highlighted fields.",
     "invalid": "This value is invalid.",
+    "locale": "This language is not supported.",
     "min_above_max": "The maximum must not be below the minimum.",
     "number": "Enter a number.",
     "password_mismatch": "The passwords do not match.",
     "required": "This field is required.",
-    "too_long": "This value is too long."
+    "too_long": "This value is too long (at most {{max}} characters).",
+    "too_many": "There are too many entries (at most {{max}})."
   }
 }
