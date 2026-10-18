@@ -4,7 +4,7 @@ test('an unknown URL shows the not-found page', async ({ page }) => {
   await page.goto('/projects/123/does-not-exist')
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
   await page.getByRole('link', { name: 'Go to start page' }).click()
-  await expect(page).toHaveURL(/\/catalog\/function-types$/)
+  await expect(page).toHaveURL(/\/projects$/)
 })
 
 test('function types: create, duplicate key, edit, delete', async ({ page }) => {

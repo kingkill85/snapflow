@@ -25,8 +25,8 @@ test.describe('signed out', () => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/login\?returnTo=%2F$/)
     await signIn(page, user.email, user.password)
-    await expect(page).toHaveURL(/\/catalog\/function-types$/)
-    await expect(page.getByRole('heading', { name: 'Function types' })).toBeVisible()
+    await expect(page).toHaveURL(/\/projects$/)
+    await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible()
     await expect(accountButton(page)).toHaveAccessibleName(`Account: ${user.fullName}`)
   })
 
@@ -49,7 +49,7 @@ test.describe('signed out', () => {
     const user = await api.createUser()
     await page.goto('/login?returnTo=//evil.example')
     await signIn(page, user.email, user.password)
-    await expect(page).toHaveURL(/\/catalog\/function-types$/)
+    await expect(page).toHaveURL(/\/projects$/)
   })
 
   test('ten failed logins for one email lead to "Too many attempts"', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('signed out', () => {
 
 test('a signed-in user visiting /login is sent on', async ({ page }) => {
   await page.goto('/login')
-  await expect(page).toHaveURL(/\/catalog\/function-types$/)
+  await expect(page).toHaveURL(/\/projects$/)
 })
 
 test('a signed-in user visiting /login?returnTo goes there', async ({ page }) => {

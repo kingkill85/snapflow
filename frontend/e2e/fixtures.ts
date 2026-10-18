@@ -79,6 +79,7 @@ export type Product = Required<Pick<ProductInput, 'productTypeId' | 'categoryId'
     variantsWithProblems: number
     updatedAt: string
   }
+export type Project = { id: string; number: string; name: string; status: string; updatedAt: string; versions: { id: string; name: string }[] }
 export type StoredFile = { id: string; contentType: string; size: number; width: number; height: number; sha256: string }
 /** A user created by a spec, with the password it signs in with. */
 export type Account = User & { password: string }
@@ -164,6 +165,17 @@ export class Api {
     const key = input.key ?? uniqueKey('pt')
     const data: ProductTypeInput = { key, name: { en: unique('Type') }, isActive: true, ...input }
     return this.json<ProductType>(await this.ctx.post('/api/product-types', { data }))
+  }
+
+  /** A project (in the caller's tenant unless tenantId); needs an active product type to exist. */
+  async createProject(input: { name?: string; tenantId?: string; status?: string; customer?: { name?: string; company?: string } } = {}): Promise<Project> {
+    const project = await this.json<Project>(
+      await this.ctx.post('/api/projects', { data: { name: input.name ?? unique('Project'), tenantId: input.tenantId, customer: input.customer } }),
+    )
+    if (!input.status || input.status === 'active') return project
+    return this.json<Project>(
+      await this.ctx.put(`/api/projects/${project.id}`, { data: { name: project.name, status: input.status, expectedUpdatedAt: project.updatedAt } }),
+    )
   }
 
   async productType(id: string): Promise<ProductType> {
