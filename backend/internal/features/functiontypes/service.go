@@ -15,6 +15,7 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
@@ -42,6 +43,9 @@ func NewService(q store.Querier) *Service {
 }
 
 func (s *Service) List(ctx context.Context) ([]FunctionType, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
+		return nil, err
+	}
 	rows, err := s.q.ListFunctionTypes(ctx)
 	if err != nil {
 		return nil, err
@@ -54,6 +58,9 @@ func (s *Service) List(ctx context.Context) ([]FunctionType, error) {
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (FunctionType, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
+		return FunctionType{}, err
+	}
 	row, err := s.q.GetFunctionType(ctx, id)
 	if err != nil {
 		return FunctionType{}, mapErr(err)
@@ -62,6 +69,9 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (FunctionType, error) {
 }
 
 func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionType, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return FunctionType{}, err
+	}
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
@@ -73,6 +83,9 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput) (FunctionType, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return FunctionType{}, err
+	}
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
@@ -84,6 +97,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 }
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return err
+	}
 	n, err := s.q.DeleteFunctionType(ctx, id)
 	if err != nil {
 		return err

@@ -1,0 +1,25 @@
+{
+  "title": "Rollen",
+  "description": "Was jede Rolle darf. Rollen sind geordnet: Niemand kann eine Rolle über der eigenen vergeben oder ändern.",
+  "permission": "Berechtigung",
+  "allowed": "Erlaubt",
+  "denied": "Nicht erlaubt",
+  "permissions": {
+    "catalog": {
+      "read": { "label": "Katalog ansehen", "description": "Produkte, Produkttypen und Funktionstypen durchsuchen." },
+      "write": { "label": "Katalog bearbeiten", "description": "Katalogdaten anlegen, ändern, importieren und löschen." }
+    },
+    "projects": {
+      "read": { "label": "Projekte ansehen", "description": "Projekte des eigenen Mandanten öffnen." },
+      "write": { "label": "Projekte bearbeiten", "description": "Projekte anlegen sowie Grundrisse und Verteiler planen." },
+      "delete": { "label": "Projekte löschen", "description": "Projekte und Versionen löschen." }
+    },
+    "users": {
+      "manage": { "label": "Benutzer verwalten", "description": "Benutzer bis zur eigenen Rolle anlegen, ändern und löschen." }
+    },
+    "tenants": {
+      "manage": { "label": "Mandanten verwalten", "description": "Partner-Mandanten anlegen, ändern und löschen." },
+      "access_all": { "label": "Alle Mandanten", "description": "Daten aller Mandanten sehen und ändern, nicht nur die eigenen." }
+    }
+  }
+}

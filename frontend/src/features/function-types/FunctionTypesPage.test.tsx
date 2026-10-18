@@ -4,8 +4,9 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import type { FunctionType } from '@/api/generated/model'
-import { server } from '@/test/server'
+import { userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { server } from '@/test/server'
 
 import { FunctionTypesPage } from './FunctionTypesPage'
 
@@ -24,6 +25,15 @@ describe('FunctionTypesPage', () => {
 
     expect(await screen.findByText('dimmer')).toBeInTheDocument()
     expect(screen.getByText('Dimmer')).toBeInTheDocument()
+  })
+
+  it('is read-only without catalog.write', async () => {
+    server.use(http.get('/api/function-types', () => HttpResponse.json({ items: [dimmer] })))
+    renderWithProviders(<FunctionTypesPage />, { me: userMe })
+
+    expect(await screen.findByText('dimmer')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new function type/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
   })
 
   it('shows the empty state', async () => {

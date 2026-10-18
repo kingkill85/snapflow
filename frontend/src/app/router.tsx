@@ -1,15 +1,31 @@
-import { createBrowserRouter, Navigate } from 'react-router'
+import { createBrowserRouter } from 'react-router'
+
+import { LoginPage } from '@/features/auth'
 
 import { AppShell } from './AppShell'
 import { features } from './features'
+import { Home, RequireAuth, RequirePermission } from './guards'
 
 export const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
-    path: '/',
-    element: <AppShell />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <Navigate to={`/${features[0].path}`} replace /> },
-      ...features.map((f) => ({ path: f.path, element: <f.element /> })),
+      {
+        path: '/',
+        element: <AppShell />,
+        children: [
+          { index: true, element: <Home /> },
+          ...features.map((f) => ({
+            path: f.path,
+            element: (
+              <RequirePermission permission={f.permission}>
+                <f.element />
+              </RequirePermission>
+            ),
+          })),
+        ],
+      },
     ],
   },
 ])

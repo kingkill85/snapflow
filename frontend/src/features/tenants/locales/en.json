@@ -1,0 +1,19 @@
+{
+  "title": "Tenants",
+  "description": "The distributor and the partner companies that plan projects.",
+  "empty": "No tenants yet.",
+  "new": "New tenant",
+  "edit": "Edit tenant",
+  "deleteTitle": "Delete tenant",
+  "deleteMessage": "Delete \"{{name}}\" and all its users? This cannot be undone.",
+  "distributor": "Distributor",
+  "partner": "Partner",
+  "field": {
+    "name": "Name",
+    "type": "Type",
+    "status": "Status",
+    "active": "Active",
+    "activeHint": "Users of an inactive tenant cannot sign in.",
+    "distributorHint": "The distributor tenant always stays active."
+  }
+}

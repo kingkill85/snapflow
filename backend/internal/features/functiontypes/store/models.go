@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
@@ -17,4 +18,34 @@ type FunctionType struct {
 	Name      i18n.Text
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Session struct {
+	ID         uuid.UUID
+	TokenHash  []byte
+	UserID     uuid.UUID
+	CreatedAt  time.Time
+	LastUsedAt time.Time
+	ExpiresAt  time.Time
+}
+
+type Tenant struct {
+	ID            uuid.UUID
+	Name          string
+	IsDistributor bool
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type User struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	Email        string
+	FullName     string
+	PasswordHash string
+	Role         auth.Role
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }

@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -11,16 +12,36 @@ type Config struct {
 	DatabaseURL string
 	// StaticDir holds the built frontend. Empty means the API is served alone.
 	StaticDir string
+	// CookieSecure marks the session cookie Secure. Turn it off only for
+	// plain-HTTP deployments other than localhost.
+	CookieSecure bool
+	// DistributorName names the distributor tenant when it is first created.
+	DistributorName string
+	// AdminEmail and AdminPassword create the first admin when there is no
+	// active admin. Leave them empty once an admin exists.
+	AdminEmail    string
+	AdminPassword string
 }
 
 func Load() (Config, error) {
+	secure, err := strconv.ParseBool(getenv("COOKIE_SECURE", "true"))
+	if err != nil {
+		return Config{}, errors.New("COOKIE_SECURE must be true or false")
+	}
 	c := Config{
-		Port:        getenv("PORT", "8000"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		StaticDir:   os.Getenv("STATIC_DIR"),
+		Port:            getenv("PORT", "8000"),
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		StaticDir:       os.Getenv("STATIC_DIR"),
+		CookieSecure:    secure,
+		DistributorName: getenv("DISTRIBUTOR_NAME", "Distributor"),
+		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
+		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
 	}
 	if c.DatabaseURL == "" {
 		return c, errors.New("DATABASE_URL is required")
+	}
+	if c.AdminEmail != "" && c.AdminPassword == "" {
+		return c, errors.New("ADMIN_PASSWORD is required when ADMIN_EMAIL is set")
 	}
 	return c, nil
 }

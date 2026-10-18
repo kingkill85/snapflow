@@ -34,7 +34,8 @@ Single tests: `cd backend && go test ./internal/features/functiontypes -run Test
 7. **i18n everywhere:** no user-facing string in code. UI text in the feature's `locales/en.json` + `de.json` (en is the reference, keys are type-checked). Translatable data uses `i18n.Text` (jsonb, `en` required); display with `useLocalized()`.
 8. **Design system only:** features use components from `@/components/ui` (Button, Field, DataTable, FormDialog, ConfirmDialog, Page, ...), never raw `<button>`, `<input>`, `<table>`, `<select>`, `<dialog>` (enforced by `src/test/design-system.test.ts`). Colours via tokens (`bg-surface`, `text-muted`, `border-line`, `bg-primary`, `text-danger`), never raw palette colours. Missing a component? Add it to `components/ui` first.
 9. **UI patterns:** dialogs take `item: T | null` (null = create). Labels: Create / Update / Cancel / Delete / Edit (from `common`). Row actions: Edit (`secondary`) before Delete (`danger`), `size="sm"`, icon + text.
-10. **Tests:** backend tests hit a real Postgres (`testdb.Run` in `TestMain`, `testdb.Pool(t)` per test). Frontend tests mock HTTP with MSW (`server.use(...)`); unhandled requests fail the test.
+10. **Tests:** backend tests hit a real Postgres (`testdb.Run` in `TestMain`; `apptest.New(t)` for the whole API with a logged-in `api.Admin`, `api.NewUser(tenant, role)` for others). Frontend tests mock HTTP with MSW (`server.use(...)`); unhandled requests fail the test. `renderWithProviders(ui, { me })` sets the logged-in user (admin by default).
+11. **Permissions:** every service method starts with `auth.Require(ctx, auth.Perm...)`; the matrix lives in `platform/auth` only. Tenant-owned data is scoped with `actor.SeesTenant`. All endpoints need login unless wrapped in `auth.Public`. The frontend gates with `useCan()` and the `can` flags the API returns, never with role names.
 
 ## Git
 

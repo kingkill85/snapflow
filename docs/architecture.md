@@ -28,6 +28,16 @@ The top priority is that new features, importers and exporters are easy to add i
 - **Revisions**: proposal, as-built and programmed states as snapshots.
 - Customers stay embedded in projects for now.
 
+## Auth, tenants and permissions
+
+- **Tenants**: exactly one *distributor* tenant (runs SnapFlow, owns the catalog, home of the admins; created at startup, cannot be deactivated or deleted) and any number of *partner* tenants. Deleting a partner deletes its users.
+- **Roles** are fixed and ordered: `admin` > `tenant_admin` > `user`. Nobody assigns a role above their own or changes a user whose role is above their own. Nobody changes their own role, tenant or active flag, or deletes themselves, so the last admin cannot disappear. `admin` requires the distributor tenant.
+- **Permission matrix** in `backend/internal/platform/auth` (pinned by `TestMatrix`): `catalog.read` (all), `catalog.write` (admin), `projects.read`/`write` (all), `projects.delete` (admin, tenant_admin), `users.manage` (admin, tenant_admin), `tenants.manage` and `tenants.access_all` (admin). `GET /api/roles` returns it; the Roles page shows it.
+- **Where checks run**: every service operation starts with `auth.Require(ctx, permission)`, so the HTTP API and the MCP server share them. The HTTP middleware only authenticates and refuses anonymous calls to non-public operations (`auth.Public` marks the exceptions). Tenant scoping uses `actor.SeesTenant`; rows of other tenants look like 404.
+- **The UI never re-implements rules**: `/api/auth/me` returns the user's permissions and assignable roles, and rows carry `can.update`/`can.delete`. The frontend gates pages, navigation and buttons with `useCan()` and those flags.
+- **Sessions**: opaque random tokens; only their SHA-256 is stored. The browser gets an HttpOnly, SameSite=Lax cookie; `Authorization: Bearer` with the same token is accepted for API clients (MCP later). Sessions expire 14 days after last use. User, role, tenant and active flags are read on every request, so changes apply at once. Changing a password ends the user's other sessions. Cross-site writes are refused (`Sec-Fetch-Site`). Login is limited to 10 attempts per email in 5 minutes (in memory). Passwords: argon2id, at least 8 characters; emails are case-insensitive.
+- **Row-level security** arrives in phase 2 with projects, the first tenant-owned business data. Until then tenant isolation is enforced in the services.
+
 ## Extension points
 
 | Extension | Contract |
@@ -47,7 +57,7 @@ All 16 recommendations were accepted, including: smart sizing (resize all instan
 ## Phases
 
 0. Foundation: inventory, skeleton, CI, design system, i18n ← **done with this repo's first commit**
-1. Catalog & tenants: auth, tenants, users, roles, product types, attribute schemas, schema-driven import
+1. Catalog & tenants: auth, tenants, users, roles ← **done**; product types, attribute schemas, schema-driven import
 2. Projects & floorplan: editor, zones, placements, BOM, proposals (DOCX)
 3. Distribution board: board editor, bus load, loads and channel assignment
 4. MCP & cutover: MCP server, data migration from SnapFlow 1, go-live

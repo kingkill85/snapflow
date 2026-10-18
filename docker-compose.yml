@@ -22,6 +22,11 @@ services:
     profiles: [app]
     environment:
       DATABASE_URL: postgres://snapflow:${POSTGRES_PASSWORD:-snapflow}@db:5432/snapflow?sslmode=disable
+      # The first admin, created when no active admin exists.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Only needed when serving over plain HTTP on a host other than localhost.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     ports:
       - "8000:8000"
     depends_on:

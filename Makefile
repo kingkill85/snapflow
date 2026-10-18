@@ -1,6 +1,9 @@
 # All commands run inside the Nix dev shell (`nix develop` or direnv).
 DATABASE_URL ?= postgres://snapflow:snapflow@localhost:5432/snapflow?sslmode=disable
 export DATABASE_URL
+# Development login, created on first start when no admin exists. Never use in production.
+DEV_ADMIN_EMAIL ?= admin@snapflow.local
+DEV_ADMIN_PASSWORD ?= snapflow-dev
 
 .PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend lint lint-backend lint-frontend check feature
 
@@ -10,8 +13,8 @@ help: ## Show this help
 db: ## Start Postgres for development
 	docker compose up -d --wait db
 
-dev-backend: ## Run the backend on :8000 (needs `make db`)
-	cd backend && go run ./cmd/snapflow serve
+dev-backend: ## Run the backend on :8000 (needs `make db`); login admin@snapflow.local / snapflow-dev
+	cd backend && ADMIN_EMAIL=$(DEV_ADMIN_EMAIL) ADMIN_PASSWORD=$(DEV_ADMIN_PASSWORD) go run ./cmd/snapflow serve
 
 dev-frontend: ## Run the frontend on :5173 with the API proxied
 	cd frontend && npm run dev

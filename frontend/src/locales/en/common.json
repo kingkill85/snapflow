@@ -6,8 +6,18 @@
     "update": "Update",
     "cancel": "Cancel",
     "delete": "Delete",
-    "edit": "Edit"
+    "edit": "Edit",
+    "save": "Save",
+    "signOut": "Sign out"
   },
-  "state": { "loading": "Loading…" },
+  "state": {
+    "loading": "Loading…",
+    "saved": "Saved.",
+    "forbiddenTitle": "No access",
+    "forbidden": "You do not have permission to see this page."
+  },
+  "account": { "profile": "Profile" },
+  "role": { "admin": "Admin", "tenant_admin": "Tenant admin", "user": "User" },
+  "status": { "active": "Active", "inactive": "Inactive" },
   "language": { "label": "Language", "en": "English", "de": "Deutsch" }
 }

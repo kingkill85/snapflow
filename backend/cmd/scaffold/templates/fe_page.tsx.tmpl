@@ -9,6 +9,7 @@ import {
   useList[[.Plural]],
 } from '@/api/generated/[[.URL]]/[[.URL]]'
 import type { [[.Type]] } from '@/api/generated/model'
+import { useCan } from '@/app/session'
 import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
@@ -18,6 +19,7 @@ export function [[.Plural]]Page() {
   const { t } = useTranslation('[[.NS]]')
   const { t: tCommon } = useTranslation()
   const localized = useLocalized()
+  const canWrite = useCan()('catalog.write')
   const queryClient = useQueryClient()
   const list = useList[[.Plural]]()
   const remove = useDelete[[.Type]]()
@@ -42,10 +44,22 @@ export function [[.Plural]]Page() {
     setDeleting(null)
   }
 
-  const createButton = (
+  // Without catalog.write the page is read-only.
+  const createButton = canWrite ? (
     <Button onClick={() => openForm(null)}>
       <Plus /> {t('new')}
     </Button>
+  ) : undefined
+
+  const rowActions = (item: [[.Type]]) => (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => openForm(item)}>
+        <Pencil /> {tCommon('action.edit')}
+      </Button>
+      <Button size="sm" variant="danger" onClick={() => setDeleting(item)}>
+        <Trash2 /> {tCommon('action.delete')}
+      </Button>
+    </>
   )
 
   return (
@@ -59,16 +73,7 @@ export function [[.Plural]]Page() {
           rows={list.data.items}
           rowKey={(item) => item.id}
           columns={[{ header: t('field.name'), cell: (item) => localized(item.name) }]}
-          actions={(item) => (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => openForm(item)}>
-                <Pencil /> {tCommon('action.edit')}
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => setDeleting(item)}>
-                <Trash2 /> {tCommon('action.delete')}
-              </Button>
-            </>
-          )}
+          actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}
         />
       )}

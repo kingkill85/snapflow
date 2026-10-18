@@ -53,3 +53,12 @@ export function ErrorMessage({ error }: { error: unknown }) {
     </p>
   )
 }
+
+/** A short confirmation shown after an action succeeded. */
+export function Notice({ children }: { children: ReactNode }) {
+  return (
+    <p role="status" className="rounded-control border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+      {children}
+    </p>
+  )
+}

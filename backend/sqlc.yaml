@@ -5,6 +5,12 @@ overrides:
     overrides:
       - db_type: uuid
         go_type: github.com/google/uuid.UUID
+      - db_type: uuid
+        nullable: true
+        go_type:
+          import: github.com/google/uuid
+          type: UUID
+          pointer: true
       - db_type: timestamptz
         go_type: time.Time
       # Translatable columns are listed one by one; other jsonb stays []byte.
@@ -12,6 +18,10 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
           type: Text
+      - column: users.role
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/auth
+          type: Role
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -24,4 +34,18 @@ sql:
         sql_package: pgx/v5
         emit_interface: true
         emit_empty_slices: true
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/tenants/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/tenants/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/users/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/users/store
   # scaffold:sqlc

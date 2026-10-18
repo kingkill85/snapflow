@@ -1,0 +1,25 @@
+{
+  "title": "Roles",
+  "description": "What each role may do. Roles are ordered: nobody can assign or change a role above their own.",
+  "permission": "Permission",
+  "allowed": "Allowed",
+  "denied": "Not allowed",
+  "permissions": {
+    "catalog": {
+      "read": { "label": "View catalog", "description": "Browse products, product types and function types." },
+      "write": { "label": "Edit catalog", "description": "Create, change, import and delete catalog data." }
+    },
+    "projects": {
+      "read": { "label": "View projects", "description": "Open projects of the own tenant." },
+      "write": { "label": "Edit projects", "description": "Create projects and plan floorplans and boards." },
+      "delete": { "label": "Delete projects", "description": "Delete projects and versions." }
+    },
+    "users": {
+      "manage": { "label": "Manage users", "description": "Create, change and delete users up to the own role." }
+    },
+    "tenants": {
+      "manage": { "label": "Manage tenants", "description": "Create, change and delete partner tenants." },
+      "access_all": { "label": "Access all tenants", "description": "See and change the data of every tenant, not only the own." }
+    }
+  }
+}
