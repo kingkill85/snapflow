@@ -1,9 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { AddonList, Product, Variant, VariantInput, VariantSearchItem, VariantUpdate } from '@/api/generated/model'
+import i18n from '@/i18n'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
@@ -68,6 +69,10 @@ const searchItem = (n: number, overrides: Partial<VariantSearchItem> = {}): Vari
 })
 
 describe('VariantEditorPage', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en')
+  })
+
   it('creates a variant with price, image and variant attributes, then continues on its page', async () => {
     let posted: VariantInput | undefined
     const created: Variant = { ...ivory, id: ids.id(399), name: { en: 'Standard' }, addons: [] }
@@ -159,6 +164,20 @@ describe('VariantEditorPage', () => {
     await u.click(screen.getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(puts).toHaveLength(1))
     expect(puts[0].price).toBe('27.5')
+  })
+
+  it('shows the stored price with the German decimal comma and sends it back unchanged', async () => {
+    await i18n.changeLanguage('de')
+    const u = userEvent.setup()
+    const priced = { ...dimmer, variants: [{ ...ivory, price: '27.50' }, black] }
+    const { puts } = handlers(() => priced)
+    renderRoutes(routes, { me: adminMe, route: ivoryRoute })
+
+    expect(await screen.findByLabelText('Preis')).toHaveValue('27,50')
+    await u.click(screen.getByRole('button', { name: 'Aktualisieren' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].price).toBe('27.50')
   })
 
   it('reads "Back to product" while nothing is unsaved and "Cancel" while it is', async () => {

@@ -11,3 +11,11 @@ SELECT * FROM files WHERE id = $1;
 
 -- name: FileExists :one
 SELECT EXISTS (SELECT 1 FROM files WHERE id = $1);
+
+-- FileBySource returns the file an uploaded image became (file_sources),
+-- by the SHA-256 of the uploaded bytes.
+-- name: FileBySource :one
+SELECT f.* FROM file_sources s JOIN files f ON f.id = s.file_id WHERE s.source_sha256 = $1;
+
+-- name: AddFileSource :exec
+INSERT INTO file_sources (source_sha256, file_id) VALUES ($1, $2) ON CONFLICT (source_sha256) DO NOTHING;

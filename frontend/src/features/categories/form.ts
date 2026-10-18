@@ -9,7 +9,7 @@ import {
   type CategoryInput,
   type InstanceAttributeDefinition,
 } from '@/api/generated/model'
-import { parseDecimal } from '@/catalog/decimal'
+import { formatDecimal, parseDecimal } from '@/catalog/decimal'
 import {
   type ApiFieldMap,
   defaultLanguage,
@@ -222,9 +222,9 @@ export const copyAttribute = (a: AttributeValues): AttributeValues => {
   return { ...structuredClone(a), key: copied, copiedKey: copied }
 }
 
-const bound = (n?: number) => (n === undefined ? '' : String(n))
+const bound = (n: number | undefined, separator: ',' | '.') => (n === undefined ? '' : formatDecimal(n, separator))
 
-const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition): AttributeValues => ({
+const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition, separator: ',' | '.'): AttributeValues => ({
   key: a.key,
   copiedKey: '',
   label: toTranslatable(a.label),
@@ -233,21 +233,21 @@ const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition)
   required: a.required ?? false,
   unit: a.unit ?? '',
   scope: ('scope' in a ? a.scope : undefined) ?? 'product',
-  min: bound(a.min),
-  max: bound(a.max),
+  min: bound(a.min, separator),
+  max: bound(a.max, separator),
   itemType: a.itemType ?? 'text',
   options: (a.options ?? []).map((o) => ({ key: o.key, label: toTranslatable(o.label) })),
 })
 
-/** The form's values for a category, or for a new one. */
-export function toFormValues(item: Category | null): FormValues {
+/** The form's values for a category, or for a new one; bounds show the UI language's decimal separator ("0,5"). */
+export function toFormValues(item: Category | null, separator: ',' | '.' = '.'): FormValues {
   return {
     key: item?.key ?? '',
     name: toTranslatable(item?.name),
     description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
-    attributes: (item?.attributes ?? []).map(toAttributeValues),
-    instanceAttributes: (item?.instanceAttributes ?? []).map(toAttributeValues),
+    attributes: (item?.attributes ?? []).map((a) => toAttributeValues(a, separator)),
+    instanceAttributes: (item?.instanceAttributes ?? []).map((a) => toAttributeValues(a, separator)),
   }
 }
 

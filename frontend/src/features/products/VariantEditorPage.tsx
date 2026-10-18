@@ -18,6 +18,7 @@ import {
 } from '@/api/generated/products/products'
 import { definitionsFor, extraKeys, storedValueErrors } from '@/catalog/attribute-values'
 import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEditor'
+import { useDecimalSeparator } from '@/catalog/decimal'
 import { fileUrl, imageTypes, useImageUpload } from '@/catalog/files'
 import { catalogCurrency } from '@/catalog/money'
 import {
@@ -219,7 +220,8 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
   const definitions = definitionsFor(category, 'variant')
   const stored = storedValues(loaded)
   const extras = extraKeys(definitions, stored)
-  const [defaults] = useState(() => toVariantFormValues(loaded, definitions))
+  const separator = useDecimalSeparator()
+  const [defaults] = useState(() => toVariantFormValues(loaded, definitions, separator))
   // Stored values that do not fit the current schema are marked from the start (D55).
   const [storedErrors] = useState(() =>
     loaded && loaded.attributeErrors.length > 0

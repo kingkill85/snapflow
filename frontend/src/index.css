@@ -101,6 +101,11 @@
       content: attr(data-label) / '';
       color: var(--color-muted);
     }
+    /* A column with mobile: 'block': the label on its own line above the value. */
+    td[data-label][data-mobile='block']::before {
+      display: block;
+      margin-bottom: 0.375rem;
+    }
   }
 
   body {

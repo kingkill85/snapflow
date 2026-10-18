@@ -9,6 +9,7 @@ import (
 	filesstore "github.com/kingkill85/snapflow/backend/internal/features/files/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	functiontypesstore "github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
+	"github.com/kingkill85/snapflow/backend/internal/features/imports"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
@@ -41,6 +42,8 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	categories.Register(api, cats)
 	fileSvc := files.NewService(filesstore.New(deps.DB), deps.Storage)
 	files.Register(api, fileSvc)
-	products.Register(api, products.NewService(deps.DB, productTypes, cats, fileSvc))
+	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc)
+	products.Register(api, productSvc)
+	imports.Register(api, imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users))
 	// scaffold:features
 }

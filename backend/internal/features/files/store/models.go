@@ -36,12 +36,83 @@ type File struct {
 	CreatedAt   time.Time
 }
 
+type FileSource struct {
+	SourceSha256 string
+	FileID       uuid.UUID
+}
+
 type FunctionType struct {
 	ID        uuid.UUID
 	Key       string
 	Name      i18n.Text
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type ImportChange struct {
+	RunID    uuid.UUID
+	Seq      int32
+	Entity   string
+	Action   string
+	EntityID uuid.UUID
+	Label    string
+	Before   []byte
+	After    []byte
+}
+
+type ImportIssue struct {
+	RunID    uuid.UUID
+	Seq      int32
+	Severity string
+	Issue    []byte
+}
+
+type ImportItem struct {
+	RunID   uuid.UUID
+	Seq     int32
+	Entity  string
+	Status  string
+	Skipped bool
+	Item    []byte
+	Plan    []byte
+}
+
+type ImportLock struct {
+	ID         bool
+	Generation int64
+}
+
+type ImportProfile struct {
+	ID        uuid.UUID
+	Name      string
+	Mapping   []byte
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type ImportRun struct {
+	ID           uuid.UUID
+	ProfileID    *uuid.UUID
+	ProfileName  *string
+	FileID       uuid.UUID
+	FileName     string
+	FileSize     int64
+	SourceKind   string
+	UserID       *uuid.UUID
+	UserName     string
+	State        string
+	Mapping      []byte
+	AllOrNothing bool
+	CatalogToken string
+	Counts       []byte
+	Error        []byte
+	CreatedAt    time.Time
+	PreviewedAt  *time.Time
+	AppliedAt    *time.Time
+	UndoneAt     *time.Time
+	UpdatedAt    time.Time
+	CatalogScope []byte
+	Images       []byte
 }
 
 type Product struct {
@@ -70,17 +141,18 @@ type ProductType struct {
 }
 
 type ProductVariant struct {
-	ID          uuid.UUID
-	ProductID   uuid.UUID
-	Name        i18n.Text
-	Sku         *string
-	Price       string
-	ImageFileID *uuid.UUID
-	Attributes  attrschema.Values
-	SortOrder   int32
-	IsActive    bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID              uuid.UUID
+	ProductID       uuid.UUID
+	Name            i18n.Text
+	Sku             *string
+	Price           string
+	ImageFileID     *uuid.UUID
+	Attributes      attrschema.Values
+	SortOrder       int32
+	IsActive        bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AddonsUpdatedAt time.Time
 }
 
 type Session struct {

@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	CatalogAddons(ctx context.Context) ([]VariantAddon, error)
+	// Bulk reads and business-key lookups for other features (the import):
+	// the whole catalog in a few queries, no page cap, no active filter.
+	CatalogProducts(ctx context.Context) ([]Product, error)
+	CatalogVariants(ctx context.Context) ([]ProductVariant, error)
 	// CountProducts counts what ListProducts lists without the page.
 	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
 	// CountVariants counts what SearchVariants lists without the page.
@@ -19,18 +24,30 @@ type Querier interface {
 	// New variants go to the end of their product's order (the caller holds
 	// LockProduct, so two creates never get the same sort order).
 	CreateVariant(ctx context.Context, arg CreateVariantParams) (ProductVariant, error)
+	// Batch writes for the import (all or nothing): one statement for many rows.
+	// CreateVariants adds variants at the end of a product's order, in the
+	// given order (the caller holds LockProduct). Empty SKUs and image ids are
+	// NULL.
+	CreateVariants(ctx context.Context, arg CreateVariantsParams) ([]ProductVariant, error)
 	DeleteAddons(ctx context.Context, variantID uuid.UUID) error
+	DeleteAddonsOf(ctx context.Context, variantIds []uuid.UUID) error
 	DeleteProduct(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteVariant(ctx context.Context, arg DeleteVariantParams) (int64, error)
 	// ExistingVariantIDs returns which of ids exist and keeps them from being
 	// deleted until the transaction ends.
 	ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	FindProductByModelNumber(ctx context.Context, modelNumber string) (Product, error)
+	FindVariantByName(ctx context.Context, arg FindVariantByNameParams) (ProductVariant, error)
+	FindVariantBySKU(ctx context.Context, sku string) (ProductVariant, error)
 	// Products, variants and add-ons are one aggregate. Product type and category
 	// facts (catalog order, active flags) come from producttypes.Service and
 	// categories.Service and are passed in as arrays: this feature never reads
 	// the product_types or categories tables.
 	GetProduct(ctx context.Context, id uuid.UUID) (Product, error)
 	GetVariant(ctx context.Context, arg GetVariantParams) (ProductVariant, error)
+	// InsertAddonLists links many lists at once; sort_orders are each list's
+	// positions (1..n).
+	InsertAddonLists(ctx context.Context, arg InsertAddonListsParams) error
 	// InsertAddons links the add-ons in list order (sort order 1..n).
 	InsertAddons(ctx context.Context, arg InsertAddonsParams) error
 	// ListAddons returns the add-ons of the given variants with what the editor
@@ -48,13 +65,6 @@ type Querier interface {
 	// LockProduct serialises changes to a product's variant list (sort orders).
 	// Lock order of the aggregate: the product row first, then its variants.
 	LockProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
-	// LockVariantForAddons serialises add-on replaces of one variant (after
-	// ShareProduct). NO KEY UPDATE does not conflict with the KEY SHARE locks
-	// other replaces take on their add-on variants, so replaces of two variants
-	// that point at each other do not wait for each other. Deadlocks with
-	// deletes (which lock the add-on variants FOR UPDATE in their own order)
-	// remain possible; inTx retries those.
-	LockVariantForAddons(ctx context.Context, arg LockVariantForAddonsParams) (uuid.UUID, error)
 	// LockVariantIDs locks a product's variants for a reorder (after
 	// LockProduct). NO KEY UPDATE keeps them from being deleted or updated
 	// meanwhile but, unlike FOR UPDATE, does not wait for the KEY SHARE locks
@@ -67,12 +77,33 @@ type Querier interface {
 	// ListProducts) or own name or SKU matches. product_type_id and category_id
 	// narrow it to one type or category.
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
+	// SetProductActive changes only the active flag, if the product is still
+	// the version read (expected_updated_at).
+	SetProductActive(ctx context.Context, arg SetProductActiveParams) (Product, error)
+	SetVariantActive(ctx context.Context, arg SetVariantActiveParams) (ProductVariant, error)
 	// SetVariantOrder gives the ids sort orders 1..n in the given order.
 	SetVariantOrder(ctx context.Context, ids []uuid.UUID) error
 	// ShareProduct keeps a product from being deleted, and waits for a running
 	// variant reorder or create (LockProduct), before ReplaceAddons locks any
 	// variant: the same order (product, then variants) as LockProduct callers.
 	ShareProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// ShareProducts is ShareProduct for many products, in id order.
+	ShareProducts(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	// TouchVariantAddons bumps the version of a variant's add-on list
+	// (addons_updated_at, not updated_at: an add-on edit does not make the
+	// variant form stale, D56) and so serialises add-on replaces of one variant
+	// (after ShareProduct). Updating a non-key column takes a NO KEY UPDATE lock,
+	// which does not conflict with the KEY SHARE locks other replaces take on
+	// their add-on variants, so replaces of two variants that point at each
+	// other do not wait for each other. Because the row changes, a REPEATABLE
+	// READ transaction (an import) that writes the same list after a replace
+	// committed fails with a serialization error instead of merging the lists.
+	// Deadlocks with deletes (which lock the add-on variants FOR UPDATE in their
+	// own order) remain possible; inTx retries those.
+	TouchVariantAddons(ctx context.Context, arg TouchVariantAddonsParams) (uuid.UUID, error)
+	// TouchVariantsAddons is TouchVariantAddons for many variants (ids with
+	// their product_ids); it returns the ids found.
+	TouchVariantsAddons(ctx context.Context, arg TouchVariantsAddonsParams) ([]uuid.UUID, error)
 	// UpdateProduct changes the product only if nobody else has since it was
 	// read (expected_updated_at); no row means stale or deleted.
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)

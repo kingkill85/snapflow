@@ -7,7 +7,7 @@ test('switching to Deutsch translates the UI and survives a reload', async ({ pa
 
   await expect(page.getByRole('heading', { name: 'Mandanten' })).toBeVisible()
   expect(await navEntries(page)).toEqual({
-    Katalog: ['Produkte', 'Kategorien', 'Produkttypen', 'Funktionstypen'],
+    Katalog: ['Produkte', 'Kategorien', 'Produkttypen', 'Funktionstypen', 'Import'],
     Verwaltung: ['Benutzer', 'Mandanten', 'Rollen'],
   })
   await expect(page.getByRole('button', { name: 'Neuer Mandant' })).toBeVisible()

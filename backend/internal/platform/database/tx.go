@@ -26,8 +26,13 @@ type Beginner interface {
 // serialization failure (40001) is run again from the start, up to
 // TxAttempts times with a short jittered pause; if it still fails, the
 // caller gets 409 request.conflict_retry. fn must therefore only touch the
-// database through tx and must be safe to run more than once.
+// database through tx and must be safe to run more than once. On a Nested
+// database fn runs once in a savepoint.
 func InTx(ctx context.Context, db Beginner, opts pgx.TxOptions, fn func(pgx.Tx) error) error {
+	if _, nested := db.(*Nested); nested {
+		// A savepoint: run once, the outer transaction retries.
+		return pgx.BeginTxFunc(ctx, db, opts, fn)
+	}
 	for attempt := 1; ; attempt++ {
 		err := pgx.BeginTxFunc(ctx, db, opts, fn)
 		if !apperr.IsRetryable(err) {
@@ -51,3 +56,44 @@ func InTx(ctx context.Context, db Beginner, opts pgx.TxOptions, fn func(pgx.Tx) 
 // ReadOnlySnapshot is for reads that run several queries (a page and its
 // total) and must see one consistent state.
 var ReadOnlySnapshot = pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}
+
+// Nested is an open transaction used as the database of a service, so that
+// the service's work joins the outer transaction (e.g. an import that writes
+// through the products service). Its BeginTx starts a savepoint: a failing
+// statement inside a service transaction (a unique violation, say) rolls back
+// only to that savepoint and leaves the outer transaction usable. InTx does
+// not retry on a Nested database: a deadlock or serialization failure aborts
+// the outer transaction's snapshot, so the outer InTx must run again from the
+// start.
+type Nested struct {
+	pgx.Tx
+}
+
+// NewNested wraps tx; see Nested.
+func NewNested(tx pgx.Tx) *Nested { return &Nested{Tx: tx} }
+
+// BeginTx starts a savepoint; opts are ignored (the outer transaction's
+// isolation and access mode apply).
+func (n *Nested) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
+	return n.Begin(ctx)
+}
+
+// Joined returns tx for services whose transactions should join it without
+// savepoints: Begin (and so a Nested built on it) returns tx itself, whose
+// Commit and Rollback do nothing; the outer transaction commits or rolls
+// back everything. A failing statement then aborts the outer transaction,
+// so only a caller that gives up at the first error may use it (an
+// all-or-nothing import, which saves the two round trips of a savepoint
+// per write).
+func Joined(tx pgx.Tx) pgx.Tx {
+	if j, ok := tx.(joined); ok {
+		return j
+	}
+	return joined{tx}
+}
+
+type joined struct{ pgx.Tx }
+
+func (j joined) Begin(context.Context) (pgx.Tx, error) { return j, nil }
+func (joined) Commit(context.Context) error            { return nil }
+func (joined) Rollback(context.Context) error          { return nil }

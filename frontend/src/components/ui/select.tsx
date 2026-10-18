@@ -43,7 +43,12 @@ export type SelectProps = {
  */
 export function Select({ value, onValueChange, options, className, placeholder, disabled, onBlur, ref, ...aria }: SelectProps) {
   return (
-    <SelectPrimitive.Root value={toRadix(value)} onValueChange={(v) => onValueChange(fromRadix(v))} disabled={disabled}>
+    // A value no option has shows the placeholder (Radix shows it for "" only).
+    <SelectPrimitive.Root
+      value={options.some((o) => o.value === value) ? toRadix(value) : ''}
+      onValueChange={(v) => onValueChange(fromRadix(v))}
+      disabled={disabled}
+    >
       <SelectPrimitive.Trigger
         ref={ref}
         onBlur={onBlur}

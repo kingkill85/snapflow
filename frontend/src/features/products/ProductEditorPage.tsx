@@ -19,6 +19,7 @@ import {
 import { useCan } from '@/app/session'
 import { definitionsFor, extraKeys, storedValueErrors } from '@/catalog/attribute-values'
 import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEditor'
+import { useDecimalSeparator } from '@/catalog/decimal'
 import {
   type ApiFieldMap,
   Button,
@@ -230,7 +231,8 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
 
   const categoryById = (id: string) => categories.find((c) => c.id === id)
   const stored = storedValues(loaded)
-  const [defaults] = useState(() => toProductFormValues(loaded, definitionsFor(categoryById(loaded?.categoryId ?? ''), 'product')))
+  const separator = useDecimalSeparator()
+  const [defaults] = useState(() => toProductFormValues(loaded, definitionsFor(categoryById(loaded?.categoryId ?? ''), 'product'), separator))
   // Stored values that do not fit the current schema are marked from the start (D55).
   const [storedErrors] = useState(() =>
     loaded && loaded.attributeErrors.length > 0

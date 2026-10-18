@@ -32,6 +32,15 @@ describe('attribute values', () => {
     expect(toFormValue(requiredFlag, undefined)).toBe(false)
   })
 
+  it('shows numbers with the decimal separator of the UI language, and reads them back unchanged', () => {
+    const stored = { series: '2.5', power: 12.5, width: 4, currents: [1.5, 2] }
+    const values = toFormValues([text, number, integer, numbers], stored, ',')
+    // Text stays as stored: only number inputs are numbers.
+    expect(values).toEqual({ series: '2.5', power: '12,5', width: '4', currents: ['1,5', '2'] })
+    expect(toApiValues([text, number, integer, numbers], values).attributes).toEqual(stored)
+    expect(toFormValue(number, 12.5)).toBe('12.5')
+  })
+
   it('reports text that is not a number, or not a whole number', () => {
     expect(toApiValue(number, 'abc')).toEqual({ error: 'validation.number' })
     expect(toApiValue(integer, '2.5')).toEqual({ error: 'attribute.type {"expected":"integer"}' })

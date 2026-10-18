@@ -12,7 +12,8 @@ const reuse = process.env.E2E_REUSE_SERVERS === '1'
 
 // The default run leaves out the layout matrix (every page at several widths,
 // light and dark, English and German, tagged @visual); `make e2e-visual`
-// (E2E_VISUAL=1) runs the whole layout spec instead, with screenshots.
+// (E2E_VISUAL=1) runs the whole layout spec and the import's visual spec
+// instead, with screenshots.
 const visual = process.env.E2E_VISUAL === '1'
 
 // Specs only share the server; each seeds its own uniquely named data. A CI
@@ -51,7 +52,7 @@ export default defineConfig({
   projects: [
     { name: 'setup', testDir: '.', testMatch: /global\.setup\.ts/ },
     visual
-      ? { name: 'visual', dependencies: ['setup'], testMatch: /layout\.spec\.ts/, use: { storageState: adminStorageState } }
+      ? { name: 'visual', dependencies: ['setup'], testMatch: /(layout|imports-visual)\.spec\.ts/, use: { storageState: adminStorageState } }
       : { name: 'chromium', dependencies: ['setup'], grepInvert: /@visual/, use: { storageState: adminStorageState } },
   ],
   webServer: [

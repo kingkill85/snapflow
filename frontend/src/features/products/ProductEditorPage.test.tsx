@@ -1,10 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Product, ProductInput, ProductUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
+import i18n from '@/i18n'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
@@ -58,10 +59,10 @@ function editHandlers(item: () => Product = () => dimmer, respond?: () => Respon
   return { puts }
 }
 
-async function openEditor(item?: () => Product, respond?: () => Response) {
+async function openEditor(item?: () => Product, respond?: () => Response, heading = 'Edit product') {
   const calls = editHandlers(item, respond)
   renderRoutes(routes, { me: adminMe, route: editRoute })
-  await screen.findByRole('heading', { name: 'Edit product' })
+  await screen.findByRole('heading', { name: heading })
   return calls
 }
 
@@ -70,6 +71,10 @@ const add = async (u: User, label: string, ...items: string[]) => {
 }
 
 describe('ProductEditorPage', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en')
+  })
+
   it('creates a product with a value of every attribute type, sending exactly what is set', async () => {
     let posted: ProductInput | undefined
     const created = { ...dimmer, id: ids.id(299), variants: [] }
@@ -523,6 +528,21 @@ describe('ProductEditorPage', () => {
     await u.click(screen.getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(puts).toHaveLength(1))
     expect(puts[0].attributes).toMatchObject({ power: 12.5, currents: [1.5, 2, 0.75] })
+  })
+
+  it('shows stored numbers with the German decimal comma and sends them back unchanged', async () => {
+    await i18n.changeLanguage('de')
+    const u = userEvent.setup()
+    const decimals = { ...dimmer, attributes: { ...dimmer.attributes, power: 12.5 } }
+    const { puts } = await openEditor(() => decimals, undefined, 'Produkt bearbeiten')
+
+    const section = region('Attribute')
+    expect(within(section).getByLabelText('Power')).toHaveValue('12,5')
+    expect(within(section).getByRole('button', { name: '1,5 entfernen' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Aktualisieren' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toEqual(decimals.attributes)
   })
 
   it('sends stored zero and "no" back as they are', async () => {

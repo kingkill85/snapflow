@@ -213,6 +213,15 @@ func TestUploadPermissions(t *testing.T) {
 	if resp := upload(t, api, "", data); resp.Code != http.StatusUnauthorized {
 		t.Errorf("anonymous upload: got %d", resp.Code)
 	}
+	// The permission is checked before the body is looked at: an oversized
+	// one is refused as unauthorised, not as too large.
+	big := make([]byte, files.MaxSize+1<<20)
+	if resp := upload(t, api, "", big); resp.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous oversized upload: got %d", resp.Code)
+	}
+	if resp := upload(t, api, api.NewUser(partner, auth.RoleUser).Cookie, big); resp.Code != http.StatusForbidden {
+		t.Errorf("oversized upload without the permission: got %d", resp.Code)
+	}
 }
 
 func TestUploadTypes(t *testing.T) {
@@ -308,10 +317,16 @@ func TestDedup(t *testing.T) {
 	if other := mustUpload(t, api, pngImage(t, 8, 9)); other.ID == first.ID {
 		t.Error("different bytes gave the same file")
 	}
-	// Downscaling is deterministic, so a large image deduplicates too.
+	// Downscaling is deterministic, so a large image deduplicates too; the
+	// second upload is found by the uploaded bytes' hash, without decoding
+	// (file_sources).
 	big := jpegImage(t, 2000, 100)
 	if a, b := mustUpload(t, api, big), mustUpload(t, api, big); a.ID != b.ID {
 		t.Errorf("downscaled uploads differ: %s, %s", a.ID, b.ID)
+	}
+	var sources int
+	if err := api.DB.QueryRow(t.Context(), "SELECT count(*) FROM file_sources").Scan(&sources); err != nil || sources != 3 {
+		t.Errorf("file sources: %d %v", sources, err)
 	}
 }
 

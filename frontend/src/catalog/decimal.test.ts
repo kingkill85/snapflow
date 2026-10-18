@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseDecimal } from './decimal'
+import { decimalSeparator, formatDecimal, parseDecimal } from './decimal'
 
 describe('parseDecimal', () => {
   it('accepts a point or a comma as the decimal separator and returns the point form', () => {
@@ -19,4 +19,18 @@ describe('parseDecimal', () => {
       expect(parseDecimal(text)).toBeUndefined()
     },
   )
+})
+
+describe('formatDecimal', () => {
+  it('shows the decimal separator of the UI language and parses back to the same value', () => {
+    expect(decimalSeparator('de')).toBe(',')
+    expect(decimalSeparator('en')).toBe('.')
+    expect(formatDecimal('27.50', ',')).toBe('27,50')
+    expect(formatDecimal(2.5, ',')).toBe('2,5')
+    expect(formatDecimal(-0.25, ',')).toBe('-0,25')
+    expect(formatDecimal(4, ',')).toBe('4')
+    expect(formatDecimal('27.50', '.')).toBe('27.50')
+    expect(formatDecimal(1e21, ',')).toBe('1e+21')
+    for (const v of ['27.50', '2.5', '-0.25', '120']) expect(parseDecimal(formatDecimal(v, ','))).toBe(v)
+  })
 })

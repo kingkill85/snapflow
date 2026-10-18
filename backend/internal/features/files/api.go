@@ -13,6 +13,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/google/uuid"
+
+	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
 
 const tag = "files"
@@ -97,7 +100,11 @@ func Register(api huma.API, svc *Service) {
 			}
 			hctx.SetHeader("Content-Type", file.ContentType)
 			hctx.SetHeader("Content-Length", strconv.FormatInt(file.Size, 10))
-			hctx.SetHeader("Content-Disposition", "inline")
+			disposition := "inline"
+			if !strings.HasPrefix(file.ContentType, "image/") {
+				disposition = "attachment" // e.g. an import workbook: never rendered
+			}
+			hctx.SetHeader("Content-Disposition", disposition)
 			hctx.SetStatus(http.StatusOK)
 			if _, err := io.Copy(hctx.BodyWriter(), contents); err != nil {
 				slog.WarnContext(ctx, "files: send", "id", file.ID, "error", err)
@@ -124,6 +131,15 @@ func matches(header, etag string) bool {
 // by the cap is 413 file.too_large, not a generic form error; huma then uses
 // the parsed form.
 func limitBody(ctx huma.Context, next func(huma.Context)) {
+	// The permission first: nobody without it gets a body parsed (and
+	// multipart parts spilled to disk).
+	if _, err := auth.Require(ctx.Context(), auth.PermCatalogWrite); err != nil {
+		var ae *apperr.Error
+		if errors.As(err, &ae) {
+			writeProblem(ctx, ae)
+			return
+		}
+	}
 	r, w := humachi.Unwrap(ctx)
 	if r.ContentLength > maxRequestBytes {
 		writeProblem(ctx, ErrTooLarge())

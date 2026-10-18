@@ -10,7 +10,7 @@ import {
   toApiValues,
   toFormValues,
 } from '@/catalog/attribute-values'
-import { parseDecimal } from '@/catalog/decimal'
+import { formatDecimal, parseDecimal } from '@/catalog/decimal'
 import { pricePattern } from '@/catalog/money'
 import {
   type ApiFieldMap,
@@ -78,7 +78,8 @@ export const storedValues = (item: Product | Variant | null): Record<string, unk
 
 const keepAll = (stored: Record<string, unknown>) => Object.fromEntries(Object.keys(stored).map((k) => [k, true]))
 
-export function toProductFormValues(item: Product | null, defs: Definition[]): ProductFormValues {
+/** `separator`: the UI language's decimal separator, which number inputs show ("2,5"). */
+export function toProductFormValues(item: Product | null, defs: Definition[], separator: ',' | '.' = '.'): ProductFormValues {
   return {
     productTypeId: item?.productTypeId ?? '',
     categoryId: item?.categoryId ?? '',
@@ -86,19 +87,20 @@ export function toProductFormValues(item: Product | null, defs: Definition[]): P
     name: toTranslatable(item?.name),
     description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
-    values: toFormValues(defs, item?.attributes),
+    values: toFormValues(defs, item?.attributes, separator),
     keep: keepAll(storedValues(item)),
   }
 }
 
-export function toVariantFormValues(item: Variant | null, defs: Definition[]): VariantFormValues {
+/** `separator`: the UI language's decimal separator, which the price and number inputs show ("27,50"). */
+export function toVariantFormValues(item: Variant | null, defs: Definition[], separator: ',' | '.' = '.'): VariantFormValues {
   return {
     name: toTranslatable(item?.name),
     sku: item?.sku ?? '',
-    price: item?.price ?? '',
+    price: item?.price ? formatDecimal(item.price, separator) : '',
     imageFileId: item?.imageFileId ?? '',
     isActive: item?.isActive ?? true,
-    values: toFormValues(defs, item?.attributes),
+    values: toFormValues(defs, item?.attributes, separator),
     keep: keepAll(storedValues(item)),
   }
 }

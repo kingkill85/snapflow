@@ -2,7 +2,7 @@ import { ApiError } from '@/api/client'
 import type { AttributeDefinition, Category, FieldError, InstanceAttributeDefinition } from '@/api/generated/model'
 import { type ApiFieldMap, errorKey } from '@/components/ui'
 
-import { parseDecimal } from './decimal'
+import { formatDecimal, parseDecimal } from './decimal'
 
 // Attribute values as a form edits them, and back to what the API takes.
 // Shared by the product and variant editors, later the import mapping (1d) and
@@ -48,17 +48,21 @@ export const scalarText = (v: unknown) => (isObject(v) ? JSON.stringify(v) : Str
  * A value in the shape a definition's input edits. Values stored for another
  * type (e.g. after the schema changed) are converted as well as possible, so
  * nothing is hidden; the server reports what does not fit. What the input
- * cannot hold without changing it is kept raw (RawValue).
+ * cannot hold without changing it is kept raw (RawValue). Numbers of number
+ * and integer inputs show the UI language's decimal separator (`separator`,
+ * "2,5" in German); parsing takes both (D71).
  */
-export function toFormValue(d: Definition, v: unknown): AttributeFormValue {
+export function toFormValue(d: Definition, v: unknown, separator: ',' | '.' = '.'): AttributeFormValue {
   if (v === undefined || v === null || v === '') return emptyValue(d)
   if (d.type === 'boolean') return typeof v === 'boolean' ? v : { raw: v }
+  const numeric = (type: Definition['type'] | undefined) => type === 'number' || type === 'integer'
+  const text = (type: Definition['type'] | undefined) => (x: unknown) => (numeric(type) && typeof x === 'number' ? formatDecimal(x, separator) : scalarText(x))
   if (d.type === 'list') {
-    if (!Array.isArray(v)) return isObject(v) ? { raw: v } : [scalarText(v)]
-    return v.some(isObject) ? { raw: v } : v.map(scalarText)
+    if (!Array.isArray(v)) return isObject(v) ? { raw: v } : [text(d.itemType)(v)]
+    return v.some(isObject) ? { raw: v } : v.map(text(d.itemType))
   }
-  if (Array.isArray(v)) return v.some(isObject) ? { raw: v } : v.map(scalarText).join(', ')
-  return isObject(v) ? { raw: v } : scalarText(v)
+  if (Array.isArray(v)) return v.some(isObject) ? { raw: v } : v.map(text(d.type)).join(', ')
+  return isObject(v) ? { raw: v } : text(d.type)(v)
 }
 
 /** The form value of a definition: the edited one, or the empty one for a key not edited yet. */
@@ -77,8 +81,8 @@ export function formValueOf(d: Definition, values: AttributeFormValues): Attribu
 export const rawItems = (v: RawValue): string[] => (Array.isArray(v.raw) ? v.raw.map(scalarText) : [scalarText(v.raw)])
 
 /** The form values for stored values: one per definition. */
-export function toFormValues(defs: Definition[], stored: Record<string, unknown> | undefined): AttributeFormValues {
-  return Object.fromEntries(defs.map((d) => [d.key, toFormValue(d, stored?.[d.key])]))
+export function toFormValues(defs: Definition[], stored: Record<string, unknown> | undefined, separator: ',' | '.' = '.'): AttributeFormValues {
+  return Object.fromEntries(defs.map((d) => [d.key, toFormValue(d, stored?.[d.key], separator)]))
 }
 
 type Converted = { value?: unknown; error?: string }
