@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { type Page } from '@playwright/test'
 
-import { expect, test } from '../fixtures'
+import { expect, test, unique } from '../fixtures'
 
 // Key pages at phone and desktop width, in light and dark mode: nothing may
 // overflow the viewport horizontally (tables scroll inside their own box).
@@ -95,6 +98,57 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/catalog/product-types')
         await expect(page.getByRole('row').filter({ hasText: type.key })).toBeVisible()
         await expectNoHorizontalOverflow(page)
+      })
+
+      test('the product pages fit the screen', async ({ page, api }) => {
+        const image = await api.uploadFile('blue.png', 'image/png', readFileSync(fileURLToPath(new URL('../assets/blue.png', import.meta.url))))
+        const type = await api.createProductType({
+          name: { en: unique('Universal dimmer actuator with a rather long name') },
+          color: '#1f6feb',
+          attributes: [
+            { key: 'nominal_power', label: { en: 'Nominal power per channel at 230 V' }, type: 'number', unit: 'W', scope: 'product', required: true },
+            {
+              key: 'protocols',
+              label: { en: 'Supported protocols' },
+              type: 'list',
+              itemType: 'enum',
+              scope: 'product',
+              options: ['KNX', 'Zigbee', 'Matter', 'Thread', 'Bluetooth Low Energy', 'DALI-2'].map((en) => ({ key: en.toLowerCase().replace(/\W+/g, '_'), label: { en } })),
+            },
+            { key: 'tags', label: { en: 'Tags' }, type: 'list', itemType: 'text', scope: 'product' },
+            { key: 'finish', label: { en: 'Surface finish' }, type: 'text', scope: 'variant' },
+          ],
+        })
+        const product = await api.createProduct({
+          productTypeId: type.id,
+          modelNumber: unique('M485/GW-ZB.10-EXTRA-LONG').replace(/\s+/g, '-'),
+          name: { en: 'Universal dimmer actuator, 4-fold, with manual operation and status LEDs' },
+          attributes: { nominal_power: 500, protocols: ['knx', 'matter'], tags: ['flush mounted', 'professional series', 'DIN rail'] },
+        })
+        const sku = unique('SKU-M485-GW-ZB.10-IVORY-WHITE-GLOSSY').replace(/\s+/g, '-')
+        const variant = await api.createVariant(product.id, { name: { en: 'Ivory white glossy with anthracite frame' }, sku, price: '1234567.89', imageFileId: image.id })
+        const addon = await api.createVariant(product.id, { name: { en: 'Power supply 640 mA with integrated choke' }, price: '89.00' })
+        await api.replaceAddons(product.id, variant.id, [{ addonVariantId: addon.id, required: true }])
+        // Offered in the add-on picker.
+        await api.createVariant(product.id, { name: { en: 'Design frame, 2-gang, anthracite' }, sku: `FRAME-${sku}`, price: '12.50' })
+
+        await page.goto(`/catalog/products?type=${type.id}`)
+        await expect(page.getByRole('row').filter({ hasText: product.modelNumber })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/products-${viewport.name}-${colorScheme}.png`, fullPage: true })
+
+        await page.goto(`/catalog/products/${product.id}`)
+        await expect(page.getByRole('heading', { name: 'Edit product', level: 1 })).toBeVisible()
+        await expect(page.getByRole('row').filter({ hasText: 'Ivory white glossy' })).toContainText(sku)
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/product-${viewport.name}-${colorScheme}.png`, fullPage: true })
+
+        await page.goto(`/catalog/products/${product.id}/variants/${variant.id}`)
+        await expect(page.getByRole('heading', { name: 'Edit variant', level: 1 })).toBeVisible()
+        await expect(page.getByRole('region', { name: 'Search results' }).getByRole('listitem').first()).toBeVisible()
+        await expect(page.getByRole('img', { name: 'Image' })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/variant-${viewport.name}-${colorScheme}.png`, fullPage: true })
       })
 
       test.describe('signed out', () => {

@@ -206,7 +206,8 @@ export function AddonsEditor({ product, variant, types, readOnly, linkState, onD
                       {offered.map((r) => (
                         <li key={r.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                           <Thumbnail src={fileUrl(r.imageFileId)} />
-                          <div className="min-w-0 flex-1 space-y-0.5 text-sm">
+                          {/* Long model numbers and SKUs wrap; on a phone, price and Add move below. */}
+                          <div className="min-w-0 flex-1 basis-48 space-y-0.5 text-sm wrap-anywhere">
                             <p className="font-medium">
                               {r.modelNumber} · {localized(r.name)}
                             </p>

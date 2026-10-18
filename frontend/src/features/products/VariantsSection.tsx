@@ -114,8 +114,10 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
             {localized(v.name)}
           </TextLink>
         ),
+      // On narrow screens the table scrolls instead of breaking names word by word.
+      className: 'min-w-40',
     },
-    { header: t('variants.column.sku'), cell: (v) => v.sku ?? '' },
+    { header: t('variants.column.sku'), cell: (v) => v.sku ?? '', className: 'min-w-48 wrap-anywhere' },
     { header: t('variants.column.price'), cell: (v) => price(v.price), className: 'text-right whitespace-nowrap tabular-nums' },
     {
       header: t('variants.column.status'),
@@ -126,7 +128,7 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
         </span>
       ),
     },
-    { header: t('variants.column.addons'), cell: (v) => v.addons.length, className: 'text-right tabular-nums' },
+    { header: t('variants.column.addons'), cell: (v) => v.addons.length, className: 'text-right whitespace-nowrap tabular-nums' },
   ]
 
   const rowActions = (v: Variant) => {

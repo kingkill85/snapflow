@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { createMemoryRouter, MemoryRouter, type RouteObject, RouterProvider } from 'react-router'
+import { createMemoryRouter, MemoryRouter, type RouteObject } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 
 import { getGetMeQueryKey } from '@/api/generated/auth/auth'
 import type { Me } from '@/api/generated/model'

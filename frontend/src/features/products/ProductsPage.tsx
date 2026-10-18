@@ -64,21 +64,26 @@ export function ProductsPage() {
   const showInactive = params.get('inactive') === '1'
   const offset = Math.max(0, Math.floor(Number(params.get('offset'))) || 0)
 
-  /** Changes filters; any change but paging starts again at the first page. */
+  /**
+   * Changes filters; any change but paging starts again at the first page.
+   * A user's change is applied synchronously (`flushSync`): in a transition
+   * the controlled checkbox and select would show the old value until the
+   * navigation finished. `sync: false` from effects, where flushSync is not allowed.
+   */
   const setFilters = useCallback(
-    (changes: Record<string, string>) =>
+    (changes: Record<string, string>, { sync = true } = {}) =>
       setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        if (!('offset' in changes)) next.delete('offset')
-        for (const [name, value] of Object.entries(changes)) {
-          if (value === '' || value === '0') next.delete(name)
-          else next.set(name, value)
-        }
-        return next
-      },
-      { replace: true },
-    ),
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (!('offset' in changes)) next.delete('offset')
+          for (const [name, value] of Object.entries(changes)) {
+            if (value === '' || value === '0') next.delete(name)
+            else next.set(name, value)
+          }
+          return next
+        },
+        { replace: true, flushSync: sync },
+      ),
     [setParams],
   )
 
@@ -112,7 +117,7 @@ export function ProductsPage() {
   // the URL says so) moves to the last page.
   const total = list.data?.total
   useEffect(() => {
-    if (total !== undefined && total > 0 && offset >= total) setFilters({ offset: String(lastPageOffset(total, pageSize)) })
+    if (total !== undefined && total > 0 && offset >= total) setFilters({ offset: String(lastPageOffset(total, pageSize)) }, { sync: false })
   }, [total, offset, setFilters])
 
   const remove = useDeleteProduct()
@@ -164,7 +169,8 @@ export function ProductsPage() {
       ),
       className: 'whitespace-nowrap',
     },
-    { header: t('column.name'), cell: (p) => localized(p.name) },
+    // On narrow screens the table scrolls instead of breaking names word by word.
+    { header: t('column.name'), cell: (p) => localized(p.name), className: 'min-w-48' },
     {
       header: t('column.type'),
       cell: (p) => <TypeBadge color={p.productType.color}>{localized(p.productType.name)}</TypeBadge>,

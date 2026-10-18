@@ -132,6 +132,25 @@ describe('ProductsPage', () => {
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', includeInactive: 'true', limit: '50', offset: '0' }))
   })
 
+  it('shows a changed filter at once, not only when the navigation has finished', async () => {
+    listHandlers(
+      () => [listItem()],
+      () => 1,
+    )
+    renderRoutes(routes, { me: adminMe, route: '/catalog/products' })
+    const checkbox = await screen.findByLabelText('Show inactive')
+    const typeSelect = screen.getByLabelText('Product type')
+
+    // Not through act(), which would finish the navigation first: what the
+    // user sees right after the click.
+    checkbox.click()
+    expect(checkbox).toBeChecked()
+    ;(typeSelect as HTMLSelectElement).value = gatewayType.id
+    typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(typeSelect).toHaveValue(gatewayType.id)
+    await waitFor(() => expect(checkbox).toBeChecked())
+  })
+
   it('pages with Previous and Next, showing where the page is', async () => {
     const { last } = listHandlers(
       () => [listItem()],
