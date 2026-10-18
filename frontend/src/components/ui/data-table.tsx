@@ -30,6 +30,11 @@ type DataTableProps<T> = {
    * diff): rows are separated by lines, also on phones instead of cards.
    */
   flat?: boolean
+  /**
+   * Column headers for screen readers only, for label and value pairs whose
+   * labels say it all (e.g. the fields of something new in a diff).
+   */
+  hideHeader?: boolean
 }
 
 /**
@@ -39,7 +44,7 @@ type DataTableProps<T> = {
  * explicitly (table, rowgroup, row, columnheader, cell), because browsers drop
  * table semantics from elements whose display changes (D117).
  */
-export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat }: DataTableProps<T>) {
+export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat, hideHeader }: DataTableProps<T>) {
   const scroller = useRef<HTMLDivElement>(null)
   const cue = useScrollCue(scroller, rows.length > 0)
   if (rows.length === 0) return <>{empty}</>
@@ -49,7 +54,8 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
     columns.findIndex((c) => c.mobile === 'title') >= 0 ? columns.findIndex((c) => c.mobile === 'title') : columns.findIndex((c) => c.mobile !== 'media'),
   )
   const cellClass = (c: Column<T>, i: number) => {
-    if (c.mobile === 'media') return 'max-md:col-start-1 max-md:row-start-1 max-md:block max-md:w-auto max-md:self-center'
+    // Beside a flat table's long values (a field's label) at their top, beside a card's title centred.
+    if (c.mobile === 'media') return cn('max-md:col-start-1 max-md:row-start-1 max-md:block max-md:w-auto', flat ? 'max-md:self-start' : 'max-md:self-center')
     if (c.mobile === 'block') return 'max-md:col-span-2 max-md:block max-md:text-left'
     if (i === titleIndex) {
       return cn(
@@ -64,7 +70,7 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
     <div className={cn('relative', !flat && 'rounded-control border border-line bg-surface max-md:border-0 max-md:bg-transparent')}>
       <div ref={scroller} className="overflow-x-auto max-md:overflow-visible">
         <table role="table" aria-label={label} className="w-full text-sm max-md:block">
-          <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs')}>
+          <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs', hideHeader && 'sr-only')}>
             <tr role="row">
               {columns.map((c) => (
                 <th key={c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
@@ -75,46 +81,53 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
             </tr>
           </thead>
           <tbody role="rowgroup" className={cn('max-md:block', flat ? 'max-md:space-y-2' : 'max-md:space-y-3')}>
-            {rows.map((row) => (
-              <tr
-                key={rowKey(row)}
-                role="row"
-                className={cn(
-                  'border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3',
-                  flat
-                    ? 'max-md:gap-y-1 max-md:pb-2 max-md:last:pb-0'
-                    : 'max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border',
-                )}
-              >
-                {columns.map((c, i) => {
-                  const line = c.mobile !== 'media' && i !== titleIndex
-                  const block = c.mobile === 'block'
-                  return (
+            {rows.map((row) => {
+              const rowActions = actions?.(row)
+              return (
+                <tr
+                  key={rowKey(row)}
+                  role="row"
+                  className={cn(
+                    'border-b border-line last:border-0 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:gap-x-3',
+                    flat
+                      ? 'max-md:gap-y-1 max-md:pb-2 max-md:last:pb-0'
+                      : 'max-md:gap-y-2 max-md:rounded-control max-md:border max-md:bg-surface max-md:p-4 max-md:last:border',
+                  )}
+                >
+                  {columns.map((c, i) => {
+                    const line = c.mobile !== 'media' && i !== titleIndex
+                    const block = c.mobile === 'block'
+                    return (
+                      <td
+                        key={c.header}
+                        role="cell"
+                        // On a phone a line's label is the header, as CSS content with empty alternative text
+                        // (index.css): not part of the cell's text, not read twice by screen readers.
+                        data-label={line ? c.header : undefined}
+                        data-mobile={block ? 'block' : undefined}
+                        className={cn(
+                          'px-3 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
+                          flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
+                          c.className,
+                          cellClass(c, i),
+                        )}
+                      >
+                        {line ? <div className="min-w-0 break-words md:contents">{c.cell(row)}</div> : c.cell(row)}
+                      </td>
+                    )
+                  })}
+                  {actions && (
+                    // A row without actions (e.g. nothing it may do) has no empty bar at the bottom of its card.
                     <td
-                      key={c.header}
                       role="cell"
-                      // On a phone a line's label is the header, as CSS content with empty alternative text
-                      // (index.css): not part of the cell's text, not read twice by screen readers.
-                      data-label={line ? c.header : undefined}
-                      data-mobile={block ? 'block' : undefined}
-                      className={cn(
-                        'px-3 max-md:p-0 max-md:first:pl-0 max-md:last:pr-0',
-                        flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
-                        c.className,
-                        cellClass(c, i),
-                      )}
+                      className={cn('py-2 pr-4 pl-3 max-md:col-span-2 max-md:border-t max-md:border-line max-md:p-0 max-md:pt-3', (rowActions == null || rowActions === false) && 'max-md:hidden')}
                     >
-                      {line ? <div className="min-w-0 break-words md:contents">{c.cell(row)}</div> : c.cell(row)}
+                      <div className="flex justify-end gap-2 max-md:flex-wrap max-md:justify-start">{rowActions}</div>
                     </td>
-                  )
-                })}
-                {actions && (
-                  <td role="cell" className="py-2 pr-4 pl-3 max-md:col-span-2 max-md:border-t max-md:border-line max-md:p-0 max-md:pt-3">
-                    <div className="flex justify-end gap-2 max-md:flex-wrap max-md:justify-start">{actions(row)}</div>
-                  </td>
-                )}
-              </tr>
-            ))}
+                  )}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

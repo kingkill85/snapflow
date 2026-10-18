@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-import type { ImportTarget } from '@/api/generated/model'
+import type { ImportMapping, ImportTarget } from '@/api/generated/model'
 import type { ErrorKey } from '@/components/ui'
 import { type LocalizedText, useLocalized } from '@/i18n/localized'
 
@@ -15,8 +15,20 @@ function useLanguageName() {
 /** Attribute labels by key, from the targets list. */
 export type AttributeLabels = Map<string, LocalizedText>
 
-export const attributeLabels = (targets: ImportTarget[] | undefined): AttributeLabels =>
-  new Map((targets ?? []).flatMap((x) => (x.attribute ? [[x.attribute.key, x.attribute.label] as const] : [])))
+/**
+ * Attribute labels by key: the catalog's (from the targets list), else the
+ * header of the column a run's mapping imports the key from, the label a
+ * category the import creates gives it (D133).
+ */
+export function attributeLabels(targets: ImportTarget[] | undefined, mapping?: ImportMapping): AttributeLabels {
+  const labels: AttributeLabels = new Map((targets ?? []).flatMap((x) => (x.attribute ? [[x.attribute.key, x.attribute.label] as const] : [])))
+  for (const f of mapping?.fields ?? []) {
+    const key = f.target.startsWith('attribute.') ? f.target.slice('attribute.'.length) : ''
+    const header = f.column?.replace(/\s+/g, ' ').trim()
+    if (key && header && !labels.has(key)) labels.set(key, { en: header })
+  }
+  return labels
+}
 
 /**
  * A mapping target's name, e.g. "Name (German)" for product.name.de or the

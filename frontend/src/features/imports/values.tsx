@@ -68,7 +68,7 @@ export function FieldValue({ field, value }: { field: string; value: unknown }) 
       <ul className="space-y-0.5">
         {(value as AddonRef[]).map((a, i) => (
           <li key={i} className="flex flex-wrap items-center gap-1.5">
-            <span className="break-all">{a.label}</span>
+            <span className="min-w-0 break-words">{a.label}</span>
             <Badge variant={a.required ? 'primary' : 'neutral'}>{a.required ? t('value.required') : t('value.optional')}</Badge>
           </li>
         ))}
@@ -90,8 +90,8 @@ export function FieldValue({ field, value }: { field: string; value: unknown }) 
 export type DiffRow = { key: string; label: string; before: { field: string; value: unknown }; after: { field: string; value: unknown } }
 
 /**
- * Fields before and after (or only the values of something new): a table
- * inside the entry's card. On phones a changed field is a title with its
+ * Fields before and after (or only the values of something new, label and
+ * value pairs without a visible header row): a table inside the entry's card. On phones a changed field is a title with its
  * before and after lines; a new value sits on one line beside its field.
  */
 export function DiffList({ rows, showBefore }: { rows: DiffRow[]; showBefore: boolean }) {
@@ -130,7 +130,7 @@ export function DiffList({ rows, showBefore }: { rows: DiffRow[]; showBefore: bo
   ]
   return (
     <div className="border-t border-line pt-1">
-      <DataTable flat rows={rows} rowKey={(r) => r.key} columns={columns} empty={null} />
+      <DataTable flat hideHeader={!showBefore} rows={rows} rowKey={(r) => r.key} columns={columns} empty={null} />
     </div>
   )
 }

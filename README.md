@@ -33,6 +33,7 @@ make e2e                       # needs Docker; recreates this checkout's e2e dat
 make e2e args="--ui"           # Playwright UI mode; any Playwright CLI arguments work, e.g. args="users.spec.ts"
 make e2e-visual                # the full layout matrix (widths x light/dark x en/de) with screenshots
 E2E_SLOT=3 make e2e            # pick the slot (ports and database) yourself
+SNAPFLOW_V1_WORKBOOK=/path/to/workbook.xlsx make e2e args=imports-v1-workbook   # the real SnapFlow 1 workbook (not in the repository; skipped without it)
 ```
 
 Playwright (Chromium from the Nix shell, `PLAYWRIGHT_BROWSERS_PATH`) starts its own backend and serves a production build of the frontend, against its own database, so the development servers and database are never touched. Specs live in `frontend/e2e/specs/`; seed data through the `api` fixture, test behaviour through the UI; specs run in parallel (half the CPU cores, 2 per shard in CI, `E2E_WORKERS` overrides), so they only rely on data they create. The `@playwright/test` version in `frontend/package.json` must equal nixpkgs' `playwright-driver` version (`echo $PLAYWRIGHT_DRIVER_VERSION`); bump both together when updating `flake.lock`. Report: `cd frontend && npx playwright show-report e2e/playwright-report`.

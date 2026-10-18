@@ -232,7 +232,7 @@ function ItemsSection({ run }: { run: ImportRun }) {
   useClampOffset(items.data?.total, offset, 'offset', setFilters)
   useScrollToHash((id) => id === changesSection || id.startsWith('item-'), !items.isPending && !items.isPlaceholderData)
   const targets = useListImportTargets(undefined, { query: { staleTime: 60_000 } })
-  const labels = attributeLabels(targets.data)
+  const labels = attributeLabels(targets.data, run.mapping)
   const highlighted = location.hash.slice(1)
 
   return (
@@ -366,7 +366,12 @@ function ItemCard({ item, labels, highlighted }: { item: ImportItem; labels: Ret
       {changes.length > 0 && (
         <DiffList
           showBefore={showBefore}
-          rows={changes.map((c) => ({ key: c.field, label: fieldLabel(c.field), before: { field: c.field, value: c.before }, after: { field: c.field, value: c.after } }))}
+          rows={changes.map((c) => {
+            // A new category's attribute: its type (the attribute an import creates for a mapped column, D133).
+            const typed = item.entity === 'category' && c.field.startsWith('attributes.') && typeof c.after === 'string'
+            const after = typed ? t(`attributeType.${c.after}` as 'attributeType.text', { defaultValue: c.after }) : c.after
+            return { key: c.field, label: fieldLabel(c.field), before: { field: c.field, value: c.before }, after: { field: c.field, value: after } }
+          })}
         />
       )}
     </li>

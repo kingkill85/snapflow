@@ -66,7 +66,7 @@ describe('ImportRunPage: mapping', () => {
     expect(screen.getByText(/Uploaded by Ada Admin/)).toHaveTextContent('0.1 MB')
     expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Mapping')
     // The source: the first rows with the picture marker.
-    expect(await screen.findByText('2 data rows, 4 columns, 1 pictures')).toBeInTheDocument()
+    expect(await screen.findByText('2 data rows, 4 columns, 1 picture')).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'A · Model Number' })).toBeInTheDocument()
     expect(screen.getByTitle('1 picture over this row')).toBeInTheDocument()
 

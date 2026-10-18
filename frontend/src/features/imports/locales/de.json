@@ -106,7 +106,13 @@
     "headerRow": "Kopfzeile",
     "headerRowHint": "0 für eine Datei ohne Spaltenüberschriften",
     "dataStartRow": "Erste Datenzeile",
-    "sourceSummary": "{{rows}} Datenzeilen, {{columns}} Spalten, {{pictures}} Bilder",
+    "sourceSummary": "{{rows}}, {{columns}}, {{pictures}}",
+    "sourceRows_one": "{{count}} Datenzeile",
+    "sourceRows_other": "{{count}} Datenzeilen",
+    "sourceColumns_one": "{{count}} Spalte",
+    "sourceColumns_other": "{{count}} Spalten",
+    "sourcePictures_one": "{{count}} Bild",
+    "sourcePictures_other": "{{count}} Bilder",
     "noRows": "Unter der Kopfzeile stehen keine Datenzeilen.",
     "row": "Zeile",
     "pictures": "Bilder",
@@ -221,6 +227,14 @@
     "required": "Pflicht",
     "optional": "optional"
   },
+  "attributeType": {
+    "text": "Textattribut",
+    "number": "Zahlenattribut",
+    "integer": "Ganzzahl-Attribut",
+    "boolean": "Ja/Nein-Attribut",
+    "enum": "Auswahlattribut",
+    "list": "Listenattribut"
+  },
   "counts": {
     "products": "Produkte",
     "variants": "Varianten",
@@ -243,7 +257,7 @@
     "images": "Bilder",
     "imagesNew": "Neu",
     "imagesChanged": "Ersetzt",
-    "imagesFiles": "Bilder in der Datei",
+    "imagesFiles": "Verschiedene Bilder",
     "rows": "Zeilen",
     "rowsRead": "Datenzeilen",
     "newCategories": "Neue Kategorien",

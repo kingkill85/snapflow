@@ -65,6 +65,21 @@ describe('PreviewStep: the diff', () => {
     await waitFor(() => expect(query(itemQueries.at(-1))).toEqual({ limit: '50', offset: '0' }))
   })
 
+  it('heads the fields of a change with Field, Before and After, and those of something new for screen readers only', async () => {
+    lookups()
+    runHandlers(() => previewed())
+    previewLists([productItem, variantItem], [])
+    renderRoutes(routes, { route: runRoute })
+
+    await screen.findByRole('link', { name: 'GW-1 · Gateway' })
+    const changed = within(document.getElementById(`item-${productItem.seq}`)!)
+    expect(changed.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Field', 'Before', 'After'])
+    expect(changed.getAllByRole('rowgroup')[0]).not.toHaveClass('sr-only')
+    const added = within(document.getElementById(`item-${variantItem.seq}`)!)
+    expect(added.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Field', 'Value'])
+    expect(added.getAllByRole('rowgroup')[0]).toHaveClass('sr-only')
+  })
+
   it('says when nothing changes and shows the unchanged items on request', async () => {
     lookups()
     runHandlers(() => previewed())

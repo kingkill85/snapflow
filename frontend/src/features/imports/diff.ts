@@ -20,7 +20,7 @@ type FieldDiff = { field: string; before: unknown; after: unknown }
 export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 /** Bookkeeping fields of the stored state: not shown. */
-const hidden = new Set(['id', 'updatedAt', 'productId', 'sortOrder', 'variants', 'addons', 'refs'])
+const hidden = new Set(['id', 'updatedAt', 'addonsUpdatedAt', 'productId', 'sortOrder', 'variants', 'addons', 'refs'])
 /** Fields stored as objects whose keys are shown one by one. */
 const nested = new Set(['name', 'description', 'attributes'])
 

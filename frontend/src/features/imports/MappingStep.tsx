@@ -679,7 +679,11 @@ export function MappingStep({ run, autoProfileId, onAutoSettled, allOrNothing, o
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted">
-                  {t('mapping.sourceSummary', { rows: source.data.dataRows, columns: columns.length, pictures: source.data.images })}
+                  {t('mapping.sourceSummary', {
+                    rows: t('mapping.sourceRows', { count: source.data.dataRows }),
+                    columns: t('mapping.sourceColumns', { count: columns.length }),
+                    pictures: t('mapping.sourcePictures', { count: source.data.images }),
+                  })}
                 </p>
                 {source.data.rows.length > 0 && (
                   // On phones the rows are cards of every column: shown on request.

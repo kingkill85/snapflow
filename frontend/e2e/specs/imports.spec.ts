@@ -38,7 +38,7 @@ const counter = (page: Page, card: string, line: string) =>
     .filter({ has: page.locator('dt').getByText(line, { exact: true }) })
     .locator('dd')
 
-type Product = { id: string; modelNumber: string; isActive: boolean; variants: { name: { en: string }; imageFileId?: string; addons: unknown[] }[] }
+type Product = { id: string; modelNumber: string; isActive: boolean; variants: { name: { en: string }; price: string; imageFileId?: string; addons: unknown[] }[] }
 
 async function productByModel(api: Api, model: string): Promise<Product | undefined> {
   const res = await api.ctx.get('/api/products', { params: { search: model, includeInactive: true } })
@@ -93,7 +93,7 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
   await expect(counter(page, 'Products', 'New')).toHaveText('2')
   await expect(counter(page, 'Variants', 'New')).toHaveText('3')
   await expect(counter(page, 'Rows', 'New categories')).toHaveText('2')
-  await expect(counter(page, 'Images', 'Pictures in the file')).toHaveText('2')
+  await expect(counter(page, 'Images', 'Distinct pictures')).toHaveText('2')
   // The unknown add-on is a warning, not an error.
   await expect(
     page.getByRole('table', { name: 'Errors and warnings' }).getByRole('row').filter({ hasText: `The add-on "${p}-PSU-9" was found neither in the file nor in the catalog.` }),
@@ -136,7 +136,7 @@ test('a SnapFlow 1 workbook imports with the starter profile; importing it again
   expect(await productByModel(api, `${p}-DIM-2`)).toBeUndefined()
 })
 
-test('a CSV is mapped by hand, saved as a profile and imported into a fixed product type and category', async ({ page, api }) => {
+test('a CSV with a title line is mapped by hand, saved as a profile and imported into a fixed product type and category', async ({ page, api }) => {
   const { type, category } = await api.createKind(
     { name: { en: unique('CSV dimmers') }, attributes: [{ key: 'width_te', label: { en: 'Width' }, type: 'integer', scope: 'product' }] },
     { name: { en: unique('CSV system') } },
@@ -144,11 +144,15 @@ test('a CSV is mapped by hand, saved as a profile and imported into a fixed prod
   const model = uniqueKey('CSV').toUpperCase()
   const dir = mkdtempSync(join(tmpdir(), 'snapflow-import-'))
   const file = join(dir, 'supplier.csv')
-  writeFileSync(file, `Model;Name;Style;SKU;Price;Width\n${model};Dimmer 4ch;White;${model}-W;27,50;4\n${model};Dimmer 4ch;Black;${model}-B;28;4\n`)
+  // A title line above the header, decimal commas and a thousands separator, as a German spreadsheet saves it.
+  writeFileSync(file, `Price list 2026\nModel;Name;Style;SKU;Price;Width\n${model};Dimmer 4ch;White;${model}-W;27,50;4\n${model};Dimmer 4ch;Black;${model}-B;1.028,00;4\n`)
   const profileName = unique('Supplier')
 
   await upload(page, file)
   await expect(page.getByRole('heading', { name: 'Columns' })).toBeVisible()
+  await expect(page.getByText('3 data rows, 6 columns, 0 pictures')).toBeVisible()
+  await page.getByLabel('Header row').fill('2')
+  await expect(page.getByLabel('First data row')).toHaveValue('3')
   await expect(page.getByText('2 data rows, 6 columns, 0 pictures')).toBeVisible()
   await chooseOption(page.getByRole('combobox', { name: 'Product type', exact: true }), type.name.en)
   await chooseOption(page.getByRole('combobox', { name: 'Category', exact: true }), category.name.en)
@@ -172,7 +176,7 @@ test('a CSV is mapped by hand, saved as a profile and imported into a fixed prod
   await applyImport(page)
 
   const product = await productByModel(api, model)
-  expect(product?.variants.map((v) => v.name.en).sort()).toEqual(['Black', 'White'])
+  expect(product?.variants.map((v) => `${v.name.en} ${v.price}`).sort()).toEqual(['Black 1028.00', 'White 27.50'])
 
   // The saved profile maps the next file at once.
   await upload(page, file, profileName)

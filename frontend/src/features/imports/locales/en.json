@@ -106,7 +106,13 @@
     "headerRow": "Header row",
     "headerRowHint": "0 for a file without column headers",
     "dataStartRow": "First data row",
-    "sourceSummary": "{{rows}} data rows, {{columns}} columns, {{pictures}} pictures",
+    "sourceSummary": "{{rows}}, {{columns}}, {{pictures}}",
+    "sourceRows_one": "{{count}} data row",
+    "sourceRows_other": "{{count}} data rows",
+    "sourceColumns_one": "{{count}} column",
+    "sourceColumns_other": "{{count}} columns",
+    "sourcePictures_one": "{{count}} picture",
+    "sourcePictures_other": "{{count}} pictures",
     "noRows": "No data rows below the header row.",
     "row": "Row",
     "pictures": "Pictures",
@@ -221,6 +227,14 @@
     "required": "required",
     "optional": "optional"
   },
+  "attributeType": {
+    "text": "Text attribute",
+    "number": "Number attribute",
+    "integer": "Whole-number attribute",
+    "boolean": "Yes/no attribute",
+    "enum": "Choice attribute",
+    "list": "List attribute"
+  },
   "counts": {
     "products": "Products",
     "variants": "Variants",
@@ -243,7 +257,7 @@
     "images": "Images",
     "imagesNew": "New",
     "imagesChanged": "Replaced",
-    "imagesFiles": "Pictures in the file",
+    "imagesFiles": "Distinct pictures",
     "rows": "Rows",
     "rowsRead": "Data rows",
     "newCategories": "New categories",

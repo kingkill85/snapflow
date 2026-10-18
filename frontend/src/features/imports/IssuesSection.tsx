@@ -32,7 +32,7 @@ export function IssuesSection({ run, counts, linkItems }: Props) {
   useClampOffset(issues.data?.total, offset, 'issues', setFilters)
   useScrollToHash((id) => id === issuesSection, !issues.isPending || !any)
   const targets = useListImportTargets(undefined, { query: { staleTime: 60_000 } })
-  const labels = attributeLabels(targets.data)
+  const labels = attributeLabels(targets.data, run.mapping)
   const targetLabel = useTargetLabel(labels)
   const fieldLabel = useFieldLabel(labels)
   const message = useCodeMessage()

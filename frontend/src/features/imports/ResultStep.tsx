@@ -143,7 +143,7 @@ function ChangeLog({ run }: { run: ImportRun }) {
   const targets = useListImportTargets(undefined, { query: { staleTime: 60_000 } })
   const types = useListProductTypes({ includeInactive: true })
   const categories = useListCategories({ includeInactive: true })
-  const fieldLabel = useFieldLabel(attributeLabels(targets.data))
+  const fieldLabel = useFieldLabel(attributeLabels(targets.data, run.mapping))
 
   /** Ids in the stored state, shown as the product type's badge or the category's name. */
   const display = (field: string, value: unknown): { field: string; value: unknown } => {
