@@ -63,6 +63,7 @@
   },
   "file": {
     "not_found": "Diese Datei existiert nicht mehr.",
+    "tenant_forbidden": "Sie können keine Dateien eines anderen Mandanten speichern.",
     "too_large": "Die Datei ist zu groß (höchstens {{maxMb}} MB).",
     "too_many_pixels": "Das Bild ist zu groß (höchstens {{megapixels}} Megapixel).",
     "type": "Nur JPEG-, PNG- und WebP-Bilder werden akzeptiert."
@@ -131,12 +132,30 @@
   },
   "product_type": {
     "color_format": "Geben Sie eine Farbe als #rrggbb ein, z. B. #1f6feb.",
-    "in_use": "Dieser Produkttyp wird noch von Produkten verwendet. Deaktivieren Sie ihn stattdessen.",
+    "in_use": "Dieser Produkttyp wird noch von Produkten oder Projekten verwendet. Deaktivieren Sie ihn stattdessen.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "not_found": "Dieser Produkttyp existiert nicht mehr.",
     "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
     "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
+  "project": {
+    "currency_format": "Geben Sie einen dreistelligen Währungscode wie EUR oder USD ein.",
+    "exchange_rate": "Geben Sie einen Wechselkurs über 0 ein (bis zu 6 Nachkommastellen); für USD ist er 1.",
+    "not_found": "Dieses Projekt existiert nicht mehr.",
+    "product_type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
+    "product_type_not_found": "Der gewählte Produkttyp existiert nicht mehr.",
+    "product_types_required": "Wählen Sie mindestens einen Produkttyp.",
+    "read_only": "Dieses Projekt ist abgeschlossen oder storniert und kann nicht geändert werden. Öffnen Sie es zuerst wieder.",
+    "stale": "Jemand anderes hat dieses Projekt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "tenant_forbidden": "Sie können keine Projekte in einem anderen Mandanten anlegen.",
+    "tenant_not_found": "Der gewählte Mandant existiert nicht."
+  },
+  "project_version": {
+    "last": "Die letzte Version kann nicht gelöscht werden. Löschen Sie stattdessen das Projekt.",
+    "name_taken": "Dieses Projekt hat bereits eine Version namens „{{name}}“.",
+    "not_found": "Diese Version existiert nicht mehr.",
+    "stale": "Jemand anderes hat diese Version inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "request": {
     "bad": "Die Anfrage war ungültig.",
@@ -151,7 +170,9 @@
     "error": "Etwas ist schiefgelaufen. Bitte erneut versuchen."
   },
   "tenant": {
+    "archived": "Dieser Mandant ist archiviert. Stellen Sie ihn wieder her, bevor Sie ihn aktivieren.",
     "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden.",
+    "has_projects": "Dieser archivierte Mandant hat noch Projekte ({{count}}) und kann nicht gelöscht werden.",
     "name_taken": "Ein Mandant namens \"{{name}}\" existiert bereits.",
     "not_found": "Dieser Mandant existiert nicht mehr."
   },

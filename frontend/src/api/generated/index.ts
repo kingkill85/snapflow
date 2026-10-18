@@ -5,6 +5,7 @@ export * from './function-types/function-types';
 export * from './imports/imports';
 export * from './product-types/product-types';
 export * from './products/products';
+export * from './projects/projects';
 export * from './system/system';
 export * from './tenants/tenants';
 export * from './users/users';

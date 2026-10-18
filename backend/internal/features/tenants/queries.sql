@@ -1,5 +1,7 @@
 -- name: ListTenants :many
-SELECT * FROM tenants ORDER BY is_distributor DESC, lower(name);
+SELECT * FROM tenants
+WHERE sqlc.arg(include_archived)::boolean OR archived_at IS NULL
+ORDER BY is_distributor DESC, lower(name);
 
 -- name: GetTenant :one
 SELECT * FROM tenants WHERE id = $1;
@@ -18,3 +20,15 @@ RETURNING *;
 
 -- name: DeleteTenant :execrows
 DELETE FROM tenants WHERE id = $1;
+
+-- ArchiveTenant deactivates and archives a partner tenant (D13).
+-- name: ArchiveTenant :one
+UPDATE tenants SET is_active = false, archived_at = now(), updated_at = now()
+WHERE id = $1 AND NOT is_distributor
+RETURNING *;
+
+-- RestoreTenant takes a tenant out of the archive; it stays inactive.
+-- name: RestoreTenant :one
+UPDATE tenants SET archived_at = NULL, updated_at = now()
+WHERE id = $1 AND archived_at IS NOT NULL
+RETURNING *;

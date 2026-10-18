@@ -24,7 +24,7 @@ export function UsersPage() {
   // list needs tenants.manage); everyone else works in their own.
   const allTenants = can('tenants.access_all') && can('tenants.manage')
   const [tenantFilter, setTenantFilter] = useState('')
-  const tenants = useListTenants({ query: { enabled: allTenants } })
+  const tenants = useListTenants(undefined, { query: { enabled: allTenants } })
   const tenantList = allTenants ? (tenants.data?.items ?? noTenants) : noTenants
   const list = useListUsers(tenantFilter ? { tenantId: tenantFilter } : undefined)
   const remove = useDeleteUser()

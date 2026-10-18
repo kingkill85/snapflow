@@ -310,8 +310,8 @@ func mapErr(err error, key string) error {
 		switch pgErr.Code {
 		case "23505": // unique_violation: the key is the only unique column
 			return apperr.Conflict("product_type.key_taken", "key already exists").With("key", key)
-		case "23503": // foreign_key_violation: products still use the type
-			return apperr.Conflict("product_type.in_use", "products still use this product type")
+		case "23503": // foreign_key_violation: products or projects still use the type
+			return apperr.Conflict("product_type.in_use", "products or projects still use this product type")
 		}
 	}
 	return err

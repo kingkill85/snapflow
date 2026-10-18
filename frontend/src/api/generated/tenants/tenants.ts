@@ -25,6 +25,7 @@ import type {
 
 import type {
   Error,
+  ListTenantsParams,
   Tenant,
   TenantInput,
   TenantList
@@ -82,13 +83,14 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * @summary List tenants
  */
 export const listTenants = (
-
+    params?: ListTenantsParams,
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<TenantList>(
-      {url: `/api/tenants`, method: 'GET', signal
+      {url: `/api/tenants`, method: 'GET',
+        params, signal
     },
       );
     }
@@ -96,23 +98,23 @@ export const listTenants = (
 
 
 
-export const getListTenantsQueryKey = () => {
+export const getListTenantsQueryKey = (params?: ListTenantsParams,) => {
     return [
-    `/api/tenants`
+    `/api/tenants`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListTenantsQueryOptions = <TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
+export const getListTenantsQueryOptions = <TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>(params?: ListTenantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListTenantsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListTenantsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTenants>>> = ({ signal }) => listTenants(signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTenants>>> = ({ signal }) => listTenants(params, signal);
 
 
 
@@ -126,7 +128,7 @@ export type ListTenantsQueryError = ErrorType<Error>
 
 
 export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>> & Pick<
+ params: undefined |  ListTenantsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTenants>>,
           TError,
@@ -136,7 +138,7 @@ export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, 
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>> & Pick<
+ params?: ListTenantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTenants>>,
           TError,
@@ -146,7 +148,7 @@ export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, 
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
+ params?: ListTenantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -154,11 +156,11 @@ export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, 
  */
 
 export function useListTenants<TData = Awaited<ReturnType<typeof listTenants>>, TError = ErrorType<Error>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
+ params?: ListTenantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenants>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListTenantsQueryOptions(options)
+  const queryOptions = getListTenantsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -238,7 +240,8 @@ export const useCreateTenant = <TError = ErrorType<Error>,
       return useMutation(getCreateTenantMutationOptions(options), queryClient);
     }
     /**
- * @summary Delete a partner tenant and its users
+ * A tenant without projects is deleted with its users. A tenant with projects (projectCount) is deactivated and archived instead, keeping its users and projects; an archived tenant with projects cannot be deleted (409 tenant.has_projects).
+ * @summary Delete a partner tenant and its users, or archive it when it has projects
  */
 export const deleteTenant = (
     id: string,
@@ -290,7 +293,7 @@ const {mutation: mutationOptions} = options ?
     export type DeleteTenantMutationVariables = {id: string}
 
     /**
- * @summary Delete a partner tenant and its users
+ * @summary Delete a partner tenant and its users, or archive it when it has projects
  */
 export const useDeleteTenant = <TError = ErrorType<Error>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTenant>>, TError,DeleteTenantMutationVariables, TContext>, }
@@ -461,4 +464,70 @@ export const useUpdateTenant = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getUpdateTenantMutationOptions(options), queryClient);
+    }
+    /**
+ * The tenant leaves the archive and stays inactive until it is activated.
+ * @summary Restore an archived tenant
+ */
+export const restoreTenant = (
+    id: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Tenant>(
+      {url: `/api/tenants/${id}/restore`, method: 'POST', signal
+    },
+      );
+    }
+
+
+
+
+export const getRestoreTenantMutationKey = () => ['restoreTenant'] as const;
+
+export const getRestoreTenantMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreTenant>>, TError,RestoreTenantMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof restoreTenant>>, TError,RestoreTenantMutationVariables, TContext> => {
+
+const mutationKey = getRestoreTenantMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreTenant>>, RestoreTenantMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  restoreTenant(id,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreTenantMutationResult = NonNullable<Awaited<ReturnType<typeof restoreTenant>>>
+
+    export type RestoreTenantMutationError = ErrorType<Error>
+    export type RestoreTenantMutationVariables = {id: string}
+
+    /**
+ * @summary Restore an archived tenant
+ */
+export const useRestoreTenant = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreTenant>>, TError,RestoreTenantMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreTenant>>,
+        TError,
+        RestoreTenantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRestoreTenantMutationOptions(options), queryClient);
     }

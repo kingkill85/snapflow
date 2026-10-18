@@ -52,7 +52,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 
 /**
  * Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large, also for a chunked body) and 25 megapixels (422 file.too_many_pixels). Other or damaged content is 415 file.type. JPEG and PNG are re-encoded in the same format without metadata, turned upright and scaled down to 1600 px wide; WebP is validated and stored as uploaded. The same stored bytes always give the same file.
- * @summary Upload an image
+ * @summary Upload a catalog image
  */
 export const uploadFile = (
     uploadFileBody?: BodyType<UploadFileBody>,
@@ -110,7 +110,7 @@ const {mutation: mutationOptions} = options ?
     export type UploadFileMutationVariables = {data?: BodyType<UploadFileBody>}
 
     /**
- * @summary Upload an image
+ * @summary Upload a catalog image
  */
 export const useUploadFile = <TError = ErrorType<Error>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFile>>, TError,UploadFileMutationVariables, TContext>, }

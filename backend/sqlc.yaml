@@ -154,4 +154,11 @@ sql:
       go:
         <<: *go
         out: internal/features/imports/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/projects/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/projects/store
   # scaffold:sqlc

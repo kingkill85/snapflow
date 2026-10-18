@@ -63,6 +63,7 @@
   },
   "file": {
     "not_found": "This file no longer exists.",
+    "tenant_forbidden": "You cannot store files of another tenant.",
     "too_large": "The file is too large (at most {{maxMb}} MB).",
     "too_many_pixels": "The image is too large (at most {{megapixels}} megapixels).",
     "type": "Only JPEG, PNG and WebP images are accepted."
@@ -131,12 +132,30 @@
   },
   "product_type": {
     "color_format": "Enter a colour as #rrggbb, e.g. #1f6feb.",
-    "in_use": "This product type is still used by products. Deactivate it instead.",
+    "in_use": "This product type is still used by products or projects. Deactivate it instead.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "not_found": "This product type no longer exists.",
     "order_mismatch": "The product types have changed in the meantime. Please reload and try again.",
     "stale": "Someone else changed this product type in the meantime. Reload it and make your changes again."
+  },
+  "project": {
+    "currency_format": "Enter a three-letter currency code such as EUR or USD.",
+    "exchange_rate": "Enter an exchange rate above 0 (up to 6 decimals); for USD it is 1.",
+    "not_found": "This project no longer exists.",
+    "product_type_inactive": "This product type is inactive. Choose an active product type.",
+    "product_type_not_found": "The selected product type no longer exists.",
+    "product_types_required": "Choose at least one product type.",
+    "read_only": "This project is completed or cancelled and cannot be changed. Reopen it first.",
+    "stale": "Someone else changed this project in the meantime. Reload it and make your changes again.",
+    "tenant_forbidden": "You cannot place projects in another tenant.",
+    "tenant_not_found": "The selected tenant does not exist."
+  },
+  "project_version": {
+    "last": "The last version cannot be deleted. Delete the project instead.",
+    "name_taken": "This project already has a version named \"{{name}}\".",
+    "not_found": "This version no longer exists.",
+    "stale": "Someone else changed this version in the meantime. Reload it and make your changes again."
   },
   "request": {
     "bad": "The request was invalid.",
@@ -151,7 +170,9 @@
     "error": "Something went wrong. Please try again."
   },
   "tenant": {
+    "archived": "This tenant is archived. Restore it before activating it.",
     "distributor_protected": "The distributor tenant cannot be deactivated or deleted.",
+    "has_projects": "This archived tenant still has projects ({{count}}) and cannot be deleted.",
     "name_taken": "A tenant named \"{{name}}\" already exists.",
     "not_found": "This tenant no longer exists."
   },

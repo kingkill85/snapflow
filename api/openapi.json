@@ -632,6 +632,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "tenantId": {
+            "description": "The tenant the file belongs to; absent for catalog files",
+            "type": "string"
+          },
           "url": {
             "description": "Download path (needs a login)",
             "examples": [
@@ -2766,6 +2770,542 @@
         ],
         "type": "object"
       },
+      "Project": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Project.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ProjectActions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "currency": {
+            "examples": [
+              "EUR"
+            ],
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/ProjectCustomer"
+          },
+          "exchangeRate": {
+            "description": "Units of the currency per 1 USD, decimal string",
+            "examples": [
+              "0.92"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "language": {
+            "description": "Content language of proposals",
+            "examples": [
+              "en"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nextVersionName": {
+            "description": "The first free name V\u003cn\u003e, to pre-fill a new version",
+            "examples": [
+              "V2"
+            ],
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "number": {
+            "description": "\u003cyear\u003e-\u003csequence of the tenant in that year\u003e; generated, not editable",
+            "examples": [
+              "2026-0007"
+            ],
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "In catalog order; may contain types deactivated since they were chosen",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ProjectTenant",
+            "description": "Only for callers who see every tenant"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "versions": {
+            "description": "In creation order",
+            "items": {
+              "$ref": "#/components/schemas/ProjectVersion"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "number",
+          "name",
+          "status",
+          "language",
+          "currency",
+          "exchangeRate",
+          "customer",
+          "notes",
+          "productTypeIds",
+          "versions",
+          "nextVersionName",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProjectActions": {
+        "additionalProperties": false,
+        "properties": {
+          "delete": {
+            "description": "Delete the project (projects.delete)",
+            "type": "boolean"
+          },
+          "reopen": {
+            "description": "Set a completed or cancelled project back to active (projects.write)",
+            "type": "boolean"
+          },
+          "update": {
+            "description": "Change the project and its versions (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update",
+          "delete",
+          "reopen"
+        ],
+        "type": "object"
+      },
+      "ProjectCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectCreate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "description": "ISO 4217, three upper-case letters; defaults to USD",
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/ProjectCustomer"
+          },
+          "exchangeRate": {
+            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
+            "type": "string"
+          },
+          "language": {
+            "description": "A content language; defaults to en",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-200 characters",
+            "type": "string"
+          },
+          "notes": {
+            "description": "At most 5000 characters",
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "At least one; new choices must be active. Create without it: every active product type",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "tenantId": {
+            "description": "Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectCustomer": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "At most 500 characters, may have several lines",
+            "type": "string"
+          },
+          "company": {
+            "description": "At most 200 characters",
+            "type": "string"
+          },
+          "email": {
+            "description": "A valid email address or empty",
+            "type": "string"
+          },
+          "name": {
+            "description": "At most 200 characters",
+            "type": "string"
+          },
+          "phone": {
+            "description": "At most 50 characters",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProjectListItem": {
+        "additionalProperties": false,
+        "properties": {
+          "can": {
+            "$ref": "#/components/schemas/ProjectActions"
+          },
+          "customerCompany": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "number": {
+            "examples": [
+              "2026-0007"
+            ],
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "In catalog order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ProjectTenant",
+            "description": "Only for callers who see every tenant"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "versionCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "number",
+          "name",
+          "customerName",
+          "customerCompany",
+          "status",
+          "versionCount",
+          "productTypeIds",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProjectPage": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectPage.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectListItem"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Matching projects, all pages",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ProjectTenant": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "description": "ISO 4217, three upper-case letters; defaults to USD",
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/ProjectCustomer"
+          },
+          "exchangeRate": {
+            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if the project changed since, the update fails with project.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "A content language; defaults to en",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-200 characters",
+            "type": "string"
+          },
+          "notes": {
+            "description": "At most 5000 characters",
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "At least one; new choices must be active. Create without it: every active product type",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "expectedUpdatedAt",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectVersion.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ProjectVersionActions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "position": {
+            "description": "Creation order",
+            "format": "int32",
+            "type": "integer"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "notes",
+          "position",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProjectVersionActions": {
+        "additionalProperties": false,
+        "properties": {
+          "delete": {
+            "description": "False for the project's last version",
+            "type": "boolean"
+          },
+          "update": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update",
+          "delete"
+        ],
+        "type": "object"
+      },
+      "ProjectVersionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectVersionCreate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters, unique in the project ignoring case",
+            "type": "string"
+          },
+          "sourceVersionId": {
+            "description": "The version to copy (everything it owns); leave out for an empty version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectVersionUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProjectVersionUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; project_version.stale otherwise",
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters, unique in the project ignoring case",
+            "type": "string"
+          },
+          "notes": {
+            "description": "At most 2000 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "expectedUpdatedAt"
+        ],
+        "type": "object"
+      },
       "Role": {
         "description": "A user's role, highest first",
         "enum": [
@@ -2839,6 +3379,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "archivedAt": {
+            "description": "Set while the tenant is archived: deleted, but kept for its projects",
+            "format": "date-time",
+            "type": "string"
+          },
           "can": {
             "$ref": "#/components/schemas/Actions"
           },
@@ -2860,6 +3405,11 @@
           "name": {
             "type": "string"
           },
+          "projectCount": {
+            "description": "Projects of the tenant: deleting a tenant with projects archives it",
+            "format": "int64",
+            "type": "integer"
+          },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
@@ -2870,6 +3420,7 @@
           "name",
           "isDistributor",
           "isActive",
+          "projectCount",
           "createdAt",
           "updatedAt",
           "can"
@@ -3932,7 +4483,7 @@
             "description": "Error"
           }
         },
-        "summary": "Upload an image",
+        "summary": "Upload a catalog image",
         "tags": [
           "files"
         ]
@@ -5990,6 +6541,429 @@
         ]
       }
     },
+    "/api/projects": {
+      "get": {
+        "description": "One page of the projects the caller sees, the most recently changed first.",
+        "operationId": "listProjects",
+        "parameters": [
+          {
+            "description": "Case-insensitive substring of number, name, customer name or company",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Case-insensitive substring of number, name, customer name or company",
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Defaults to active; all lists every status",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Defaults to active; all lists every status",
+              "enum": [
+                "active",
+                "completed",
+                "cancelled",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only projects of this tenant (callers with tenants.access_all; others always get their own tenant)",
+            "explode": false,
+            "in": "query",
+            "name": "tenantId",
+            "schema": {
+              "description": "Only projects of this tenant (callers with tenants.access_all; others always get their own tenant)",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, 1-200",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Page size, 1-200",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows to skip",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "description": "Rows to skip",
+              "format": "int64",
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List projects",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "description": "The project gets the next number of its tenant and one version, V1.",
+        "operationId": "createProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{id}": {
+      "delete": {
+        "operationId": "deleteProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a project with its versions",
+        "tags": [
+          "projects"
+        ]
+      },
+      "get": {
+        "operationId": "getProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a project with its versions",
+        "tags": [
+          "projects"
+        ]
+      },
+      "put": {
+        "description": "A completed or cancelled project is read-only (409 project.read_only) except for an update that sets it back to active.",
+        "operationId": "updateProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{id}/versions": {
+      "post": {
+        "description": "A full copy of sourceVersionId, or an empty version without it.",
+        "operationId": "createProjectVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectVersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectVersion"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a version",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{id}/versions/{versionId}": {
+      "delete": {
+        "description": "The last version cannot be deleted (409 project_version.last); delete the project instead.",
+        "operationId": "deleteProjectVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a version",
+        "tags": [
+          "projects"
+        ]
+      },
+      "put": {
+        "operationId": "updateProjectVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectVersionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectVersion"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename a version or change its notes",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/roles": {
       "get": {
         "operationId": "getRoleMatrix",
@@ -6024,6 +6998,18 @@
     "/api/tenants": {
       "get": {
         "operationId": "listTenants",
+        "parameters": [
+          {
+            "description": "Also list archived tenants",
+            "explode": false,
+            "in": "query",
+            "name": "includeArchived",
+            "schema": {
+              "description": "Also list archived tenants",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -6093,6 +7079,7 @@
     },
     "/api/tenants/{id}": {
       "delete": {
+        "description": "A tenant without projects is deleted with its users. A tenant with projects (projectCount) is deactivated and archived instead, keeping its users and projects; an archived tenant with projects cannot be deleted (409 tenant.has_projects).",
         "operationId": "deleteTenant",
         "parameters": [
           {
@@ -6120,7 +7107,7 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a partner tenant and its users",
+        "summary": "Delete a partner tenant and its users, or archive it when it has projects",
         "tags": [
           "tenants"
         ]
@@ -6211,6 +7198,49 @@
           }
         },
         "summary": "Update a tenant",
+        "tags": [
+          "tenants"
+        ]
+      }
+    },
+    "/api/tenants/{id}/restore": {
+      "post": {
+        "description": "The tenant leaves the archive and stays inactive until it is activated.",
+        "operationId": "restoreTenant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tenant"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Restore an archived tenant",
         "tags": [
           "tenants"
         ]
