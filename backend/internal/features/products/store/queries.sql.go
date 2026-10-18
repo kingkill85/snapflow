@@ -24,6 +24,8 @@ WHERE ($1::uuid IS NULL OR p.product_type_id = $1)
        OR p.model_number ILIKE $4
        OR p.name ->> 'en' ILIKE $4
        OR p.name ->> 'de' ILIKE $4
+       OR p.description ->> 'en' ILIKE $4
+       OR p.description ->> 'de' ILIKE $4
        OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $4))
 `
 
@@ -51,17 +53,26 @@ const countVariants = `-- name: CountVariants :one
 SELECT count(*)
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
-WHERE $1::text = ''
-   OR p.model_number ILIKE $1
-   OR p.name ->> 'en' ILIKE $1
-   OR p.name ->> 'de' ILIKE $1
-   OR v.name ->> 'en' ILIKE $1
-   OR v.name ->> 'de' ILIKE $1
-   OR v.sku ILIKE $1
+WHERE ($1::uuid IS NULL OR p.product_type_id = $1)
+  AND ($2::text = ''
+       OR p.model_number ILIKE $2
+       OR p.name ->> 'en' ILIKE $2
+       OR p.name ->> 'de' ILIKE $2
+       OR p.description ->> 'en' ILIKE $2
+       OR p.description ->> 'de' ILIKE $2
+       OR v.name ->> 'en' ILIKE $2
+       OR v.name ->> 'de' ILIKE $2
+       OR v.sku ILIKE $2)
 `
 
-func (q *Queries) CountVariants(ctx context.Context, search string) (int64, error) {
-	row := q.db.QueryRow(ctx, countVariants, search)
+type CountVariantsParams struct {
+	ProductTypeID *uuid.UUID
+	Search        string
+}
+
+// CountVariants counts what SearchVariants lists without the page.
+func (q *Queries) CountVariants(ctx context.Context, arg CountVariantsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countVariants, arg.ProductTypeID, arg.Search)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -362,6 +373,8 @@ WHERE ($2::uuid IS NULL OR p.product_type_id = $2)
        OR p.model_number ILIKE $5
        OR p.name ->> 'en' ILIKE $5
        OR p.name ->> 'de' ILIKE $5
+       OR p.description ->> 'en' ILIKE $5
+       OR p.description ->> 'de' ILIKE $5
        OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE $5))
 ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id
 LIMIT $7 OFFSET $6
@@ -379,8 +392,8 @@ type ListProductsParams struct {
 
 // ListProducts is one page of the product list in catalog order: product
 // type order (type_ids, in order), then model number. search is an ILIKE
-// pattern (” for none) over model number, English and German name and the
-// variants' SKUs. Without include_inactive only active products of active
+// pattern (” for none) over model number, English and German name and
+// description and the variants' SKUs. Without include_inactive only active products of active
 // types are listed.
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error) {
 	rows, err := q.db.Query(ctx, listProducts,
@@ -498,6 +511,7 @@ SELECT id FROM products WHERE id = $1 FOR UPDATE
 `
 
 // LockProduct serialises changes to a product's variant list (sort orders).
+// Lock order of the aggregate: the product row first, then its variants.
 func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockProduct, id)
 	var id_2 uuid.UUID
@@ -514,10 +528,12 @@ type LockVariantForAddonsParams struct {
 	ProductID uuid.UUID
 }
 
-// LockVariantForAddons serialises add-on replaces of one variant. NO KEY
-// UPDATE does not conflict with the KEY SHARE locks other replaces take on
-// their add-on variants, so replaces of two variants that point at each
-// other cannot deadlock.
+// LockVariantForAddons serialises add-on replaces of one variant (after
+// ShareProduct). NO KEY UPDATE does not conflict with the KEY SHARE locks
+// other replaces take on their add-on variants, so replaces of two variants
+// that point at each other do not wait for each other. Deadlocks with
+// deletes (which lock the add-on variants FOR UPDATE in their own order)
+// remain possible; inTx retries those.
 func (q *Queries) LockVariantForAddons(ctx context.Context, arg LockVariantForAddonsParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockVariantForAddons, arg.ID, arg.ProductID)
 	var id uuid.UUID
@@ -526,9 +542,13 @@ func (q *Queries) LockVariantForAddons(ctx context.Context, arg LockVariantForAd
 }
 
 const lockVariantIDs = `-- name: LockVariantIDs :many
-SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id FOR UPDATE
+SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id FOR NO KEY UPDATE
 `
 
+// LockVariantIDs locks a product's variants for a reorder (after
+// LockProduct). NO KEY UPDATE keeps them from being deleted or updated
+// meanwhile but, unlike FOR UPDATE, does not wait for the KEY SHARE locks
+// that add-on replaces and add-on inserts take on them.
 func (q *Queries) LockVariantIDs(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, lockVariantIDs, productID)
 	if err != nil {
@@ -566,22 +586,26 @@ SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 LEFT JOIN unnest($1::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
-WHERE $2::text = ''
-   OR p.model_number ILIKE $2
-   OR p.name ->> 'en' ILIKE $2
-   OR p.name ->> 'de' ILIKE $2
-   OR v.name ->> 'en' ILIKE $2
-   OR v.name ->> 'de' ILIKE $2
-   OR v.sku ILIKE $2
-ORDER BY t.ord NULLS LAST, lower(p.model_number), v.sort_order, v.id
-LIMIT $4 OFFSET $3
+WHERE ($2::uuid IS NULL OR p.product_type_id = $2)
+  AND ($3::text = ''
+       OR p.model_number ILIKE $3
+       OR p.name ->> 'en' ILIKE $3
+       OR p.name ->> 'de' ILIKE $3
+       OR p.description ->> 'en' ILIKE $3
+       OR p.description ->> 'de' ILIKE $3
+       OR v.name ->> 'en' ILIKE $3
+       OR v.name ->> 'de' ILIKE $3
+       OR v.sku ILIKE $3)
+ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
+LIMIT $5 OFFSET $4
 `
 
 type SearchVariantsParams struct {
-	TypeIds   []uuid.UUID
-	Search    string
-	RowOffset int32
-	RowLimit  int32
+	TypeIds       []uuid.UUID
+	ProductTypeID *uuid.UUID
+	Search        string
+	RowOffset     int32
+	RowLimit      int32
 }
 
 type SearchVariantsRow struct {
@@ -598,11 +622,14 @@ type SearchVariantsRow struct {
 	ProductTypeID   uuid.UUID
 }
 
-// SearchVariants is the add-on picker's search across the catalog, in
-// catalog order. search as in ListProducts, plus the variant's names.
+// SearchVariants is the add-on picker's list across the catalog, in catalog
+// order (product type order, model number, variant order): all variants
+// without a search, else those whose product (as in ListProducts) or own
+// name or SKU matches. product_type_id narrows it to one type.
 func (q *Queries) SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error) {
 	rows, err := q.db.Query(ctx, searchVariants,
 		arg.TypeIds,
+		arg.ProductTypeID,
 		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -647,6 +674,20 @@ WHERE v.id = o.id
 func (q *Queries) SetVariantOrder(ctx context.Context, ids []uuid.UUID) error {
 	_, err := q.db.Exec(ctx, setVariantOrder, ids)
 	return err
+}
+
+const shareProduct = `-- name: ShareProduct :one
+SELECT id FROM products WHERE id = $1 FOR KEY SHARE
+`
+
+// ShareProduct keeps a product from being deleted, and waits for a running
+// variant reorder or create (LockProduct), before ReplaceAddons locks any
+// variant: the same order (product, then variants) as LockProduct callers.
+func (q *Queries) ShareProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, shareProduct, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
 }
 
 const updateProduct = `-- name: UpdateProduct :one

@@ -36,9 +36,13 @@ type Product struct {
 	IsActive        bool                `json:"isActive" doc:"The product's own flag"`
 	Available       bool                `json:"available" doc:"Product and product type are active"`
 	Variants        []Variant           `json:"variants" doc:"In variant order"`
-	CreatedAt       time.Time           `json:"createdAt"`
-	UpdatedAt       time.Time           `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can             auth.Actions        `json:"can"`
+	// VariantsWithProblems summarises the variants' attributeErrors and
+	// staleAttributes, e.g. after a type change: variant values are flagged
+	// against the current type, never re-validated or refused.
+	VariantsWithProblems int          `json:"variantsWithProblems" doc:"Variants with attributeErrors or staleAttributes against the current type's schema"`
+	CreatedAt            time.Time    `json:"createdAt"`
+	UpdatedAt            time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can                  auth.Actions `json:"can"`
 }
 
 // Variant is a sellable version of a product (colour, finish) with a price.
@@ -121,8 +125,8 @@ type VariantPage struct {
 }
 
 type ProductInput struct {
-	ProductTypeID uuid.UUID         `json:"productTypeId"`
-	ModelNumber   string            `json:"modelNumber" doc:"Unique ignoring case, at most 100 characters" example:"M485/GW-ZB.10"`
+	ProductTypeID uuid.UUID         `json:"productTypeId" doc:"Must be active (product.type_inactive), except the type the product already has"`
+	ModelNumber   string            `json:"modelNumber" doc:"Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC" example:"M485/GW-ZB.10"`
 	Name          i18n.Text         `json:"name" doc:"At most 200 characters; \"en\" is required"`
 	Description   i18n.Text         `json:"description,omitempty" doc:"At most 5000 characters; if set, \"en\" is required"`
 	Attributes    attrschema.Values `json:"attributes,omitempty" doc:"Product-scope values by key; stale values are kept only if they are sent back"`
@@ -136,7 +140,7 @@ type ProductUpdate struct {
 
 type VariantInput struct {
 	Name        i18n.Text         `json:"name" doc:"Unique within the product (English, ignoring case); at most 100 characters; \"en\" is required"`
-	SKU         string            `json:"sku,omitempty" doc:"Unique ignoring case when set; at most 100 characters"`
+	SKU         string            `json:"sku,omitempty" doc:"Unique ignoring case when set; at most 100 characters, no control characters; stored trimmed and in Unicode NFC"`
 	Price       string            `json:"price" doc:"USD as a decimal string: up to 10 digits, optionally a point and 1-2 decimals" example:"27.00"`
 	ImageFileID *uuid.UUID        `json:"imageFileId,omitempty" doc:"An uploaded file (POST /api/files); leave out for no image"`
 	Attributes  attrschema.Values `json:"attributes,omitempty" doc:"Variant-scope values by key"`
@@ -151,6 +155,14 @@ type VariantUpdate struct {
 type AddonInput struct {
 	AddonVariantID uuid.UUID `json:"addonVariantId"`
 	Required       bool      `json:"required,omitempty" doc:"Default false (optional add-on)"`
+}
+
+// VariantSearchParams filter and page the variant search.
+type VariantSearchParams struct {
+	ProductTypeID *uuid.UUID
+	Search        string
+	Limit         int
+	Offset        int
 }
 
 // ListParams filter and page the product list.

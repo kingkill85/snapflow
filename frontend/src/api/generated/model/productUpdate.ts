@@ -18,9 +18,10 @@ export interface ProductUpdate {
   /** updatedAt as last read; if the product changed since, the update fails with product.stale */
   expectedUpdatedAt: string;
   isActive: boolean;
-  /** Unique ignoring case, at most 100 characters */
+  /** Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   modelNumber: string;
   /** At most 200 characters; "en" is required */
   name: ProductUpdateName;
+  /** Must be active (product.type_inactive), except the type the product already has */
   productTypeId: string;
 }

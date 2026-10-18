@@ -407,7 +407,7 @@ export function useGetProduct<TData = Awaited<ReturnType<typeof getProduct>>, TE
 
 
 /**
- * The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt.
+ * The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the type never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).
  * @summary Update a product
  */
 export const updateProduct = (
@@ -820,8 +820,8 @@ export const useReplaceVariantAddons = <TError = ErrorType<Error>,
       return useMutation(getReplaceVariantAddonsMutationOptions(options), queryClient);
     }
     /**
- * For the add-on picker; in catalog order (product type, model number, variant order). Lists inactive variants too, flagged by available.
- * @summary Search variants across the catalog
+ * For the add-on picker; in catalog order (product type, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.
+ * @summary List or search variants across the catalog
  */
 export const searchVariants = (
     params?: SearchVariantsParams,
@@ -893,7 +893,7 @@ export function useSearchVariants<TData = Awaited<ReturnType<typeof searchVarian
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Search variants across the catalog
+ * @summary List or search variants across the catalog
  */
 
 export function useSearchVariants<TData = Awaited<ReturnType<typeof searchVariants>>, TError = ErrorType<Error>>(

@@ -3,6 +3,7 @@ package files
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -44,8 +45,10 @@ func Register(api huma.API, svc *Service) {
 		Path:        "/api/files",
 		Summary:     "Upload an image",
 		Description: "Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), " +
-			"at most 10 MB (413 file.too_large). Other content is 415 file.type. JPEG and PNG wider than 1600 px " +
-			"are scaled down to 1600 px in the same format. The same stored bytes always give the same file.",
+			"at most 10 MB (413 file.too_large, also for a chunked body) and 25 megapixels (422 file.too_many_pixels). " +
+			"Other or damaged content is 415 file.type. JPEG and PNG are re-encoded in the same format without metadata, " +
+			"turned upright and scaled down to 1600 px wide; WebP is validated and stored as uploaded. " +
+			"The same stored bytes always give the same file.",
 		Tags:          []string{tag},
 		DefaultStatus: http.StatusCreated,
 		Middlewares:   huma.Middlewares{limitBody},
@@ -116,8 +119,10 @@ func matches(header, etag string) bool {
 
 // limitBody refuses uploads that announce more than maxRequestBytes before
 // anything is read, and caps the body for those that do not announce their
-// size (multipart parts are buffered to disk, so an unbounded body would fill
-// it).
+// size (chunked; multipart parts are buffered to disk, so an unbounded body
+// would fill it). It parses the multipart form itself so that a body cut off
+// by the cap is 413 file.too_large, not a generic form error; huma then uses
+// the parsed form.
 func limitBody(ctx huma.Context, next func(huma.Context)) {
 	r, w := humachi.Unwrap(ctx)
 	if r.ContentLength > maxRequestBytes {
@@ -125,6 +130,14 @@ func limitBody(ctx huma.Context, next func(huma.Context)) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	if err := r.ParseMultipartForm(humachi.MultipartMaxMemory); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeProblem(ctx, ErrTooLarge())
+			return
+		}
+		// Anything else (not multipart, malformed) is reported by huma.
+	}
 	next(ctx)
 }
 

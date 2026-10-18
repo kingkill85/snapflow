@@ -71,6 +71,7 @@
     "model_number_taken": "Die Modellnummer \"{{modelNumber}}\" ist bereits vergeben.",
     "not_found": "Dieses Produkt existiert nicht mehr.",
     "stale": "Jemand anderes hat dieses Produkt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
     "type_not_found": "Der gewählte Produkttyp existiert nicht mehr."
   },
   "product_type": {
@@ -85,6 +86,7 @@
   "request": {
     "bad": "Die Anfrage war ungültig.",
     "conflict": "Das widerspricht vorhandenen Daten.",
+    "conflict_retry": "Jemand anderes hat dies gleichzeitig geändert. Bitte versuchen Sie es erneut.",
     "failed": "Die Anfrage ist fehlgeschlagen.",
     "not_found": "Nicht gefunden."
   },
@@ -115,6 +117,7 @@
     "tenant_not_found": "Der gewählte Mandant existiert nicht."
   },
   "validation": {
+    "control_chars": "Steuerzeichen (z. B. Tabulatoren, Zeilenumbrüche oder unsichtbare Zeichen) sind nicht erlaubt.",
     "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
     "failed": "Bitte die markierten Felder prüfen.",
     "invalid": "Dieser Wert ist ungültig.",

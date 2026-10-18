@@ -13,7 +13,8 @@ import (
 type Querier interface {
 	// CountProducts counts what ListProducts lists without the page.
 	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
-	CountVariants(ctx context.Context, search string) (int64, error)
+	// CountVariants counts what SearchVariants lists without the page.
+	CountVariants(ctx context.Context, arg CountVariantsParams) (int64, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	// New variants go to the end of their product's order (the caller holds
 	// LockProduct, so two creates never get the same sort order).
@@ -36,26 +37,39 @@ type Querier interface {
 	ListAddons(ctx context.Context, variantIds []uuid.UUID) ([]ListAddonsRow, error)
 	// ListProducts is one page of the product list in catalog order: product
 	// type order (type_ids, in order), then model number. search is an ILIKE
-	// pattern ('' for none) over model number, English and German name and the
-	// variants' SKUs. Without include_inactive only active products of active
+	// pattern ('' for none) over model number, English and German name and
+	// description and the variants' SKUs. Without include_inactive only active products of active
 	// types are listed.
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListVariants(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
 	ListVariantsOfProducts(ctx context.Context, productIds []uuid.UUID) ([]ProductVariant, error)
 	// LockProduct serialises changes to a product's variant list (sort orders).
+	// Lock order of the aggregate: the product row first, then its variants.
 	LockProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
-	// LockVariantForAddons serialises add-on replaces of one variant. NO KEY
-	// UPDATE does not conflict with the KEY SHARE locks other replaces take on
-	// their add-on variants, so replaces of two variants that point at each
-	// other cannot deadlock.
+	// LockVariantForAddons serialises add-on replaces of one variant (after
+	// ShareProduct). NO KEY UPDATE does not conflict with the KEY SHARE locks
+	// other replaces take on their add-on variants, so replaces of two variants
+	// that point at each other do not wait for each other. Deadlocks with
+	// deletes (which lock the add-on variants FOR UPDATE in their own order)
+	// remain possible; inTx retries those.
 	LockVariantForAddons(ctx context.Context, arg LockVariantForAddonsParams) (uuid.UUID, error)
+	// LockVariantIDs locks a product's variants for a reorder (after
+	// LockProduct). NO KEY UPDATE keeps them from being deleted or updated
+	// meanwhile but, unlike FOR UPDATE, does not wait for the KEY SHARE locks
+	// that add-on replaces and add-on inserts take on them.
 	LockVariantIDs(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ProductExists(ctx context.Context, id uuid.UUID) (bool, error)
-	// SearchVariants is the add-on picker's search across the catalog, in
-	// catalog order. search as in ListProducts, plus the variant's names.
+	// SearchVariants is the add-on picker's list across the catalog, in catalog
+	// order (product type order, model number, variant order): all variants
+	// without a search, else those whose product (as in ListProducts) or own
+	// name or SKU matches. product_type_id narrows it to one type.
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
 	// SetVariantOrder gives the ids sort orders 1..n in the given order.
 	SetVariantOrder(ctx context.Context, ids []uuid.UUID) error
+	// ShareProduct keeps a product from being deleted, and waits for a running
+	// variant reorder or create (LockProduct), before ReplaceAddons locks any
+	// variant: the same order (product, then variants) as LockProduct callers.
+	ShareProduct(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// UpdateProduct changes the product only if nobody else has since it was
 	// read (expected_updated_at); no row means stale or deleted.
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)

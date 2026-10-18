@@ -36,8 +36,9 @@ func (s *Storage) path(sum string) (string, error) {
 }
 
 // Put stores data under its hash sum. Existing contents are kept (the same
-// hash means the same bytes); new ones are written to a temporary file and
-// renamed, so a reader never sees a partial file.
+// hash means the same bytes); new ones are written to a temporary file,
+// synced, renamed (so a reader never sees a partial file) and the
+// directories are synced, so the file survives a crash once Put returns.
 func (s *Storage) Put(sum string, data []byte) error {
 	p, err := s.path(sum)
 	if err != nil {
@@ -65,10 +66,34 @@ func (s *Storage) Put(sum string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), p)
+	if err := os.Rename(tmp.Name(), p); err != nil {
+		return err
+	}
+	// The rename and any new shard directories are durable only once their
+	// parent directories are synced.
+	shard := filepath.Dir(p)
+	for _, dir := range []string{shard, filepath.Dir(shard), s.dir} {
+		if err := syncDir(dir); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Open opens the contents stored under sum.
+func syncDir(dir string) error {
+	d, err := os.Open(dir) //nolint:gosec // a directory of the storage
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		_ = d.Close()
+		return fmt.Errorf("files: sync %s: %w", dir, err)
+	}
+	return d.Close()
+}
+
+// Open opens the contents stored under sum; missing contents are an error
+// wrapping fs.ErrNotExist.
 func (s *Storage) Open(sum string) (*os.File, error) {
 	p, err := s.path(sum)
 	if err != nil {

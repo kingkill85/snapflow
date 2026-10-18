@@ -10,11 +10,13 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
@@ -145,25 +147,27 @@ func TestUploadAndDownload(t *testing.T) {
 	api := apptest.New(t)
 	data := pngImage(t, 10, 5)
 	f := mustUpload(t, api, data)
-	sum := sha256.Sum256(data)
+	// Stored content-addressed under the storage directory: re-encoded
+	// (always, D58), with the same pixels.
+	stored, err := os.ReadFile(filepath.Join(api.StorageDir, f.SHA256[0:2], f.SHA256[2:4], f.SHA256))
+	if err != nil {
+		t.Fatalf("stored file: %v", err)
+	}
+	sum := sha256.Sum256(stored)
 	want := file{
-		ID: f.ID, ContentType: "image/png", Size: int64(len(data)), Width: 10, Height: 5,
+		ID: f.ID, ContentType: "image/png", Size: int64(len(stored)), Width: 10, Height: 5,
 		SHA256: hex.EncodeToString(sum[:]), URL: "/api/files/" + f.ID,
 	}
 	if f != want {
 		t.Errorf("upload: %+v\nwant %+v", f, want)
 	}
-	// Stored content-addressed under the storage directory.
-	stored, err := os.ReadFile(filepath.Join(api.StorageDir, f.SHA256[0:2], f.SHA256[2:4], f.SHA256))
-	if err != nil || !bytes.Equal(stored, data) {
-		t.Errorf("stored file: %v", err)
-	}
+	samePixels(t, data, stored)
 
 	partner := api.NewTenant("Partner")
 	user := api.NewUser(partner, auth.RoleUser)
 	for name, cookie := range map[string]string{"admin": api.Admin.Cookie, "partner user": user.Cookie} {
 		resp := api.Get(f.URL, cookie)
-		if resp.Code != http.StatusOK || !bytes.Equal(resp.Body.Bytes(), data) {
+		if resp.Code != http.StatusOK || !bytes.Equal(resp.Body.Bytes(), stored) {
 			t.Fatalf("%s download: got %d", name, resp.Code)
 		}
 		h := resp.Header()
@@ -259,11 +263,37 @@ func TestUploadTooLarge(t *testing.T) {
 	if resp.Code != http.StatusRequestEntityTooLarge || decode[problem](t, resp).Code != "file.too_large" {
 		t.Errorf("far over the limit: got %d: %s", resp.Code, resp.Body)
 	}
-	// Exactly at the limit is accepted (a valid PNG padded with trailing bytes).
+	// Exactly at the limit is accepted (a valid PNG padded with trailing
+	// bytes, which re-encoding drops).
 	data = pngImage(t, 2, 2)
 	data = append(data, make([]byte, files.MaxSize-len(data))...)
-	if f := mustUpload(t, api, data); f.Size != files.MaxSize {
+	if f := mustUpload(t, api, data); f.Width != 2 || f.Size >= 1000 {
 		t.Errorf("at the limit: %+v", f)
+	}
+}
+
+// A chunked body announces no size: it is cut off at the cap while the
+// multipart form is read, and that is file.too_large too, not a form error.
+func TestUploadTooLargeChunked(t *testing.T) {
+	api := apptest.New(t)
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	part, err := w.CreateFormFile("file", "big.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = part.Write(append(pngImage(t, 2, 2), make([]byte, files.MaxSize+1<<20)...))
+	_ = w.Close()
+	// Hide the length: httptest would set ContentLength from a *bytes.Buffer.
+	req := httptest.NewRequest(http.MethodPost, "/api/files", io.MultiReader(&body))
+	req.ContentLength = -1
+	req.TransferEncoding = []string{"chunked"}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Cookie", api.Admin.Cookie[len("Cookie: "):])
+	resp := httptest.NewRecorder()
+	api.Adapter().ServeHTTP(resp, req)
+	if p := decode[problem](t, resp); resp.Code != http.StatusRequestEntityTooLarge || p.Code != "file.too_large" {
+		t.Errorf("chunked: got %d: %s", resp.Code, resp.Body)
 	}
 }
 
@@ -359,9 +389,9 @@ func TestOrientation(t *testing.T) {
 	}
 	red := func(c color.Color) bool { r, _, b, _ := c.RGBA(); return r > b }
 
-	// Upright: stored as uploaded.
+	// Upright: same size (re-encoded, without the EXIF segment).
 	upright := withOrientation(buf.Bytes(), 1)
-	if f := mustUpload(t, api, upright); f.Width != 40 || f.Height != 20 || f.Size != int64(len(upright)) {
+	if f := mustUpload(t, api, upright); f.Width != 40 || f.Height != 20 {
 		t.Errorf("upright: %+v", f)
 	}
 	// 6 = turn 90° clockwise: the left (red) half ends up on top.
@@ -388,18 +418,183 @@ func TestOrientation(t *testing.T) {
 	if err != nil || f.Width != 40 || red(out.At(5, 10)) || !red(out.At(35, 10)) {
 		t.Errorf("rotation 3: %+v %v", f, err)
 	}
+	// Scaled first, then turned: a 1000×3400 photo with orientation 6 is
+	// 3400 px wide upright, so it is stored 1600 px wide.
+	f = mustUpload(t, api, withOrientation(jpegImage(t, 1000, 3400), 6))
+	if f.Width != 1600 || f.Height != 471 {
+		t.Errorf("rotated and scaled: %+v", f)
+	}
 }
 
 func TestTooManyPixels(t *testing.T) {
 	api := apptest.New(t)
-	// A PNG header claiming 10000×5000 pixels: refused before decoding.
+	// One pixel row above 25 megapixels: refused before decoding.
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 10000, 5000))); err != nil {
+	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 5000, 5001))); err != nil {
 		t.Fatal(err)
 	}
 	resp := upload(t, api, api.Admin.Cookie, buf.Bytes())
 	p := decode[problem](t, resp)
-	if resp.Code != http.StatusUnprocessableEntity || p.Code != "file.too_many_pixels" || p.Params["megapixels"] != 40.0 {
+	if resp.Code != http.StatusUnprocessableEntity || p.Code != "file.too_many_pixels" || p.Params["megapixels"] != 25.0 {
 		t.Errorf("got %d: %s", resp.Code, resp.Body)
+	}
+	// Exactly 25 megapixels, 16 bits per sample: accepted, stored with 8.
+	buf.Reset()
+	if err := png.Encode(&buf, image.NewGray16(image.Rect(0, 0, 5000, 5000))); err != nil {
+		t.Fatal(err)
+	}
+	f := mustUpload(t, api, buf.Bytes())
+	stored := api.Get(f.URL, api.Admin.Cookie).Body.Bytes()
+	if f.Width != 1600 || f.Height != 1600 || pngBitDepth(stored) != 8 {
+		t.Errorf("25 MP 16-bit: %+v, bit depth %d", f, pngBitDepth(stored))
+	}
+}
+
+// pngBitDepth reads the bit depth from a PNG's IHDR chunk.
+func pngBitDepth(data []byte) int {
+	if len(data) < 25 || !bytes.Equal(data[12:16], []byte("IHDR")) {
+		return 0
+	}
+	return int(data[24])
+}
+
+// A 16-bit PNG (with transparency) is stored with 8 bits per sample and the
+// same colours.
+func TestSixteenBitPNG(t *testing.T) {
+	api := apptest.New(t)
+	img := image.NewNRGBA64(image.Rect(0, 0, 30, 20))
+	for y := range 20 {
+		for x := range 30 {
+			img.Set(x, y, color.NRGBA64{R: uint16(x) * 2000, G: uint16(y) * 3000, B: 0xffff, A: 0x8000}) //nolint:gosec // small
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	if pngBitDepth(buf.Bytes()) != 16 {
+		t.Fatal("test image is not 16-bit")
+	}
+	f := mustUpload(t, api, buf.Bytes())
+	stored := api.Get(f.URL, api.Admin.Cookie).Body.Bytes()
+	if f.Width != 30 || f.Height != 20 || pngBitDepth(stored) != 8 {
+		t.Fatalf("stored: %+v, bit depth %d", f, pngBitDepth(stored))
+	}
+	out, err := png.Decode(bytes.NewReader(stored))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := color.NRGBAModel.Convert(out.At(10, 5)).(color.NRGBA)
+	want := color.NRGBAModel.Convert(img.At(10, 5)).(color.NRGBA)
+	if diff(got.R, want.R) > 1 || diff(got.G, want.G) > 1 || diff(got.B, want.B) > 1 || diff(got.A, want.A) > 1 {
+		t.Errorf("pixel %v, want %v", got, want)
+	}
+}
+
+func diff(a, b uint8) int {
+	if a > b {
+		return int(a - b)
+	}
+	return int(b - a)
+}
+
+// samePixels checks that two PNGs hold the same 8-bit pixels.
+func samePixels(t *testing.T, a, b []byte) {
+	t.Helper()
+	ia, err := png.Decode(bytes.NewReader(a))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ib, err := png.Decode(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ia.Bounds() != ib.Bounds() {
+		t.Fatalf("bounds %v, %v", ia.Bounds(), ib.Bounds())
+	}
+	for y := ia.Bounds().Min.Y; y < ia.Bounds().Max.Y; y++ {
+		for x := ia.Bounds().Min.X; x < ia.Bounds().Max.X; x++ {
+			if color.NRGBAModel.Convert(ia.At(x, y)) != color.NRGBAModel.Convert(ib.At(x, y)) {
+				t.Fatalf("pixel %d,%d differs", x, y)
+			}
+		}
+	}
+}
+
+// Every stored JPEG is re-encoded, so no EXIF (GPS position, camera,
+// thumbnail) survives, also when nothing needs scaling or turning.
+func TestJPEGMetadataStripped(t *testing.T) {
+	api := apptest.New(t)
+	upright := withOrientation(jpegImage(t, 40, 30), 1)
+	// An EXIF segment, and a comment standing in for a GPS position.
+	marked := withComment(upright, "GPS 52.5200N 13.4050E")
+	f := mustUpload(t, api, marked)
+	stored := api.Get(f.URL, api.Admin.Cookie).Body.Bytes()
+	for _, s := range []string{"Exif", "GPS 52.5200N"} {
+		if bytes.Contains(stored, []byte(s)) {
+			t.Errorf("stored JPEG still contains %q", s)
+		}
+	}
+	if f.Width != 40 || f.Height != 30 {
+		t.Errorf("size: %+v", f)
+	}
+}
+
+// withComment inserts a COM segment after a JPEG's SOI marker.
+func withComment(jpg []byte, comment string) []byte {
+	seg := []byte{0xff, 0xfe, byte((len(comment) + 2) >> 8), byte(len(comment) + 2)}
+	out := append([]byte{}, jpg[:2]...)
+	out = append(out, seg...)
+	out = append(out, comment...)
+	return append(out, jpg[2:]...)
+}
+
+// A WebP is decoded completely: a valid header with broken image data is
+// refused like any other damaged image.
+func TestInvalidWebP(t *testing.T) {
+	api := apptest.New(t)
+	data := webpImage(t)
+	for i := 25; i < len(data); i++ { // the VP8L bitstream after its header
+		data[i] = 0xff
+	}
+	resp := upload(t, api, api.Admin.Cookie, data)
+	if resp.Code != http.StatusUnsupportedMediaType || decode[problem](t, resp).Code != "file.type" {
+		t.Errorf("broken webp: got %d: %s", resp.Code, resp.Body)
+	}
+	// A valid WebP is stored as uploaded (Go has no WebP encoder).
+	valid := webpImage(t)
+	if f := mustUpload(t, api, valid); f.Size != int64(len(valid)) {
+		t.Errorf("valid webp: %+v", f)
+	}
+}
+
+// The catalog is global (D17): a user of a partner tenant downloads every
+// file. Files get an owner scope before the first tenant-owned upload.
+func TestDownloadAcrossTenants(t *testing.T) {
+	api := apptest.New(t)
+	f := mustUpload(t, api, pngImage(t, 3, 3))
+	user := api.NewUser(api.NewTenant("Partner"), auth.RoleUser)
+	if resp := api.Get(f.URL, user.Cookie); resp.Code != http.StatusOK {
+		t.Errorf("partner download: got %d", resp.Code)
+	}
+}
+
+// Contents missing on disk are an integrity error: 500, logged, and the
+// response tells nothing about it.
+func TestMissingContents(t *testing.T) {
+	api := apptest.New(t)
+	f := mustUpload(t, api, pngImage(t, 4, 4))
+	if err := os.Remove(filepath.Join(api.StorageDir, f.SHA256[0:2], f.SHA256[2:4], f.SHA256)); err != nil {
+		t.Fatal(err)
+	}
+	resp := api.Get(f.URL, api.Admin.Cookie)
+	body := resp.Body.String()
+	if resp.Code != http.StatusInternalServerError || decode[problem](t, resp).Code != "server.error" {
+		t.Fatalf("got %d: %s", resp.Code, body)
+	}
+	for _, leak := range []string{f.SHA256, api.StorageDir, "no such file", "missing"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("response reveals %q: %s", leak, body)
+		}
 	}
 }

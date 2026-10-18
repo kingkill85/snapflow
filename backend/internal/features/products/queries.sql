@@ -10,8 +10,15 @@ SELECT * FROM products WHERE id = $1;
 SELECT EXISTS (SELECT 1 FROM products WHERE id = $1);
 
 -- LockProduct serialises changes to a product's variant list (sort orders).
+-- Lock order of the aggregate: the product row first, then its variants.
 -- name: LockProduct :one
 SELECT id FROM products WHERE id = $1 FOR UPDATE;
+
+-- ShareProduct keeps a product from being deleted, and waits for a running
+-- variant reorder or create (LockProduct), before ReplaceAddons locks any
+-- variant: the same order (product, then variants) as LockProduct callers.
+-- name: ShareProduct :one
+SELECT id FROM products WHERE id = $1 FOR KEY SHARE;
 
 -- name: CreateProduct :one
 INSERT INTO products (product_type_id, model_number, name, description, attributes, is_active)
@@ -32,8 +39,8 @@ DELETE FROM products WHERE id = $1;
 
 -- ListProducts is one page of the product list in catalog order: product
 -- type order (type_ids, in order), then model number. search is an ILIKE
--- pattern ('' for none) over model number, English and German name and the
--- variants' SKUs. Without include_inactive only active products of active
+-- pattern ('' for none) over model number, English and German name and
+-- description and the variants' SKUs. Without include_inactive only active products of active
 -- types are listed.
 -- name: ListProducts :many
 SELECT p.*
@@ -46,6 +53,8 @@ WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
        OR p.name ->> 'de' ILIKE sqlc.arg(search)
+       OR p.description ->> 'en' ILIKE sqlc.arg(search)
+       OR p.description ->> 'de' ILIKE sqlc.arg(search)
        OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE sqlc.arg(search)))
 ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
@@ -61,6 +70,8 @@ WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
        OR p.name ->> 'de' ILIKE sqlc.arg(search)
+       OR p.description ->> 'en' ILIKE sqlc.arg(search)
+       OR p.description ->> 'de' ILIKE sqlc.arg(search)
        OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE sqlc.arg(search)));
 
 
@@ -95,8 +106,12 @@ RETURNING *;
 -- name: DeleteVariant :execrows
 DELETE FROM product_variants WHERE id = $1 AND product_id = $2;
 
+-- LockVariantIDs locks a product's variants for a reorder (after
+-- LockProduct). NO KEY UPDATE keeps them from being deleted or updated
+-- meanwhile but, unlike FOR UPDATE, does not wait for the KEY SHARE locks
+-- that add-on replaces and add-on inserts take on them.
 -- name: LockVariantIDs :many
-SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id FOR UPDATE;
+SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id FOR NO KEY UPDATE;
 
 -- SetVariantOrder gives the ids sort orders 1..n in the given order.
 -- name: SetVariantOrder :exec
@@ -104,41 +119,52 @@ UPDATE product_variants v SET sort_order = o.ord
 FROM unnest(sqlc.arg(ids)::uuid[]) WITH ORDINALITY AS o (id, ord)
 WHERE v.id = o.id;
 
--- SearchVariants is the add-on picker's search across the catalog, in
--- catalog order. search as in ListProducts, plus the variant's names.
+-- SearchVariants is the add-on picker's list across the catalog, in catalog
+-- order (product type order, model number, variant order): all variants
+-- without a search, else those whose product (as in ListProducts) or own
+-- name or SKU matches. product_type_id narrows it to one type.
 -- name: SearchVariants :many
 SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
        p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 LEFT JOIN unnest(sqlc.arg(type_ids)::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
-WHERE sqlc.arg(search)::text = ''
-   OR p.model_number ILIKE sqlc.arg(search)
-   OR p.name ->> 'en' ILIKE sqlc.arg(search)
-   OR p.name ->> 'de' ILIKE sqlc.arg(search)
-   OR v.name ->> 'en' ILIKE sqlc.arg(search)
-   OR v.name ->> 'de' ILIKE sqlc.arg(search)
-   OR v.sku ILIKE sqlc.arg(search)
-ORDER BY t.ord NULLS LAST, lower(p.model_number), v.sort_order, v.id
+WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.arg(search)::text = ''
+       OR p.model_number ILIKE sqlc.arg(search)
+       OR p.name ->> 'en' ILIKE sqlc.arg(search)
+       OR p.name ->> 'de' ILIKE sqlc.arg(search)
+       OR p.description ->> 'en' ILIKE sqlc.arg(search)
+       OR p.description ->> 'de' ILIKE sqlc.arg(search)
+       OR v.name ->> 'en' ILIKE sqlc.arg(search)
+       OR v.name ->> 'de' ILIKE sqlc.arg(search)
+       OR v.sku ILIKE sqlc.arg(search))
+ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
+-- CountVariants counts what SearchVariants lists without the page.
 -- name: CountVariants :one
 SELECT count(*)
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
-WHERE sqlc.arg(search)::text = ''
-   OR p.model_number ILIKE sqlc.arg(search)
-   OR p.name ->> 'en' ILIKE sqlc.arg(search)
-   OR p.name ->> 'de' ILIKE sqlc.arg(search)
-   OR v.name ->> 'en' ILIKE sqlc.arg(search)
-   OR v.name ->> 'de' ILIKE sqlc.arg(search)
-   OR v.sku ILIKE sqlc.arg(search);
+WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.arg(search)::text = ''
+       OR p.model_number ILIKE sqlc.arg(search)
+       OR p.name ->> 'en' ILIKE sqlc.arg(search)
+       OR p.name ->> 'de' ILIKE sqlc.arg(search)
+       OR p.description ->> 'en' ILIKE sqlc.arg(search)
+       OR p.description ->> 'de' ILIKE sqlc.arg(search)
+       OR v.name ->> 'en' ILIKE sqlc.arg(search)
+       OR v.name ->> 'de' ILIKE sqlc.arg(search)
+       OR v.sku ILIKE sqlc.arg(search));
 
 
--- LockVariantForAddons serialises add-on replaces of one variant. NO KEY
--- UPDATE does not conflict with the KEY SHARE locks other replaces take on
--- their add-on variants, so replaces of two variants that point at each
--- other cannot deadlock.
+-- LockVariantForAddons serialises add-on replaces of one variant (after
+-- ShareProduct). NO KEY UPDATE does not conflict with the KEY SHARE locks
+-- other replaces take on their add-on variants, so replaces of two variants
+-- that point at each other do not wait for each other. Deadlocks with
+-- deletes (which lock the add-on variants FOR UPDATE in their own order)
+-- remain possible; inTx retries those.
 -- name: LockVariantForAddons :one
 SELECT id FROM product_variants WHERE id = $1 AND product_id = $2 FOR NO KEY UPDATE;
 

@@ -51,7 +51,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large). Other content is 415 file.type. JPEG and PNG wider than 1600 px are scaled down to 1600 px in the same format. The same stored bytes always give the same file.
+ * Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large, also for a chunked body) and 25 megapixels (422 file.too_many_pixels). Other or damaged content is 415 file.type. JPEG and PNG are re-encoded in the same format without metadata, turned upright and scaled down to 1600 px wide; WebP is validated and stored as uploaded. The same stored bytes always give the same file.
  * @summary Upload an image
  */
 export const uploadFile = (

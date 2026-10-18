@@ -11,7 +11,7 @@ export type ListProductsParams = {
  */
 productTypeId?: string;
 /**
- * Case-insensitive substring of model number, English or German name, or a variant's SKU
+ * Case-insensitive substring of model number, English or German name or description, or a variant's SKU
  * @maxLength 200
  */
 search?: string;

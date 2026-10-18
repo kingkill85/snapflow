@@ -81,8 +81,10 @@ type product struct {
 	IsActive        bool           `json:"isActive"`
 	Available       bool           `json:"available"`
 	Variants        []variant      `json:"variants"`
-	UpdatedAt       string         `json:"updatedAt"`
-	Can             auth.Actions   `json:"can"`
+	// VariantsWithProblems counts variants with attribute errors or stale values.
+	VariantsWithProblems int          `json:"variantsWithProblems"`
+	UpdatedAt            string       `json:"updatedAt"`
+	Can                  auth.Actions `json:"can"`
 }
 
 type listItem struct {

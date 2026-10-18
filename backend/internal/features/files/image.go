@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"image"
+	"image/color"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -46,47 +48,135 @@ func decodeConfig(data []byte, contentType string) (image.Config, error) {
 	}
 }
 
-// process decodes a JPEG or PNG completely (so a damaged one is refused).
-// A JPEG whose EXIF orientation is not upright is turned upright (re-encoding
-// drops EXIF, so browsers could no longer rotate it). If the image is wider
-// than maxWidth, it is scaled to maxWidth pixels wide (aspect ratio kept).
-// Changed images are encoded in the same format (PNG keeps transparency);
-// otherwise data is returned unchanged.
-func process(data []byte, contentType string, maxWidth int) ([]byte, int, int, error) {
+// process decodes an image completely (so a damaged one is refused) and
+// returns the bytes to store with their pixel size.
+//
+// JPEG and PNG are always re-encoded in their own format with 8 bits per
+// channel, so nothing but pixels is stored: no EXIF (GPS position, camera,
+// thumbnail), no PNG text or eXIf chunks, no 16-bit samples. Images wider
+// than maxWidth (once upright) are scaled to maxWidth pixels wide, aspect
+// ratio kept. The scaled copy is made straight from the decoded image into
+// an 8-bit buffer of the target size, and only that small copy is turned
+// upright by the EXIF orientation of a JPEG; the full-size image is never
+// copied.
+//
+// WebP is decoded only to validate it and stored as uploaded: Go has no
+// WebP encoder, so its metadata chunks (EXIF, XMP) are kept.
+func process(data []byte, contentType string, orientation, maxWidth int) ([]byte, int, int, error) {
+	if contentType == TypeWebP {
+		img, err := webp.Decode(bytes.NewReader(data))
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		b := img.Bounds()
+		return data, b.Dx(), b.Dy(), nil
+	}
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	orientation := 1
-	if contentType == TypeJPEG {
-		orientation = jpegOrientation(data)
-		src = orient(src, orientation)
-	}
-	b := src.Bounds()
-	if b.Dx() <= maxWidth && orientation == 1 {
-		return data, b.Dx(), b.Dy(), nil
-	}
-	width := min(b.Dx(), maxWidth)
-	height := max(1, int(math.Round(float64(b.Dy())*float64(width)/float64(b.Dx()))))
-	rect := image.Rect(0, 0, width, height)
+	sb := src.Bounds()
+	// Scaled size before orientation (sw × sh) such that the upright image
+	// is at most maxWidth wide.
+	sw, sh := scaledSize(sb.Dx(), sb.Dy(), maxWidth, orientation >= 5)
+	rect := image.Rect(0, 0, sw, sh)
 
 	var buf bytes.Buffer
 	if contentType == TypePNG {
-		dst := image.NewNRGBA(rect)
-		xdraw.CatmullRom.Scale(dst, rect, src, b, xdraw.Src, nil)
+		dst := image.NewNRGBA(rect) // 8 bits per channel, transparency kept
+		resample(dst, src)
 		err = (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&buf, dst)
+		sw, sh = dst.Rect.Dx(), dst.Rect.Dy()
 	} else {
 		dst := image.NewRGBA(rect)
-		xdraw.CatmullRom.Scale(dst, rect, src, b, xdraw.Src, nil)
+		resample(dst, src)
+		dst = orientRGBA(dst, orientation)
 		err = jpeg.Encode(&buf, dst, &jpeg.Options{Quality: jpegQuality})
+		sw, sh = dst.Rect.Dx(), dst.Rect.Dy()
 	}
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	return buf.Bytes(), width, height, nil
+	return buf.Bytes(), sw, sh, nil
+}
+
+// scaledSize returns the size (w × h) to scale a w × h image to so that,
+// turned upright (axes swapped when swap), it is at most maxWidth wide.
+func scaledSize(w, h, maxWidth int, swap bool) (int, int) {
+	uw, uh := w, h
+	if swap {
+		uw, uh = h, w
+	}
+	if uw <= maxWidth {
+		return w, h
+	}
+	nw := maxWidth
+	nh := max(1, int(math.Round(float64(uh)*float64(nw)/float64(uw))))
+	if swap {
+		return nh, nw
+	}
+	return nw, nh
+}
+
+// resample draws src into dst: a plain copy at the same size, else a
+// Catmull-Rom scale. Either way the pixels are converted to dst's 8-bit
+// format.
+func resample(dst draw.Image, src image.Image) {
+	sb, db := src.Bounds(), dst.Bounds()
+	if sb.Dx() == db.Dx() && sb.Dy() == db.Dy() {
+		xdraw.Draw(dst, db, src, sb.Min, xdraw.Src)
+		return
+	}
+	xdraw.CatmullRom.Scale(dst, db, src, sb, xdraw.Src, nil)
 }
 
 const jpegQuality = 85
+
+// bytesPerPixel estimates the memory a decoded image of this colour model
+// takes per pixel (worst case: YCbCr as 4:4:4).
+func bytesPerPixel(m color.Model) int64 {
+	switch m {
+	case color.GrayModel, color.AlphaModel:
+		return 1
+	case color.Gray16Model, color.Alpha16Model:
+		return 2
+	case color.YCbCrModel:
+		return 3
+	case color.NYCbCrAModel:
+		return 4
+	case color.RGBA64Model, color.NRGBA64Model:
+		return 8
+	}
+	if _, ok := m.(color.Palette); ok {
+		return 1
+	}
+	return 4 // RGBA, NRGBA, CMYK
+}
+
+// decodeCost estimates the bytes processing an image needs at its peak: the
+// decoded source plus the 8-bit target, twice for a JPEG that is turned
+// upright (process).
+func decodeCost(cfg image.Config, contentType string, orientation, maxWidth int) int64 {
+	src := int64(cfg.Width) * int64(cfg.Height) * bytesPerPixel(cfg.ColorModel)
+	if contentType == TypeWebP {
+		return src
+	}
+	w, h := scaledSize(cfg.Width, cfg.Height, maxWidth, orientation >= 5)
+	dst := int64(w) * int64(h) * 4
+	if orientation > 1 {
+		dst *= 2
+	}
+	return src + dst
+}
+
+// orientationOf returns the EXIF orientation (1-8) of an image: that of a
+// JPEG, 1 for other types (PNG and WebP are shown as stored).
+func orientationOf(data []byte, contentType string) int {
+	if contentType != TypeJPEG {
+		return 1
+	}
+	return jpegOrientation(data)
+}
 
 // jpegOrientation returns the EXIF orientation (1-8) of a JPEG, 1 if it has
 // none or it cannot be read.
@@ -144,20 +234,19 @@ func exifOrientation(tiff []byte) int {
 	return 1
 }
 
-// orient returns img turned upright for an EXIF orientation (1 = as is).
-func orient(img image.Image, orientation int) image.Image {
+// orientRGBA returns img turned upright for an EXIF orientation (1 = as
+// is, the same image).
+func orientRGBA(img *image.RGBA, orientation int) *image.RGBA {
 	if orientation <= 1 || orientation > 8 {
 		return img
 	}
 	b := img.Bounds()
-	src := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
-	xdraw.Draw(src, src.Bounds(), img, b.Min, xdraw.Src)
 	w, h := b.Dx(), b.Dy()
 	dw, dh := w, h
 	if orientation >= 5 { // 5-8 swap the axes
 		dw, dh = h, w
 	}
-	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
+	dst := image.NewRGBA(image.Rect(0, 0, dw, dh))
 	for y := range dh {
 		for x := range dw {
 			var sx, sy int
@@ -177,7 +266,8 @@ func orient(img image.Image, orientation int) image.Image {
 			case 8: // needs 90° counter-clockwise
 				sx, sy = w-1-y, x
 			}
-			copy(dst.Pix[dst.PixOffset(x, y):dst.PixOffset(x, y)+4], src.Pix[src.PixOffset(sx, sy):src.PixOffset(sx, sy)+4])
+			si := img.PixOffset(b.Min.X+sx, b.Min.Y+sy)
+			copy(dst.Pix[dst.PixOffset(x, y):dst.PixOffset(x, y)+4], img.Pix[si:si+4])
 		}
 	}
 	return dst

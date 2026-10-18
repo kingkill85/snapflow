@@ -38,4 +38,6 @@ export interface Product {
   updatedAt: string;
   /** In variant order */
   variants: Variant[];
+  /** Variants with attributeErrors or staleAttributes against the current type's schema */
+  variantsWithProblems: number;
 }

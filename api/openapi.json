@@ -787,6 +787,11 @@
               "$ref": "#/components/schemas/Variant"
             },
             "type": "array"
+          },
+          "variantsWithProblems": {
+            "description": "Variants with attributeErrors or staleAttributes against the current type's schema",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -801,6 +806,7 @@
           "isActive",
           "available",
           "variants",
+          "variantsWithProblems",
           "createdAt",
           "updatedAt",
           "can"
@@ -835,7 +841,7 @@
             "type": "boolean"
           },
           "modelNumber": {
-            "description": "Unique ignoring case, at most 100 characters",
+            "description": "Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "examples": [
               "M485/GW-ZB.10"
             ],
@@ -849,6 +855,7 @@
             "type": "object"
           },
           "productTypeId": {
+            "description": "Must be active (product.type_inactive), except the type the product already has",
             "type": "string"
           }
         },
@@ -1317,7 +1324,7 @@
             "type": "boolean"
           },
           "modelNumber": {
-            "description": "Unique ignoring case, at most 100 characters",
+            "description": "Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "examples": [
               "M485/GW-ZB.10"
             ],
@@ -1331,6 +1338,7 @@
             "type": "object"
           },
           "productTypeId": {
+            "description": "Must be active (product.type_inactive), except the type the product already has",
             "type": "string"
           }
         },
@@ -1808,7 +1816,7 @@
             "type": "string"
           },
           "sku": {
-            "description": "Unique ignoring case when set; at most 100 characters",
+            "description": "Unique ignoring case when set; at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "type": "string"
           }
         },
@@ -1978,7 +1986,7 @@
             "type": "string"
           },
           "sku": {
-            "description": "Unique ignoring case when set; at most 100 characters",
+            "description": "Unique ignoring case when set; at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "type": "string"
           }
         },
@@ -2228,7 +2236,7 @@
     },
     "/api/files": {
       "post": {
-        "description": "Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large). Other content is 415 file.type. JPEG and PNG wider than 1600 px are scaled down to 1600 px in the same format. The same stored bytes always give the same file.",
+        "description": "Multipart field `file`: a JPEG, PNG or WebP image (recognised by its content, not its name), at most 10 MB (413 file.too_large, also for a chunked body) and 25 megapixels (422 file.too_many_pixels). Other or damaged content is 415 file.type. JPEG and PNG are re-encoded in the same format without metadata, turned upright and scaled down to 1600 px wide; WebP is validated and stored as uploaded. The same stored bytes always give the same file.",
         "operationId": "uploadFile",
         "requestBody": {
           "content": {
@@ -2833,12 +2841,12 @@
             }
           },
           {
-            "description": "Case-insensitive substring of model number, English or German name, or a variant's SKU",
+            "description": "Case-insensitive substring of model number, English or German name or description, or a variant's SKU",
             "explode": false,
             "in": "query",
             "name": "search",
             "schema": {
-              "description": "Case-insensitive substring of model number, English or German name, or a variant's SKU",
+              "description": "Case-insensitive substring of model number, English or German name or description, or a variant's SKU",
               "maxLength": 200,
               "type": "string"
             }
@@ -3025,7 +3033,7 @@
         ]
       },
       "put": {
-        "description": "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt.",
+        "description": "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the type never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).",
         "operationId": "updateProduct",
         "parameters": [
           {
@@ -3784,16 +3792,27 @@
     },
     "/api/variants": {
       "get": {
-        "description": "For the add-on picker; in catalog order (product type, model number, variant order). Lists inactive variants too, flagged by available.",
+        "description": "For the add-on picker; in catalog order (product type, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.",
         "operationId": "searchVariants",
         "parameters": [
           {
-            "description": "Case-insensitive substring of model number, product or variant name (en/de) or SKU",
+            "description": "Only variants of products of this type",
+            "explode": false,
+            "in": "query",
+            "name": "productTypeId",
+            "schema": {
+              "description": "Only variants of products of this type",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant",
             "explode": false,
             "in": "query",
             "name": "search",
             "schema": {
-              "description": "Case-insensitive substring of model number, product or variant name (en/de) or SKU",
+              "description": "Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant",
               "maxLength": 200,
               "type": "string"
             }
@@ -3813,11 +3832,13 @@
             }
           },
           {
+            "description": "Rows to skip",
             "explode": false,
             "in": "query",
             "name": "offset",
             "schema": {
               "default": 0,
+              "description": "Rows to skip",
               "format": "int64",
               "maximum": 1073741824,
               "minimum": 0,
@@ -3847,7 +3868,7 @@
             "description": "Error"
           }
         },
-        "summary": "Search variants across the catalog",
+        "summary": "List or search variants across the catalog",
         "tags": [
           "products"
         ]

@@ -21,7 +21,7 @@ type variantIDParams struct {
 
 type listInput struct {
 	ProductTypeID   uuid.UUID `query:"productTypeId" format:"uuid" doc:"Only products of this type"`
-	Search          string    `query:"search" maxLength:"200" doc:"Case-insensitive substring of model number, English or German name, or a variant's SKU"`
+	Search          string    `query:"search" maxLength:"200" doc:"Case-insensitive substring of model number, English or German name or description, or a variant's SKU"`
 	IncludeInactive bool      `query:"includeInactive" doc:"Also list inactive products and products of inactive types"`
 	Limit           int       `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"Page size, 1-200"`
 	Offset          int       `query:"offset" default:"0" minimum:"0" maximum:"1073741824" doc:"Rows to skip"`
@@ -75,9 +75,10 @@ type addonsInput struct {
 }
 
 type variantSearchInput struct {
-	Search string `query:"search" maxLength:"200" doc:"Case-insensitive substring of model number, product or variant name (en/de) or SKU"`
-	Limit  int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"Page size, 1-200"`
-	Offset int    `query:"offset" default:"0" minimum:"0" maximum:"1073741824"`
+	ProductTypeID uuid.UUID `query:"productTypeId" format:"uuid" doc:"Only variants of products of this type"`
+	Search        string    `query:"search" maxLength:"200" doc:"Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant"`
+	Limit         int       `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"Page size, 1-200"`
+	Offset        int       `query:"offset" default:"0" minimum:"0" maximum:"1073741824" doc:"Rows to skip"`
 }
 
 type variantSearchOutput struct {
@@ -141,8 +142,9 @@ func Register(api huma.API, svc *Service) {
 		Method:      http.MethodPut,
 		Path:        "/api/products/{id}",
 		Summary:     "Update a product",
-		Description: "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt.",
-		Tags:        []string{tag},
+		Description: "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. " +
+			"Changing the type never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).",
+		Tags: []string{tag},
 	}, func(ctx context.Context, in *updateInput) (*productOutput, error) {
 		p, err := svc.Update(ctx, in.ID, in.Body)
 		if err != nil {
@@ -240,12 +242,17 @@ func Register(api huma.API, svc *Service) {
 		OperationID: "searchVariants",
 		Method:      http.MethodGet,
 		Path:        "/api/variants",
-		Summary:     "Search variants across the catalog",
+		Summary:     "List or search variants across the catalog",
 		Description: "For the add-on picker; in catalog order (product type, model number, variant order). " +
+			"Without search it lists every variant (browsing, paged with offset). " +
 			"Lists inactive variants too, flagged by available.",
 		Tags: []string{tag},
 	}, func(ctx context.Context, in *variantSearchInput) (*variantSearchOutput, error) {
-		page, err := svc.SearchVariants(ctx, in.Search, in.Limit, in.Offset)
+		p := VariantSearchParams{Search: in.Search, Limit: in.Limit, Offset: in.Offset}
+		if in.ProductTypeID != uuid.Nil {
+			p.ProductTypeID = &in.ProductTypeID
+		}
+		page, err := svc.SearchVariants(ctx, p)
 		if err != nil {
 			return nil, err
 		}

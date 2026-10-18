@@ -71,6 +71,7 @@
     "model_number_taken": "The model number \"{{modelNumber}}\" is already used.",
     "not_found": "This product no longer exists.",
     "stale": "Someone else changed this product in the meantime. Reload it and make your changes again.",
+    "type_inactive": "This product type is inactive. Choose an active product type.",
     "type_not_found": "The selected product type no longer exists."
   },
   "product_type": {
@@ -85,6 +86,7 @@
   "request": {
     "bad": "The request was invalid.",
     "conflict": "This conflicts with existing data.",
+    "conflict_retry": "Someone else changed this at the same time. Please try again.",
     "failed": "The request failed.",
     "not_found": "Not found."
   },
@@ -115,6 +117,7 @@
     "tenant_not_found": "The selected tenant does not exist."
   },
   "validation": {
+    "control_chars": "Control characters (such as tabs, line breaks or invisible characters) are not allowed.",
     "email": "Enter a valid email address.",
     "failed": "Please check the highlighted fields.",
     "invalid": "This value is invalid.",

@@ -19,6 +19,6 @@ export interface VariantInput {
   name: VariantInputName;
   /** USD as a decimal string: up to 10 digits, optionally a point and 1-2 decimals */
   price: string;
-  /** Unique ignoring case when set; at most 100 characters */
+  /** Unique ignoring case when set; at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   sku?: string;
 }

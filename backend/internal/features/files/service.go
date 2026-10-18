@@ -12,11 +12,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/files/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
@@ -32,7 +34,17 @@ const (
 	MaxWidth = 1600
 	// MaxMegapixels bounds the pixel count of an image, so decoding one
 	// cannot exhaust memory.
-	MaxMegapixels = 40
+	MaxMegapixels = 25
+	// DecodeBudget bounds the memory of all image decodes running at once,
+	// in bytes (decodeCost: decoded source plus 8-bit target). The largest
+	// single image needs at most 300 MB: a 25 MP 16-bit PNG decodes to
+	// 8 bytes per pixel (200 MB) plus a 4-byte target of up to 25 MP (100 MB,
+	// a tall image is not scaled); a 25 MP CMYK JPEG 100 MB plus twice its
+	// target when it is turned upright (200 MB). Typical photos (8-bit YCbCr,
+	// scaled to 1600 px) need well under 100 MB, so several run in parallel;
+	// a large one waits until the budget is free. Encoded output and request
+	// buffers (each upload at most MaxSize) come on top.
+	DecodeBudget = 300 << 20
 )
 
 type File struct {
@@ -49,20 +61,22 @@ type File struct {
 type Service struct {
 	q       store.Querier
 	storage *Storage
-	// decoding limits concurrent image decodes, which need a lot of memory.
-	decoding chan struct{}
+	// decoding holds DecodeBudget bytes; every image decode acquires its
+	// decodeCost first.
+	decoding *semaphore.Weighted
 }
 
 // NewService returns the service; storage may be nil when the API is only
 // built to export the OpenAPI document.
 func NewService(q store.Querier, storage *Storage) *Service {
-	return &Service{q: q, storage: storage, decoding: make(chan struct{}, 2)}
+	return &Service{q: q, storage: storage, decoding: semaphore.NewWeighted(DecodeBudget)}
 }
 
 // Upload stores an image (JPEG, PNG or WebP, by magic bytes, at most
-// MaxSize). JPEG and PNG must decode completely; those wider than MaxWidth
-// are scaled down to it in the same format. Uploading the same stored bytes again returns the existing
-// file.
+// MaxSize and MaxMegapixels). Every image must decode completely. JPEG and
+// PNG are always re-encoded (8 bits per channel, no metadata), turned
+// upright and scaled down to MaxWidth (process); WebP is stored as
+// uploaded. Uploading the same stored bytes again returns the existing file.
 func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return File{}, err
@@ -86,18 +100,15 @@ func (s *Service) Upload(ctx context.Context, r io.Reader) (File, error) {
 		return File{}, apperr.New(http.StatusUnprocessableEntity, "file.too_many_pixels", "the image has too many pixels").
 			With("megapixels", MaxMegapixels)
 	}
-	width, height := cfg.Width, cfg.Height
-	if contentType != TypeWebP { // WebP is stored as uploaded
-		select {
-		case s.decoding <- struct{}{}:
-		case <-ctx.Done():
-			return File{}, ctx.Err()
-		}
-		data, width, height, err = process(data, contentType, MaxWidth)
-		<-s.decoding
-		if err != nil {
-			return File{}, errType() // the header was fine, the image data is not
-		}
+	orientation := orientationOf(data, contentType)
+	cost := min(decodeCost(cfg, contentType, orientation, MaxWidth), DecodeBudget)
+	if err := s.decoding.Acquire(ctx, cost); err != nil {
+		return File{}, err
+	}
+	data, width, height, err := process(data, contentType, orientation, MaxWidth)
+	s.decoding.Release(cost)
+	if err != nil {
+		return File{}, errType() // the header was fine, the image data is not
 	}
 
 	sum := sha256.Sum256(data)
@@ -130,6 +141,10 @@ func (s *Service) Open(ctx context.Context, id uuid.UUID) (File, io.ReadSeekClos
 		return File{}, nil, err
 	}
 	f, err := s.storage.Open(row.Sha256)
+	if errors.Is(err, fs.ErrNotExist) {
+		return File{}, nil, apperr.Internal(ctx, "files: integrity error: contents missing on disk",
+			fmt.Errorf("file %s (sha256 %s): %w", row.ID, row.Sha256, err))
+	}
 	if err != nil {
 		return File{}, nil, err
 	}

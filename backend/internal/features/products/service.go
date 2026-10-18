@@ -17,11 +17,13 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products/store"
@@ -29,6 +31,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
@@ -52,7 +55,7 @@ var pricePattern = regexp.MustCompile(`^\d{1,10}(\.\d{1,2})?$`)
 // DB is the database the service runs on; *pgxpool.Pool implements it.
 type DB interface {
 	store.DBTX
-	Begin(ctx context.Context) (pgx.Tx, error)
+	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
 }
 
 type Service struct {
@@ -66,9 +69,18 @@ func NewService(db DB, types *producttypes.Service, files *files.Service) *Servi
 	return &Service{db: db, q: store.New(db), types: types, files: files}
 }
 
-// inTx runs fn in one transaction; any error rolls it back.
+// inSnapshot runs the reads of fn in one read-only REPEATABLE READ
+// transaction, so they see one state of the database.
+func (s *Service) inSnapshot(ctx context.Context, fn func(q *store.Queries) error) error {
+	return database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
+}
+
+// inTx runs fn in one transaction; any error rolls it back. A transaction
+// aborted by a deadlock or serialization failure is run again (at most
+// database.TxAttempts times, then 409 request.conflict_retry), so fn must be
+// safe to repeat.
 func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) error {
-	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
+	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
 }
 
 // ---------------------------------------------------------------- products
@@ -89,27 +101,36 @@ func (s *Service) List(ctx context.Context, p ListParams) (ProductPage, error) {
 		return ProductPage{}, err
 	}
 	pattern := likePattern(p.Search)
-	rows, err := s.q.ListProducts(ctx, store.ListProductsParams{
-		TypeIds: types.order, ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
-		InactiveTypeIds: types.inactive, Search: pattern,
-		RowLimit: int32(p.Limit), RowOffset: int32(p.Offset), //nolint:gosec // checked by checkPage
+	var (
+		rows     []store.Product
+		total    int64
+		variants []store.ProductVariant
+	)
+	// One snapshot: the page, its total and its variants agree.
+	err = s.inSnapshot(ctx, func(q *store.Queries) error {
+		var err error
+		rows, err = q.ListProducts(ctx, store.ListProductsParams{
+			TypeIds: types.order, ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
+			InactiveTypeIds: types.inactive, Search: pattern,
+			RowLimit: int32(p.Limit), RowOffset: int32(p.Offset), //nolint:gosec // checked by checkPage
+		})
+		if err != nil {
+			return err
+		}
+		total, err = q.CountProducts(ctx, store.CountProductsParams{
+			ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
+			InactiveTypeIds: types.inactive, Search: pattern,
+		})
+		if err != nil {
+			return err
+		}
+		ids := make([]uuid.UUID, len(rows))
+		for i, r := range rows {
+			ids[i] = r.ID
+		}
+		variants, err = q.ListVariantsOfProducts(ctx, ids)
+		return err
 	})
-	if err != nil {
-		return ProductPage{}, err
-	}
-	total, err := s.q.CountProducts(ctx, store.CountProductsParams{
-		ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
-		InactiveTypeIds: types.inactive, Search: pattern,
-	})
-	if err != nil {
-		return ProductPage{}, err
-	}
-
-	ids := make([]uuid.UUID, len(rows))
-	for i, r := range rows {
-		ids[i] = r.ID
-	}
-	variants, err := s.q.ListVariantsOfProducts(ctx, ids)
 	if err != nil {
 		return ProductPage{}, err
 	}
@@ -184,9 +205,14 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 	if err != nil {
 		return Product{}, err
 	}
-	row, err := s.q.CreateProduct(ctx, store.CreateProductParams{
-		ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
-		Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
+	var row store.Product
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		row, err = q.CreateProduct(ctx, store.CreateProductParams{
+			ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
+		})
+		return err
 	})
 	if err != nil {
 		return Product{}, mapProductErr(err, in.ModelNumber)
@@ -197,7 +223,9 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 // Update replaces a product's own fields (not its variants). It fails with
 // product.stale if the product changed since in.ExpectedUpdatedAt. Values
 // whose key the (new) type's schema does not have are kept only if they
-// were stored before and are sent back.
+// were stored before and are sent back. The type may change, also to one
+// whose schema the variants' values do not match: those are only flagged on
+// read (Product.VariantsWithProblems), never re-validated or refused.
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (Product, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
@@ -210,14 +238,19 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
 		return Product{}, errProductStale()
 	}
-	in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, current.Attributes)
+	in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current)
 	if err != nil {
 		return Product{}, err
 	}
-	row, err := s.q.UpdateProduct(ctx, store.UpdateProductParams{
-		ID: id, ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
-		Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
-		ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+	var row store.Product
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		row, err = q.UpdateProduct(ctx, store.UpdateProductParams{
+			ID: id, ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
+			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+		})
+		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		exists, err := s.q.ProductExists(ctx, id)
@@ -241,22 +274,31 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return err
 	}
-	n, err := s.q.DeleteProduct(ctx, id)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return apperr.NotFound("product.not_found")
-	}
-	return nil
+	return s.inTx(ctx, func(q *store.Queries) error {
+		n, err := q.DeleteProduct(ctx, id)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return apperr.NotFound("product.not_found")
+		}
+		return nil
+	})
 }
 
-func (s *Service) validateProduct(ctx context.Context, in ProductInput, previous attrschema.Values) (ProductInput, error) {
+// validateProduct checks a create (current nil) or an update of current.
+func (s *Service) validateProduct(ctx context.Context, in ProductInput, current *store.Product) (ProductInput, error) {
 	var errs []apperr.FieldError
-	in.ModelNumber = strings.TrimSpace(in.ModelNumber)
+	var previous attrschema.Values
+	if current != nil {
+		previous = current.Attributes
+	}
+	in.ModelNumber = businessKey(in.ModelNumber)
 	switch {
 	case in.ModelNumber == "":
 		errs = append(errs, apperr.Field("body.modelNumber", "validation.required", "model number is required"))
+	case hasControlChars(in.ModelNumber):
+		errs = append(errs, errControlChars("body.modelNumber"))
 	case utf8.RuneCountInString(in.ModelNumber) > MaxModelNumberLength:
 		errs = append(errs, tooLong("body.modelNumber", MaxModelNumberLength))
 	}
@@ -277,6 +319,10 @@ func (s *Service) validateProduct(ctx context.Context, in ProductInput, previous
 	case err != nil:
 		return in, err
 	default:
+		// An inactive type takes no new products; a product keeps its own.
+		if !pt.IsActive && (current == nil || current.ProductTypeID != pt.ID) {
+			errs = append(errs, apperr.Field("body.productTypeId", "product.type_inactive", "the product type is inactive"))
+		}
 		var attrErrs []apperr.FieldError
 		in.Attributes, attrErrs = saveValues(pt.Attributes, attrschema.ScopeProduct, in.Attributes, previous, "body.attributes")
 		errs = append(errs, attrErrs...)
@@ -322,6 +368,9 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Produc
 	p.Variants = make([]Variant, len(variants))
 	for i, v := range variants {
 		p.Variants[i] = variantOut(actor, v, pt, p.Available, addons[v.ID])
+		if len(p.Variants[i].AttributeErrors) > 0 || len(p.Variants[i].StaleAttributes) > 0 {
+			p.VariantsWithProblems++
+		}
 	}
 	return p, nil
 }
@@ -389,10 +438,15 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if err != nil {
 		return Variant{}, err
 	}
-	row, err := s.q.UpdateVariant(ctx, store.UpdateVariantParams{
-		ID: id, ProductID: productID, Name: in.Name, Sku: strPtr(in.SKU), Price: in.Price,
-		ImageFileID: in.ImageFileID, Attributes: in.Attributes, IsActive: in.IsActive,
-		ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+	var row store.ProductVariant
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		row, err = q.UpdateVariant(ctx, store.UpdateVariantParams{
+			ID: id, ProductID: productID, Name: in.Name, Sku: strPtr(in.SKU), Price: in.Price,
+			ImageFileID: in.ImageFileID, Attributes: in.Attributes, IsActive: in.IsActive,
+			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+		})
+		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		exists, err := s.q.VariantExists(ctx, store.VariantExistsParams{ID: id, ProductID: productID})
@@ -415,18 +469,23 @@ func (s *Service) DeleteVariant(ctx context.Context, productID, id uuid.UUID) er
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return err
 	}
-	n, err := s.q.DeleteVariant(ctx, store.DeleteVariantParams{ID: id, ProductID: productID})
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return apperr.NotFound("variant.not_found")
-	}
-	return nil
+	return s.inTx(ctx, func(q *store.Queries) error {
+		n, err := q.DeleteVariant(ctx, store.DeleteVariantParams{ID: id, ProductID: productID})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return apperr.NotFound("variant.not_found")
+		}
+		return nil
+	})
 }
 
 // ReorderVariants sets the order of a product's variants. ids must list
-// every variant of the product exactly once.
+// every variant of the product exactly once. It locks the product (FOR
+// UPDATE, serialising reorders and creates), then its variants FOR NO KEY
+// UPDATE (no delete or update of them meanwhile, yet no wait for add-on
+// replaces' KEY SHARE locks).
 func (s *Service) ReorderVariants(ctx context.Context, productID uuid.UUID, ids []uuid.UUID) (Product, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
@@ -463,8 +522,11 @@ func (s *Service) validateVariant(ctx context.Context, pt producttypes.ProductTy
 	if !in.Name.Valid() {
 		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
 	}
-	in.SKU = strings.TrimSpace(in.SKU)
-	if utf8.RuneCountInString(in.SKU) > MaxSKULength {
+	in.SKU = businessKey(in.SKU)
+	switch {
+	case hasControlChars(in.SKU):
+		errs = append(errs, errControlChars("body.sku"))
+	case utf8.RuneCountInString(in.SKU) > MaxSKULength:
 		errs = append(errs, tooLong("body.sku", MaxSKULength))
 	}
 	if price, ok := parsePrice(in.Price); ok {
@@ -504,28 +566,38 @@ func (s *Service) variantDetail(ctx context.Context, actor auth.Actor, product s
 	return variantOut(actor, v, pt, product.IsActive && pt.IsActive, addons[v.ID]), nil
 }
 
-// SearchVariants searches variants across the catalog (add-on picker), in
-// catalog order: product type, model number, variant order.
-func (s *Service) SearchVariants(ctx context.Context, search string, limit, offset int) (VariantPage, error) {
+// SearchVariants lists variants across the catalog (add-on picker) in
+// catalog order: product type, model number, variant order. Without a
+// search it lists every variant (browsing); productTypeID narrows it to one
+// type.
+func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (VariantPage, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
 		return VariantPage{}, err
 	}
-	if err := checkPage(limit, offset); err != nil {
+	if err := checkPage(p.Limit, p.Offset); err != nil {
 		return VariantPage{}, err
 	}
 	types, err := s.loadTypes(ctx)
 	if err != nil {
 		return VariantPage{}, err
 	}
-	pattern := likePattern(search)
-	rows, err := s.q.SearchVariants(ctx, store.SearchVariantsParams{
-		TypeIds: types.order, Search: pattern,
-		RowLimit: int32(limit), RowOffset: int32(offset), //nolint:gosec // checked by checkPage
+	pattern := likePattern(p.Search)
+	var (
+		rows  []store.SearchVariantsRow
+		total int64
+	)
+	err = s.inSnapshot(ctx, func(q *store.Queries) error {
+		var err error
+		rows, err = q.SearchVariants(ctx, store.SearchVariantsParams{
+			TypeIds: types.order, ProductTypeID: p.ProductTypeID, Search: pattern,
+			RowLimit: int32(p.Limit), RowOffset: int32(p.Offset), //nolint:gosec // checked by checkPage
+		})
+		if err != nil {
+			return err
+		}
+		total, err = q.CountVariants(ctx, store.CountVariantsParams{ProductTypeID: p.ProductTypeID, Search: pattern})
+		return err
 	})
-	if err != nil {
-		return VariantPage{}, err
-	}
-	total, err := s.q.CountVariants(ctx, pattern)
 	if err != nil {
 		return VariantPage{}, err
 	}
@@ -550,6 +622,13 @@ func (s *Service) SearchVariants(ctx context.Context, search string, limit, offs
 // ReplaceAddons replaces a variant's add-ons with list (in list order) in
 // one transaction. Every add-on must exist, differ from the variant and
 // appear once; all problems are reported together. Cycles are allowed.
+//
+// Lock order: the product (KEY SHARE, like LockProduct's callers take the
+// product first), the variant (NO KEY UPDATE), then the add-on variants (KEY
+// SHARE, in id order). Replaces never wait for each other's add-on locks, and
+// reorders and creates wait at the product. A product or variant delete
+// locks the add-on variants it removes in its own order, so a deadlock with a
+// concurrent replace is possible; inTx runs the loser again.
 func (s *Service) ReplaceAddons(ctx context.Context, productID, variantID uuid.UUID, list []AddonInput) (Variant, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
@@ -560,6 +639,9 @@ func (s *Service) ReplaceAddons(ctx context.Context, productID, variantID uuid.U
 			fmt.Sprintf("at most %d add-ons", MaxAddons)).With("max", MaxAddons))
 	}
 	err = s.inTx(ctx, func(q *store.Queries) error {
+		if _, err := q.ShareProduct(ctx, productID); err != nil {
+			return notFound(err, "variant.not_found")
+		}
 		if _, err := q.LockVariantForAddons(ctx, store.LockVariantForAddonsParams{ID: variantID, ProductID: productID}); err != nil {
 			return notFound(err, "variant.not_found")
 		}
@@ -816,6 +898,25 @@ func notFound(err error, code string) error {
 		return apperr.NotFound(code)
 	}
 	return err
+}
+
+// businessKey normalises a model number or SKU: Unicode NFC (so a composed
+// and a decomposed "é" are the same key) and trimmed.
+func businessKey(s string) string {
+	return strings.TrimSpace(norm.NFC.String(s))
+}
+
+// hasControlChars reports control and format characters (Unicode Cc and
+// Cf: tabs, line breaks, zero-width and bidi controls), which no business
+// key may contain: they are invisible and break lookups and exports.
+func hasControlChars(s string) bool {
+	return strings.IndexFunc(s, func(r rune) bool {
+		return unicode.In(r, unicode.Cc, unicode.Cf)
+	}) >= 0
+}
+
+func errControlChars(loc string) apperr.FieldError {
+	return apperr.Field(loc, "validation.control_chars", "control characters are not allowed")
 }
 
 func tooLong(loc string, max int) apperr.FieldError {

@@ -141,6 +141,7 @@ export const dimmer: Product = {
   isActive: true,
   available: true,
   variants: [ivory, black],
+  variantsWithProblems: 0,
   createdAt: at,
   updatedAt: at,
   can: { update: true, delete: true },

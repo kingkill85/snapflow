@@ -7,7 +7,11 @@
 
 export type SearchVariantsParams = {
 /**
- * Case-insensitive substring of model number, product or variant name (en/de) or SKU
+ * Only variants of products of this type
+ */
+productTypeId?: string;
+/**
+ * Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant
  * @maxLength 200
  */
 search?: string;
@@ -18,6 +22,7 @@ search?: string;
  */
 limit?: number;
 /**
+ * Rows to skip
  * @minimum 0
  * @maximum 1073741824
  */

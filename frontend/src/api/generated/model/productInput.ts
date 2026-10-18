@@ -16,9 +16,10 @@ export interface ProductInput {
   /** At most 5000 characters; if set, "en" is required */
   description?: ProductInputDescription;
   isActive: boolean;
-  /** Unique ignoring case, at most 100 characters */
+  /** Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   modelNumber: string;
   /** At most 200 characters; "en" is required */
   name: ProductInputName;
+  /** Must be active (product.type_inactive), except the type the product already has */
   productTypeId: string;
 }
