@@ -14,6 +14,14 @@
     "status": "Status",
     "active": "Aktiv",
     "activeHint": "Benutzer eines inaktiven Mandanten können sich nicht anmelden.",
-    "distributorHint": "Der Distributor-Mandant bleibt immer aktiv."
-  }
+    "distributorHint": "Der Distributor-Mandant bleibt immer aktiv.",
+    "projects": "Projekte"
+  },
+  "showArchived": "Archivierte anzeigen",
+  "archived": "Archiviert",
+  "restore": "Wiederherstellen",
+  "archiveTitle": "Mandant archivieren",
+  "archiveMessage_one": "\"{{name}}\" hat {{count}} Projekt und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archiveMessage_other": "\"{{name}}\" hat {{count}} Projekte und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
+  "archive": "Archivieren"
 }

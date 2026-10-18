@@ -14,6 +14,14 @@
     "status": "Status",
     "active": "Active",
     "activeHint": "Users of an inactive tenant cannot sign in.",
-    "distributorHint": "The distributor tenant always stays active."
-  }
+    "distributorHint": "The distributor tenant always stays active.",
+    "projects": "Projects"
+  },
+  "showArchived": "Show archived",
+  "archived": "Archived",
+  "restore": "Restore",
+  "archiveTitle": "Archive tenant",
+  "archiveMessage_one": "\"{{name}}\" has {{count}} project, so it is archived instead of deleted: it is deactivated and hidden, its users and projects are kept. You can restore it later.",
+  "archiveMessage_other": "\"{{name}}\" has {{count}} projects, so it is archived instead of deleted: it is deactivated and hidden, its users and projects are kept. You can restore it later.",
+  "archive": "Archive"
 }

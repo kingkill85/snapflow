@@ -1,12 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArchiveRestore, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Tenant } from '@/api/generated/model'
-import { getListTenantsQueryKey, useDeleteTenant, useListTenants } from '@/api/generated/tenants/tenants'
+import { getListTenantsQueryKey, useDeleteTenant, useListTenants, useRestoreTenant } from '@/api/generated/tenants/tenants'
 import { getListUsersQueryKey } from '@/api/generated/users/users'
-import { Badge, Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
+import { Badge, Button, CheckboxField, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 
 import { TenantFormDialog } from './TenantFormDialog'
 
@@ -14,8 +14,11 @@ export function TenantsPage() {
   const { t } = useTranslation('tenants')
   const { t: tCommon } = useTranslation()
   const queryClient = useQueryClient()
-  const list = useListTenants()
+  // Archived tenants (deleted, kept for their projects; D13) only on request.
+  const [showArchived, setShowArchived] = useState(false)
+  const list = useListTenants(showArchived ? { includeArchived: true } : undefined)
   const remove = useDeleteTenant()
+  const restore = useRestoreTenant()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Tenant | null>(null)
@@ -45,6 +48,15 @@ export function TenantsPage() {
     setDeleting(null)
   }
 
+  const doRestore = async (tenant: Tenant) => {
+    try {
+      await restore.mutateAsync({ id: tenant.id })
+    } catch {
+      return // shown by ErrorMessage via restore.error
+    }
+    await queryClient.invalidateQueries({ queryKey: getListTenantsQueryKey() })
+  }
+
   const createButton = (
     <Button onClick={() => openForm(null)}>
       <Plus /> {t('new')}
@@ -53,6 +65,8 @@ export function TenantsPage() {
 
   return (
     <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
+      <CheckboxField label={t('showArchived')} checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+      <ErrorMessage error={restore.error} />
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (
@@ -70,10 +84,18 @@ export function TenantsPage() {
             {
               header: t('field.status'),
               cell: (tenant) => (
-                <Badge variant={tenant.isActive ? 'success' : 'neutral'}>
-                  {tenant.isActive ? tCommon('status.active') : tCommon('status.inactive')}
-                </Badge>
+                <span className="inline-flex flex-wrap gap-1.5">
+                  <Badge variant={tenant.isActive ? 'success' : 'neutral'}>
+                    {tenant.isActive ? tCommon('status.active') : tCommon('status.inactive')}
+                  </Badge>
+                  {tenant.archivedAt && <Badge variant="warning">{t('archived')}</Badge>}
+                </span>
               ),
+            },
+            {
+              header: t('field.projects'),
+              cell: (tenant) => tenant.projectCount,
+              className: 'text-right tabular-nums',
             },
           ]}
           actions={(tenant) => (
@@ -81,7 +103,11 @@ export function TenantsPage() {
               {tenant.can.update && (
                 <RowAction onClick={() => openForm(tenant)} icon={<Pencil />} label={tCommon('action.edit')} />
               )}
-              {tenant.can.delete && (
+              {tenant.can.update && tenant.archivedAt && (
+                <RowAction onClick={() => void doRestore(tenant)} disabled={restore.isPending} icon={<ArchiveRestore />} label={t('restore')} />
+              )}
+              {/* An archived tenant with projects cannot be deleted (tenant.has_projects). */}
+              {tenant.can.delete && !(tenant.archivedAt && tenant.projectCount > 0) && (
                 <RowAction variant="danger-quiet" onClick={() => openDelete(tenant)} icon={<Trash2 />} label={tCommon('action.delete')} />
               )}
             </>
@@ -95,9 +121,13 @@ export function TenantsPage() {
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && openDelete(null)}
-        title={t('deleteTitle')}
-        message={t('deleteMessage', { name: deleting?.name })}
-        confirmLabel={tCommon('action.delete')}
+        title={deleting && deleting.projectCount > 0 ? t('archiveTitle') : t('deleteTitle')}
+        message={
+          deleting && deleting.projectCount > 0
+            ? t('archiveMessage', { name: deleting.name, count: deleting.projectCount })
+            : t('deleteMessage', { name: deleting?.name })
+        }
+        confirmLabel={deleting && deleting.projectCount > 0 ? t('archive') : tCommon('action.delete')}
         pending={remove.isPending}
         onConfirm={() => void confirmDelete()}
         error={<ErrorMessage error={remove.error} />}

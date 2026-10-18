@@ -137,4 +137,58 @@ describe('TenantsPage', () => {
     expect(client.getQueryState(getListUsersQueryKey())?.isInvalidated).toBe(true)
     expect(await screen.findByText('No tenants yet.')).toBeInTheDocument()
   })
+
+  it('says that deleting a tenant with projects archives it', async () => {
+    let deleted = false
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({ projectCount: 3 })] })),
+      http.delete('/api/tenants/:id', () => {
+        deleted = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+
+    await user.click(await screen.findByRole('button', { name: /delete/i }))
+    const dialog = await screen.findByRole('dialog', { name: 'Archive tenant' })
+    expect(dialog).toHaveTextContent('"Acme" has 3 projects, so it is archived instead of deleted')
+    await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
+    await waitFor(() => expect(deleted).toBe(true))
+  })
+
+  it('shows archived tenants on request and restores one', async () => {
+    let archived = true
+    const requests: string[] = []
+    let restored = false
+    server.use(
+      http.get('/api/tenants', ({ request }) => {
+        requests.push(new URL(request.url).search)
+        const include = new URL(request.url).searchParams.get('includeArchived') === 'true'
+        const items = [distributor, ...(include || !archived ? [tenant({ isActive: false, projectCount: 2, archivedAt: archived ? '2026-10-18T11:00:00Z' : undefined })] : [])]
+        return HttpResponse.json({ items })
+      }),
+      http.post('/api/tenants/:id/restore', () => {
+        restored = true
+        archived = false
+        return HttpResponse.json(tenant({ isActive: false }))
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+
+    await screen.findByText('Distributor', { selector: 'td' })
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText('Show archived'))
+
+    const acme = (await screen.findByText('Acme')).closest('tr')!
+    expect(within(acme).getByText('Archived')).toBeInTheDocument()
+    // An archived tenant with projects cannot be deleted.
+    expect(within(acme).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    await user.click(within(acme).getByRole('button', { name: 'Restore' }))
+
+    await waitFor(() => expect(restored).toBe(true))
+    await waitFor(() => expect(screen.queryByText('Archived')).not.toBeInTheDocument())
+    expect(requests).toContain('?includeArchived=true')
+  })
 })
