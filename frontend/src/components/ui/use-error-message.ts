@@ -20,7 +20,7 @@ export function useErrorMessage() {
       const elsewhere = error.fields.filter((f) => !apiFieldFor(f.location, fields))
       // Every error is shown at its field.
       if (elsewhere.length === 0) return t('validation.failed')
-      const messages = new Set(elsewhere.map((f) => translate(f.code) ?? t('validation.invalid')))
+      const messages = new Set(elsewhere.map((f) => translate(f.code, f.params) ?? t('validation.invalid')))
       if (elsewhere.length < error.fields.length) messages.add(t('validation.failed'))
       return [...messages].join(' ')
     }

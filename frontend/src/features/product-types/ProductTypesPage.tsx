@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 
+import { ApiError } from '@/api/client'
 import type { ProductType } from '@/api/generated/model'
 import {
+  getGetProductTypeQueryKey,
   getListProductTypesQueryKey,
   getListProductTypesQueryOptions,
   useDeleteProductType,
@@ -26,6 +28,7 @@ import {
   Loading,
   Page,
   TextLink,
+  TypeBadge,
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
@@ -58,19 +61,24 @@ export function ProductTypesPage() {
     } catch {
       return // shown by ErrorMessage via remove.error
     }
+    queryClient.removeQueries({ queryKey: getGetProductTypeQueryKey(deleting.id) })
     await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
     setDeleting(null)
   }
 
   // Moves a type past its visible neighbour. The order covers inactive types
-  // too and the API wants all ids, so the move is applied to the full list.
+  // too and the API wants all ids, so the move is applied to the full list,
+  // fetched fresh (D29). If the list changed meanwhile, nothing is sent.
   const move = async (item: ProductType, neighbour: ProductType, direction: 'up' | 'down') => {
     setMoving(true)
     setMoveError(null)
     try {
-      const all = await queryClient.fetchQuery(getListProductTypesQueryOptions({ includeInactive: true }))
+      const all = await queryClient.fetchQuery({ ...getListProductTypesQueryOptions({ includeInactive: true }), staleTime: 0 })
       const ids = all.items.map((i) => i.id).filter((id) => id !== item.id)
       const at = ids.indexOf(neighbour.id)
+      if (at < 0 || ids.length === all.items.length) {
+        throw new ApiError({ status: 422, code: 'product_type.order_mismatch' })
+      }
       ids.splice(direction === 'up' ? at : at + 1, 0, item.id)
       await reorder.mutateAsync({ data: { ids } })
     } catch (error) {
@@ -82,8 +90,16 @@ export function ProductTypesPage() {
 
   const rows = list.data?.items ?? []
   const columns: Column<ProductType>[] = [
-    { header: t('field.order'), cell: (p) => p.sortOrder, className: 'w-px text-right tabular-nums' },
-    { header: t('field.name'), cell: (p) => <TextLink to={`${listPath}/${p.id}`}>{localized(p.name)}</TextLink> },
+    // The position among the rows shown (sortOrder counts hidden inactive types too).
+    { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px text-right tabular-nums' },
+    {
+      header: t('field.name'),
+      cell: (p) => (
+        <TypeBadge color={p.color}>
+          <TextLink to={`${listPath}/${p.id}`}>{localized(p.name)}</TextLink>
+        </TypeBadge>
+      ),
+    },
     { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code> },
     { header: t('field.attributeCount'), cell: (p) => p.attributes.length, className: 'tabular-nums' },
     {

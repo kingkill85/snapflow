@@ -9,11 +9,23 @@
     "edit": "Bearbeiten",
     "save": "Speichern",
     "signOut": "Abmelden",
-    "moveUp": "Nach oben",
-    "moveDown": "Nach unten",
-    "remove": "Entfernen",
-    "back": "Zurück zur Liste",
-    "home": "Zur Startseite"
+    "home": "Zur Startseite",
+    "moveUpItem": "{{item}} nach oben verschieben",
+    "moveDownItem": "{{item}} nach unten verschieben",
+    "moveTopItem": "{{item}} ganz nach oben verschieben",
+    "moveBottomItem": "{{item}} ganz nach unten verschieben",
+    "insertBelowItem": "Unter {{item}} einfügen",
+    "duplicateItem": "{{item}} duplizieren",
+    "removeItem": "{{item}} entfernen",
+    "expandItem": "{{item}} aufklappen",
+    "collapseItem": "{{item}} zuklappen",
+    "expandAll": "Alle aufklappen",
+    "collapseAll": "Alle zuklappen",
+    "backToList": "Zurück zur Liste",
+    "pickColor": "Farbe auswählen",
+    "reload": "Neu laden",
+    "leave": "Seite verlassen",
+    "stay": "Bleiben"
   },
   "state": {
     "loading": "Wird geladen…",
@@ -23,10 +35,15 @@
     "notFoundTitle": "Seite nicht gefunden",
     "notFound": "Diese Seite gibt es nicht (mehr).",
     "errorTitle": "Etwas ist schiefgelaufen",
-    "error": "Diese Seite konnte nicht angezeigt werden. Bitte laden Sie sie neu oder gehen Sie zur Startseite."
+    "error": "Diese Seite konnte nicht angezeigt werden. Bitte laden Sie sie neu oder gehen Sie zur Startseite.",
+    "hasErrors": "Enthält Fehler"
   },
   "account": { "profile": "Profil" },
   "role": { "admin": "Admin", "tenant_admin": "Mandanten-Admin", "user": "Benutzer" },
   "status": { "active": "Aktiv", "inactive": "Inaktiv" },
-  "language": { "label": "Sprache", "en": "English", "de": "Deutsch" }
+  "language": { "label": "Sprache", "en": "English", "de": "Deutsch" },
+  "unsaved": {
+    "title": "Ungespeicherte Änderungen verwerfen?",
+    "message": "Sie haben Änderungen, die noch nicht gespeichert sind. Wenn Sie die Seite verlassen, gehen sie verloren."
+  }
 }

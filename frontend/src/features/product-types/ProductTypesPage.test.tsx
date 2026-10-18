@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import type { ProductType } from '@/api/generated/model'
+import { getGetProductTypeQueryKey } from '@/api/generated/product-types/product-types'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
@@ -27,7 +28,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   ...over,
 })
 
-const alpha = productType({})
+const alpha = productType({ color: '#1f6feb' })
 const beta = productType({
   id: '6f1c2b8e-0000-4000-8000-000000000002',
   key: 'gateway',
@@ -64,13 +65,20 @@ describe('ProductTypesPage', () => {
     expect(within(row).getByText('dimmer_actuator')).toBeInTheDocument()
     expect(within(row).getByText('Active')).toBeInTheDocument()
     expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['1', 'Dimmer actuator', 'dimmer_actuator', '1', 'Active', expect.any(String)])
+    // The badge colour as a dot before the name; none is an empty outline.
+    expect(within(row).getByTestId('type-color')).toHaveStyle({ backgroundColor: '#1f6feb' })
     expect(screen.queryByText('Gateway')).not.toBeInTheDocument()
     expect(requested).toEqual([''])
+    // The position among the rows shown, not the stored sortOrder (gamma is 3, beta is hidden).
+    const wallSwitch = screen.getByRole('link', { name: 'Wall switch' }).closest('tr')!
+    expect(within(wallSwitch).getAllByRole('cell')[0]).toHaveTextContent('2')
+    expect(within(wallSwitch).getByTestId('type-color')).not.toHaveAttribute('style')
 
     await u.click(screen.getByLabelText('Show inactive'))
 
     const gateway = (await screen.findByRole('link', { name: 'Gateway' })).closest('tr')!
     expect(within(gateway).getByText('Inactive')).toBeInTheDocument()
+    expect(within(gateway).getAllByRole('cell')[0]).toHaveTextContent('2')
     expect(requested).toContain('?includeInactive=true')
   })
 
@@ -123,6 +131,50 @@ describe('ProductTypesPage', () => {
     expect(names).toEqual(['Wall switch', 'Dimmer actuator'])
   })
 
+  it('moves down past the visible neighbour, keeping hidden inactive types in place', async () => {
+    let all = [alpha, beta, gamma]
+    let sent: unknown
+    server.use(
+      listHandler(() => all),
+      http.put('/api/product-types/order', async ({ request }) => {
+        sent = await request.json()
+        const ids = (sent as { ids: string[] }).ids
+        all = ids.map((id, i) => ({ ...all.find((p) => p.id === id)!, sortOrder: i + 1 }))
+        return HttpResponse.json({ items: all })
+      }),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+
+    await u.click(await screen.findByRole('button', { name: 'Move Dimmer actuator down' }))
+
+    await waitFor(() => expect(sent).toEqual({ ids: [beta.id, gamma.id, alpha.id] }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move Dimmer actuator down' })).toBeDisabled())
+  })
+
+  it('sends nothing when the visible neighbour is gone from the fresh list', async () => {
+    let all = [alpha, gamma]
+    let sent = false
+    server.use(
+      listHandler(() => all),
+      http.put('/api/product-types/order', () => {
+        sent = true
+        return HttpResponse.json({ items: all })
+      }),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    const button = await screen.findByRole('button', { name: 'Move Dimmer actuator down' })
+    // Someone else deleted the wall switch meanwhile.
+    all = [alpha]
+
+    await u.click(button)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The product types have changed in the meantime.')
+    expect(sent).toBe(false)
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Wall switch' })).not.toBeInTheDocument())
+  })
+
   it('shows reorder errors', async () => {
     server.use(
       listHandler(() => [alpha, gamma]),
@@ -167,7 +219,8 @@ describe('ProductTypesPage', () => {
       }),
     )
     const u = userEvent.setup()
-    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    const { client } = renderWithProviders(<ProductTypesPage />, { me: adminMe })
+    client.setQueryData(getGetProductTypeQueryKey(gamma.id), gamma)
 
     const row = (await screen.findByRole('link', { name: 'Wall switch' })).closest('tr')!
     await u.click(within(row).getByRole('button', { name: /delete/i }))
@@ -175,5 +228,7 @@ describe('ProductTypesPage', () => {
 
     await waitFor(() => expect(screen.queryByText('Wall switch')).not.toBeInTheDocument())
     expect(screen.getByText('Dimmer actuator')).toBeInTheDocument()
+    // Its editor must not show it from the cache.
+    expect(client.getQueryData(getGetProductTypeQueryKey(gamma.id))).toBeUndefined()
   })
 })

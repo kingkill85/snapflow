@@ -23,15 +23,15 @@ import {
 } from '@/components/ui'
 
 const schema = z.object({
-  email: z.email(errorKey('validation.email')).max(254, errorKey('validation.too_long')),
-  fullName: z.string().trim().max(200, errorKey('validation.too_long')),
+  email: z.email(errorKey('validation.email')).max(254, errorKey('validation.too_long', { max: 254 })),
+  fullName: z.string().trim().max(200, errorKey('validation.too_long', { max: 200 })),
   role: z.enum(Role),
   tenantId: z.string(),
   isActive: z.boolean(),
   password: z
     .string()
     .refine((v) => v === '' || v.length >= 8, errorKey('user.password_too_short'))
-    .max(200, errorKey('validation.too_long')),
+    .max(200, errorKey('validation.too_long', { max: 200 })),
 })
 type FormValues = z.infer<typeof schema>
 

@@ -14,7 +14,7 @@ import type { FunctionType } from '@/api/generated/model'
 import { apiFields, errorKey, ErrorMessage, Field, FormDialog, setApiFieldErrors, useFieldError } from '@/components/ui'
 
 const schema = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9_]*$/, errorKey('function_type.key_format')).max(64, errorKey('validation.too_long')),
+  key: z.string().regex(/^[a-z][a-z0-9_]*$/, errorKey('function_type.key_format')).max(64, errorKey('validation.too_long', { max: 64 })),
   nameEn: z.string().trim().min(1, errorKey('validation.required')),
   nameDe: z.string().trim(),
 })

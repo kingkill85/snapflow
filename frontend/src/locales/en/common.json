@@ -9,11 +9,23 @@
     "edit": "Edit",
     "save": "Save",
     "signOut": "Sign out",
-    "moveUp": "Move up",
-    "moveDown": "Move down",
-    "remove": "Remove",
-    "back": "Back to list",
-    "home": "Go to start page"
+    "home": "Go to start page",
+    "moveUpItem": "Move {{item}} up",
+    "moveDownItem": "Move {{item}} down",
+    "moveTopItem": "Move {{item}} to the top",
+    "moveBottomItem": "Move {{item}} to the bottom",
+    "insertBelowItem": "Insert below {{item}}",
+    "duplicateItem": "Duplicate {{item}}",
+    "removeItem": "Remove {{item}}",
+    "expandItem": "Expand {{item}}",
+    "collapseItem": "Collapse {{item}}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "backToList": "Back to list",
+    "pickColor": "Pick a colour",
+    "reload": "Reload",
+    "leave": "Leave page",
+    "stay": "Stay"
   },
   "state": {
     "loading": "Loading…",
@@ -23,10 +35,15 @@
     "notFoundTitle": "Page not found",
     "notFound": "This page does not exist (anymore).",
     "errorTitle": "Something went wrong",
-    "error": "This page could not be shown. Please reload it or go to the start page."
+    "error": "This page could not be shown. Please reload it or go to the start page.",
+    "hasErrors": "Contains errors"
   },
   "account": { "profile": "Profile" },
   "role": { "admin": "Admin", "tenant_admin": "Tenant admin", "user": "User" },
   "status": { "active": "Active", "inactive": "Inactive" },
-  "language": { "label": "Language", "en": "English", "de": "Deutsch" }
+  "language": { "label": "Language", "en": "English", "de": "Deutsch" },
+  "unsaved": {
+    "title": "Discard unsaved changes?",
+    "message": "You have changes that are not saved yet. If you leave this page, they are lost."
+  }
 }

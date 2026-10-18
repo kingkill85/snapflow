@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import type { ProductType } from '@/api/generated/model'
+import { getGetProductTypeQueryKey } from '@/api/generated/product-types/product-types'
+import type { ProductType, ProductTypeUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
@@ -25,6 +26,7 @@ const existing: ProductType = {
   key: 'dimmer_actuator',
   name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
   description: { en: 'DIN rail dimmer' },
+  color: '#1f6feb',
   sortOrder: 1,
   isActive: true,
   attributes: [
@@ -46,10 +48,42 @@ const existing: ProductType = {
   updatedAt: '2026-01-01T00:00:00Z',
   can: { update: true, delete: true },
 }
+const editRoute = `/catalog/product-types/${existing.id}`
 
 const group = (name: string, container: HTMLElement = document.body) => within(container).getByRole('group', { name })
 /** The attribute row's own field (option rows inside repeat the labels). */
 const own = (row: HTMLElement, label: string) => within(row).getAllByLabelText(label)[0]
+const region = (name: string) => screen.getByRole('region', { name })
+const attributesRegion = () => region('Attributes')
+const instanceRegion = () => region('Instance attributes')
+
+type User = ReturnType<typeof userEvent.setup>
+/** Rows of an existing type start collapsed. */
+const expandAll = (u: User, section: HTMLElement) => u.click(within(section).getByRole('button', { name: 'Expand all' }))
+
+/** GET returns `item`, PUT records the body (and answers with `respond`, if given). */
+function editHandlers(item: () => ProductType = () => existing, respond?: () => Response) {
+  const puts: ProductTypeUpdate[] = []
+  const gets: number[] = []
+  server.use(
+    http.get('/api/product-types/:id', () => {
+      gets.push(Date.now())
+      return HttpResponse.json(item())
+    }),
+    http.put('/api/product-types/:id', async ({ request }) => {
+      puts.push((await request.json()) as ProductTypeUpdate)
+      return respond ? respond() : HttpResponse.json(item())
+    }),
+  )
+  return { puts, gets }
+}
+
+async function openEditor(item?: () => ProductType, respond?: () => Response) {
+  const calls = editHandlers(item, respond)
+  renderRoutes(routes, { me: adminMe, route: editRoute })
+  await screen.findByRole('heading', { name: 'Edit product type' })
+  return calls
+}
 
 describe('ProductTypeEditorPage', () => {
   it('creates a product type with an enum attribute, sending exactly what applies', async () => {
@@ -67,8 +101,9 @@ describe('ProductTypeEditorPage', () => {
     await u.type(screen.getByLabelText('Key'), 'gateway')
     await u.type(screen.getByLabelText('Name (English)'), 'Gateway')
     await u.type(screen.getByLabelText('Name (German)'), 'Gateway')
+    await u.type(screen.getByLabelText('Colour'), '#1F6FEB')
 
-    const attributes = screen.getByRole('region', { name: 'Attributes' })
+    const attributes = attributesRegion()
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const row = group('Attribute 1', attributes)
     await u.type(own(row, 'Key'), 'bus_system')
@@ -90,7 +125,7 @@ describe('ProductTypeEditorPage', () => {
     await u.type(within(group('Option 2', row)).getByLabelText('Label (English)'), 'KNX')
     await u.type(within(group('Option 2', row)).getByLabelText('Label (German)'), 'KNX')
     // Move KNX first.
-    await u.click(within(group('Option 2', row)).getByRole('button', { name: 'Move up' }))
+    await u.click(within(group('Option 2', row)).getByRole('button', { name: 'Move option 2 up' }))
 
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
@@ -98,6 +133,7 @@ describe('ProductTypeEditorPage', () => {
     expect(posted).toEqual({
       key: 'gateway',
       name: { en: 'Gateway', de: 'Gateway' },
+      color: '#1f6feb',
       isActive: true,
       attributes: [
         {
@@ -116,30 +152,29 @@ describe('ProductTypeEditorPage', () => {
     })
   })
 
-  it('loads an existing schema and saves it unchanged', async () => {
-    let put: unknown
-    server.use(
-      http.get('/api/product-types/:id', () => HttpResponse.json(existing)),
-      http.put('/api/product-types/:id', async ({ request }) => {
-        put = await request.json()
-        return HttpResponse.json(existing)
-      }),
-    )
+  it('loads an existing schema collapsed, and saves it unchanged with the version it was loaded from', async () => {
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: `/catalog/product-types/${existing.id}` })
+    const { puts } = await openEditor()
 
-    expect(await screen.findByRole('heading', { name: 'Edit product type' })).toBeInTheDocument()
-    const basics = screen.getByRole('region', { name: 'Basics' })
+    const basics = region('Basics')
     expect(within(basics).getByLabelText('Key')).toHaveValue('dimmer_actuator')
     expect(within(basics).getByLabelText('Name (German)')).toHaveValue('Dimmaktor')
     expect(within(basics).getByLabelText('Description (English)')).toHaveValue('DIN rail dimmer')
+    expect(within(basics).getByLabelText('Colour')).toHaveValue('#1f6feb')
 
-    const attributes = screen.getByRole('region', { name: 'Attributes' })
+    // Collapsed rows summarise what they define.
+    const attributes = attributesRegion()
     const width = group('Attribute 1', attributes)
+    expect(width).toHaveTextContent('Width · Whole number · TE · Required · Product')
+    expect(within(width).queryByLabelText('Key')).not.toBeInTheDocument()
+    expect(group('Attribute 2', attributes)).toHaveTextContent('Colour · Choice · Variant')
+    expect(group('Attribute 1', instanceRegion())).toHaveTextContent('Bus address · Text · Required')
+
+    await expandAll(u, attributes)
     expect(own(width, 'Key')).toHaveValue('width_te')
     expect(within(width).getByLabelText('Type')).toHaveValue('integer')
-    expect(within(width).getByLabelText('Minimum')).toHaveValue(1)
-    expect(within(width).getByLabelText('Maximum')).toHaveValue(12)
+    expect(within(width).getByLabelText('Minimum')).toHaveValue('1')
+    expect(within(width).getByLabelText('Maximum')).toHaveValue('12')
     expect(within(width).getByLabelText('Unit')).toHaveValue('TE')
     expect(within(width).getByLabelText('Required')).toBeChecked()
     const colour = group('Attribute 2', attributes)
@@ -147,9 +182,10 @@ describe('ProductTypeEditorPage', () => {
     expect(within(group('Option 1', colour)).getByLabelText('Label (German)')).toHaveValue('Weiß')
     const protocols = group('Attribute 3', attributes)
     expect(within(protocols).getByLabelText('Item type')).toHaveValue('text')
-    expect(within(protocols).getByLabelText('Maximum items')).toHaveValue(4)
+    expect(within(protocols).getByLabelText('Maximum items')).toHaveValue('4')
 
-    const instance = screen.getByRole('region', { name: 'Instance attributes' })
+    const instance = instanceRegion()
+    await expandAll(u, instance)
     const busAddress = group('Attribute 1', instance)
     expect(own(busAddress, 'Key')).toHaveValue('bus_address')
     expect(within(busAddress).queryByLabelText('Set per')).not.toBeInTheDocument()
@@ -157,54 +193,161 @@ describe('ProductTypeEditorPage', () => {
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(await screen.findByText('list page')).toBeInTheDocument()
-    expect(put).toEqual({
-      key: existing.key,
-      name: existing.name,
-      description: existing.description,
-      isActive: true,
-      attributes: [
-        { ...existing.attributes[0] },
-        { ...existing.attributes[1], required: false },
-        { ...existing.attributes[2], required: false },
-      ],
-      instanceAttributes: [{ key: 'bus_address', label: { en: 'Bus address' }, type: 'text', required: true }],
-      expectedUpdatedAt: existing.updatedAt,
-    })
+    expect(puts).toEqual([
+      {
+        key: existing.key,
+        name: existing.name,
+        description: existing.description,
+        color: '#1f6feb',
+        isActive: true,
+        attributes: [
+          { ...existing.attributes[0] },
+          { ...existing.attributes[1], required: false },
+          { ...existing.attributes[2], required: false },
+        ],
+        instanceAttributes: [{ key: 'bus_address', label: { en: 'Bus address' }, type: 'text', required: true }],
+        expectedUpdatedAt: existing.updatedAt,
+      },
+    ])
+    // Instance attributes have no scope.
+    expect(puts[0].instanceAttributes[0]).not.toHaveProperty('scope')
   })
 
-  it('shows server field errors at the attribute row and option they belong to', async () => {
-    server.use(
-      http.get('/api/product-types/:id', () => HttpResponse.json(existing)),
-      http.put('/api/product-types/:id', () =>
-        problem(422, {
-          code: 'validation.failed',
-          fields: [
-            { location: 'body.attributes[1].options[1].key', code: 'attribute.option_key_duplicate' },
-            { location: 'body.attributes[2].max', code: 'attribute.range_invalid' },
-            { location: 'body.instanceAttributes[0].key', code: 'attribute.key_duplicate' },
-          ],
-        }),
-      ),
-    )
+  it('removes the colour', async () => {
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: `/catalog/product-types/${existing.id}` })
+    const { puts } = await openEditor()
 
-    await u.click(await screen.findByRole('button', { name: 'Update' }))
+    await u.clear(screen.getByLabelText('Colour'))
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0]).not.toHaveProperty('color')
+  })
+
+  it('checks the colour format', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+
+    await u.clear(screen.getByLabelText('Colour'))
+    await u.type(screen.getByLabelText('Colour'), 'blue')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    expect(screen.getByLabelText('Colour')).toHaveAccessibleDescription('Enter a colour as #rrggbb, e.g. #1f6feb.')
+    expect(screen.getByLabelText('Colour')).toHaveFocus()
+    expect(puts).toHaveLength(0)
+  })
+
+  it('shows server field errors at the row and option they belong to, opens those rows and focuses the first', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, {
+        code: 'validation.failed',
+        fields: [
+          { location: 'body.attributes[1].options[1].key', code: 'attribute.option_key_duplicate' },
+          { location: 'body.attributes[2].max', code: 'attribute.count_max', params: { max: 3 } },
+          { location: 'body.instanceAttributes[0].key', code: 'attribute.key_duplicate' },
+        ],
+      }),
+    )
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Please check the highlighted fields.')
-    const attributes = screen.getByRole('region', { name: 'Attributes' })
+    const attributes = attributesRegion()
+    // Rows with errors open and say so in their header; the others stay closed.
+    expect(within(group('Attribute 1', attributes)).queryByLabelText('Key')).not.toBeInTheDocument()
+    expect(within(group('Attribute 1', attributes)).queryByText('Contains errors')).not.toBeInTheDocument()
+    expect(within(group('Attribute 2', attributes)).getAllByText('Contains errors')).toHaveLength(2) // the row and its option
     const black = group('Option 2', group('Attribute 2', attributes))
     expect(within(black).getByLabelText('Key')).toHaveAccessibleDescription('This option key is used twice.')
+    expect(within(black).getByLabelText('Key')).toHaveFocus()
     expect(within(group('Option 1', group('Attribute 2', attributes))).getByLabelText('Key')).not.toHaveAccessibleDescription()
+    // With its params.
     expect(within(group('Attribute 3', attributes)).getByLabelText('Maximum items')).toHaveAccessibleDescription(
-      /The maximum must not be below the minimum/,
+      'Number of items: at most 3.',
     )
-    const instance = screen.getByRole('region', { name: 'Instance attributes' })
-    expect(own(group('Attribute 1', instance), 'Key')).toHaveAccessibleDescription('This key is used twice.')
+    expect(own(group('Attribute 1', instanceRegion()), 'Key')).toHaveAccessibleDescription('This key is used twice.')
     expect(screen.queryByText('list page')).not.toBeInTheDocument()
   })
 
-  it('checks the obvious rules before saving', async () => {
+  it('keeps a server error with its row when an earlier row is removed', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, {
+        code: 'validation.failed',
+        fields: [{ location: 'body.attributes[2].max', code: 'attribute.range_invalid', params: { min: 5 } }],
+      }),
+    )
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    const attributes = attributesRegion()
+    expect(await within(group('Attribute 3', attributes)).findByLabelText('Maximum items')).toHaveAccessibleDescription(
+      'The maximum must not be below the minimum (5).',
+    )
+
+    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Remove attribute 2' }))
+
+    const protocols = group('Attribute 2', attributes)
+    expect(own(protocols, 'Key')).toHaveValue('protocols')
+    expect(within(protocols).getByLabelText('Maximum items')).toHaveAccessibleDescription('The maximum must not be below the minimum (5).')
+    expect(within(protocols).getByText('Contains errors')).toBeInTheDocument()
+  })
+
+  it('spells out errors without a visible field instead of pointing at highlighted fields', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, {
+        code: 'validation.failed',
+        // Instance attributes have no scope field, and there is no fourth attribute.
+        fields: [
+          { location: 'body.instanceAttributes[0].scope', code: 'validation.invalid' },
+          { location: 'body.attributes[3].key', code: 'attribute.key_format' },
+        ],
+      }),
+    )
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This value is invalid. Use lower case letters, digits and underscores, starting with a letter.')
+    expect(alert).not.toHaveTextContent('highlighted')
+  })
+
+  it('shows too many attributes next to the section', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, { code: 'validation.failed', fields: [{ location: 'body.attributes', code: 'validation.too_many', params: { max: 200 } }] }),
+    )
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const message = await within(attributesRegion()).findByText('There are too many entries (at most 200).')
+    expect(message).toHaveRole('alert')
+    expect(message).toHaveFocus()
+    expect(screen.getByText('Please check the highlighted fields.')).toBeInTheDocument()
+  })
+
+  it('shows "add at least one option" under the options, linked to the options group', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () =>
+      problem(422, { code: 'validation.failed', fields: [{ location: 'body.attributes[1].options', code: 'attribute.options_required' }] }),
+    )
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const options = await within(group('Attribute 2', attributesRegion())).findByRole('group', { name: 'Options' })
+    expect(options).toHaveAccessibleDescription('Add at least one option.')
+    expect(within(options).getByRole('alert')).toHaveTextContent('Add at least one option.')
+  })
+
+  it('shows a taken key at the Key field', async () => {
+    const u = userEvent.setup()
+    await openEditor(undefined, () => problem(409, { code: 'product_type.key_taken', params: { key: 'dimmer_actuator' } }))
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const key = within(region('Basics')).getByLabelText('Key')
+    await waitFor(() => expect(key).toHaveAccessibleDescription('The key "dimmer_actuator" is already used.'))
+    expect(key).toHaveFocus()
+  })
+
+  it('checks the obvious rules before saving, with the limits in the messages', async () => {
     let called = false
     server.use(
       http.post('/api/product-types', () => {
@@ -216,13 +359,15 @@ describe('ProductTypeEditorPage', () => {
     renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/new' })
 
     await u.type(await screen.findByLabelText('Key'), 'Bad Key')
-    const attributes = screen.getByRole('region', { name: 'Attributes' })
+    await u.type(screen.getByLabelText('Name (German)'), 'x'.repeat(101))
+    const attributes = attributesRegion()
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const row = group('Attribute 1', attributes)
     await u.type(own(row, 'Key'), 'width')
     await u.selectOptions(within(row).getByLabelText('Type'), 'number')
     await u.type(within(row).getByLabelText('Minimum'), '10')
     await u.type(within(row).getByLabelText('Maximum'), '2')
+    await u.type(within(row).getByLabelText('Unit'), 'x'.repeat(17))
     await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
     const choice = group('Attribute 2', attributes)
     await u.type(own(choice, 'Key'), 'width')
@@ -230,49 +375,287 @@ describe('ProductTypeEditorPage', () => {
 
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
-    expect(await screen.findByText('The maximum must not be below the minimum.')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Basics' })).getByLabelText('Key')).toHaveAccessibleDescription(
-      'Use lower case letters, digits and underscores, starting with a letter.',
-    )
+    const key = within(region('Basics')).getByLabelText('Key')
+    expect(key).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
+    expect(key).toHaveFocus()
     expect(screen.getByLabelText('Name (English)')).toHaveAccessibleDescription('This field is required.')
+    expect(screen.getByLabelText('Name (German)')).toHaveAccessibleDescription('This value is too long (at most 100 characters).')
     expect(own(row, 'Label (English)')).toHaveAccessibleDescription('An English label is required.')
-    expect(within(row).getByLabelText('Maximum')).toHaveAccessibleDescription('The maximum must not be below the minimum.')
+    expect(within(row).getByLabelText('Maximum')).toHaveAccessibleDescription('The maximum must not be below the minimum (10).')
+    expect(within(row).getByLabelText('Unit')).toHaveAccessibleDescription('This value is too long (at most 16 characters).')
     expect(own(choice, 'Key')).toHaveAccessibleDescription('This key is used twice.')
-    expect(within(choice).getByText('Add at least one option.')).toBeInTheDocument()
+    expect(within(choice).getByRole('group', { name: 'Options' })).toHaveAccessibleDescription('Add at least one option.')
     expect(called).toBe(false)
   })
 
-  it('removes and reorders attributes', async () => {
-    let put: { attributes: { key: string }[] } | undefined
-    server.use(
-      http.get('/api/product-types/:id', () => HttpResponse.json(existing)),
-      http.put('/api/product-types/:id', async ({ request }) => {
-        put = (await request.json()) as typeof put
-        return HttpResponse.json(existing)
-      }),
-    )
+  it('checks bounds as typed: numbers, whole numbers, no negative lengths', async () => {
     const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: `/catalog/product-types/${existing.id}` })
+    const { puts } = await openEditor()
+    const attributes = attributesRegion()
+    await expandAll(u, attributes)
 
-    const attributes = await screen.findByRole('region', { name: 'Attributes' })
-    expect(within(group('Attribute 1', attributes)).getAllByRole('button', { name: 'Move up' })[0]).toBeDisabled()
-    await u.click(within(group('Attribute 3', attributes)).getAllByRole('button', { name: 'Move up' })[0])
-    await u.click(within(group('Attribute 1', attributes)).getAllByRole('button', { name: 'Remove' })[0])
+    const width = group('Attribute 1', attributes)
+    await u.clear(within(width).getByLabelText('Minimum'))
+    await u.type(within(width).getByLabelText('Minimum'), 'abc')
+    await u.clear(within(width).getByLabelText('Maximum'))
+    await u.type(within(width).getByLabelText('Maximum'), '2.5')
+    const protocols = group('Attribute 3', attributes)
+    await u.type(within(protocols).getByLabelText('Minimum items'), '-1')
+    await u.clear(within(protocols).getByLabelText('Maximum items'))
+    await u.type(within(protocols).getByLabelText('Maximum items'), '9007199254740992')
+
     await u.click(screen.getByRole('button', { name: 'Update' }))
 
-    await waitFor(() => expect(put?.attributes.map((a) => a.key)).toEqual(['protocols', 'colour']))
+    expect(within(width).getByLabelText('Minimum')).toHaveAccessibleDescription('Enter a number.')
+    expect(within(width).getByLabelText('Minimum')).toHaveFocus()
+    expect(within(width).getByLabelText('Maximum')).toHaveAccessibleDescription('This limit must be a whole number.')
+    expect(within(protocols).getByLabelText('Minimum items')).toHaveAccessibleDescription('Lengths and item counts cannot be negative.')
+    expect(within(protocols).getByLabelText('Maximum items')).toHaveAccessibleDescription(
+      'This limit must be between 0 and 9007199254740991.',
+    )
+    expect(puts).toHaveLength(0)
+  })
+
+  it('requires the English text when only a German description is given', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    await u.clear(within(region('Basics')).getByLabelText('Description (English)'))
+    await u.type(within(region('Basics')).getByLabelText('Description (German)'), 'Dimmer für die Hutschiene')
+    const attributes = attributesRegion()
+    await expandAll(u, attributes)
+    const width = group('Attribute 1', attributes)
+    await u.type(own(width, 'Description (German)'), 'Breite in TE')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    expect(within(region('Basics')).getByLabelText('Description (English)')).toHaveAccessibleDescription('This field is required.')
+    expect(own(width, 'Description (English)')).toHaveAccessibleDescription('This field is required.')
+    expect(puts).toHaveLength(0)
+  })
+
+  it('sends only what applies after a type change', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    const attributes = attributesRegion()
+    await expandAll(u, attributes)
+
+    // integer with min/max -> boolean; enum with options -> text; list of text -> list of enum.
+    await u.selectOptions(within(group('Attribute 1', attributes)).getByLabelText('Type'), 'boolean')
+    await u.selectOptions(within(group('Attribute 2', attributes)).getByLabelText('Type'), 'text')
+    const protocols = group('Attribute 3', attributes)
+    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'enum')
+    await u.click(within(protocols).getByRole('button', { name: 'Add option' }))
+    await u.type(within(group('Option 1', protocols)).getByLabelText('Key'), 'knx')
+    await u.type(within(group('Option 1', protocols)).getByLabelText('Label (English)'), 'KNX')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes).toEqual([
+      { key: 'width_te', label: { en: 'Width', de: 'Breite' }, type: 'boolean', required: true, unit: 'TE', scope: 'product' },
+      { key: 'colour', label: { en: 'Colour' }, type: 'text', required: false, scope: 'variant' },
+      {
+        key: 'protocols',
+        label: { en: 'Protocols' },
+        type: 'list',
+        itemType: 'enum',
+        max: 4,
+        required: false,
+        scope: 'product',
+        options: [{ key: 'knx', label: { en: 'KNX' } }],
+      },
+    ])
+  })
+
+  it('sends a list of text without options, even after options were entered', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    const attributes = attributesRegion()
+    await expandAll(u, attributes)
+    const protocols = group('Attribute 3', attributes)
+    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'enum')
+    await u.click(within(protocols).getByRole('button', { name: 'Add option' }))
+    await u.type(within(group('Option 1', protocols)).getByLabelText('Key'), 'knx')
+    await u.selectOptions(within(protocols).getByLabelText('Item type'), 'text')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes[2]).toEqual({ key: 'protocols', label: { en: 'Protocols' }, type: 'list', itemType: 'text', max: 4, required: false, scope: 'product' })
+  })
+
+  it('collapses, expands, duplicates, inserts and moves attributes', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    const attributes = attributesRegion()
+
+    // One row opens and closes.
+    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Expand attribute 2' }))
+    expect(own(group('Attribute 2', attributes), 'Key')).toHaveValue('colour')
+    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Collapse attribute 2' }))
+    expect(within(group('Attribute 2', attributes)).queryByLabelText('Key')).not.toBeInTheDocument()
+
+    // Protocols to the top; focus stays on a move button that still works.
+    await u.click(within(group('Attribute 3', attributes)).getByRole('button', { name: 'Move attribute 3 to the top' }))
+    expect(group('Attribute 1', attributes)).toHaveTextContent('Protocols')
+    expect(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Move attribute 1 down' })).toHaveFocus()
+
+    // Duplicate width (now attribute 2): an open copy below, whose key must be changed.
+    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Duplicate attribute 2' }))
+    const copy = group('Attribute 3', attributes)
+    expect(own(copy, 'Key')).toHaveValue('width_te_copy')
+    expect(own(copy, 'Key')).toHaveFocus()
+    expect(within(copy).getByLabelText('Minimum')).toHaveValue('1')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    expect(own(copy, 'Key')).toHaveAccessibleDescription('Change the key of the copied attribute.')
+    expect(puts).toHaveLength(0)
+    await u.clear(own(copy, 'Key'))
+    await u.type(own(copy, 'Key'), 'height_te')
+
+    // Insert an empty row below the first.
+    await u.click(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Insert below attribute 1' }))
+    const inserted = group('Attribute 2', attributes)
+    expect(own(inserted, 'Key')).toHaveValue('')
+    expect(own(inserted, 'Key')).toHaveFocus()
+    await u.type(own(inserted, 'Key'), 'bus_system')
+    await u.type(own(inserted, 'Label (English)'), 'Bus system')
+
+    // Move the colour (last) to the bottom is disabled; to the top works.
+    const last = group('Attribute 5', attributes)
+    expect(within(last).getByRole('button', { name: 'Move attribute 5 to the bottom' })).toBeDisabled()
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes.map((a) => a.key)).toEqual(['protocols', 'bus_system', 'width_te', 'height_te', 'colour'])
+    expect(puts[0].attributes[3]).toMatchObject({ type: 'integer', min: 1, max: 12, unit: 'TE', required: true })
+  })
+
+  it('moves focus sensibly when attributes and options are added and removed', async () => {
+    const u = userEvent.setup()
+    await openEditor()
+    const attributes = attributesRegion()
+
+    // Removing focuses the next row's first control ...
+    await u.click(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Remove attribute 1' }))
+    expect(within(group('Attribute 1', attributes)).getByRole('button', { name: 'Expand attribute 1' })).toHaveFocus()
+    // ... or, without a next row, the add button.
+    await u.click(within(group('Attribute 2', attributes)).getByRole('button', { name: 'Remove attribute 2' }))
+    expect(within(attributes).getByRole('button', { name: 'Add attribute' })).toHaveFocus()
+
+    // Adding focuses the new row's first field, at the end or at the top.
+    await u.click(within(attributes).getByRole('button', { name: 'Add attribute' }))
+    expect(own(group('Attribute 2', attributes), 'Key')).toHaveFocus()
+    await u.click(within(attributes).getByRole('button', { name: 'Add attribute at the top' }))
+    expect(own(group('Attribute 1', attributes), 'Key')).toHaveFocus()
+
+    // Options: the same.
+    const colour = group('Attribute 2', attributes)
+    await u.click(within(colour).getByRole('button', { name: 'Expand attribute 2' }))
+    await u.click(within(colour).getByRole('button', { name: 'Add option' }))
+    expect(within(group('Option 3', colour)).getByLabelText('Key')).toHaveFocus()
+    await u.click(within(group('Option 1', colour)).getByRole('button', { name: 'Remove option 1' }))
+    expect(within(group('Option 1', colour)).getByRole('button', { name: 'Move option 1 down' })).toHaveFocus()
+    await u.click(within(group('Option 2', colour)).getByRole('button', { name: 'Move option 2 up' }))
+    // At the top, "up" is disabled: focus moves to "down".
+    expect(within(group('Option 1', colour)).getByRole('button', { name: 'Move option 1 down' })).toHaveFocus()
+    await u.click(within(group('Option 2', colour)).getByRole('button', { name: 'Remove option 2' }))
+    expect(within(colour).getByRole('button', { name: 'Add option' })).toHaveFocus()
+  })
+
+  it('reloads after someone else changed the product type', async () => {
+    let version = existing
+    const { puts } = editHandlers(
+      () => version,
+      () => (puts.length === 1 ? problem(409, { code: 'product_type.stale' }) : HttpResponse.json(version)),
+    )
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: editRoute })
+
+    await u.clear(await screen.findByLabelText('Name (English)'))
+    await u.type(screen.getByLabelText('Name (English)'), 'My dimmer')
+    version = { ...existing, name: { en: 'Their dimmer' }, updatedAt: '2026-02-01T00:00:00Z' }
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Someone else changed this product type in the meantime.')
+    await u.click(within(alert).getByRole('button', { name: 'Reload' }))
+
+    await waitFor(() => expect(screen.getByLabelText('Name (English)')).toHaveValue('Their dimmer'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    expect(await screen.findByText('list page')).toBeInTheDocument()
+    expect(puts.map((p) => [p.name.en, p.expectedUpdatedAt])).toEqual([
+      ['My dimmer', existing.updatedAt],
+      ['Their dimmer', '2026-02-01T00:00:00Z'],
+    ])
+  })
+
+  it('never starts editing from cached data', async () => {
+    const fresh = { ...existing, name: { en: 'Fresh name' }, updatedAt: '2026-03-01T00:00:00Z' }
+    const { puts, gets } = editHandlers(() => fresh)
+    const u = userEvent.setup()
+    // A production-like client with a warm cache (staleTime 30 s by default).
+    renderRoutes(routes, {
+      me: adminMe,
+      route: editRoute,
+      appClient: true,
+      prepare: (client) => client.setQueryData(getGetProductTypeQueryKey(existing.id), existing),
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
+    expect(await screen.findByLabelText('Name (English)')).toHaveValue('Fresh name')
+    expect(gets).toHaveLength(1)
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].expectedUpdatedAt).toBe('2026-03-01T00:00:00Z')
+  })
+
+  it('asks before leaving with unsaved changes: stay keeps them, leave discards them', async () => {
+    const u = userEvent.setup()
+    await openEditor()
+
+    await u.type(screen.getByLabelText('Name (German)'), ' neu')
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+
+    let dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
+    await u.click(within(dialog).getByRole('button', { name: 'Stay' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Name (German)')).toHaveValue('Dimmaktor neu')
+
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+    dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
+    await u.click(within(dialog).getByRole('button', { name: 'Leave page' }))
+
+    expect(await screen.findByText('list page')).toBeInTheDocument()
+  })
+
+  it('leaves without asking when nothing changed', async () => {
+    const u = userEvent.setup()
+    await openEditor()
+
+    await u.click(screen.getByRole('link', { name: 'Cancel' }))
+
+    expect(await screen.findByText('list page')).toBeInTheDocument()
   })
 
   it('shows the product type read-only without catalog.write', async () => {
     server.use(http.get('/api/product-types/:id', () => HttpResponse.json({ ...existing, can: { update: false, delete: false } })))
-    renderRoutes(routes, { me: userMe, route: `/catalog/product-types/${existing.id}` })
+    renderRoutes(routes, { me: userMe, route: editRoute })
 
     expect(await screen.findByRole('heading', { name: 'Dimmer actuator' })).toBeInTheDocument()
     expect(screen.getByText('You can view this product type but not change it.')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Basics' })).getByLabelText('Key')).toBeDisabled()
-    const width = group('Attribute 1', screen.getByRole('region', { name: 'Attributes' }))
-    expect(own(width, 'Key')).toBeDisabled()
-    expect(screen.queryByRole('button', { name: /update|add attribute|remove|move/i })).not.toBeInTheDocument()
+    expect(within(region('Basics')).getByLabelText('Key')).toBeDisabled()
+    expect(within(region('Basics')).getByLabelText('Colour')).toBeDisabled()
+    // Everything is shown, nothing can be changed.
+    const attributes = attributesRegion()
+    expect(own(group('Attribute 1', attributes), 'Key')).toBeDisabled()
+    expect(within(group('Option 1', group('Attribute 2', attributes))).getByLabelText('Key')).toHaveValue('white')
+    expect(
+      screen.queryByRole('button', { name: /update|add attribute|remove|move|duplicate|insert|expand|collapse/i }),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
   })
 
@@ -282,20 +665,24 @@ describe('ProductTypeEditorPage', () => {
     expect(await screen.findByText('You do not have permission to see this page.')).toBeInTheDocument()
   })
 
-  it('cancel returns to the list without saving', async () => {
-    const u = userEvent.setup()
-    renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/new' })
-
-    await u.type(await screen.findByLabelText('Key'), 'draft')
-    await u.click(screen.getByRole('link', { name: 'Cancel' }))
-
-    expect(await screen.findByText('list page')).toBeInTheDocument()
-  })
-
   it('shows when the product type does not exist', async () => {
     server.use(http.get('/api/product-types/:id', () => problem(404, { code: 'product_type.not_found' })))
-    renderRoutes(routes, { me: adminMe, route: `/catalog/product-types/${existing.id}` })
+    renderRoutes(routes, { me: adminMe, route: editRoute })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This product type no longer exists.')
+    expect(await screen.findByRole('heading', { name: 'Product type not found' })).toBeInTheDocument()
+    expect(screen.getByText('This product type does not exist (anymore).')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to list' })).toHaveAttribute('href', '/catalog/product-types')
+  })
+
+  it('shows an invalid id in the URL as not found', async () => {
+    server.use(
+      http.get('/api/product-types/:id', () =>
+        problem(422, { code: 'validation.failed', fields: [{ location: 'path.id', code: 'validation.invalid' }] }),
+      ),
+    )
+    renderRoutes(routes, { me: adminMe, route: '/catalog/product-types/not-a-uuid' })
+
+    expect(await screen.findByRole('heading', { name: 'Product type not found' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Edit product type' })).not.toBeInTheDocument()
   })
 })

@@ -45,14 +45,22 @@ export function Loading() {
   )
 }
 
-/** A translated API error. `fields`: the form fields that show per-field errors (see setApiFieldErrors). */
-export function ErrorMessage({ error, fields }: { error: unknown; fields?: ApiFieldMap }) {
+/**
+ * A translated API error. `fields`: the form fields that show per-field errors
+ * (see setApiFieldErrors). `action`: a way out shown next to the text, e.g. a
+ * Reload button.
+ */
+export function ErrorMessage({ error, fields, action }: { error: unknown; fields?: ApiFieldMap; action?: ReactNode }) {
   const message = useErrorMessage()
   if (!error) return null
   return (
-    <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-      {message(error, fields)}
-    </p>
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
+    >
+      <p>{message(error, fields)}</p>
+      {action}
+    </div>
   )
 }
 

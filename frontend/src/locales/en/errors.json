@@ -7,6 +7,7 @@
     "count_max": "Number of items: at most {{max}}.",
     "count_min": "Number of items: at least {{min}}.",
     "item_type_required": "Choose the type of the list items.",
+    "key_copy": "Change the key of the copied attribute.",
     "key_duplicate": "This key is used twice.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "label_required": "An English label is required.",

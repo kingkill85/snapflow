@@ -13,7 +13,7 @@ export function Select({ className, options, ...props }: SelectProps) {
   return (
     <div className={cn('relative', className)}>
       <select
-        className="h-9 w-full appearance-none rounded-control border border-line bg-surface pr-8 pl-3 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:opacity-50 aria-invalid:border-danger"
+        className="h-9 w-full appearance-none rounded-control border border-line bg-surface pr-8 pl-3 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger"
         {...props}
       >
         {options.map((o) => (
@@ -36,13 +36,13 @@ export function SelectField({ label, error, hint, id, ...props }: SelectFieldPro
   const messageId = `${selectId}-message`
   const message = error || hint
   return (
-    <div className="space-y-1.5">
+    <div className="group/field space-y-1.5">
       <LabelPrimitive.Root htmlFor={selectId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
       <Select id={selectId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
       {message && (
-        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
+        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
           {message}
         </p>
       )}

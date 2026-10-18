@@ -7,6 +7,7 @@
     "count_max": "Anzahl der Einträge: höchstens {{max}}.",
     "count_min": "Anzahl der Einträge: mindestens {{min}}.",
     "item_type_required": "Wählen Sie den Typ der Listeneinträge.",
+    "key_copy": "Ändern Sie den Schlüssel des kopierten Attributs.",
     "key_duplicate": "Dieser Schlüssel ist doppelt vergeben.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "label_required": "Eine englische Bezeichnung ist erforderlich.",

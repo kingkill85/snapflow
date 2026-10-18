@@ -25,16 +25,16 @@ import {
 } from '@/components/ui'
 
 const detailsSchema = z.object({
-  fullName: z.string().trim().max(200, errorKey('validation.too_long')),
-  email: z.email(errorKey('validation.email')).max(254, errorKey('validation.too_long')),
+  fullName: z.string().trim().max(200, errorKey('validation.too_long', { max: 200 })),
+  email: z.email(errorKey('validation.email')).max(254, errorKey('validation.too_long', { max: 254 })),
 })
 type DetailsValues = z.infer<typeof detailsSchema>
 const detailsFields = apiFields<DetailsValues>(['fullName', 'email'])
 
 const passwordSchema = z
   .object({
-    currentPassword: z.string().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long')),
-    newPassword: z.string().min(8, errorKey('user.password_too_short')).max(200, errorKey('validation.too_long')),
+    currentPassword: z.string().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long', { max: 200 })),
+    newPassword: z.string().min(8, errorKey('user.password_too_short')).max(200, errorKey('validation.too_long', { max: 200 })),
     confirmPassword: z.string(),
   })
   .refine((v) => v.newPassword === v.confirmPassword, { message: errorKey('validation.password_mismatch'), path: ['confirmPassword'] })

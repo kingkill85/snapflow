@@ -9,7 +9,7 @@ export function Textarea({ className, rows = 3, ...props }: ComponentProps<'text
     <textarea
       rows={rows}
       className={cn(
-        'w-full rounded-control border border-line bg-surface px-3 py-2 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:opacity-50 aria-invalid:border-danger',
+        'w-full rounded-control border border-line bg-surface px-3 py-2 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger',
         className,
       )}
       {...props}
@@ -26,13 +26,13 @@ export function TextareaField({ label, error, hint, id, ...props }: TextareaFiel
   const messageId = `${inputId}-message`
   const message = error || hint
   return (
-    <div className="space-y-1.5">
+    <div className="group/field space-y-1.5">
       <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
         {label}
       </LabelPrimitive.Root>
       <Textarea id={inputId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
       {message && (
-        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted')}>
+        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
           {message}
         </p>
       )}

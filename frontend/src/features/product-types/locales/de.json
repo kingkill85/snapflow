@@ -18,7 +18,6 @@
     "instanceAttributesHint": "Werte, die im Projekt pro verbautem Gerät erfasst werden (z. B. Busadresse, MAC-Adresse)."
   },
   "field": {
-    "order": "Reihenfolge",
     "key": "Schlüssel",
     "keyHint": "z. B. dimmer_actuator, wall_switch",
     "name": "Name",
@@ -38,13 +37,18 @@
     "unit": "Einheit",
     "unitHint": "Nur zur Anzeige, z. B. TE, mA, W",
     "required": "Pflichtfeld",
-    "requiredHint": "Ein Wert muss gesetzt sein."
+    "requiredHint": "Ein Wert muss gesetzt sein.",
+    "position": "Position",
+    "color": "Farbe",
+    "colorHint": "Farbe des Kennzeichens in Listen, z. B. #1f6feb. Leer für keine."
   },
   "schema": {
     "item": "Attribut {{n}}",
     "empty": "Noch keine Attribute.",
     "add": "Attribut hinzufügen",
-    "keyHint": "z. B. width_te, bus_system"
+    "keyHint": "z. B. width_te, bus_system",
+    "itemName": "Attribut {{n}}",
+    "addFirst": "Attribut oben hinzufügen"
   },
   "type": {
     "text": "Text",
@@ -67,6 +71,11 @@
   "options": {
     "title": "Optionen",
     "item": "Option {{n}}",
-    "add": "Option hinzufügen"
+    "add": "Option hinzufügen",
+    "itemName": "Option {{n}}"
+  },
+  "notFound": {
+    "title": "Produkttyp nicht gefunden",
+    "message": "Diesen Produkttyp gibt es nicht (mehr)."
   }
 }

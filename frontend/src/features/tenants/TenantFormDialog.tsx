@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 
 const schema = z.object({
-  name: z.string().trim().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long')),
+  name: z.string().trim().min(1, errorKey('validation.required')).max(200, errorKey('validation.too_long', { max: 200 })),
   isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
