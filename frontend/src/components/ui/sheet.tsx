@@ -17,10 +17,10 @@ export function Sheet({ open, onOpenChange, title, closeLabel, children }: Sheet
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="fixed inset-y-0 right-0 z-40 flex w-[min(20rem,calc(100vw-3rem))] flex-col border-l border-line bg-surface shadow-lg"
+          className="fixed inset-y-0 right-0 z-40 flex w-[min(20rem,calc(100vw-3rem))] flex-col border-l border-edge bg-raised shadow-2xl"
         >
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
             <DialogPrimitive.Title className="font-semibold">{title}</DialogPrimitive.Title>

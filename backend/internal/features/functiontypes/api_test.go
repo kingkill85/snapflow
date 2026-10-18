@@ -114,3 +114,20 @@ func TestUnknownLocale(t *testing.T) {
 	}
 	assertContains(t, resp.Body.String(), `{"location":"body.name.fr","code":"validation.locale"`)
 }
+
+func TestNameIsTrimmed(t *testing.T) {
+	api := apptest.New(t)
+
+	resp := api.Post("/api/function-types", api.Admin.Cookie, map[string]any{"key": "dimmer", "name": map[string]string{"en": "  Dimmer ", "de": "   "}})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("create: got %d: %s", resp.Code, resp.Body)
+	}
+	// Trimmed, and the blank German text is dropped.
+	assertContains(t, resp.Body.String(), `"name":{"en":"Dimmer"}`)
+
+	resp = api.Post("/api/function-types", api.Admin.Cookie, map[string]any{"key": "blind", "name": map[string]string{"en": "   ", "de": "Jalousie"}})
+	if resp.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("blank English: got %d: %s", resp.Code, resp.Body)
+	}
+	assertContains(t, resp.Body.String(), `"location":"body.name.en"`)
+}

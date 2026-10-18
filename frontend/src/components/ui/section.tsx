@@ -26,3 +26,8 @@ export function Section({ title, description, actions, children }: SectionProps)
     </section>
   )
 }
+
+/** The buttons at the end of a section's form, right-aligned above a divider, the same in every section. */
+export function SectionActions({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">{children}</div>
+}

@@ -7,22 +7,28 @@ import {
   ChevronRight,
   CircleAlert,
   Copy,
+  Ellipsis,
   ListPlus,
   Trash2,
 } from 'lucide-react'
-import { type ReactNode, useId } from 'react'
+import { type ReactNode, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/cn'
 
 import { IconButton } from './icon-button'
+import { Menu, MenuItem, MenuSeparator } from './menu'
 
 type RepeaterItemProps = {
-  /** Names the item, e.g. "Attribute 2"; also its accessible group name. */
+  /** The item's title, e.g. an attribute's label; also its accessible group name unless `groupLabel` is given. */
   title: string
   /** Names the item inside labels, e.g. "attribute 2" in "Expand attribute 2"; defaults to the title. */
   name?: string
-  /** Shown muted next to the title, e.g. the item's key or a summary. */
+  /** The group's accessible name when it should differ from the title, e.g. "Attribute 2: Bus system". */
+  groupLabel?: string
+  /** Shown muted before the title, e.g. the position. */
+  prefix?: ReactNode
+  /** Shown muted after the title, e.g. the item's key, type and unit. */
   subtitle?: ReactNode
   /** Controls in the item's header, usually RepeaterControls. */
   controls?: ReactNode
@@ -39,7 +45,20 @@ type RepeaterItemProps = {
 }
 
 /** One item of an editable list (a repeated group of fields), with a header and controls. */
-export function RepeaterItem({ title, name = title, subtitle, controls, compact, expanded, onExpandedChange, invalid, itemId, children }: RepeaterItemProps) {
+export function RepeaterItem({
+  title,
+  name = title,
+  groupLabel,
+  prefix,
+  subtitle,
+  controls,
+  compact,
+  expanded,
+  onExpandedChange,
+  invalid,
+  itemId,
+  children,
+}: RepeaterItemProps) {
   const { t } = useTranslation()
   const titleId = useId()
   const bodyId = useId()
@@ -49,7 +68,8 @@ export function RepeaterItem({ title, name = title, subtitle, controls, compact,
     <div
       data-repeater-item={itemId}
       role="group"
-      aria-labelledby={titleId}
+      aria-labelledby={groupLabel ? undefined : titleId}
+      aria-label={groupLabel}
       className={cn(
         'rounded-control border',
         invalid ? 'border-danger' : 'border-line',
@@ -75,10 +95,11 @@ export function RepeaterItem({ title, name = title, subtitle, controls, compact,
             </>
           )}
           <p className={cn('min-w-0 truncate', compact ? 'text-xs font-medium text-muted' : 'text-sm font-semibold')}>
+            {prefix && <span className="mr-2 font-normal text-muted tabular-nums">{prefix}</span>}
             <span id={titleId} className={cn(invalid && 'text-danger')}>
               {title}
             </span>
-            {subtitle && <span className="ml-2 font-normal text-muted">{subtitle}</span>}
+            {subtitle && <span className="ml-2 text-xs font-normal text-muted">{subtitle}</span>}
           </p>
         </div>
         {controls && <div className="ml-auto flex flex-wrap justify-end gap-1">{controls}</div>}
@@ -110,11 +131,24 @@ type RepeaterControlsProps = {
   boundaryMoves?: boolean
 }
 
-/** Move / insert / duplicate / remove buttons for a RepeaterItem (moves past the ends are disabled). */
+/**
+ * The controls of a RepeaterItem: move up and down stay visible (moves past
+ * the ends are disabled); the rarer actions (move to top or bottom, insert
+ * below, duplicate, remove) sit in a "⋯" menu when there are any besides
+ * remove, otherwise remove is a button of its own (D114).
+ */
 export function RepeaterControls({ index, count, name, onMove, onRemove, onInsertBelow, onDuplicate, boundaryMoves }: RepeaterControlsProps) {
   const { t } = useTranslation()
   const first = index === 0
   const last = index === count - 1
+  // An entry was chosen: the repeater moves focus itself (useRepeaterFocus), the menu must not take it back.
+  const acted = useRef(false)
+  const act = (action: () => void) => () => {
+    acted.current = true
+    action()
+  }
+  const remove = { label: t('action.removeItem', { item: name }), icon: <Trash2 /> }
+  const menu = boundaryMoves || onInsertBelow || onDuplicate
   return (
     <>
       <IconButton
@@ -131,27 +165,49 @@ export function RepeaterControls({ index, count, name, onMove, onRemove, onInser
         disabled={last}
         onClick={() => onMove(index, index + 1, 'down')}
       />
-      {boundaryMoves && (
-        <>
-          <IconButton
-            data-move="top"
-            label={t('action.moveTopItem', { item: name })}
-            icon={<ArrowUpToLine />}
-            disabled={first}
-            onClick={() => onMove(index, 0, 'top')}
-          />
-          <IconButton
-            data-move="bottom"
-            label={t('action.moveBottomItem', { item: name })}
-            icon={<ArrowDownToLine />}
-            disabled={last}
-            onClick={() => onMove(index, count - 1, 'bottom')}
-          />
-        </>
+      {menu ? (
+        <Menu
+          align="end"
+          label={t('action.moreItem', { item: name })}
+          trigger={<IconButton label={t('action.moreItem', { item: name })} icon={<Ellipsis />} />}
+          onCloseAutoFocus={(e) => {
+            if (acted.current) e.preventDefault()
+            acted.current = false
+          }}
+        >
+          {boundaryMoves && (
+            <>
+              <MenuItem disabled={first} onSelect={act(() => onMove(index, 0, 'top'))}>
+                <ArrowUpToLine /> {t('action.moveTop')}
+              </MenuItem>
+              <MenuItem disabled={last} onSelect={act(() => onMove(index, count - 1, 'bottom'))}>
+                <ArrowDownToLine /> {t('action.moveBottom')}
+              </MenuItem>
+            </>
+          )}
+          {(onInsertBelow || onDuplicate) && (
+            <>
+              {boundaryMoves && <MenuSeparator />}
+              {onInsertBelow && (
+                <MenuItem onSelect={act(() => onInsertBelow(index))}>
+                  <ListPlus /> {t('action.insertBelow')}
+                </MenuItem>
+              )}
+              {onDuplicate && (
+                <MenuItem onSelect={act(() => onDuplicate(index))}>
+                  <Copy /> {t('action.duplicate')}
+                </MenuItem>
+              )}
+            </>
+          )}
+          <MenuSeparator />
+          <MenuItem danger onSelect={act(() => onRemove(index))}>
+            {remove.icon} {t('action.remove')}
+          </MenuItem>
+        </Menu>
+      ) : (
+        <IconButton label={remove.label} icon={remove.icon} className="text-danger" onClick={() => onRemove(index)} />
       )}
-      {onInsertBelow && <IconButton label={t('action.insertBelowItem', { item: name })} icon={<ListPlus />} onClick={() => onInsertBelow(index)} />}
-      {onDuplicate && <IconButton label={t('action.duplicateItem', { item: name })} icon={<Copy />} onClick={() => onDuplicate(index)} />}
-      <IconButton label={t('action.removeItem', { item: name })} icon={<Trash2 />} className="text-danger" onClick={() => onRemove(index)} />
     </>
   )
 }

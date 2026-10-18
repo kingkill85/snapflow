@@ -60,7 +60,7 @@ export function [[.Plural]]Page() {
   const rowActions = (item: [[.Type]]) => (
     <>
       <RowAction onClick={() => openForm(item)} icon={<Pencil />} label={tCommon('action.edit')} />
-      <RowAction variant="danger" onClick={() => openDelete(item)} icon={<Trash2 />} label={tCommon('action.delete')} />
+      <RowAction variant="danger-quiet" onClick={() => openDelete(item)} icon={<Trash2 />} label={tCommon('action.delete')} />
     </>
   )
 
@@ -74,7 +74,7 @@ export function [[.Plural]]Page() {
         <DataTable
           rows={list.data.items}
           rowKey={(item) => item.id}
-          columns={[{ header: t('field.name'), cell: (item) => localized(item.name) }]}
+          columns={[{ header: t('field.name'), cell: (item) => localized(item.name), mobile: 'title' }]}
           actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}
         />

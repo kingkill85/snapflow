@@ -7,6 +7,7 @@ import type { AddonList, Product, Variant, VariantInput, VariantSearchItem, Vari
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
+import { shownTranslation, translation } from '@/test/translatable'
 import { chooseOption, optionTexts } from '@/test/select'
 
 import { black, categories, dimmer, gatewayCategory, ids, ivory, knxType, problem, types } from './test-fixtures'
@@ -85,7 +86,7 @@ describe('VariantEditorPage', () => {
     expect(await screen.findByRole('heading', { name: 'New variant' })).toBeInTheDocument()
     expect(screen.getByText('Variant of M485/DIM.4 · Dimmer 4ch')).toBeInTheDocument()
     expect(region('Add-ons')).toHaveTextContent('Add-ons can be added once the variant is created.')
-    await u.type(screen.getByLabelText('Name (English)'), 'Standard')
+    await u.type((await translation(u, document.body, 'Name', 'en')), 'Standard')
     await u.type(screen.getByLabelText('Price'), '27.5.0')
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
@@ -180,14 +181,30 @@ describe('VariantEditorPage', () => {
     renderRoutes(routes, { me: adminMe, route: ivoryRoute })
 
     await u.click(await screen.findByRole('button', { name: 'Update' }))
+    // The English tab is shown (the UI language).
     await waitFor(() =>
-      expect(screen.getByLabelText('Name (English)')).toHaveAccessibleDescription(expect.stringContaining('"Ivory White"') as unknown as string),
+      expect(screen.getByLabelText('Name')).toHaveAccessibleDescription(expect.stringContaining('"Ivory White"') as unknown as string),
     )
-    expect(screen.getByLabelText('Name (English)')).toHaveFocus()
+    expect(screen.getByLabelText('Name')).toHaveFocus()
 
     respond = () => problem(409, { code: 'variant.sku_taken', params: { sku: 'M485-IW' } })
     await u.click(screen.getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(screen.getByLabelText('SKU')).toHaveAccessibleDescription(expect.stringContaining('"M485-IW"') as unknown as string))
+  })
+
+  it('shows a server error of the German name on the German tab', async () => {
+    const u = userEvent.setup()
+    handlers(undefined, () =>
+      problem(422, { code: 'validation.failed', fields: [{ location: 'body.name.de', code: 'validation.too_long', params: { max: 100 } }] }),
+    )
+    renderRoutes(routes, { me: adminMe, route: ivoryRoute })
+
+    await u.click(await screen.findByRole('button', { name: 'Update' }))
+
+    const basics = region('Basics')
+    await waitFor(() => expect(shownTranslation(basics, 'Name').language).toBe('German'))
+    expect(shownTranslation(basics, 'Name').input).toHaveAccessibleDescription('This value is too long (at most 100 characters).')
+    expect(shownTranslation(basics, 'Name').input).toHaveFocus()
   })
 
   it('keeps Update disabled while an image uploads', async () => {

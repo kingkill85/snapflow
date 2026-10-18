@@ -33,9 +33,9 @@ export function RolesPage() {
       className: 'text-center',
       cell: (p: Permission) =>
         r.permissions.includes(p) ? (
-          <Check className="mx-auto size-4 text-success" role="img" aria-label={t('allowed')} />
+          <Check className="mx-auto size-4 text-success max-md:mx-0" role="img" aria-label={t('allowed')} />
         ) : (
-          <Minus className="mx-auto size-4 text-muted" role="img" aria-label={t('denied')} />
+          <Minus className="mx-auto size-4 text-muted max-md:mx-0" role="img" aria-label={t('denied')} />
         ),
     })),
   ]

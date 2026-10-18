@@ -11,13 +11,13 @@ import { Role, type Tenant, type User } from '@/api/generated/model'
 import { useMe } from '@/app/session'
 import {
   apiFields,
-  CheckboxField,
   errorKey,
   ErrorMessage,
   Field,
   FormDialog,
   FormSelectField,
   setApiFieldErrors,
+  SwitchField,
   TextLink,
   useFieldError,
 } from '@/components/ui'
@@ -112,7 +112,7 @@ export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenan
       onSubmit={() => void submit()}
       error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
-      <Field label={t('field.email')} type="email" autoComplete="off" error={fieldError(errors.email?.message)} {...form.register('email')} />
+      <Field label={t('field.email')} type="email" autoComplete="off" required error={fieldError(errors.email?.message)} {...form.register('email')} />
       <Field label={t('field.fullName')} autoComplete="off" error={fieldError(errors.fullName?.message)} {...form.register('fullName')} />
       {!isSelf && (
         <FormSelectField
@@ -142,11 +142,12 @@ export function UserFormDialog({ open, onOpenChange, item, tenants, defaultTenan
           type="password"
           autoComplete="new-password"
           hint={item ? t('field.passwordResetHint') : t('field.passwordHint')}
+          required={!item}
           error={fieldError(errors.password?.message)}
           {...form.register('password')}
         />
       )}
-      {!isSelf && <CheckboxField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />}
+      {!isSelf && <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />}
     </FormDialog>
   )
 }

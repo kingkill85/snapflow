@@ -12,7 +12,15 @@ import {
 } from '@/catalog/attribute-values'
 import { parseDecimal } from '@/catalog/decimal'
 import { pricePattern } from '@/catalog/money'
-import { type ApiFieldMap, errorKey } from '@/components/ui'
+import {
+  type ApiFieldMap,
+  errorKey,
+  fromTranslatable,
+  optionalTranslatable,
+  toTranslatable,
+  translatableApiFields,
+  translatableSchema,
+} from '@/components/ui'
 
 // The product and variant forms mirror the API body (name.en, price, ...), so
 // field error locations map 1:1; attribute values live under `values.<key>`
@@ -24,38 +32,24 @@ import { type ApiFieldMap, errorKey } from '@/components/ui'
 export const limits = { modelNumber: 100, name: 200, description: 5000, variantName: 100, sku: 100 }
 
 const tooLong = (max: number) => errorKey('validation.too_long', { max })
-const text = (max: number) => z.object({ en: z.string().max(max, tooLong(max)), de: z.string().max(max, tooLong(max)) })
-const requiredText = (max: number) =>
-  z.object({
-    en: z
-      .string()
-      .max(max, tooLong(max))
-      .refine((v) => v.trim() !== '', errorKey('validation.required')),
-    de: z.string().max(max, tooLong(max)),
-  })
+const requiredText = (max: number) => translatableSchema({ max, required: errorKey('validation.required') })
 const attributeValues = z.record(z.string(), z.custom<AttributeFormValue>())
 /** Per stored key outside the schema: sent back (true) or removed (false). */
 const keep = z.record(z.string(), z.boolean())
 
-export const productSchema = z
-  .object({
-    productTypeId: z.string().min(1, errorKey('validation.required')),
-    categoryId: z.string().min(1, errorKey('validation.required')),
-    modelNumber: z
-      .string()
-      .refine((v) => v.trim() !== '', errorKey('validation.required'))
-      .refine((v) => v.trim().length <= limits.modelNumber, tooLong(limits.modelNumber)),
-    name: requiredText(limits.name),
-    description: text(limits.description),
-    isActive: z.boolean(),
-    values: attributeValues,
-    keep,
-  })
-  .superRefine((v, ctx) => {
-    if (v.description.de.trim() !== '' && v.description.en.trim() === '') {
-      ctx.addIssue({ code: 'custom', path: ['description', 'en'], message: errorKey('validation.required') })
-    }
-  })
+export const productSchema = z.object({
+  productTypeId: z.string().min(1, errorKey('validation.required')),
+  categoryId: z.string().min(1, errorKey('validation.required')),
+  modelNumber: z
+    .string()
+    .refine((v) => v.trim() !== '', errorKey('validation.required'))
+    .refine((v) => v.trim().length <= limits.modelNumber, tooLong(limits.modelNumber)),
+  name: requiredText(limits.name),
+  description: translatableSchema({ max: limits.description }),
+  isActive: z.boolean(),
+  values: attributeValues,
+  keep,
+})
 export type ProductFormValues = z.infer<typeof productSchema>
 
 /** A typed price ("27,50" or "27.50") in the API's format, or undefined if it is not one (D52, D71). */
@@ -78,12 +72,6 @@ export const variantSchema = z.object({
 })
 export type VariantFormValues = z.infer<typeof variantSchema>
 
-const textValues = (t?: { [locale: string]: string }) => ({ en: t?.en ?? '', de: t?.de ?? '' })
-/** {en, de} without a blank German text. */
-const localized = (t: { en: string; de: string }) => ({ en: t.en, ...(t.de.trim() ? { de: t.de } : {}) })
-/** Like localized, but nothing when both are blank. */
-const optionalLocalized = (t: { en: string; de: string }) => (t.en.trim() || t.de.trim() ? localized(t) : undefined)
-
 /** Every stored value of a product or variant: the schema's and the stale ones. */
 export const storedValues = (item: Product | Variant | null): Record<string, unknown> =>
   item ? { ...item.attributes, ...item.staleAttributes } : {}
@@ -95,8 +83,8 @@ export function toProductFormValues(item: Product | null, defs: Definition[]): P
     productTypeId: item?.productTypeId ?? '',
     categoryId: item?.categoryId ?? '',
     modelNumber: item?.modelNumber ?? '',
-    name: textValues(item?.name),
-    description: textValues(item?.description),
+    name: toTranslatable(item?.name),
+    description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
     values: toFormValues(defs, item?.attributes),
     keep: keepAll(storedValues(item)),
@@ -105,7 +93,7 @@ export function toProductFormValues(item: Product | null, defs: Definition[]): P
 
 export function toVariantFormValues(item: Variant | null, defs: Definition[]): VariantFormValues {
   return {
-    name: textValues(item?.name),
+    name: toTranslatable(item?.name),
     sku: item?.sku ?? '',
     price: item?.price ?? '',
     imageFileId: item?.imageFileId ?? '',
@@ -127,12 +115,12 @@ export function toAttributes(defs: Definition[], values: AttributeFormValues, ke
 }
 
 export function toProductInput(v: ProductFormValues, attributes: Record<string, unknown>): ProductInput {
-  const description = optionalLocalized(v.description)
+  const description = optionalTranslatable(v.description)
   return {
     productTypeId: v.productTypeId,
     categoryId: v.categoryId,
     modelNumber: v.modelNumber.trim(),
-    name: localized(v.name),
+    name: fromTranslatable(v.name),
     ...(description ? { description } : {}),
     attributes,
     isActive: v.isActive,
@@ -142,7 +130,7 @@ export function toProductInput(v: ProductFormValues, attributes: Record<string, 
 export function toVariantInput(v: VariantFormValues, attributes: Record<string, unknown>): VariantInput {
   const sku = v.sku.trim()
   return {
-    name: localized(v.name),
+    name: fromTranslatable(v.name),
     ...(sku ? { sku } : {}),
     // Checked by the schema; the text as typed only if it is not a price (the server then says so).
     price: apiPrice(v.price) ?? v.price.trim(),
@@ -153,11 +141,13 @@ export function toVariantInput(v: VariantFormValues, attributes: Record<string, 
   }
 }
 
-const productFields = ['productTypeId', 'categoryId', 'modelNumber', 'name.en', 'name.de', 'description.en', 'description.de']
-const variantFields = ['name.en', 'name.de', 'sku', 'price', 'imageFileId']
+const productFields = ['productTypeId', 'categoryId', 'modelNumber']
+const variantFields = ['sku', 'price', 'imageFileId']
 
 /** API error locations shown at the form's fields, for the definitions shown and the stored values outside them. */
 export function editorFields(kind: 'product' | 'variant', defs: Definition[], values: AttributeFormValues, stored: Record<string, unknown>): ApiFieldMap {
   const own = Object.fromEntries((kind === 'product' ? productFields : variantFields).map((f) => [f, f]))
-  return { ...own, ...attributeFieldMap(defs, values, extraKeys(defs, stored)) }
+  const texts =
+    kind === 'product' ? { ...translatableApiFields('name'), ...translatableApiFields('description') } : translatableApiFields('name')
+  return { ...own, ...texts, ...attributeFieldMap(defs, values, extraKeys(defs, stored)) }
 }

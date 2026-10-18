@@ -102,7 +102,7 @@ export function UsersPage() {
                 <RowAction onClick={() => openForm(u)} icon={<Pencil />} label={tCommon('action.edit')} />
               )}
               {u.can.delete && (
-                <RowAction variant="danger" onClick={() => openDelete(u)} icon={<Trash2 />} label={tCommon('action.delete')} />
+                <RowAction variant="danger-quiet" onClick={() => openDelete(u)} icon={<Trash2 />} label={tCommon('action.delete')} />
               )}
             </>
           )}

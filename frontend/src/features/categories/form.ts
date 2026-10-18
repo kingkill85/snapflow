@@ -10,7 +10,17 @@ import {
   type InstanceAttributeDefinition,
 } from '@/api/generated/model'
 import { parseDecimal } from '@/catalog/decimal'
-import { type ApiFieldMap, errorKey } from '@/components/ui'
+import {
+  type ApiFieldMap,
+  defaultLanguage,
+  emptyTranslatable,
+  errorKey,
+  fromTranslatable,
+  optionalTranslatable,
+  toTranslatable,
+  translatableApiFields,
+  translatableSchema,
+} from '@/components/ui'
 
 // The editor's form mirrors the API body (name.en, attributes.2.options.0.key, ...),
 // so the API's field error locations map 1:1 to form fields. Numbers are edited
@@ -27,10 +37,6 @@ const keyPattern = /^[a-z][a-z0-9_]*$/
 const tooLong = (max: number) => errorKey('validation.too_long', { max })
 const key = (format: 'category.key_format' | 'attribute.key_format') =>
   z.string().max(limits.key, tooLong(limits.key)).regex(keyPattern, errorKey(format))
-
-const text = (max: number) => z.object({ en: z.string().max(max, tooLong(max)), de: z.string().max(max, tooLong(max)) })
-const requiredText = (max: number, message: 'validation.required' | 'attribute.label_required') =>
-  z.object({ en: z.string().max(max, tooLong(max)).refine((v) => v.trim() !== '', errorKey(message)), de: z.string().max(max, tooLong(max)) })
 
 /** Whether min/max apply to a type (value range, text length or item count). */
 export const hasBounds = (type: AttributeDefinitionType) => type === 'text' || type === 'number' || type === 'integer' || type === 'list'
@@ -51,19 +57,17 @@ const boundNumber = (v: string) => {
 const isNumber = (v: string) => Number.isFinite(boundNumber(v))
 
 type Ctx = z.RefinementCtx
-const requireEnglish = (t: { en: string; de: string }, path: (string | number)[], ctx: Ctx) => {
-  if (t.de.trim() !== '' && t.en.trim() === '') ctx.addIssue({ code: 'custom', path: [...path, 'en'], message: errorKey('validation.required') })
-}
 
-const option = z.object({ key: z.string(), label: text(limits.label) })
+// Options are checked only for types that have them (checkOptions), so their label is not required here.
+const option = z.object({ key: z.string(), label: translatableSchema({ max: limits.label, checkDefault: false }) })
 
 const attribute = z
   .object({
     key: key('attribute.key_format'),
     /** The key a duplicated row got; it must be changed before saving. Not sent. */
     copiedKey: z.string(),
-    label: requiredText(limits.label, 'attribute.label_required'),
-    description: text(limits.attributeDescription),
+    label: translatableSchema({ max: limits.label, required: errorKey('attribute.label_required') }),
+    description: translatableSchema({ max: limits.attributeDescription }),
     type: z.enum(AttributeDefinitionType),
     required: z.boolean(),
     unit: z.string().max(limits.unit, tooLong(limits.unit)),
@@ -77,7 +81,6 @@ const attribute = z
     if (a.copiedKey !== '' && a.key === a.copiedKey) {
       ctx.addIssue({ code: 'custom', path: ['key'], message: errorKey('attribute.key_copy') })
     }
-    requireEnglish(a.description, ['description'], ctx)
     if (hasBounds(a.type)) checkBounds(a, ctx)
     if (hasOptions(a.type, a.itemType)) checkOptions(a.options, ctx)
   })
@@ -131,10 +134,9 @@ function checkOptions(options: AttributeShape['options'], ctx: Ctx) {
       ctx.addIssue({ code: 'custom', path: ['options', j, 'key'], message: errorKey('attribute.option_key_duplicate') })
     }
     seen.add(o.key)
-    if (o.label.en.trim() === '') {
-      ctx.addIssue({ code: 'custom', path: ['options', j, 'label', 'en'], message: errorKey('attribute.label_required') })
+    if (o.label[defaultLanguage].trim() === '') {
+      ctx.addIssue({ code: 'custom', path: ['options', j, 'label', defaultLanguage], message: errorKey('attribute.label_required') })
     }
-    requireEnglish(o.label, ['options', j, 'label'], ctx)
   })
 }
 
@@ -151,16 +153,14 @@ const schemaList = z
     })
   })
 
-export const formSchema = z
-  .object({
-    key: key('category.key_format'),
-    name: requiredText(limits.name, 'validation.required'),
-    description: text(limits.description),
-    isActive: z.boolean(),
-    attributes: schemaList,
-    instanceAttributes: schemaList,
-  })
-  .superRefine((v, ctx) => requireEnglish(v.description, ['description'], ctx))
+export const formSchema = z.object({
+  key: key('category.key_format'),
+  name: translatableSchema({ max: limits.name, required: errorKey('validation.required') }),
+  description: translatableSchema({ max: limits.description }),
+  isActive: z.boolean(),
+  attributes: schemaList,
+  instanceAttributes: schemaList,
+})
 
 export type FormValues = z.infer<typeof formSchema>
 export type AttributeValues = FormValues['attributes'][number]
@@ -174,11 +174,16 @@ export type SchemaName = 'attributes' | 'instanceAttributes'
  */
 export function editorFields(v: FormValues): ApiFieldMap {
   const map: Record<string, string> = {}
-  for (const name of ['key', 'name.en', 'name.de', 'description.en', 'description.de']) map[name] = name
+  Object.assign(map, { key: 'key' }, translatableApiFields('name'), translatableApiFields('description'))
   for (const schema of ['attributes', 'instanceAttributes'] as const) {
     map[schema] = `${schema}.root`
     v[schema].forEach((a, i) => {
-      const leaves = ['key', 'label.en', 'label.de', 'description.en', 'description.de', 'type', 'unit']
+      Object.assign(
+        map,
+        translatableApiFields(`${schema}[${i}].label`, `${schema}.${i}.label`),
+        translatableApiFields(`${schema}[${i}].description`, `${schema}.${i}.description`),
+      )
+      const leaves = ['key', 'type', 'unit']
       if (schema === 'attributes') leaves.push('scope')
       if (a.type === 'list') leaves.push('itemType')
       if (hasBounds(a.type)) leaves.push('min', 'max')
@@ -186,20 +191,21 @@ export function editorFields(v: FormValues): ApiFieldMap {
       if (!hasOptions(a.type, a.itemType)) return
       map[`${schema}[${i}].options`] = `${schema}.${i}.options.root`
       a.options.forEach((_, j) => {
-        for (const leaf of ['key', 'label.en', 'label.de']) map[`${schema}[${i}].options[${j}].${leaf}`] = `${schema}.${i}.options.${j}.${leaf}`
+        map[`${schema}[${i}].options[${j}].key`] = `${schema}.${i}.options.${j}.key`
+        Object.assign(map, translatableApiFields(`${schema}[${i}].options[${j}].label`, `${schema}.${i}.options.${j}.label`))
       })
     })
   }
   return map
 }
 
-export const emptyOption = (): AttributeValues['options'][number] => ({ key: '', label: { en: '', de: '' } })
+export const emptyOption = (): AttributeValues['options'][number] => ({ key: '', label: emptyTranslatable() })
 
 export const emptyAttribute = (): AttributeValues => ({
   key: '',
   copiedKey: '',
-  label: { en: '', de: '' },
-  description: { en: '', de: '' },
+  label: emptyTranslatable(),
+  description: emptyTranslatable(),
   type: 'text',
   required: false,
   unit: '',
@@ -216,14 +222,13 @@ export const copyAttribute = (a: AttributeValues): AttributeValues => {
   return { ...structuredClone(a), key: copied, copiedKey: copied }
 }
 
-const textValues = (t?: { [locale: string]: string }) => ({ en: t?.en ?? '', de: t?.de ?? '' })
 const bound = (n?: number) => (n === undefined ? '' : String(n))
 
 const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition): AttributeValues => ({
   key: a.key,
   copiedKey: '',
-  label: textValues(a.label),
-  description: textValues(a.description),
+  label: toTranslatable(a.label),
+  description: toTranslatable(a.description),
   type: a.type,
   required: a.required ?? false,
   unit: a.unit ?? '',
@@ -231,31 +236,26 @@ const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition)
   min: bound(a.min),
   max: bound(a.max),
   itemType: a.itemType ?? 'text',
-  options: (a.options ?? []).map((o) => ({ key: o.key, label: textValues(o.label) })),
+  options: (a.options ?? []).map((o) => ({ key: o.key, label: toTranslatable(o.label) })),
 })
 
 /** The form's values for a category, or for a new one. */
 export function toFormValues(item: Category | null): FormValues {
   return {
     key: item?.key ?? '',
-    name: textValues(item?.name),
-    description: textValues(item?.description),
+    name: toTranslatable(item?.name),
+    description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
     attributes: (item?.attributes ?? []).map(toAttributeValues),
     instanceAttributes: (item?.instanceAttributes ?? []).map(toAttributeValues),
   }
 }
 
-/** {en, de} without a blank German text. */
-const localized = (t: { en: string; de: string }) => ({ en: t.en, ...(t.de.trim() ? { de: t.de } : {}) })
-/** Like localized, but nothing when both are blank. */
-const optionalLocalized = (t: { en: string; de: string }) => (t.en.trim() || t.de.trim() ? localized(t) : undefined)
-
 const toInstanceDefinition = (a: AttributeValues): InstanceAttributeDefinition => {
-  const description = optionalLocalized(a.description)
+  const description = optionalTranslatable(a.description)
   return {
     key: a.key,
-    label: localized(a.label),
+    label: fromTranslatable(a.label),
     ...(description ? { description } : {}),
     type: a.type,
     required: a.required,
@@ -263,7 +263,7 @@ const toInstanceDefinition = (a: AttributeValues): InstanceAttributeDefinition =
     ...(hasBounds(a.type) && a.min.trim() ? { min: boundNumber(a.min) } : {}),
     ...(hasBounds(a.type) && a.max.trim() ? { max: boundNumber(a.max) } : {}),
     ...(a.type === 'list' ? { itemType: a.itemType } : {}),
-    ...(hasOptions(a.type, a.itemType) ? { options: a.options.map((o) => ({ key: o.key, label: localized(o.label) })) } : {}),
+    ...(hasOptions(a.type, a.itemType) ? { options: a.options.map((o) => ({ key: o.key, label: fromTranslatable(o.label) })) } : {}),
   }
 }
 
@@ -271,10 +271,10 @@ const toDefinition = (a: AttributeValues): AttributeDefinition => ({ ...toInstan
 
 /** The API body for the form's values: only what applies to each attribute's type. */
 export function toInput(v: FormValues): CategoryInput {
-  const description = optionalLocalized(v.description)
+  const description = optionalTranslatable(v.description)
   return {
     key: v.key,
-    name: localized(v.name),
+    name: fromTranslatable(v.name),
     ...(description ? { description } : {}),
     isActive: v.isActive,
     attributes: v.attributes.map(toDefinition),

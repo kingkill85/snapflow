@@ -35,21 +35,21 @@ func TestLocales(t *testing.T) {
 	}
 }
 
-// The frontend's language list must match Locales.
+// The frontend's content locales (the TranslatableField tabs) must match Locales.
 func TestLocalesMatchFrontend(t *testing.T) {
-	src, err := os.ReadFile("../../../../frontend/src/i18n/resources.ts")
+	src, err := os.ReadFile("../../../../frontend/src/i18n/content-locales.ts")
 	if err != nil {
 		t.Skipf("frontend not checked out: %v", err)
 	}
-	m := regexp.MustCompile(`export const languages = \[([^\]]*)\]`).FindSubmatch(src)
+	m := regexp.MustCompile(`export const contentLocales = \[([^\]]*)\]`).FindSubmatch(src)
 	if m == nil {
-		t.Fatal("languages not found in resources.ts")
+		t.Fatal("contentLocales not found in content-locales.ts")
 	}
 	got := []string{}
 	for _, l := range strings.Split(string(m[1]), ",") {
 		got = append(got, strings.Trim(strings.TrimSpace(l), `'"`))
 	}
 	if !reflect.DeepEqual(got, Locales) {
-		t.Errorf("frontend languages %q, backend Locales %q", got, Locales)
+		t.Errorf("frontend contentLocales %q, backend Locales %q", got, Locales)
 	}
 }

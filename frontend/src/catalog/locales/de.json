@@ -4,7 +4,6 @@
   "yes": "Ja",
   "no": "Nein",
   "hint": {
-    "required": "Pflichtfeld",
     "length": "{{min}} bis {{max}} Zeichen",
     "lengthMin": "Mindestens {{min}} Zeichen",
     "lengthMax": "Höchstens {{max}} Zeichen",

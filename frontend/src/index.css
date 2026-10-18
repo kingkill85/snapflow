@@ -21,6 +21,14 @@
   --color-success: oklch(0.5 0.12 150);
   --color-warning: oklch(0.5 0.12 70);
   --color-focus: oklch(0.7 0.15 262);
+  /*
+   * Floating layers (dialogs, menus, dropdowns): their surface and edge, and
+   * the scrim that dims the page behind a dialog. In the dark theme the layer
+   * is lighter than the page and the scrim stronger, so a dialog stands out.
+   */
+  --color-raised: oklch(1 0 0);
+  --color-edge: oklch(0.86 0.01 260);
+  --color-scrim: oklch(0.2 0.01 260 / 0.45);
   --radius-control: 0.5rem;
 }
 
@@ -50,6 +58,9 @@
       --color-primary-ink: oklch(0.16 0.01 260);
       --color-danger: oklch(0.7 0.19 25);
       --color-danger-ink: oklch(0.16 0.01 260);
+      --color-raised: oklch(0.24 0.01 260);
+      --color-edge: oklch(0.38 0.01 260);
+      --color-scrim: oklch(0 0 0 / 0.65);
     }
   }
   :root[data-theme='dark'] {
@@ -64,6 +75,32 @@
     --color-primary-ink: oklch(0.16 0.01 260);
     --color-danger: oklch(0.7 0.19 25);
     --color-danger-ink: oklch(0.16 0.01 260);
+    --color-raised: oklch(0.24 0.01 260);
+    --color-edge: oklch(0.38 0.01 260);
+    --color-scrim: oklch(0 0 0 / 0.65);
+  }
+
+  /*
+   * Keyboard focus and jumps to an error never end under a page's sticky
+   * action bar (FormActions measures its height; plus its 0.75rem offset and
+   * some air).
+   */
+  html:has([data-form-actions]) {
+    scroll-padding-bottom: calc(var(--form-actions-height, 4.5rem) + 1.5rem);
+  }
+
+  /*
+   * A DataTable cell's label in the stacked cards of phones (D117): the
+   * column header as generated content, with empty alternative text so
+   * screen readers (which have the real header) do not read it twice. The
+   * first declaration is the fallback for browsers without the "/ alt" form.
+   */
+  @media (width < 48rem) {
+    td[data-label]::before {
+      content: attr(data-label);
+      content: attr(data-label) / '';
+      color: var(--color-muted);
+    }
   }
 
   body {

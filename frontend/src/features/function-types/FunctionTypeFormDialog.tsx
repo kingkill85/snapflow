@@ -11,16 +11,28 @@ import {
   useUpdateFunctionType,
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
-import { apiFields, errorKey, ErrorMessage, Field, FormDialog, setApiFieldErrors, useFieldError } from '@/components/ui'
+import {
+  apiFields,
+  errorKey,
+  ErrorMessage,
+  Field,
+  FormDialog,
+  FormTranslatableField,
+  fromTranslatable,
+  setApiFieldErrors,
+  toTranslatable,
+  translatableApiFields,
+  translatableSchema,
+  useFieldError,
+} from '@/components/ui'
 
 const schema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]*$/, errorKey('function_type.key_format')).max(64, errorKey('validation.too_long', { max: 64 })),
-  nameEn: z.string().trim().min(1, errorKey('validation.required')),
-  nameDe: z.string().trim(),
+  name: translatableSchema({ required: errorKey('validation.required') }),
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = apiFields<FormValues>(['key'], { 'name.en': 'nameEn', 'name.de': 'nameDe' })
+const fields = { ...apiFields<FormValues>(['key']), ...translatableApiFields('name') }
 
 type Props = {
   open: boolean
@@ -49,15 +61,14 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
     if (!open) return
     reset({
       key: functionType?.key ?? '',
-      nameEn: functionType?.name.en ?? '',
-      nameDe: functionType?.name.de ?? '',
+      name: toTranslatable(functionType?.name),
     })
     resetCreate()
     resetUpdate()
   }, [open, functionType, reset, resetCreate, resetUpdate])
 
   const submit = form.handleSubmit(async (values) => {
-    const data = { key: values.key, name: { en: values.nameEn, ...(values.nameDe ? { de: values.nameDe } : {}) } }
+    const data = { key: values.key, name: fromTranslatable(values.name) }
     try {
       if (functionType) await update.mutateAsync({ id: functionType.id, data })
       else await create.mutateAsync({ data })
@@ -79,9 +90,8 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       onSubmit={() => void submit()}
       error={<ErrorMessage error={mutation.error} fields={fields} />}
     >
-      <Field label={t('field.key')} hint={t('field.keyHint')} error={fieldError(errors.key?.message)} {...form.register('key')} />
-      <Field label={t('field.nameEn')} error={fieldError(errors.nameEn?.message)} {...form.register('nameEn')} />
-      <Field label={t('field.nameDe')} error={fieldError(errors.nameDe?.message)} {...form.register('nameDe')} />
+      <Field label={t('field.key')} hint={t('field.keyHint')} required autoComplete="off" error={fieldError(errors.key?.message)} {...form.register('key')} />
+      <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
     </FormDialog>
   )
 }

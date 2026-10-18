@@ -1,10 +1,11 @@
-import * as LabelPrimitive from '@radix-ui/react-label'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { type ReactNode, type Ref, useId } from 'react'
 import { type Control, type FieldPath, type FieldValues, useController } from 'react-hook-form'
 
 import { cn } from '@/lib/cn'
+
+import { FieldLabel, FieldMessage } from './label'
 
 /**
  * One choice. `label` is the plain text (typeahead, accessible name);
@@ -65,7 +66,7 @@ export function Select({ value, onValueChange, options, className, placeholder, 
           position="popper"
           sideOffset={4}
           collisionPadding={8}
-          className="z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-line bg-surface text-ink shadow-lg"
+          className="z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-edge bg-raised text-ink shadow-lg"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-6 items-center justify-center text-muted">
             <ChevronUp className="size-4" />
@@ -95,25 +96,32 @@ export function Select({ value, onValueChange, options, className, placeholder, 
   )
 }
 
-type SelectFieldProps = Omit<SelectProps, 'aria-label' | 'aria-invalid' | 'aria-describedby'> & { label: string; error?: string; hint?: string }
+type SelectFieldProps = Omit<SelectProps, 'aria-label' | 'aria-invalid' | 'aria-describedby'> & {
+  label: string
+  error?: string
+  hint?: string
+  /** Marks the label with an asterisk and the dropdown with aria-required. */
+  required?: boolean
+}
 
 /** Label + dropdown + hint/error, wired for accessibility like Field. */
-export function SelectField({ label, error, hint, id, ...props }: SelectFieldProps) {
+export function SelectField({ label, error, hint, required, id, 'aria-required': ariaRequired, ...props }: SelectFieldProps) {
   const generated = useId()
   const selectId = id ?? generated
   const messageId = `${selectId}-message`
-  const message = error || hint
   return (
     <div className="group/field min-w-0 space-y-1.5">
-      <LabelPrimitive.Root htmlFor={selectId} className="text-sm font-medium">
+      <FieldLabel htmlFor={selectId} required={required}>
         {label}
-      </LabelPrimitive.Root>
-      <Select id={selectId} aria-invalid={error ? true : undefined} aria-describedby={message ? messageId : undefined} {...props} />
-      {message && (
-        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
-          {message}
-        </p>
-      )}
+      </FieldLabel>
+      <Select
+        id={selectId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error || hint ? messageId : undefined}
+        aria-required={required || ariaRequired || undefined}
+        {...props}
+      />
+      <FieldMessage id={messageId} error={error} hint={hint} />
     </div>
   )
 }

@@ -18,8 +18,8 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-control border border-line bg-surface p-6 shadow-lg">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
+        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl">
           <div className="space-y-1">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
             {description ? (
@@ -58,8 +58,8 @@ export function FormDialog({ open, onOpenChange, title, submitLabel, submitting,
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-control border border-line bg-surface p-6 shadow-lg">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
+        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl">
           <DialogPrimitive.Title className="mb-4 text-lg font-semibold">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>

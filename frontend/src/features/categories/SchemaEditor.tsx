@@ -9,11 +9,11 @@ import {
   CheckboxField,
   EmptyState,
   Field,
+  FormSelectField,
+  FormTranslatableField,
   type MoveAction,
   RepeaterControls,
   RepeaterItem,
-  FormSelectField,
-  TextareaField,
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
@@ -119,7 +119,7 @@ export function SchemaEditor({ form, name, readOnly, startCollapsed, errorRevisi
         <AttributeRow
           key={field.id}
           itemId={field.id}
-                    form={form}
+          form={form}
           name={name}
           index={index}
           readOnly={readOnly}
@@ -176,9 +176,12 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
 
   // Labels for min/max say what they limit for the chosen type.
   const boundsLabel = type === 'text' ? 'length' : type === 'list' ? 'items' : 'value'
-  // Collapsed rows show what they define: Label · type · unit · required · scope.
+  // The card is titled by the attribute's label (its key, or its position, while it has none) and
+  // says what it defines: key · type · unit · required · scope (D114).
+  const position = t('schema.item', { n: index + 1 })
+  const title = localized(label).trim() || key.trim() || position
   const summary = [
-    localized(label) || key,
+    title !== key.trim() ? key.trim() : '',
     t(`type.${type}`),
     unit.trim(),
     required ? t('field.required') : '',
@@ -190,20 +193,30 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
   return (
     <RepeaterItem
       itemId={itemId}
-      title={t('schema.item', { n: index + 1 })}
+      title={title}
+      prefix={index + 1}
+      groupLabel={title === position ? position : `${position}: ${title}`}
       name={t('schema.itemName', { n: index + 1 })}
-      subtitle={expanded === false ? summary : key}
+      subtitle={summary}
       controls={controls}
       expanded={expanded}
       onExpandedChange={onExpandedChange}
       invalid={hasErrorAt(form, path)}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label={t('field.key')} hint={t('schema.keyHint')} error={errorAt(`${path}.key`)} {...register(`${path}.key`)} />
-        <Field label={t('field.labelEn')} error={errorAt(`${path}.label.en`)} {...register(`${path}.label.en`)} />
-        <Field label={t('field.labelDe')} error={errorAt(`${path}.label.de`)} {...register(`${path}.label.de`)} />
+      <div className="grid items-start gap-4 sm:grid-cols-3">
+        <Field
+          label={t('field.key')}
+          hint={t('schema.keyHint')}
+          required
+          autoComplete="off"
+          error={errorAt(`${path}.key`)}
+          {...register(`${path}.key`)}
+        />
+        <div className="sm:col-span-2">
+          <FormTranslatableField control={form.control} name={`${path}.label`} label={t('field.label')} required />
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-3">
         <FormSelectField
           control={form.control}
           name={`${path}.type`}
@@ -248,20 +261,14 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
           ))}
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextareaField
-          label={t('field.descriptionEn')}
-          rows={2}
-          error={errorAt(`${path}.description.en`)}
-          {...register(`${path}.description.en`)}
-        />
-        <TextareaField
-          label={t('field.descriptionDe')}
-          rows={2}
-          error={errorAt(`${path}.description.de`)}
-          {...register(`${path}.description.de`)}
-        />
-      </div>
+      <FormTranslatableField
+        control={form.control}
+        name={`${path}.description`}
+        label={t('field.description')}
+        hint={t('field.descriptionHint')}
+        multiline
+        rows={2}
+      />
       <CheckboxField label={t('field.required')} hint={t('field.requiredHint')} {...register(`${path}.required`)} />
       {hasOptions(type, itemType) && <OptionsEditor form={form} path={path} readOnly={readOnly} />}
     </RepeaterItem>
@@ -315,18 +322,17 @@ function OptionsEditor({ form, path, readOnly }: OptionsEditorProps) {
             )
           }
         >
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label={t('field.key')} error={errorAt(`${path}.options.${j}.key`)} {...form.register(`${path}.options.${j}.key`)} />
+          <div className="grid items-start gap-3 sm:grid-cols-3">
             <Field
-              label={t('field.labelEn')}
-              error={errorAt(`${path}.options.${j}.label.en`)}
-              {...form.register(`${path}.options.${j}.label.en`)}
+              label={t('field.key')}
+              required
+              autoComplete="off"
+              error={errorAt(`${path}.options.${j}.key`)}
+              {...form.register(`${path}.options.${j}.key`)}
             />
-            <Field
-              label={t('field.labelDe')}
-              error={errorAt(`${path}.options.${j}.label.de`)}
-              {...form.register(`${path}.options.${j}.label.de`)}
-            />
+            <div className="sm:col-span-2">
+              <FormTranslatableField control={form.control} name={`${path}.options.${j}.label`} label={t('field.label')} required />
+            </div>
           </div>
         </RepeaterItem>
       ))}

@@ -113,6 +113,7 @@ export function ProductTypesPage() {
     { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px text-right tabular-nums' },
     {
       header: t('field.name'),
+      mobile: 'title',
       cell: (p) => (
         <TypeBadge color={p.color} abbreviation={p.abbreviation} wrap>
           {localized(p.name)}
@@ -146,7 +147,7 @@ export function ProductTypesPage() {
         />
         {p.can.update && <RowAction onClick={() => openForm(p)} icon={<Pencil />} label={tCommon('action.edit')} />}
         {p.can.delete && (
-          <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
+          <RowAction variant="danger-quiet" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
       </>
     )

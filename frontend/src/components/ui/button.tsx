@@ -11,7 +11,10 @@ const buttonVariants = cva(
       variant: {
         primary: 'bg-primary text-primary-ink hover:bg-primary/90',
         secondary: 'border border-line bg-surface hover:bg-canvas',
+        /** Solid: only for confirming a destructive action (ConfirmDialog). */
         danger: 'bg-danger text-danger-ink hover:bg-danger/90',
+        /** A destructive action offered among others (row Delete, Remove): quiet until hovered. */
+        'danger-quiet': 'border border-line bg-surface text-danger hover:border-danger/40 hover:bg-danger/10',
         ghost: 'hover:bg-canvas',
       },
       size: {

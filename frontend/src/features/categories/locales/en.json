@@ -22,16 +22,10 @@
     "key": "Key",
     "keyHint": "e.g. gateways, dimmer_actuators",
     "name": "Name",
-    "nameEn": "Name (English)",
-    "nameDe": "Name (German)",
-    "descriptionEn": "Description (English)",
-    "descriptionDe": "Description (German)",
     "active": "Active",
     "activeHint": "Inactive categories are hidden from the catalog but keep their products.",
     "attributeCount": "Attributes",
     "status": "Status",
-    "labelEn": "Label (English)",
-    "labelDe": "Label (German)",
     "type": "Type",
     "itemType": "Item type",
     "scope": "Set per",
@@ -39,7 +33,10 @@
     "unitHint": "Display only, e.g. TE, mA, W",
     "required": "Required",
     "requiredHint": "A value must be set.",
-    "position": "Position"
+    "position": "Position",
+    "description": "Description",
+    "label": "Label",
+    "descriptionHint": "Shown as help under the input."
   },
   "schema": {
     "item": "Attribute {{n}}",

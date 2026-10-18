@@ -1,4 +1,4 @@
-import { expect, row, test, unique } from '../fixtures'
+import { expect, row, test, unique, translation } from '../fixtures'
 
 test('an unknown URL shows the not-found page', async ({ page }) => {
   await page.goto('/projects/123/does-not-exist')
@@ -18,18 +18,18 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
   await dialog.getByLabel('Key').fill('Not A Key')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog.getByLabel('Key')).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
-  await expect(dialog.getByLabel('Name (English)')).toHaveAccessibleDescription('This field is required.')
+  await expect(await translation(dialog, 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
 
   await dialog.getByLabel('Key').fill(key)
-  await dialog.getByLabel('Name (English)').fill(name)
-  await dialog.getByLabel('Name (German)').fill(`${name} DE`)
+  await (await translation(dialog, 'Name', 'en')).fill(name)
+  await (await translation(dialog, 'Name', 'de')).fill(`${name} DE`)
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog).toBeHidden()
   await expect(row(page, key)).toContainText(name)
 
   await page.getByRole('button', { name: 'New function type' }).first().click()
   await dialog.getByLabel('Key').fill(key)
-  await dialog.getByLabel('Name (English)').fill('Duplicate')
+  await (await translation(dialog, 'Name', 'en')).fill('Duplicate')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog.getByRole('alert')).toHaveText(`The key "${key}" is already used.`)
   await dialog.getByRole('button', { name: 'Cancel' }).click()
@@ -39,7 +39,7 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
   await row(page, key).getByRole('button', { name: 'Edit' }).click()
   const edit = page.getByRole('dialog', { name: 'Edit function type' })
   await expect(edit.getByLabel('Key')).toHaveValue(key)
-  await edit.getByLabel('Name (English)').fill(renamed)
+  await (await translation(edit, 'Name', 'en')).fill(renamed)
   await edit.getByRole('button', { name: 'Update' }).click()
   await expect(edit).toBeHidden()
   await expect(row(page, key)).toContainText(renamed)

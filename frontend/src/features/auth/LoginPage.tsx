@@ -61,6 +61,7 @@ export function LoginPage() {
           <Field
             label={t('login.email')}
             type="email"
+            required
             autoComplete="username"
             autoFocus
             error={fieldError(errors.email?.message)}
@@ -69,6 +70,7 @@ export function LoginPage() {
           <Field
             label={t('login.password')}
             type="password"
+            required
             autoComplete="current-password"
             error={fieldError(errors.password?.message)}
             {...form.register('password')}

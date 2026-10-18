@@ -1,10 +1,8 @@
-import * as LabelPrimitive from '@radix-ui/react-label'
 import { type ComponentProps, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { cn } from '@/lib/cn'
-
 import { Input } from './field'
+import { FieldLabel, FieldMessage } from './label'
 
 const hex = /^#[0-9a-fA-F]{6}$/
 
@@ -28,10 +26,8 @@ export function ColorField({ label, value, onChange, error, hint, id, disabled, 
   const messageId = `${inputId}-message`
   const message = error || hint
   return (
-    <div className="group/field space-y-1.5">
-      <LabelPrimitive.Root htmlFor={inputId} className="text-sm font-medium">
-        {label}
-      </LabelPrimitive.Root>
+    <div className="group/field min-w-0 space-y-1.5">
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
       <div className="flex gap-2">
         <input
           type="color"
@@ -54,11 +50,7 @@ export function ColorField({ label, value, onChange, error, hint, id, disabled, 
           {...props}
         />
       </div>
-      {message && (
-        <p id={messageId} className={cn('text-xs', error ? 'text-danger' : 'text-muted group-has-[:disabled]/field:hidden')}>
-          {message}
-        </p>
-      )}
+      <FieldMessage id={messageId} error={error} hint={hint} />
     </div>
   )
 }

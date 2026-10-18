@@ -184,7 +184,7 @@ export function ProductsPage() {
   ]
 
   const columns: Column<ProductListItem>[] = [
-    { header: t('column.image'), cell: (p) => <Thumbnail src={fileUrl(p.previewImageFileId)} />, className: 'w-px' },
+    { header: t('column.image'), cell: (p) => <Thumbnail src={fileUrl(p.previewImageFileId)} />, className: 'w-px', mobile: 'media' },
     {
       header: t('column.modelNumber'),
       cell: (p) => (
@@ -236,7 +236,7 @@ export function ProductsPage() {
         <RowAction to={productPath(p.id)} state={linkState} icon={<Pencil />} label={tCommon('action.edit')} />
       )}
       {p.can.delete && (
-        <RowAction variant="danger" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
+        <RowAction variant="danger-quiet" onClick={() => openDelete(p)} icon={<Trash2 />} label={tCommon('action.delete')} />
       )}
     </>
   )

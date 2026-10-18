@@ -67,6 +67,8 @@ func (s *Service) Create(ctx context.Context, in [[.Type]]Input) ([[.Type]], err
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return [[.Type]]{}, err
 	}
+	// Names are stored trimmed, blank translations dropped.
+	in.Name = in.Name.Trimmed()
 	if err := validate(in); err != nil {
 		return [[.Type]]{}, err
 	}
@@ -81,6 +83,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in [[.Type]]Input) (
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return [[.Type]]{}, err
 	}
+	// Names are stored trimmed, blank translations dropped.
+	in.Name = in.Name.Trimmed()
 	if err := validate(in); err != nil {
 		return [[.Type]]{}, err
 	}

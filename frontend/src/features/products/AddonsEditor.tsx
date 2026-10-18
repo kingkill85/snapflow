@@ -300,7 +300,8 @@ export function AddonsEditor({ product, variant, types, categories, readOnly, li
             >
               <div className="flex flex-wrap items-center gap-3">
                 <Thumbnail src={fileUrl(item.imageFileId)} />
-                <p className="min-w-0 flex-1 text-sm text-muted">
+                {/* At least 10rem for the product name: on a phone the badge and checkbox wrap below it. */}
+                <p className="min-w-0 flex-1 basis-40 text-sm text-muted">
                   <TextLink to={productPath(item.productId)} state={linkState}>
                     {localized(item.productName)}
                   </TextLink>

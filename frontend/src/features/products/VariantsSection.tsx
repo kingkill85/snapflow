@@ -104,7 +104,7 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
   }
 
   const columns: Column<Variant>[] = [
-    { header: t('variants.column.image'), cell: (v) => <Thumbnail src={fileUrl(v.imageFileId)} />, className: 'w-px' },
+    { header: t('variants.column.image'), cell: (v) => <Thumbnail src={fileUrl(v.imageFileId)} />, className: 'w-px', mobile: 'media' },
     {
       header: t('variants.column.name'),
       cell: (v) =>
@@ -156,7 +156,7 @@ export function VariantsSection({ product, locked = false, linkState }: Variants
             <RowAction to={variantPath(product.id, v.id)} state={linkState} icon={<Pencil />} label={tCommon('action.edit')} />
           ))}
         {v.can.delete && (
-          <RowAction variant="danger" onClick={() => openDelete(v)} icon={<Trash2 />} label={tCommon('action.delete')} />
+          <RowAction variant="danger-quiet" onClick={() => openDelete(v)} icon={<Trash2 />} label={tCommon('action.delete')} />
         )}
       </>
     )

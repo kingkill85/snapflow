@@ -18,6 +18,7 @@ import {
   Notice,
   Page,
   Section,
+  SectionActions,
   setApiFieldErrors,
   useFieldError,
 } from '@/components/ui'
@@ -47,12 +48,11 @@ export function ProfilePage() {
   const me = useMe()
 
   return (
-    <Page title={t('profile.title')} description={`${tCommon(`role.${me.role}`)} · ${me.tenantName}`}>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <DetailsForm />
-        <PasswordForm />
-        <Sessions />
-      </div>
+    // One column of three sections, each with its action at the bottom right (D116).
+    <Page width="narrow" title={t('profile.title')} description={`${tCommon(`role.${me.role}`)} · ${me.tenantName}`}>
+      <DetailsForm />
+      <PasswordForm />
+      <Sessions />
     </Page>
   )
 }
@@ -92,13 +92,16 @@ function DetailsForm() {
         <Field
           label={t('profile.email')}
           type="email"
+          required
           autoComplete="email"
           error={fieldError(errors.email?.message)}
           {...form.register('email')}
         />
-        <Button type="submit" disabled={update.isPending}>
-          {tCommon('action.save')}
-        </Button>
+        <SectionActions>
+          <Button type="submit" disabled={update.isPending}>
+            {tCommon('action.save')}
+          </Button>
+        </SectionActions>
       </form>
     </Section>
   )
@@ -133,6 +136,7 @@ function PasswordForm() {
         <Field
           label={t('profile.currentPassword')}
           type="password"
+          required
           autoComplete="current-password"
           error={fieldError(errors.currentPassword?.message)}
           {...form.register('currentPassword')}
@@ -140,6 +144,7 @@ function PasswordForm() {
         <Field
           label={t('profile.newPassword')}
           type="password"
+          required
           autoComplete="new-password"
           hint={t('profile.newPasswordHint')}
           error={fieldError(errors.newPassword?.message)}
@@ -148,13 +153,16 @@ function PasswordForm() {
         <Field
           label={t('profile.confirmPassword')}
           type="password"
+          required
           autoComplete="new-password"
           error={fieldError(errors.confirmPassword?.message)}
           {...form.register('confirmPassword')}
         />
-        <Button type="submit" disabled={change.isPending}>
-          {t('profile.changePassword')}
-        </Button>
+        <SectionActions>
+          <Button type="submit" disabled={change.isPending}>
+            {t('profile.changePassword')}
+          </Button>
+        </SectionActions>
       </form>
     </Section>
   )
@@ -166,9 +174,11 @@ function Sessions() {
 
   return (
     <Section title={t('profile.sessions')} description={t('profile.sessionsDescription')}>
-      <Button variant="secondary" onClick={() => setConfirming(true)}>
-        <LogOut /> {t('profile.signOutEverywhere')}
-      </Button>
+      <SectionActions>
+        <Button variant="secondary" onClick={() => setConfirming(true)}>
+          <LogOut /> {t('profile.signOutEverywhere')}
+        </Button>
+      </SectionActions>
       <SignOutEverywhereDialog open={confirming} onOpenChange={setConfirming} />
     </Section>
   )

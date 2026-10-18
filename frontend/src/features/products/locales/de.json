@@ -46,12 +46,10 @@
     "chooseCategory": "Kategorie auswählen",
     "modelNumber": "Modellnummer",
     "modelNumberHint": "z. B. M485/GW-ZB.10; eindeutig im Katalog",
-    "nameEn": "Name (Englisch)",
-    "nameDe": "Name (Deutsch)",
-    "descriptionEn": "Beschreibung (Englisch)",
-    "descriptionDe": "Beschreibung (Deutsch)",
     "active": "Aktiv",
-    "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung."
+    "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung.",
+    "name": "Name",
+    "description": "Beschreibung"
   },
   "categoryChange": "Sie haben die Kategorie geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute der neuen Kategorie geprüft; Werte, die die neue Kategorie nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zur neuen Kategorie passen, werden an den Varianten markiert.",
   "chooseCategoryFirst": "Wählen Sie eine Kategorie, um ihre Attribute auszufüllen.",
@@ -92,9 +90,8 @@
       "attributesHint": "Werte der Attribute der Kategorie, die pro Variante gesetzt werden."
     },
     "field": {
-      "nameEn": "Name (Englisch)",
+      "name": "Name",
       "nameHint": "z. B. Ivory White; „Standard“, wenn das Produkt nur eine Variante hat",
-      "nameDe": "Name (Deutsch)",
       "sku": "SKU",
       "skuHint": "Optional; eindeutig im Katalog",
       "price": "Preis",
