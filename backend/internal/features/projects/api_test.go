@@ -1,11 +1,13 @@
 package projects_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -104,13 +106,34 @@ func TestCRUD(t *testing.T) {
 	body["exchangeRate"] = "0.920000"
 	body["language"] = "de"
 	body["productTypeIds"] = []uuid.UUID{knx}
-	body["customer"] = map[string]any{"company": "Schmidt GmbH"}
+	// An empty string clears a customer field, one left out keeps it.
+	body["customer"] = map[string]any{"name": "", "company": "Schmidt GmbH"}
+	body["notes"] = "first notes"
 	resp := api.Put("/api/projects/"+p.ID.String(), admin, body)
 	wantCode(t, resp, http.StatusOK, "")
 	u := decode[projects.Project](t, resp)
 	if u.Name != "Villa Schmidt" || u.Currency != "EUR" || u.ExchangeRate != "0.92" || u.Language != "de" ||
-		u.Customer.Name != "" || u.Customer.Company != "Schmidt GmbH" || len(u.ProductTypeIDs) != 1 || u.Number != p.Number {
+		u.Customer.Name != "" || u.Customer.Company != "Schmidt GmbH" || u.Customer.Email != "anna@example.com" ||
+		u.Customer.Address != "Street 1\nTown" || u.Notes != "first notes" || len(u.ProductTypeIDs) != 1 || u.Number != p.Number {
 		t.Errorf("updated: %+v", u)
+	}
+	// Without customer and notes, both stay; an empty notes string clears them.
+	body = updateBody(u)
+	delete(body, "customer")
+	delete(body, "notes")
+	resp = api.Put("/api/projects/"+p.ID.String(), admin, body)
+	wantCode(t, resp, http.StatusOK, "")
+	if k := decode[projects.Project](t, resp); k.Customer != u.Customer || k.Notes != "first notes" {
+		t.Errorf("omitted customer/notes must keep them: %+v %q", k.Customer, k.Notes)
+	} else {
+		u = k
+	}
+	body = updateBody(u)
+	body["notes"] = ""
+	resp = api.Put("/api/projects/"+p.ID.String(), admin, body)
+	wantCode(t, resp, http.StatusOK, "")
+	if u = decode[projects.Project](t, resp); u.Notes != "" || u.Customer.Company != "Schmidt GmbH" {
+		t.Errorf("empty notes must clear them: %+v", u)
 	}
 
 	// Stale.
@@ -260,6 +283,17 @@ func TestVersions(t *testing.T) {
 	if premium.Notes != "cheap" || premium.Position != 2 || !premium.Can.Delete {
 		t.Errorf("copy: %+v", premium)
 	}
+	// Notes left out stay, an empty string clears them.
+	resp = api.Put(path+"/"+premium.ID.String(), admin, map[string]any{"name": "Premium+", "expectedUpdatedAt": premium.UpdatedAt})
+	wantCode(t, resp, http.StatusOK, "")
+	if premium = decode[projects.ProjectVersion](t, resp); premium.Notes != "cheap" || premium.Name != "Premium+" {
+		t.Errorf("rename without notes: %+v", premium)
+	}
+	resp = api.Put(path+"/"+premium.ID.String(), admin, map[string]any{"name": "Premium", "notes": "", "expectedUpdatedAt": premium.UpdatedAt})
+	wantCode(t, resp, http.StatusOK, "")
+	if premium = decode[projects.ProjectVersion](t, resp); premium.Notes != "" {
+		t.Errorf("empty notes: %+v", premium)
+	}
 	resp = api.Post(path, admin, map[string]any{"name": "Fresh"})
 	wantCode(t, resp, http.StatusCreated, "")
 	if fresh := decode[projects.ProjectVersion](t, resp); fresh.Notes != "" || fresh.Position != 3 {
@@ -389,5 +423,94 @@ func TestPermissionsMatrixUnchanged(t *testing.T) {
 		if got != want {
 			t.Errorf("%s: %v", role, got)
 		}
+	}
+}
+
+// Two deletes of the two versions of a project: exactly one wins, the other
+// would delete the last version.
+func TestDeleteVersionsConcurrent(t *testing.T) {
+	api := apptest.New(t)
+	newType(t, api, "zigbee", true)
+	p := create(t, api, api.Admin.Cookie, map[string]any{"name": "Villa"})
+	path := "/api/projects/" + p.ID.String() + "/versions"
+	resp := api.Post(path, api.Admin.Cookie, map[string]any{"name": "V2"})
+	wantCode(t, resp, http.StatusCreated, "")
+	v2 := decode[projects.ProjectVersion](t, resp)
+	var (
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		codes []int
+	)
+	for _, id := range []uuid.UUID{p.Versions[0].ID, v2.ID} {
+		wg.Go(func() {
+			resp := api.Delete(path+"/"+id.String(), api.Admin.Cookie)
+			if resp.Code == http.StatusConflict && !strings.Contains(resp.Body.String(), "project_version.last") {
+				t.Errorf("conflict: %s", resp.Body)
+			}
+			mu.Lock()
+			codes = append(codes, resp.Code)
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	slices.Sort(codes)
+	if !slices.Equal(codes, []int{http.StatusNoContent, http.StatusConflict}) {
+		t.Errorf("want one 204 and one 409, got %v", codes)
+	}
+	if got := get(t, api, api.Admin.Cookie, p.ID); len(got.Versions) != 1 {
+		t.Errorf("versions left: %+v", got.Versions)
+	}
+}
+
+// Deleting the user who created a project keeps the project, without creator.
+func TestCreatorDeleted(t *testing.T) {
+	api := apptest.New(t)
+	newType(t, api, "zigbee", true)
+	acme := api.NewTenant("Acme")
+	user := api.NewUser(acme, auth.RoleUser)
+	p := create(t, api, user.Cookie, map[string]any{"name": "Villa"})
+	if p.CreatedBy == nil || *p.CreatedBy != user.UserID {
+		t.Fatalf("createdBy: %v", p.CreatedBy)
+	}
+	wantCode(t, api.Delete("/api/users/"+user.UserID.String(), api.Admin.Cookie), http.StatusNoContent, "")
+	if got := get(t, api, api.Admin.Cookie, p.ID); got.CreatedBy != nil {
+		t.Errorf("createdBy after the user was deleted: %v", got.CreatedBy)
+	}
+}
+
+// A product type or tenant deleted between validation and the write is
+// reported like the check before reports it, not as a 500. Triggers delete
+// them right before the insert, inside the writing transaction.
+func TestReferenceDeletedMeanwhile(t *testing.T) {
+	api := apptest.New(t)
+	ctx := t.Context()
+	zigbee := newType(t, api, "zigbee", true)
+	gone := api.NewTenant("Gone")
+	exec := func(sql string) {
+		t.Helper()
+		if _, err := api.DB.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`CREATE FUNCTION test_drop_type() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+		BEGIN DELETE FROM product_types WHERE id = NEW.product_type_id; RETURN NEW; END $$`)
+	exec(`CREATE FUNCTION test_drop_tenant() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+		BEGIN DELETE FROM tenants WHERE id = NEW.tenant_id AND name = 'Gone'; RETURN NEW; END $$`)
+	t.Cleanup(func() {
+		_, _ = api.DB.Exec(context.Background(), `DROP TRIGGER IF EXISTS test_drop_type ON project_product_types;
+			DROP TRIGGER IF EXISTS test_drop_tenant ON projects;
+			DROP FUNCTION IF EXISTS test_drop_type(); DROP FUNCTION IF EXISTS test_drop_tenant()`)
+	})
+
+	exec(`CREATE TRIGGER test_drop_tenant BEFORE INSERT ON projects FOR EACH ROW EXECUTE FUNCTION test_drop_tenant()`)
+	resp := api.Post("/api/projects", api.Admin.Cookie, map[string]any{"name": "x", "tenantId": gone})
+	wantCode(t, resp, http.StatusUnprocessableEntity, "project.tenant_not_found")
+	exec(`DROP TRIGGER test_drop_tenant ON projects`)
+
+	exec(`CREATE TRIGGER test_drop_type BEFORE INSERT ON project_product_types FOR EACH ROW EXECUTE FUNCTION test_drop_type()`)
+	resp = api.Post("/api/projects", api.Admin.Cookie, map[string]any{"name": "x", "productTypeIds": []uuid.UUID{zigbee}})
+	wantCode(t, resp, http.StatusUnprocessableEntity, "project.product_type_not_found")
+	if !strings.Contains(resp.Body.String(), `"location":"body.productTypeIds"`) {
+		t.Errorf("location: %s", resp.Body)
 	}
 }

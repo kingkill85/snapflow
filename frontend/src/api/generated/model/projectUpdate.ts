@@ -4,7 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { ProjectCustomer } from './projectCustomer';
+import type { ProjectCustomerInput } from './projectCustomerInput';
 import type { ProjectUpdateStatus } from './projectUpdateStatus';
 
 export interface ProjectUpdate {
@@ -12,7 +12,8 @@ export interface ProjectUpdate {
   readonly $schema?: string;
   /** ISO 4217, three upper-case letters; defaults to USD */
   currency?: string;
-  customer?: ProjectCustomer;
+  /** Left out: the stored customer stays (create: none) */
+  customer?: ProjectCustomerInput;
   /** Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1 */
   exchangeRate?: string;
   /** updatedAt as last read; if the project changed since, the update fails with project.stale */
@@ -21,7 +22,7 @@ export interface ProjectUpdate {
   language?: string;
   /** 1-200 characters */
   name: string;
-  /** At most 5000 characters */
+  /** At most 5000 characters; empty clears, left out keeps the stored notes */
   notes?: string;
   /**
      * At least one; new choices must be active. Create without it: every active product type

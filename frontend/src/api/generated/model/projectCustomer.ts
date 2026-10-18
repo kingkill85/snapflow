@@ -6,14 +6,9 @@
  */
 
 export interface ProjectCustomer {
-  /** At most 500 characters, may have several lines */
-  address?: string;
-  /** At most 200 characters */
-  company?: string;
-  /** A valid email address or empty */
-  email?: string;
-  /** At most 200 characters */
-  name?: string;
-  /** At most 50 characters */
-  phone?: string;
+  address: string;
+  company: string;
+  email: string;
+  name: string;
+  phone: string;
 }

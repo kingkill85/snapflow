@@ -9,6 +9,7 @@
   "searchHint": "Number, name or customer",
   "statusFilter": "Status",
   "tenantFilter": "Tenant",
+  "archivedTenant": "{{name}} (archived)",
   "allTenants": "All tenants",
   "deleteTitle": "Delete project",
   "deleteMessage": "Delete project {{name}} with all its versions? This cannot be undone.",
@@ -63,8 +64,8 @@
     "lastVersionHint": "The last version cannot be deleted. Delete the project instead.",
     "noPlans": "No plans yet.",
     "readOnly": {
-      "completed": "This project is completed and can no longer be changed.",
-      "cancelled": "This project is cancelled and can no longer be changed."
+      "completed": "This project is completed. Reopen it to change it.",
+      "cancelled": "This project is cancelled. Reopen it to change it."
     },
     "reopen": "Reopen",
     "notFound": "This project does not exist or you cannot see it.",

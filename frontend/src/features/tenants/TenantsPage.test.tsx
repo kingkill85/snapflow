@@ -93,6 +93,30 @@ describe('TenantsPage', () => {
     expect(put).toEqual({ name: 'Acme', isActive: false })
   })
 
+  it('keeps the Active switch of an archived tenant off until it is restored', async () => {
+    let put: unknown
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({ isActive: false, projectCount: 1, archivedAt: '2026-10-18T11:00:00Z' })] })),
+      http.put('/api/tenants/:id', async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json(tenant({ name: 'Acme 2', isActive: false, archivedAt: '2026-10-18T11:00:00Z' }))
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+    await user.click(screen.getByLabelText('Show archived'))
+
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('Active')).toBeDisabled()
+    expect(within(dialog).getByText('An archived tenant stays inactive. Restore it first to activate it.')).toBeInTheDocument()
+    const name = within(dialog).getByLabelText(/Name/)
+    await user.clear(name)
+    await user.type(name, 'Acme 2')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(put).toEqual({ name: 'Acme 2', isActive: false }))
+  })
+
   it('explains instead of offering to deactivate the distributor, and refreshes the session for the own tenant', async () => {
     let meReloaded = false
     server.use(

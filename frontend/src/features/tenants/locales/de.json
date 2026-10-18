@@ -14,6 +14,7 @@
     "status": "Status",
     "active": "Aktiv",
     "activeHint": "Benutzer eines inaktiven Mandanten können sich nicht anmelden.",
+    "archivedHint": "Ein archivierter Mandant bleibt inaktiv. Stellen Sie ihn zuerst wieder her, um ihn zu aktivieren.",
     "distributorHint": "Der Distributor-Mandant bleibt immer aktiv.",
     "projects": "Projekte"
   },

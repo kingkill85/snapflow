@@ -109,6 +109,38 @@ func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
 	return i, err
 }
 
+const getTenants = `-- name: GetTenants :many
+SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, error) {
+	rows, err := q.db.Query(ctx, getTenants, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Tenant{}
+	for rows.Next() {
+		var i Tenant
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.IsDistributor,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenants = `-- name: ListTenants :many
 SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants
 WHERE $1::boolean OR archived_at IS NULL
@@ -167,7 +199,7 @@ func (q *Queries) RestoreTenant(ctx context.Context, id uuid.UUID) (Tenant, erro
 
 const updateTenant = `-- name: UpdateTenant :one
 UPDATE tenants SET name = $2, is_active = $3, updated_at = now()
-WHERE id = $1
+WHERE id = $1 AND (archived_at IS NULL OR NOT $3)
 RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at
 `
 
@@ -177,6 +209,8 @@ type UpdateTenantParams struct {
 	IsActive bool
 }
 
+// UpdateTenant changes a tenant; an archived one cannot be activated, also
+// when it was archived after the caller read it (no row then).
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error) {
 	row := q.db.QueryRow(ctx, updateTenant, arg.ID, arg.Name, arg.IsActive)
 	var i Tenant

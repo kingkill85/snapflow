@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 )
 
@@ -58,5 +59,18 @@ func TestInTxRetries(t *testing.T) {
 	err = database.InTx(ctx, db, pgx.TxOptions{}, func(pgx.Tx) error { runs++; return other })
 	if !errors.Is(err, other) || runs != 1 {
 		t.Errorf("no retry: err %v, %d runs", err, runs)
+	}
+}
+
+// InScope refuses a Nested database: its savepoint would keep the role and
+// scope settings for the rest of the outer transaction.
+func TestInScopeRefusesNested(t *testing.T) {
+	ran := false
+	err := database.InScope(context.Background(), database.NewNested(fakeTx{}), auth.Actor{}, pgx.TxOptions{}, func(pgx.Tx) error {
+		ran = true
+		return nil
+	})
+	if !errors.Is(err, database.ErrScopeNested) || ran {
+		t.Errorf("want ErrScopeNested without running fn, got %v (ran %v)", err, ran)
 	}
 }

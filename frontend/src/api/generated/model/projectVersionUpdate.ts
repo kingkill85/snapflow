@@ -12,6 +12,6 @@ export interface ProjectVersionUpdate {
   expectedUpdatedAt: string;
   /** 1-100 characters, unique in the project ignoring case */
   name: string;
-  /** At most 2000 characters */
+  /** At most 2000 characters; empty clears, left out keeps the stored notes */
   notes?: string;
 }

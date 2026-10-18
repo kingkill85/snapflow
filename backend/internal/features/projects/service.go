@@ -128,13 +128,17 @@ func (s *Service) List(ctx context.Context, p ListParams) (ProjectPage, error) {
 	for _, l := range links {
 		typesOf[l.ProjectID] = append(typesOf[l.ProjectID], l.ProductTypeID)
 	}
-	names := tenantNames{s: s, actor: actor}
+	tenantIDs := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		tenantIDs[i] = r.TenantID
+	}
+	refs, err := s.tenantRefs(ctx, actor, tenantIDs)
+	if err != nil {
+		return ProjectPage{}, err
+	}
 	items := make([]ProjectListItem, 0, len(rows))
 	for _, r := range rows {
-		ref, err := names.ref(ctx, r.TenantID)
-		if err != nil {
-			return ProjectPage{}, err
-		}
+		ref := refs[r.TenantID]
 		items = append(items, ProjectListItem{
 			ID: r.ID, TenantID: r.TenantID, Tenant: ref, Number: r.Number, Name: r.Name,
 			CustomerName: r.CustomerName, CustomerCompany: r.CustomerCompany, Status: ProjectStatus(r.Status),
@@ -180,10 +184,11 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 	if err != nil {
 		return Project{}, err
 	}
-	ref, err := (&tenantNames{s: s, actor: actor}).ref(ctx, row.TenantID)
+	refs, err := s.tenantRefs(ctx, actor, []uuid.UUID{row.TenantID})
 	if err != nil {
 		return Project{}, err
 	}
+	ref := refs[row.TenantID]
 	typeIDs := make([]uuid.UUID, len(links))
 	for i, l := range links {
 		typeIDs[i] = l.ProductTypeID
@@ -248,7 +253,7 @@ func (s *Service) Create(ctx context.Context, in ProjectCreate) (Project, error)
 		return err
 	})
 	if err != nil {
-		return Project{}, err
+		return Project{}, mapRefErr(err)
 	}
 	return s.detail(ctx, actor, id)
 }
@@ -328,7 +333,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProjectUpdate) (P
 		})
 	})
 	if err != nil {
-		return Project{}, err
+		return Project{}, mapRefErr(err)
 	}
 	return s.detail(ctx, actor, id)
 }
@@ -453,9 +458,14 @@ func (s *Service) UpdateVersion(ctx context.Context, projectID, id uuid.UUID, in
 	if err != nil {
 		return ProjectVersion{}, err
 	}
-	notes, ferr := multiLine("body.notes", in.Notes, MaxVersionNotesLength)
-	if ferr != nil {
-		return ProjectVersion{}, apperr.Validation(*ferr)
+	// Notes left out keep the stored ones; an empty string clears them.
+	var notes *string
+	if in.Notes != nil {
+		n, ferr := multiLine("body.notes", *in.Notes, MaxVersionNotesLength)
+		if ferr != nil {
+			return ProjectVersion{}, apperr.Validation(*ferr)
+		}
+		notes = &n
 	}
 	var (
 		row   store.ProjectVersion
@@ -472,7 +482,11 @@ func (s *Service) UpdateVersion(ctx context.Context, projectID, id uuid.UUID, in
 		if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
 			return apperr.Conflict("project_version.stale", "the version was changed by someone else")
 		}
-		row, err = q.UpdateVersion(ctx, store.UpdateVersionParams{ID: id, ProjectID: projectID, Name: name, Notes: notes})
+		params := store.UpdateVersionParams{ID: id, ProjectID: projectID, Name: name, Notes: current.Notes}
+		if notes != nil {
+			params.Notes = *notes
+		}
+		row, err = q.UpdateVersion(ctx, params)
 		if err != nil {
 			return mapVersionErr(err, name)
 		}
@@ -594,8 +608,9 @@ type validated struct {
 
 // validate checks and normalises the input. current and currentTypes are the
 // project as stored (update) or nil (create): on update an empty language,
-// currency or exchange rate keeps the stored value, and so does a missing
-// product type list; chosen product types that were inactive stay allowed.
+// currency or exchange rate keeps the stored value, and so do a missing
+// product type list, customer field or notes; chosen product types that were
+// inactive stay allowed.
 func (s *Service) validate(ctx context.Context, in ProjectInput, current *store.Project, currentTypes []uuid.UUID) (validated, error) {
 	var errs []apperr.FieldError
 	add := func(f *apperr.FieldError) {
@@ -607,21 +622,50 @@ func (s *Service) validate(ctx context.Context, in ProjectInput, current *store.
 	var f *apperr.FieldError
 	v.name, f = singleLine("body.name", in.Name, MaxNameLength, true)
 	add(f)
-	v.customer.Name, f = singleLine("body.customer.name", in.Customer.Name, MaxCustomerNameLength, false)
-	add(f)
-	v.customer.Company, f = singleLine("body.customer.company", in.Customer.Company, MaxCustomerCompanyLength, false)
-	add(f)
-	v.customer.Phone, f = singleLine("body.customer.phone", in.Customer.Phone, MaxCustomerPhoneLength, false)
-	add(f)
-	v.customer.Email, f = singleLine("body.customer.email", in.Customer.Email, MaxCustomerEmailLength, false)
-	add(f)
-	if f == nil && v.customer.Email != "" && !validEmail(v.customer.Email) {
-		errs = append(errs, apperr.Field("body.customer.email", "validation.email", "not a valid email address"))
+	// A customer field or notes left out keep the stored value (create:
+	// empty); an empty string clears it (D170).
+	var stored ProjectCustomer
+	storedNotes := ""
+	if current != nil {
+		stored = ProjectCustomer{
+			Name: current.CustomerName, Company: current.CustomerCompany, Email: current.CustomerEmail,
+			Phone: current.CustomerPhone, Address: current.CustomerAddress,
+		}
+		storedNotes = current.Notes
 	}
-	v.customer.Address, f = multiLine("body.customer.address", in.Customer.Address, MaxCustomerAddressLength)
-	add(f)
-	v.notes, f = multiLine("body.notes", in.Notes, MaxNotesLength)
-	add(f)
+	var c ProjectCustomerInput
+	if in.Customer != nil {
+		c = *in.Customer
+	}
+	v.customer = stored
+	if c.Name != nil {
+		v.customer.Name, f = singleLine("body.customer.name", *c.Name, MaxCustomerNameLength, false)
+		add(f)
+	}
+	if c.Company != nil {
+		v.customer.Company, f = singleLine("body.customer.company", *c.Company, MaxCustomerCompanyLength, false)
+		add(f)
+	}
+	if c.Phone != nil {
+		v.customer.Phone, f = singleLine("body.customer.phone", *c.Phone, MaxCustomerPhoneLength, false)
+		add(f)
+	}
+	if c.Email != nil {
+		v.customer.Email, f = singleLine("body.customer.email", *c.Email, MaxCustomerEmailLength, false)
+		add(f)
+		if f == nil && v.customer.Email != "" && !validEmail(v.customer.Email) {
+			errs = append(errs, apperr.Field("body.customer.email", "validation.email", "not a valid email address"))
+		}
+	}
+	if c.Address != nil {
+		v.customer.Address, f = multiLine("body.customer.address", *c.Address, MaxCustomerAddressLength)
+		add(f)
+	}
+	v.notes = storedNotes
+	if in.Notes != nil {
+		v.notes, f = multiLine("body.notes", *in.Notes, MaxNotesLength)
+		add(f)
+	}
 
 	v.language, v.currency, v.rate = in.Language, strings.TrimSpace(in.Currency), strings.TrimSpace(in.ExchangeRate)
 	if current != nil {
@@ -885,30 +929,22 @@ func (o typeOrder) sort(ids []uuid.UUID) []uuid.UUID {
 	return out
 }
 
-// tenantNames names tenants for callers who see every tenant (cached per
-// call); others get no tenant reference.
-type tenantNames struct {
-	s     *Service
-	actor auth.Actor
-	cache map[uuid.UUID]*ProjectTenant
-}
-
-func (n *tenantNames) ref(ctx context.Context, id uuid.UUID) (*ProjectTenant, error) {
-	if !n.actor.Can(auth.PermTenantsAccessAll) {
-		return nil, nil
+// tenantRefs names the tenants of ids in one lookup, for callers who see
+// every tenant; others get no tenant references (an empty map).
+func (s *Service) tenantRefs(ctx context.Context, actor auth.Actor, ids []uuid.UUID) (map[uuid.UUID]*ProjectTenant, error) {
+	out := map[uuid.UUID]*ProjectTenant{}
+	if !actor.Can(auth.PermTenantsAccessAll) || len(ids) == 0 {
+		return out, nil
 	}
-	if r, ok := n.cache[id]; ok {
-		return r, nil
-	}
-	t, err := n.s.tenants.Lookup(ctx, id)
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	found, err := s.tenants.LookupMany(ctx, slices.Compact(ids))
 	if err != nil {
 		return nil, err
 	}
-	if n.cache == nil {
-		n.cache = map[uuid.UUID]*ProjectTenant{}
+	for id, t := range found {
+		out[id] = &ProjectTenant{ID: t.ID, Name: t.Name}
 	}
-	n.cache[id] = &ProjectTenant{ID: t.ID, Name: t.Name}
-	return n.cache[id], nil
+	return out, nil
 }
 
 func errNotFound() *apperr.Error { return apperr.NotFound("project.not_found") }
@@ -919,6 +955,23 @@ func errStale() *apperr.Error {
 
 func errReadOnly() *apperr.Error {
 	return apperr.Conflict("project.read_only", "the project is completed or cancelled; reopen it first")
+}
+
+// mapRefErr maps a foreign-key violation by a product type or tenant deleted
+// between validation and the write to the validation error the check before
+// would have given.
+func mapRefErr(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23503" {
+		return err
+	}
+	switch pgErr.ConstraintName {
+	case "project_product_types_product_type_id_fkey":
+		return apperr.Invalid("body.productTypeIds", "project.product_type_not_found", "a product type was deleted meanwhile")
+	case "projects_tenant_id_fkey", "project_number_counters_tenant_id_fkey":
+		return apperr.Invalid("body.tenantId", "project.tenant_not_found", "the tenant was deleted meanwhile")
+	}
+	return err
 }
 
 func mapVersionErr(err error, name string) error {

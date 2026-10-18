@@ -182,21 +182,21 @@ describe('ProjectPage', () => {
     const user = userEvent.setup()
     renderWithProviders(routes, { route: `/projects/${villa.id}` })
 
-    expect(await screen.findByText('This project is completed and can no longer be changed.')).toBeInTheDocument()
+    expect(await screen.findByText('This project is completed. Reopen it to change it.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New version' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Reopen' }))
     expect(await screen.findByRole('button', { name: 'Edit project' })).toBeInTheDocument()
-    expect(screen.queryByText('This project is completed and can no longer be changed.')).not.toBeInTheDocument()
+    expect(screen.queryByText('This project is completed. Reopen it to change it.')).not.toBeInTheDocument()
     expect(put).toMatchObject({ status: 'active', name: villa.name, currency: 'EUR', exchangeRate: '0.92', expectedUpdatedAt: villa.updatedAt })
   })
 
   it('offers no Reopen without permission to write', async () => {
     serveProject({ ...villa, status: 'cancelled', can: { update: false, delete: false, reopen: false } })
     renderWithProviders(routes, { route: `/projects/${villa.id}` })
-    expect(await screen.findByText('This project is cancelled and can no longer be changed.')).toBeInTheDocument()
+    expect(await screen.findByText('This project is cancelled. Reopen it to change it.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reopen' })).not.toBeInTheDocument()
   })
 

@@ -46,7 +46,7 @@ const schema = z
     customer: z.object({
       name: z.string().trim().max(200, tooLong(200)),
       company: z.string().trim().max(200, tooLong(200)),
-      email: z.union([z.literal(''), z.email(errorKey('validation.email'))]),
+      email: z.string().trim().pipe(z.union([z.literal(''), z.email(errorKey('validation.email'))])),
       phone: z.string().trim().max(50, tooLong(50)),
       address: z.string().trim().max(500, tooLong(500)),
     }),

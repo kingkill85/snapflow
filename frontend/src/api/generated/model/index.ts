@@ -145,6 +145,7 @@ export * from './project';
 export * from './projectActions';
 export * from './projectCreate';
 export * from './projectCustomer';
+export * from './projectCustomerInput';
 export * from './projectListItem';
 export * from './projectListItemStatus';
 export * from './projectPage';

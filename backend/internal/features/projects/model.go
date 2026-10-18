@@ -52,11 +52,21 @@ type ProjectTenant struct {
 
 // Customer is the customer a project is for. Empty strings are no value.
 type ProjectCustomer struct {
-	Name    string `json:"name,omitempty" doc:"At most 200 characters"`
-	Company string `json:"company,omitempty" doc:"At most 200 characters"`
-	Email   string `json:"email,omitempty" doc:"A valid email address or empty"`
-	Phone   string `json:"phone,omitempty" doc:"At most 50 characters"`
-	Address string `json:"address,omitempty" doc:"At most 500 characters, may have several lines"`
+	Name    string `json:"name"`
+	Company string `json:"company"`
+	Email   string `json:"email"`
+	Phone   string `json:"phone"`
+	Address string `json:"address"`
+}
+
+// ProjectCustomerInput changes the customer. A field left out keeps the
+// stored value (create: empty); an empty string clears it (D170).
+type ProjectCustomerInput struct {
+	Name    *string `json:"name,omitempty" doc:"At most 200 characters; empty clears, left out keeps"`
+	Company *string `json:"company,omitempty" doc:"At most 200 characters; empty clears, left out keeps"`
+	Email   *string `json:"email,omitempty" doc:"A valid email address; empty clears, left out keeps"`
+	Phone   *string `json:"phone,omitempty" doc:"At most 50 characters; empty clears, left out keeps"`
+	Address *string `json:"address,omitempty" doc:"At most 500 characters, may have several lines; empty clears, left out keeps"`
 }
 
 // ProjectListItem is one row of the project list.
@@ -124,14 +134,14 @@ type ProjectVersion struct {
 
 // ProjectInput is what create and update share.
 type ProjectInput struct {
-	Name           string          `json:"name" doc:"1-200 characters"`
-	TenantID       *uuid.UUID      `json:"tenantId,omitempty" doc:"Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant"`
-	Language       string          `json:"language,omitempty" doc:"A content language; defaults to en"`
-	Currency       string          `json:"currency,omitempty" doc:"ISO 4217, three upper-case letters; defaults to USD"`
-	ExchangeRate   string          `json:"exchangeRate,omitempty" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1"`
-	Customer       ProjectCustomer `json:"customer,omitempty"`
-	Notes          string          `json:"notes,omitempty" doc:"At most 5000 characters"`
-	ProductTypeIDs []uuid.UUID     `json:"productTypeIds,omitempty" maxItems:"1000" doc:"At least one; new choices must be active. Create without it: every active product type"`
+	Name           string                `json:"name" doc:"1-200 characters"`
+	TenantID       *uuid.UUID            `json:"tenantId,omitempty" doc:"Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant"`
+	Language       string                `json:"language,omitempty" doc:"A content language; defaults to en"`
+	Currency       string                `json:"currency,omitempty" doc:"ISO 4217, three upper-case letters; defaults to USD"`
+	ExchangeRate   string                `json:"exchangeRate,omitempty" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1"`
+	Customer       *ProjectCustomerInput `json:"customer,omitempty" doc:"Left out: the stored customer stays (create: none)"`
+	Notes          *string               `json:"notes,omitempty" doc:"At most 5000 characters; empty clears, left out keeps the stored notes"`
+	ProductTypeIDs []uuid.UUID           `json:"productTypeIds,omitempty" maxItems:"1000" doc:"At least one; new choices must be active. Create without it: every active product type"`
 }
 
 type ProjectCreate struct {
@@ -153,7 +163,7 @@ type ProjectVersionCreate struct {
 
 type ProjectVersionUpdate struct {
 	Name              string    `json:"name" doc:"1-100 characters, unique in the project ignoring case"`
-	Notes             string    `json:"notes,omitempty" doc:"At most 2000 characters"`
+	Notes             *string   `json:"notes,omitempty" doc:"At most 2000 characters; empty clears, left out keeps the stored notes"`
 	ExpectedUpdatedAt time.Time `json:"expectedUpdatedAt" doc:"updatedAt as last read; project_version.stale otherwise"`
 }
 

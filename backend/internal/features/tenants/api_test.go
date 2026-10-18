@@ -1,6 +1,8 @@
 package tenants_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
+	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
+	"github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
+	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
@@ -257,5 +262,37 @@ func TestArchive(t *testing.T) {
 	}
 	if resp := api.Post("/api/tenants/"+uuid.NewString()+"/restore", admin, map[string]any{}); resp.Code != http.StatusNotFound {
 		t.Errorf("restore unknown: %d", resp.Code)
+	}
+}
+
+// archiveBeforeUpdate archives the tenant right before the update, as a
+// concurrent delete would between the service's read and its write.
+type archiveBeforeUpdate struct{ store.Querier }
+
+func (a archiveBeforeUpdate) UpdateTenant(ctx context.Context, arg store.UpdateTenantParams) (store.Tenant, error) {
+	if _, err := a.ArchiveTenant(ctx, arg.ID); err != nil {
+		return store.Tenant{}, err
+	}
+	return a.Querier.UpdateTenant(ctx, arg)
+}
+
+// An update cannot activate a tenant archived after it was read.
+func TestActivateArchivedConcurrently(t *testing.T) {
+	api := apptest.New(t)
+	acme := api.NewTenant("Acme")
+	svc := tenants.NewService(archiveBeforeUpdate{store.New(api.DB)})
+	ctx := auth.WithActor(t.Context(), auth.Actor{UserID: api.Admin.UserID, TenantID: api.Distributor, Role: auth.RoleAdmin})
+	_, err := svc.Update(ctx, acme, tenants.TenantInput{Name: "Acme", IsActive: true})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Code != "tenant.archived" {
+		t.Fatalf("want tenant.archived, got %v", err)
+	}
+	var active bool
+	if err := api.DB.QueryRow(ctx, "SELECT is_active FROM tenants WHERE id = $1", acme).Scan(&active); err != nil || active {
+		t.Errorf("archived tenant activated: %v %v", active, err)
+	}
+	// Deactivating (or renaming) an archived tenant is still fine.
+	if _, err := svc.Update(ctx, acme, tenants.TenantInput{Name: "Acme 2", IsActive: false}); err != nil {
+		t.Errorf("rename archived: %v", err)
 	}
 }

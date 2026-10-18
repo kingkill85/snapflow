@@ -6,6 +6,9 @@ ORDER BY is_distributor DESC, lower(name);
 -- name: GetTenant :one
 SELECT * FROM tenants WHERE id = $1;
 
+-- name: GetTenants :many
+SELECT * FROM tenants WHERE id = ANY(sqlc.arg(ids)::uuid[]);
+
 -- name: GetDistributor :one
 SELECT * FROM tenants WHERE is_distributor;
 
@@ -13,9 +16,11 @@ SELECT * FROM tenants WHERE is_distributor;
 INSERT INTO tenants (name, is_distributor, is_active) VALUES ($1, $2, $3)
 RETURNING *;
 
+-- UpdateTenant changes a tenant; an archived one cannot be activated, also
+-- when it was archived after the caller read it (no row then).
 -- name: UpdateTenant :one
 UPDATE tenants SET name = $2, is_active = $3, updated_at = now()
-WHERE id = $1
+WHERE id = $1 AND (archived_at IS NULL OR NOT $3)
 RETURNING *;
 
 -- name: DeleteTenant :execrows

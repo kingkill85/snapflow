@@ -2932,7 +2932,8 @@
             "type": "string"
           },
           "customer": {
-            "$ref": "#/components/schemas/ProjectCustomer"
+            "$ref": "#/components/schemas/ProjectCustomerInput",
+            "description": "Left out: the stored customer stays (create: none)"
           },
           "exchangeRate": {
             "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
@@ -2947,7 +2948,7 @@
             "type": "string"
           },
           "notes": {
-            "description": "At most 5000 characters",
+            "description": "At most 5000 characters; empty clears, left out keeps the stored notes",
             "type": "string"
           },
           "productTypeIds": {
@@ -2972,23 +2973,51 @@
         "additionalProperties": false,
         "properties": {
           "address": {
-            "description": "At most 500 characters, may have several lines",
             "type": "string"
           },
           "company": {
-            "description": "At most 200 characters",
             "type": "string"
           },
           "email": {
-            "description": "A valid email address or empty",
             "type": "string"
           },
           "name": {
-            "description": "At most 200 characters",
             "type": "string"
           },
           "phone": {
-            "description": "At most 50 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "company",
+          "email",
+          "phone",
+          "address"
+        ],
+        "type": "object"
+      },
+      "ProjectCustomerInput": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "At most 500 characters, may have several lines; empty clears, left out keeps",
+            "type": "string"
+          },
+          "company": {
+            "description": "At most 200 characters; empty clears, left out keeps",
+            "type": "string"
+          },
+          "email": {
+            "description": "A valid email address; empty clears, left out keeps",
+            "type": "string"
+          },
+          "name": {
+            "description": "At most 200 characters; empty clears, left out keeps",
+            "type": "string"
+          },
+          "phone": {
+            "description": "At most 50 characters; empty clears, left out keeps",
             "type": "string"
           }
         },
@@ -3127,7 +3156,8 @@
             "type": "string"
           },
           "customer": {
-            "$ref": "#/components/schemas/ProjectCustomer"
+            "$ref": "#/components/schemas/ProjectCustomerInput",
+            "description": "Left out: the stored customer stays (create: none)"
           },
           "exchangeRate": {
             "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
@@ -3147,7 +3177,7 @@
             "type": "string"
           },
           "notes": {
-            "description": "At most 5000 characters",
+            "description": "At most 5000 characters; empty clears, left out keeps the stored notes",
             "type": "string"
           },
           "productTypeIds": {
@@ -3296,7 +3326,7 @@
             "type": "string"
           },
           "notes": {
-            "description": "At most 2000 characters",
+            "description": "At most 2000 characters; empty clears, left out keeps the stored notes",
             "type": "string"
           }
         },

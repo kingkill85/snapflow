@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -16,7 +17,9 @@ import (
 
 // Row-level security is the second wall: the store, called directly with
 // another tenant's scope (no service check), sees and changes nothing of a
-// foreign tenant.
+// foreign tenant. The tests connect as a superuser (which bypasses RLS), so
+// they prove the policies through the role snapflow_app that SetScope and
+// InScope switch to, as production does (D167).
 func TestRowLevelSecurity(t *testing.T) {
 	api := apptest.New(t)
 	ctx := t.Context()
@@ -121,16 +124,47 @@ func TestRowLevelSecurity(t *testing.T) {
 		t.Errorf("no scope: %v %v", rows, err)
 	}
 	_ = tx.Rollback(ctx)
-	err = database.InScope(ctx, api.DB, acmeActor, pgx.TxOptions{}, func(pgx.Tx) error { return nil })
+
+	// Child tables are scoped too.
+	tx, err = api.DB.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SetScope(ctx, tx, acmeActor); err != nil {
+		t.Fatal(err)
+	}
+	if links, err := store.New(tx).ListProductTypesOfProjects(ctx, []uuid.UUID{foreign.ID, own.ID}); err != nil || len(links) != 1 || links[0].ProjectID != own.ID {
+		t.Errorf("project product types: %v %v", links, err)
+	}
+	var counters, foreignCounters int
+	if err := tx.QueryRow(ctx, "SELECT count(*), count(*) FILTER (WHERE tenant_id = $1) FROM project_number_counters", other).
+		Scan(&counters, &foreignCounters); err != nil || counters != 1 || foreignCounters != 0 {
+		t.Errorf("number counters: %d (foreign %d) %v", counters, foreignCounters, err)
+	}
+	_ = tx.Rollback(ctx)
+
+	// One connection for the scope and the check, so the check sees the
+	// connection the scope ran on.
+	conn, err := api.DB.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	err = database.InScope(ctx, conn, acmeActor, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		var user string
+		if err := tx.QueryRow(ctx, "SELECT current_user").Scan(&user); err != nil || user != database.AppRole {
+			t.Errorf("in scope: %s %v", user, err)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var user, tenant string
-	if err := api.DB.QueryRow(ctx, "SELECT current_user, coalesce(current_setting('app.tenant_id', true), '')").Scan(&user, &tenant); err != nil {
+	if err := conn.QueryRow(ctx, "SELECT current_user, coalesce(current_setting('app.tenant_id', true), '')").Scan(&user, &tenant); err != nil {
 		t.Fatal(err)
 	}
 	if user == database.AppRole || tenant != "" {
-		t.Errorf("scope leaked to the pool: %s %q", user, tenant)
+		t.Errorf("scope leaked to the connection: %s %q", user, tenant)
 	}
-
 }

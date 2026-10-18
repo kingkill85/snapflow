@@ -90,7 +90,7 @@ export function ProjectsPage() {
     return () => clearTimeout(timer)
   }, [draft, search, setFilters])
 
-  const tenants = useListTenants(undefined, { query: { enabled: allTenants } })
+  const tenants = useListTenants({ includeArchived: true }, { query: { enabled: allTenants } })
   const list = useListProjects(
     { ...(search ? { search } : {}), status, ...(tenantId ? { tenantId } : {}), limit: pageSize, offset },
     { query: { placeholderData: keepPreviousData } },
@@ -125,7 +125,10 @@ export function ProjectsPage() {
   }
 
   const statusOptions = statuses.map((s) => ({ value: s, label: t(`status.${s}`) }))
-  const tenantOptions = [{ value: '', label: t('allTenants') }, ...(tenants.data?.items ?? []).map((tenant) => ({ value: tenant.id, label: tenant.name }))]
+  const tenantOptions = [{ value: '', label: t('allTenants') }, ...(tenants.data?.items ?? []).map((tenant) => ({
+      value: tenant.id,
+      label: tenant.archivedAt ? t('archivedTenant', { name: tenant.name }) : tenant.name,
+    }))]
 
   const columns: Column<ProjectListItem>[] = [
     { header: t('column.number'), cell: (p) => p.number, className: 'whitespace-nowrap tabular-nums' },
@@ -198,7 +201,8 @@ export function ProjectsPage() {
         open={creating}
         onOpenChange={setCreating}
         item={null}
-        defaultTenantId={tenantId || undefined}
+        // An archived tenant cannot get new projects: no preselection then.
+        defaultTenantId={tenantId && !tenants.data?.items.find((x) => x.id === tenantId)?.archivedAt ? tenantId : undefined}
         onSaved={(project) => void navigate(projectPath(project.id))}
       />
       <ProjectFormDialog

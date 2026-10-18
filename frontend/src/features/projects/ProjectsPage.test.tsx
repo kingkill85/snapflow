@@ -10,7 +10,9 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ProjectsPage } from './ProjectsPage'
-import { acmeId, knx, problem, productTypes, tenants, villa, villaRow, zigbee } from './test-fixtures'
+import { acmeId, knx, problem, productTypes, tenant, tenants, villa, villaRow, zigbee } from './test-fixtures'
+
+const oldId = '00000000-0000-4000-8000-0000000000a9'
 
 function Probe() {
   const location = useLocation()
@@ -75,6 +77,25 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(queries.at(-1)!.get('tenantId')).toBe(acmeId))
   })
 
+  it('offers archived tenants in the tenant filter, marked as archived', async () => {
+    const queries = serveList()
+    const tenantRequests: string[] = []
+    server.use(
+      http.get('/api/tenants', ({ request }) => {
+        tenantRequests.push(new URL(request.url).search)
+        return HttpResponse.json({ items: [...tenants, tenant({ id: oldId, name: 'Old', isActive: false, archivedAt: '2026-10-18T11:00:00Z' })] })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(routes, { route: '/projects' })
+    await screen.findByText('Villa Müller')
+
+    await user.click(screen.getByLabelText('Tenant'))
+    await user.click(await screen.findByRole('option', { name: 'Old (archived)' }))
+    await waitFor(() => expect(queries.at(-1)!.get('tenantId')).toBe(oldId))
+    expect(tenantRequests).toContain('?includeArchived=true')
+  })
+
   it('has no tenant column or filter for users of one tenant, and no Delete without projects.delete', async () => {
     serveList([{ ...villaRow, tenant: undefined, can: { update: true, delete: false, reopen: false } }])
     renderWithProviders(routes, { route: '/projects', me: userMe })
@@ -121,6 +142,8 @@ describe('ProjectsPage', () => {
     await user.clear(rate)
     await user.type(rate, '0,92')
     await user.type(within(dialog).getByLabelText('Company'), 'Müller GmbH')
+    // The email is trimmed before it is checked, like the other fields.
+    await user.type(within(dialog).getByLabelText('Email'), '  anna@example.com ')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(await screen.findByText(`at /projects/${villa.id}`)).toBeInTheDocument()
@@ -131,7 +154,7 @@ describe('ProjectsPage', () => {
       language: 'en',
       currency: 'EUR',
       exchangeRate: '0.92',
-      customer: { name: '', company: 'Müller GmbH', email: '', phone: '', address: '' },
+      customer: { name: '', company: 'Müller GmbH', email: 'anna@example.com', phone: '', address: '' },
       notes: '',
     })
   })

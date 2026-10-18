@@ -146,9 +146,15 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in TenantInput) (Ten
 		return Tenant{}, errDistributorProtected()
 	}
 	if current.ArchivedAt != nil && in.IsActive {
-		return Tenant{}, apperr.Conflict("tenant.archived", "restore the tenant before activating it")
+		return Tenant{}, errArchived()
 	}
 	row, err := s.q.UpdateTenant(ctx, store.UpdateTenantParams{ID: id, Name: name, IsActive: in.IsActive})
+	if errors.Is(err, pgx.ErrNoRows) && in.IsActive {
+		// Archived (or deleted) since it was read.
+		if t, lerr := s.Lookup(ctx, id); lerr == nil && t.ArchivedAt != nil {
+			return Tenant{}, errArchived()
+		}
+	}
 	if err != nil {
 		return Tenant{}, mapErr(err, name)
 	}
@@ -224,6 +230,24 @@ func (s *Service) Lookup(ctx context.Context, id uuid.UUID) (Tenant, error) {
 	return fromRow(row), nil
 }
 
+// LookupMany returns the tenants with the given ids (missing ones are left
+// out) without a permission check, for other services (the project list's
+// tenant names).
+func (s *Service) LookupMany(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]Tenant, error) {
+	out := make(map[uuid.UUID]Tenant, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.q.GetTenants(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ID] = fromRow(r)
+	}
+	return out, nil
+}
+
 // EnsureDistributor returns the distributor tenant, creating it with name if
 // there is none yet. Called at startup.
 func (s *Service) EnsureDistributor(ctx context.Context, name string) (Tenant, error) {
@@ -243,6 +267,10 @@ func validate(in TenantInput) (string, error) {
 		return "", apperr.Invalid("body.name", "validation.required", "name is required")
 	}
 	return name, nil
+}
+
+func errArchived() *apperr.Error {
+	return apperr.Conflict("tenant.archived", "restore the tenant before activating it")
 }
 
 func errDistributorProtected() *apperr.Error {

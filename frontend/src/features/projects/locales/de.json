@@ -9,6 +9,7 @@
   "searchHint": "Nummer, Name oder Kunde",
   "statusFilter": "Status",
   "tenantFilter": "Mandant",
+  "archivedTenant": "{{name}} (archiviert)",
   "allTenants": "Alle Mandanten",
   "deleteTitle": "Projekt löschen",
   "deleteMessage": "Projekt {{name}} mit allen Versionen löschen? Das kann nicht rückgängig gemacht werden.",
@@ -63,8 +64,8 @@
     "lastVersionHint": "Die letzte Version kann nicht gelöscht werden. Löschen Sie stattdessen das Projekt.",
     "noPlans": "Noch keine Pläne.",
     "readOnly": {
-      "completed": "Dieses Projekt ist abgeschlossen und kann nicht mehr geändert werden.",
-      "cancelled": "Dieses Projekt ist storniert und kann nicht mehr geändert werden."
+      "completed": "Dieses Projekt ist abgeschlossen. Öffnen Sie es wieder, um es zu ändern.",
+      "cancelled": "Dieses Projekt ist storniert. Öffnen Sie es wieder, um es zu ändern."
     },
     "reopen": "Wieder öffnen",
     "notFound": "Dieses Projekt gibt es nicht oder Sie können es nicht sehen.",

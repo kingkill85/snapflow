@@ -17,9 +17,12 @@ type Querier interface {
 	DeleteTenant(ctx context.Context, id uuid.UUID) (int64, error)
 	GetDistributor(ctx context.Context) (Tenant, error)
 	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, error)
 	ListTenants(ctx context.Context, includeArchived bool) ([]Tenant, error)
 	// RestoreTenant takes a tenant out of the archive; it stays inactive.
 	RestoreTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	// UpdateTenant changes a tenant; an archived one cannot be activated, also
+	// when it was archived after the caller read it (no row then).
 	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)
 }
 
