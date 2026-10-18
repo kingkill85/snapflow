@@ -15,8 +15,10 @@ const reuse = process.env.E2E_REUSE_SERVERS === '1'
 // (E2E_VISUAL=1) runs the whole layout spec instead, with screenshots.
 const visual = process.env.E2E_VISUAL === '1'
 
-// Specs only share the server; each seeds its own uniquely named data.
-const workers = process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : process.env.CI ? 4 : Math.max(2, Math.floor(availableParallelism() / 2))
+// Specs only share the server; each seeds its own uniquely named data. A CI
+// runner (4 vCPUs) also runs the backend, Postgres and vite: with 4 workers the
+// longest spec ran past its timeout there, so CI uses 2 per shard.
+const workers = process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : process.env.CI ? 2 : Math.max(2, Math.floor(availableParallelism() / 2))
 
 // The Nix shell provides the browsers of nixpkgs' playwright-driver; they only
 // fit the @playwright/test release with the same version.

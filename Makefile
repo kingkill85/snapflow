@@ -75,10 +75,14 @@ lint-frontend:
 	cd frontend && npm run lint && npx tsc -b
 
 # Generate first (lint and tests read the generated code), then lint and test
-# backend and frontend at the same time.
+# backend and frontend at the same time. CI runners have 4 vCPUs, which Vitest
+# alone fills; in parallel there it took 2.5 times as long, so CI runs them in
+# sequence (CHECK_JOBS=1).
+CHECK_JOBS ?= $(if $(CI),1,4)
+
 check: ## Everything CI runs; fails if generated code is stale
 	$(MAKE) generate
-	$(MAKE) -j4 --output-sync=target lint-backend lint-frontend test-backend test-frontend
+	$(MAKE) -j$(CHECK_JOBS) --output-sync=target lint-backend lint-frontend test-backend test-frontend
 	git diff --exit-code -- backend/internal/features api frontend/src/api
 
 feature: ## Scaffold a feature: make feature name=product_types
