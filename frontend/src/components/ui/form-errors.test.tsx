@@ -22,6 +22,33 @@ describe('API field errors', () => {
     expect(apiFieldFor('body.email', undefined)).toBeUndefined()
   })
 
+  it('maps locations inside field arrays to the same nested form path', () => {
+    type Form = { key: string; name: { en: string }; attributes: { key: string; options: { key: string }[] }[] }
+    const nested = apiFields<Form>(['key', 'name.en'], {}, ['attributes'])
+    expect(apiFieldFor('body.attributes[2].key', nested)).toBe('attributes.2.key')
+    expect(apiFieldFor('body.attributes[2].options[0].key', nested)).toBe('attributes.2.options.0.key')
+    expect(apiFieldFor('body.attributes[12].options[3].label.en', nested)).toBe('attributes.12.options.3.label.en')
+    expect(apiFieldFor('body.attributes[0].options', nested)).toBe('attributes.0.options')
+    expect(apiFieldFor('body.name.en', nested)).toBe('name.en')
+    // The array itself or one of its items has no field to show the error.
+    expect(apiFieldFor('body.attributes', nested)).toBeUndefined()
+    expect(apiFieldFor('body.attributes[2]', nested)).toBeUndefined()
+    expect(apiFieldFor('body.instanceAttributes[0].key', nested)).toBeUndefined()
+
+    const setError = vi.fn()
+    setApiFieldErrors(
+      invalid(
+        { location: 'body.attributes[1].options[0].key', code: 'attribute.option_key_duplicate' },
+        { location: 'body.attributes[1]', code: 'validation.invalid' },
+      ),
+      setError,
+      nested,
+    )
+    expect(setError.mock.calls.map(([name, error]) => [name, error.message])).toEqual([
+      ['attributes.1.options.0.key', 'attribute.option_key_duplicate'],
+    ])
+  })
+
   it('sets the field code, or validation.invalid for unknown codes, at the field', () => {
     const setError = vi.fn()
     setApiFieldErrors(

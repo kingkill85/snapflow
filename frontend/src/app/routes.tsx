@@ -20,14 +20,26 @@ export const routes: RouteObject[] = [
             element: <AppShell />,
             children: [
               { index: true, element: <Home /> },
-              ...features.map((f) => ({
-                path: f.path,
-                element: (
-                  <RequirePermission permission={f.permission}>
-                    <f.element />
-                  </RequirePermission>
-                ),
-              })),
+              ...features.flatMap((f) => [
+                {
+                  path: f.path,
+                  element: (
+                    <RequirePermission permission={f.permission}>
+                      <f.element />
+                    </RequirePermission>
+                  ),
+                },
+                ...(f.pages ?? []).map((page) => ({
+                  path: `${f.path}/${page.path}`,
+                  element: (
+                    <RequirePermission permission={f.permission}>
+                      <RequirePermission permission={page.permission}>
+                        <page.element />
+                      </RequirePermission>
+                    </RequirePermission>
+                  ),
+                })),
+              ]),
               { path: '*', element: <NotFound /> },
             ],
           },

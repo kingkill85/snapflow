@@ -1,14 +1,72 @@
 {
-  "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
-  "deleteTitle": "Delete product type",
-  "edit": "Edit product type",
+  "title": "Product types",
+  "description": "The kinds of devices in the catalog. Each product type defines which attributes its products have.",
   "empty": "No product types yet.",
-  "field": {
-    "key": "Key",
-    "name": "Name",
-    "nameDe": "Name (German)",
-    "nameEn": "Name (English)"
-  },
   "new": "New product type",
-  "title": "Product types"
+  "edit": "Edit product type",
+  "readOnly": "You can view this product type but not change it.",
+  "showInactive": "Show inactive",
+  "moveUp": "Move {{name}} up",
+  "moveDown": "Move {{name}} down",
+  "deleteTitle": "Delete product type",
+  "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
+  "section": {
+    "basics": "Basics",
+    "attributes": "Attributes",
+    "attributesHint": "Values stored on each product, or on each of its variants (e.g. width, bus system, colour).",
+    "instanceAttributes": "Instance attributes",
+    "instanceAttributesHint": "Values filled in per installed unit in a project (e.g. bus address, MAC address)."
+  },
+  "field": {
+    "order": "Order",
+    "key": "Key",
+    "keyHint": "e.g. dimmer_actuator, wall_switch",
+    "name": "Name",
+    "nameEn": "Name (English)",
+    "nameDe": "Name (German)",
+    "descriptionEn": "Description (English)",
+    "descriptionDe": "Description (German)",
+    "active": "Active",
+    "activeHint": "Inactive product types are hidden from the catalog but keep their products.",
+    "attributeCount": "Attributes",
+    "status": "Status",
+    "labelEn": "Label (English)",
+    "labelDe": "Label (German)",
+    "type": "Type",
+    "itemType": "Item type",
+    "scope": "Set per",
+    "unit": "Unit",
+    "unitHint": "Display only, e.g. TE, mA, W",
+    "required": "Required",
+    "requiredHint": "A value must be set."
+  },
+  "schema": {
+    "item": "Attribute {{n}}",
+    "empty": "No attributes yet.",
+    "add": "Add attribute",
+    "keyHint": "e.g. width_te, bus_system"
+  },
+  "type": {
+    "text": "Text",
+    "number": "Number",
+    "integer": "Whole number",
+    "boolean": "Yes/no",
+    "enum": "Choice",
+    "list": "List"
+  },
+  "scope": {
+    "product": "Product",
+    "variant": "Variant",
+    "hint": "Variant values can differ per variant, e.g. colour."
+  },
+  "bounds": {
+    "value": { "min": "Minimum", "max": "Maximum" },
+    "length": { "min": "Minimum length", "max": "Maximum length" },
+    "items": { "min": "Minimum items", "max": "Maximum items" }
+  },
+  "options": {
+    "title": "Options",
+    "item": "Option {{n}}",
+    "add": "Add option"
+  }
 }

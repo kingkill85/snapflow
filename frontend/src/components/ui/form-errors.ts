@@ -26,15 +26,30 @@ export function useFieldError() {
  * Which API field locations (below "body.") a form shows at which of its fields,
  * e.g. { email: 'email', 'name.en': 'nameEn' }. List only fields the form renders,
  * so an error is never reported as "highlighted" without a visible field.
+ * An entry "attributes[]" (see apiFields' `arrays`) maps every location inside
+ * that array to the same path in the form: "attributes[2].options[0].key" is
+ * shown at "attributes.2.options.0.key".
  */
 export type ApiFieldMap = Readonly<Record<string, string>>
 
-/** Builds an ApiFieldMap: each named field at the same location, plus aliases. */
-export function apiFields<T extends FieldValues>(names: (Path<T> | false)[], aliases: Record<string, Path<T>> = {}): ApiFieldMap {
+/**
+ * Builds an ApiFieldMap: each named field at the same location, plus aliases.
+ * `arrays` are field arrays (useFieldArray) whose items mirror the API body, so
+ * every location inside them maps to the same nested form path.
+ */
+export function apiFields<T extends FieldValues>(
+  names: (Path<T> | false)[],
+  aliases: Record<string, Path<T>> = {},
+  arrays: Path<T>[] = [],
+): ApiFieldMap {
   const map: Record<string, string> = { ...aliases }
   for (const name of names) if (name) map[name] = name
+  for (const name of arrays) map[`${name}[]`] = name
   return map
 }
+
+/** "attributes[2].options[0].key" -> "attributes.2.options.0.key" */
+const dotted = (path: string) => path.replace(/\[(\d+)\]/g, '.$1')
 
 /** The form field an API error location belongs to: exact match first, then its top-level field. */
 export function apiFieldFor(location: string, fields?: ApiFieldMap): string | undefined {
@@ -42,6 +57,12 @@ export function apiFieldFor(location: string, fields?: ApiFieldMap): string | un
   const path = location.slice('body.'.length)
   if (Object.hasOwn(fields, path)) return fields[path]
   const top = path.split(/[.[]/)[0]
+  // Inside a field array: the same path in the form, down to a named field
+  // (an error at "attributes[2]" itself has no field to show it).
+  if (path.startsWith(`${top}[`) && Object.hasOwn(fields, `${top}[]`)) {
+    const nested = dotted(path)
+    return /\.\d+(\.[A-Za-z_]\w*)+$/.test(nested) ? nested : undefined
+  }
   return Object.hasOwn(fields, top) ? fields[top] : undefined
 }
 

@@ -14,4 +14,6 @@ export type FeatureModule = {
   permission?: Permission
   /** Omit to keep the route out of the navigation. */
   nav?: { section: 'catalog' | 'projects' | 'admin'; namespace: Namespace; labelKey: string }
+  /** Further pages below `path`, e.g. "new" and ":id" of an editor; they need `permission` plus their own. */
+  pages?: { path: string; element: ComponentType; permission?: Permission }[]
 }

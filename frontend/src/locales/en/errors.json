@@ -73,6 +73,8 @@
     "email": "Enter a valid email address.",
     "failed": "Please check the highlighted fields.",
     "invalid": "This value is invalid.",
+    "min_above_max": "The maximum must not be below the minimum.",
+    "number": "Enter a number.",
     "password_mismatch": "The passwords do not match.",
     "required": "This field is required.",
     "too_long": "This value is too long."

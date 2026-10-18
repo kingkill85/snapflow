@@ -1,19 +1,35 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router'
 
+import type { ProductType } from '@/api/generated/model'
 import {
   getListProductTypesQueryKey,
+  getListProductTypesQueryOptions,
   useDeleteProductType,
   useListProductTypes,
+  useReorderProductTypes,
 } from '@/api/generated/product-types/product-types'
-import type { ProductType } from '@/api/generated/model'
 import { useCan } from '@/app/session'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page } from '@/components/ui'
+import {
+  Badge,
+  Button,
+  CheckboxField,
+  type Column,
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  ErrorMessage,
+  IconButton,
+  Loading,
+  Page,
+  TextLink,
+} from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { ProductTypeFormDialog } from './ProductTypeFormDialog'
+import { listPath } from './ProductTypeEditorPage'
 
 export function ProductTypesPage() {
   const { t } = useTranslation('productTypes')
@@ -21,17 +37,13 @@ export function ProductTypesPage() {
   const localized = useLocalized()
   const canWrite = useCan()('catalog.write')
   const queryClient = useQueryClient()
-  const list = useListProductTypes()
+  const [showInactive, setShowInactive] = useState(false)
+  const list = useListProductTypes(showInactive ? { includeInactive: true } : undefined)
   const remove = useDeleteProductType()
-
-  const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState<ProductType | null>(null)
+  const reorder = useReorderProductTypes()
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState<unknown>(null)
   const [deleting, setDeleting] = useState<ProductType | null>(null)
-
-  const openForm = (item: ProductType | null) => {
-    setEditing(item)
-    setFormOpen(true)
-  }
 
   // Each delete starts without the previous attempt's error.
   const openDelete = (item: ProductType | null) => {
@@ -50,41 +62,96 @@ export function ProductTypesPage() {
     setDeleting(null)
   }
 
+  // Moves a type past its visible neighbour. The order covers inactive types
+  // too and the API wants all ids, so the move is applied to the full list.
+  const move = async (item: ProductType, neighbour: ProductType, direction: 'up' | 'down') => {
+    setMoving(true)
+    setMoveError(null)
+    try {
+      const all = await queryClient.fetchQuery(getListProductTypesQueryOptions({ includeInactive: true }))
+      const ids = all.items.map((i) => i.id).filter((id) => id !== item.id)
+      const at = ids.indexOf(neighbour.id)
+      ids.splice(direction === 'up' ? at : at + 1, 0, item.id)
+      await reorder.mutateAsync({ data: { ids } })
+    } catch (error) {
+      setMoveError(error) // and reload below, in case the list changed meanwhile
+    }
+    await queryClient.invalidateQueries({ queryKey: getListProductTypesQueryKey() })
+    setMoving(false)
+  }
+
+  const rows = list.data?.items ?? []
+  const columns: Column<ProductType>[] = [
+    { header: t('field.order'), cell: (p) => p.sortOrder, className: 'w-px text-right tabular-nums' },
+    { header: t('field.name'), cell: (p) => <TextLink to={`${listPath}/${p.id}`}>{localized(p.name)}</TextLink> },
+    { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code> },
+    { header: t('field.attributeCount'), cell: (p) => p.attributes.length, className: 'tabular-nums' },
+    {
+      header: t('field.status'),
+      cell: (p) => (
+        <Badge variant={p.isActive ? 'success' : 'neutral'}>{p.isActive ? tCommon('status.active') : tCommon('status.inactive')}</Badge>
+      ),
+    },
+  ]
+
+  const rowActions = (p: ProductType) => {
+    const index = rows.indexOf(p)
+    return (
+      <>
+        <IconButton
+          label={t('moveUp', { name: localized(p.name) })}
+          icon={<ArrowUp />}
+          disabled={index === 0 || moving}
+          onClick={() => void move(p, rows[index - 1], 'up')}
+        />
+        <IconButton
+          label={t('moveDown', { name: localized(p.name) })}
+          icon={<ArrowDown />}
+          disabled={index === rows.length - 1 || moving}
+          onClick={() => void move(p, rows[index + 1], 'down')}
+        />
+        {p.can.update && (
+          <Button asChild size="sm" variant="secondary">
+            <Link to={`${listPath}/${p.id}`}>
+              <Pencil /> {tCommon('action.edit')}
+            </Link>
+          </Button>
+        )}
+        {p.can.delete && (
+          <Button size="sm" variant="danger" onClick={() => openDelete(p)}>
+            <Trash2 /> {tCommon('action.delete')}
+          </Button>
+        )}
+      </>
+    )
+  }
+
   // Without catalog.write the page is read-only.
   const createButton = canWrite ? (
-    <Button onClick={() => openForm(null)}>
-      <Plus /> {t('new')}
+    <Button asChild>
+      <Link to={`${listPath}/new`}>
+        <Plus /> {t('new')}
+      </Link>
     </Button>
   ) : undefined
 
-  const rowActions = (item: ProductType) => (
-    <>
-      <Button size="sm" variant="secondary" onClick={() => openForm(item)}>
-        <Pencil /> {tCommon('action.edit')}
-      </Button>
-      <Button size="sm" variant="danger" onClick={() => openDelete(item)}>
-        <Trash2 /> {tCommon('action.delete')}
-      </Button>
-    </>
-  )
-
   return (
-    <Page title={t('title')} actions={createButton}>
+    <Page title={t('title')} description={t('description')} actions={createButton}>
+      <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+      <ErrorMessage error={moveError} />
       {list.isPending ? (
         <Loading />
       ) : list.isError ? (
         <ErrorMessage error={list.error} />
       ) : (
         <DataTable
-          rows={list.data.items}
-          rowKey={(item) => item.id}
-          columns={[{ header: t('field.name'), cell: (item) => localized(item.name) }]}
+          rows={rows}
+          rowKey={(p) => p.id}
+          columns={columns}
           actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}
         />
       )}
-
-      <ProductTypeFormDialog open={formOpen} onOpenChange={setFormOpen} item={editing} />
 
       <ConfirmDialog
         open={deleting !== null}

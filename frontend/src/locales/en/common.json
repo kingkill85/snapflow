@@ -9,6 +9,10 @@
     "edit": "Edit",
     "save": "Save",
     "signOut": "Sign out",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove",
+    "back": "Back to list",
     "home": "Go to start page"
   },
   "state": {

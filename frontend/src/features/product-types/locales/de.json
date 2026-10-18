@@ -1,14 +1,72 @@
 {
-  "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
-  "deleteTitle": "Produkttyp löschen",
-  "edit": "Produkttyp bearbeiten",
+  "title": "Produkttypen",
+  "description": "Die Gerätearten im Katalog. Jeder Produkttyp legt fest, welche Attribute seine Produkte haben.",
   "empty": "Noch keine Produkttypen.",
-  "field": {
-    "key": "Schlüssel",
-    "name": "Name",
-    "nameDe": "Name (Deutsch)",
-    "nameEn": "Name (Englisch)"
-  },
   "new": "Neuer Produkttyp",
-  "title": "Produkttypen"
+  "edit": "Produkttyp bearbeiten",
+  "readOnly": "Sie können diesen Produkttyp ansehen, aber nicht ändern.",
+  "showInactive": "Inaktive anzeigen",
+  "moveUp": "{{name}} nach oben verschieben",
+  "moveDown": "{{name}} nach unten verschieben",
+  "deleteTitle": "Produkttyp löschen",
+  "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
+  "section": {
+    "basics": "Grunddaten",
+    "attributes": "Attribute",
+    "attributesHint": "Werte, die an jedem Produkt oder an jeder seiner Varianten gespeichert werden (z. B. Breite, Bussystem, Farbe).",
+    "instanceAttributes": "Instanz-Attribute",
+    "instanceAttributesHint": "Werte, die im Projekt pro verbautem Gerät erfasst werden (z. B. Busadresse, MAC-Adresse)."
+  },
+  "field": {
+    "order": "Reihenfolge",
+    "key": "Schlüssel",
+    "keyHint": "z. B. dimmer_actuator, wall_switch",
+    "name": "Name",
+    "nameEn": "Name (Englisch)",
+    "nameDe": "Name (Deutsch)",
+    "descriptionEn": "Beschreibung (Englisch)",
+    "descriptionDe": "Beschreibung (Deutsch)",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Produkttypen sind im Katalog ausgeblendet, ihre Produkte bleiben erhalten.",
+    "attributeCount": "Attribute",
+    "status": "Status",
+    "labelEn": "Bezeichnung (Englisch)",
+    "labelDe": "Bezeichnung (Deutsch)",
+    "type": "Typ",
+    "itemType": "Typ der Einträge",
+    "scope": "Festgelegt pro",
+    "unit": "Einheit",
+    "unitHint": "Nur zur Anzeige, z. B. TE, mA, W",
+    "required": "Pflichtfeld",
+    "requiredHint": "Ein Wert muss gesetzt sein."
+  },
+  "schema": {
+    "item": "Attribut {{n}}",
+    "empty": "Noch keine Attribute.",
+    "add": "Attribut hinzufügen",
+    "keyHint": "z. B. width_te, bus_system"
+  },
+  "type": {
+    "text": "Text",
+    "number": "Zahl",
+    "integer": "Ganzzahl",
+    "boolean": "Ja/Nein",
+    "enum": "Auswahl",
+    "list": "Liste"
+  },
+  "scope": {
+    "product": "Produkt",
+    "variant": "Variante",
+    "hint": "Variantenwerte können je Variante abweichen, z. B. die Farbe."
+  },
+  "bounds": {
+    "value": { "min": "Minimum", "max": "Maximum" },
+    "length": { "min": "Mindestlänge", "max": "Maximallänge" },
+    "items": { "min": "Mindestanzahl Einträge", "max": "Höchstanzahl Einträge" }
+  },
+  "options": {
+    "title": "Optionen",
+    "item": "Option {{n}}",
+    "add": "Option hinzufügen"
+  }
 }

@@ -4,11 +4,10 @@ Every product or design decision taken while building SnapFlow 2, newest step la
 
 ## Open questions
 
-New ones are added here with the assumption the code follows until they are answered.
+None right now. New ones are added here with the assumption the code follows until they are answered.
 
 | # | Step | Question | Assumption the code follows |
 | --- | --- | --- | --- |
-| Q1 | 1b/1c | What happens to existing product values when an admin changes a product type's schema (removes an attribute, makes one required, narrows a range, removes an option)? | 1b saves schema changes without looking at products (there are none yet). 1c re-validates a product's values whenever the product is saved, so stale values surface as field errors on the next edit; schema saves are not blocked |
 
 ## Decided
 
@@ -39,3 +38,7 @@ New ones are added here with the assumption the code follows until they are answ
 | D23 | 1b | Attribute values: blank text, blank enum and empty lists count as "not set"; a list of enum options is a set (repeats collapse); text length counts characters; unknown and wrong-scope keys are rejected | One rule for the editor, the import (1d) and instances; typos in imports must not be stored silently | Claude |
 | D24 | 1b | Every validation problem of a product type (key, name, every attribute row, both schemas) is reported in one response, each at its exact location (e.g. `body.attributes[2].options[0].key`) | Long schemas would otherwise need one save per mistake | Claude |
 | D25 | 1b | The catalog order is one order over active and inactive product types; reordering sends the complete list | Reactivating a type puts it back where it was; a complete list detects concurrent changes (`product_type.order_mismatch`) | Claude |
+| D26 | 1b | Product type schema changes are always allowed. Products are re-validated against the current schema when they are saved (1c), and the product list will flag products whose values no longer match (was Q1) | Follows the "extend with data, not code" principle (D15): changing a schema must not need a data migration | Claude |
+| D27 | 1b | Users without `catalog.write` open the same product type editor page read-only (every control disabled, no save, a "Back to list" link); the name in the list links there. `catalog/product-types/new` needs `catalog.write` | One page to build and test instead of a separate detail view; readers still see the full schema | Claude |
+| D28 | 1b | Saving the product type editor returns to the list; Cancel returns to the list and discards changes without asking | Same flow as the dialogs (save closes, cancel discards); an "unsaved changes" prompt needs the data router's blocker and can follow if users lose work | Claude |
+| D29 | 1b | Reordering on the list moves a type past its visible neighbour; with inactive types hidden, the move is applied to the full order (fetched fresh) and the complete id list is sent | Follows D24; hidden inactive types keep their relative place | Claude |
