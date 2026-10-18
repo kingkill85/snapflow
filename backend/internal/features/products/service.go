@@ -1,11 +1,13 @@
 // Package products manages the products of the global catalog with their
 // variants and add-ons (one aggregate). A product belongs to a product type
-// whose attribute schema its values follow; variants carry the price and
-// image; add-ons link a variant to variants that go with it. Reads need
+// (its system or product line) and a category (its kind of device) whose
+// attribute schema its values follow; variants carry the price and image;
+// add-ons link a variant to variants that go with it. Reads need
 // catalog.read, writes catalog.write.
 //
-// Product types are read through producttypes.Service and files are checked
-// through files.Service; this feature never reads their tables.
+// Product types and categories are read through producttypes.Service and
+// categories.Service, and files are checked through files.Service; this
+// feature never reads their tables.
 package products
 
 import (
@@ -25,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
@@ -62,11 +65,12 @@ type Service struct {
 	db    DB
 	q     *store.Queries
 	types *producttypes.Service
+	cats  *categories.Service
 	files *files.Service
 }
 
-func NewService(db DB, types *producttypes.Service, files *files.Service) *Service {
-	return &Service{db: db, q: store.New(db), types: types, files: files}
+func NewService(db DB, types *producttypes.Service, cats *categories.Service, files *files.Service) *Service {
+	return &Service{db: db, q: store.New(db), types: types, cats: cats, files: files}
 }
 
 // inSnapshot runs the reads of fn in one read-only REPEATABLE READ
@@ -86,8 +90,8 @@ func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) err
 // ---------------------------------------------------------------- products
 
 // List returns one page of products in catalog order (product type order,
-// then model number). Without IncludeInactive only active products of
-// active types are listed.
+// category order, then model number). Without IncludeInactive only active
+// products of active types and active categories are listed.
 func (s *Service) List(ctx context.Context, p ListParams) (ProductPage, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogRead)
 	if err != nil {
@@ -96,7 +100,7 @@ func (s *Service) List(ctx context.Context, p ListParams) (ProductPage, error) {
 	if err := checkPage(p.Limit, p.Offset); err != nil {
 		return ProductPage{}, err
 	}
-	types, err := s.loadTypes(ctx)
+	cat, err := s.loadCatalog(ctx)
 	if err != nil {
 		return ProductPage{}, err
 	}
@@ -110,16 +114,17 @@ func (s *Service) List(ctx context.Context, p ListParams) (ProductPage, error) {
 	err = s.inSnapshot(ctx, func(q *store.Queries) error {
 		var err error
 		rows, err = q.ListProducts(ctx, store.ListProductsParams{
-			TypeIds: types.order, ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
-			InactiveTypeIds: types.inactive, Search: pattern,
+			TypeIds: cat.typeOrder, CategoryIds: cat.categoryOrder,
+			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, IncludeInactive: p.IncludeInactive,
+			InactiveTypeIds: cat.inactiveTypes, InactiveCategoryIds: cat.inactiveCategories, Search: pattern,
 			RowLimit: int32(p.Limit), RowOffset: int32(p.Offset), //nolint:gosec // checked by checkPage
 		})
 		if err != nil {
 			return err
 		}
 		total, err = q.CountProducts(ctx, store.CountProductsParams{
-			ProductTypeID: p.ProductTypeID, IncludeInactive: p.IncludeInactive,
-			InactiveTypeIds: types.inactive, Search: pattern,
+			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, IncludeInactive: p.IncludeInactive,
+			InactiveTypeIds: cat.inactiveTypes, InactiveCategoryIds: cat.inactiveCategories, Search: pattern,
 		})
 		if err != nil {
 			return err
@@ -142,21 +147,26 @@ func (s *Service) List(ctx context.Context, p ListParams) (ProductPage, error) {
 	write := actor.Can(auth.PermCatalogWrite)
 	items := make([]ProductListItem, 0, len(rows))
 	for _, r := range rows {
-		pt, err := types.get(ctx, s.types, r.ProductTypeID)
+		pt, err := cat.typeOf(ctx, s, r.ProductTypeID)
+		if err != nil {
+			return ProductPage{}, err
+		}
+		c, err := cat.categoryOf(ctx, s, r.CategoryID)
 		if err != nil {
 			return ProductPage{}, err
 		}
 		item := ProductListItem{
-			ID: r.ID, ProductTypeID: r.ProductTypeID, ProductType: typeRef(pt), ModelNumber: r.ModelNumber,
-			Name: r.Name, IsActive: r.IsActive, Available: r.IsActive && pt.IsActive,
+			ID: r.ID, ProductTypeID: r.ProductTypeID, ProductType: typeRef(pt),
+			CategoryID: r.CategoryID, Category: categoryRef(c), ModelNumber: r.ModelNumber,
+			Name: r.Name, IsActive: r.IsActive, Available: r.IsActive && pt.IsActive && c.IsActive,
 			Can: auth.Actions{Update: write, Delete: write},
 		}
-		_, stale, errs := readValues(pt.Attributes, attrschema.ScopeProduct, r.Attributes)
+		_, stale, errs := readValues(c.Attributes, attrschema.ScopeProduct, r.Attributes)
 		item.AttributeErrors, item.StaleAttributes = len(errs), len(stale)
 		var lo, hi *big.Rat
 		for _, v := range byProduct[r.ID] {
 			item.VariantCount++
-			_, stale, errs := readValues(pt.Attributes, attrschema.ScopeVariant, v.Attributes)
+			_, stale, errs := readValues(c.Attributes, attrschema.ScopeVariant, v.Attributes)
 			item.AttributeErrors += len(errs)
 			item.StaleAttributes += len(stale)
 			if !v.IsActive {
@@ -209,7 +219,7 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		row, err = q.CreateProduct(ctx, store.CreateProductParams{
-			ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
+			ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
 			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
 		})
 		return err
@@ -222,8 +232,8 @@ func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) 
 
 // Update replaces a product's own fields (not its variants). It fails with
 // product.stale if the product changed since in.ExpectedUpdatedAt. Values
-// whose key the (new) type's schema does not have are kept only if they
-// were stored before and are sent back. The type may change, also to one
+// whose key the (new) category's schema does not have are kept only if they
+// were stored before and are sent back. The category may change, also to one
 // whose schema the variants' values do not match: those are only flagged on
 // read (Product.VariantsWithProblems), never re-validated or refused.
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (Product, error) {
@@ -246,7 +256,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductUpdate) (P
 	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		row, err = q.UpdateProduct(ctx, store.UpdateProductParams{
-			ID: id, ProductTypeID: in.ProductTypeID, ModelNumber: in.ModelNumber, Name: in.Name,
+			ID: id, ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
 			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
 			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
@@ -318,13 +328,23 @@ func (s *Service) validateProduct(ctx context.Context, in ProductInput, current 
 		errs = append(errs, errTypeNotFound())
 	case err != nil:
 		return in, err
-	default:
+	case !pt.IsActive && (current == nil || current.ProductTypeID != pt.ID):
 		// An inactive type takes no new products; a product keeps its own.
-		if !pt.IsActive && (current == nil || current.ProductTypeID != pt.ID) {
-			errs = append(errs, apperr.Field("body.productTypeId", "product.type_inactive", "the product type is inactive"))
+		errs = append(errs, apperr.Field("body.productTypeId", "product.type_inactive", "the product type is inactive"))
+	}
+	c, err := s.cats.Get(ctx, in.CategoryID)
+	switch {
+	case hasCode(err, "category.not_found"):
+		errs = append(errs, errCategoryNotFound())
+	case err != nil:
+		return in, err
+	default:
+		// An inactive category takes no new products; a product keeps its own.
+		if !c.IsActive && (current == nil || current.CategoryID != c.ID) {
+			errs = append(errs, apperr.Field("body.categoryId", "product.category_inactive", "the category is inactive"))
 		}
 		var attrErrs []apperr.FieldError
-		in.Attributes, attrErrs = saveValues(pt.Attributes, attrschema.ScopeProduct, in.Attributes, previous, "body.attributes")
+		in.Attributes, attrErrs = saveValues(c.Attributes, attrschema.ScopeProduct, in.Attributes, previous, "body.attributes")
 		errs = append(errs, attrErrs...)
 	}
 	if len(errs) > 0 {
@@ -335,11 +355,15 @@ func (s *Service) validateProduct(ctx context.Context, in ProductInput, current 
 
 // detail reads a product's variants and add-ons and builds the response.
 func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Product) (Product, error) {
-	types, err := s.loadTypes(ctx)
+	cat, err := s.loadCatalog(ctx)
 	if err != nil {
 		return Product{}, err
 	}
-	pt, err := types.get(ctx, s.types, row.ProductTypeID)
+	pt, err := cat.typeOf(ctx, s, row.ProductTypeID)
+	if err != nil {
+		return Product{}, err
+	}
+	c, err := cat.categoryOf(ctx, s, row.CategoryID)
 	if err != nil {
 		return Product{}, err
 	}
@@ -351,23 +375,24 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Produc
 	for i, v := range variants {
 		ids[i] = v.ID
 	}
-	addons, err := s.addons(ctx, types, ids)
+	addons, err := s.addons(ctx, cat, ids)
 	if err != nil {
 		return Product{}, err
 	}
 	write := actor.Can(auth.PermCatalogWrite)
 	p := Product{
-		ID: row.ID, ProductTypeID: row.ProductTypeID, ProductType: typeRef(pt), ModelNumber: row.ModelNumber,
-		Name: row.Name, IsActive: row.IsActive, Available: row.IsActive && pt.IsActive,
+		ID: row.ID, ProductTypeID: row.ProductTypeID, ProductType: typeRef(pt),
+		CategoryID: row.CategoryID, Category: categoryRef(c), ModelNumber: row.ModelNumber,
+		Name: row.Name, IsActive: row.IsActive, Available: row.IsActive && pt.IsActive && c.IsActive,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Can: auth.Actions{Update: write, Delete: write},
 	}
 	if row.Description != nil {
 		p.Description = *row.Description
 	}
-	p.Attributes, p.StaleAttributes, p.AttributeErrors = readValues(pt.Attributes, attrschema.ScopeProduct, row.Attributes)
+	p.Attributes, p.StaleAttributes, p.AttributeErrors = readValues(c.Attributes, attrschema.ScopeProduct, row.Attributes)
 	p.Variants = make([]Variant, len(variants))
 	for i, v := range variants {
-		p.Variants[i] = variantOut(actor, v, pt, p.Available, addons[v.ID])
+		p.Variants[i] = variantOut(actor, v, c.Attributes, p.Available, addons[v.ID])
 		if len(p.Variants[i].AttributeErrors) > 0 || len(p.Variants[i].StaleAttributes) > 0 {
 			p.VariantsWithProblems++
 		}
@@ -387,11 +412,11 @@ func (s *Service) CreateVariant(ctx context.Context, productID uuid.UUID, in Var
 	if err != nil {
 		return Variant{}, notFound(err, "product.not_found")
 	}
-	pt, err := s.types.Get(ctx, product.ProductTypeID)
+	c, err := s.cats.Get(ctx, product.CategoryID)
 	if err != nil {
 		return Variant{}, err
 	}
-	in, err = s.validateVariant(ctx, pt, in, nil)
+	in, err = s.validateVariant(ctx, c, in, nil)
 	if err != nil {
 		return Variant{}, err
 	}
@@ -409,7 +434,7 @@ func (s *Service) CreateVariant(ctx context.Context, productID uuid.UUID, in Var
 	if err != nil {
 		return Variant{}, mapVariantErr(err, in, "product.not_found")
 	}
-	return s.variantDetail(ctx, actor, product, pt, row)
+	return s.variantDetail(ctx, actor, product, row)
 }
 
 // UpdateVariant replaces a variant (not its add-ons). It fails with
@@ -430,11 +455,11 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if err != nil {
 		return Variant{}, notFound(err, "variant.not_found")
 	}
-	pt, err := s.types.Get(ctx, product.ProductTypeID)
+	c, err := s.cats.Get(ctx, product.CategoryID)
 	if err != nil {
 		return Variant{}, err
 	}
-	in.VariantInput, err = s.validateVariant(ctx, pt, in.VariantInput, current.Attributes)
+	in.VariantInput, err = s.validateVariant(ctx, c, in.VariantInput, current.Attributes)
 	if err != nil {
 		return Variant{}, err
 	}
@@ -461,7 +486,7 @@ func (s *Service) UpdateVariant(ctx context.Context, productID, id uuid.UUID, in
 	if err != nil {
 		return Variant{}, mapVariantErr(err, in.VariantInput, "variant.not_found")
 	}
-	return s.variantDetail(ctx, actor, product, pt, row)
+	return s.variantDetail(ctx, actor, product, row)
 }
 
 // DeleteVariant removes a variant and its add-on links in both directions.
@@ -515,7 +540,7 @@ func (s *Service) ReorderVariants(ctx context.Context, productID uuid.UUID, ids 
 	return s.detail(ctx, actor, row)
 }
 
-func (s *Service) validateVariant(ctx context.Context, pt producttypes.ProductType, in VariantInput, previous attrschema.Values) (VariantInput, error) {
+func (s *Service) validateVariant(ctx context.Context, c categories.Category, in VariantInput, previous attrschema.Values) (VariantInput, error) {
 	var errs []apperr.FieldError
 	in.Name = in.Name.Trimmed()
 	errs = append(errs, in.Name.Check("body.name", MaxVariantNameLength)...)
@@ -545,7 +570,7 @@ func (s *Service) validateVariant(ctx context.Context, pt producttypes.ProductTy
 		}
 	}
 	var attrErrs []apperr.FieldError
-	in.Attributes, attrErrs = saveValues(pt.Attributes, attrschema.ScopeVariant, in.Attributes, previous, "body.attributes")
+	in.Attributes, attrErrs = saveValues(c.Attributes, attrschema.ScopeVariant, in.Attributes, previous, "body.attributes")
 	errs = append(errs, attrErrs...)
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
@@ -554,22 +579,30 @@ func (s *Service) validateVariant(ctx context.Context, pt producttypes.ProductTy
 }
 
 // variantDetail builds the response of a single variant.
-func (s *Service) variantDetail(ctx context.Context, actor auth.Actor, product store.Product, pt producttypes.ProductType, v store.ProductVariant) (Variant, error) {
-	types, err := s.loadTypes(ctx)
+func (s *Service) variantDetail(ctx context.Context, actor auth.Actor, product store.Product, v store.ProductVariant) (Variant, error) {
+	cat, err := s.loadCatalog(ctx)
 	if err != nil {
 		return Variant{}, err
 	}
-	addons, err := s.addons(ctx, types, []uuid.UUID{v.ID})
+	pt, err := cat.typeOf(ctx, s, product.ProductTypeID)
 	if err != nil {
 		return Variant{}, err
 	}
-	return variantOut(actor, v, pt, product.IsActive && pt.IsActive, addons[v.ID]), nil
+	c, err := cat.categoryOf(ctx, s, product.CategoryID)
+	if err != nil {
+		return Variant{}, err
+	}
+	addons, err := s.addons(ctx, cat, []uuid.UUID{v.ID})
+	if err != nil {
+		return Variant{}, err
+	}
+	return variantOut(actor, v, c.Attributes, product.IsActive && pt.IsActive && c.IsActive, addons[v.ID]), nil
 }
 
 // SearchVariants lists variants across the catalog (add-on picker) in
-// catalog order: product type, model number, variant order. Without a
-// search it lists every variant (browsing); productTypeID narrows it to one
-// type.
+// catalog order: product type, category, model number, variant order.
+// Without a search it lists every variant (browsing); ProductTypeID and
+// CategoryID narrow it to one type or category.
 func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (VariantPage, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
 		return VariantPage{}, err
@@ -577,7 +610,7 @@ func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (Va
 	if err := checkPage(p.Limit, p.Offset); err != nil {
 		return VariantPage{}, err
 	}
-	types, err := s.loadTypes(ctx)
+	cat, err := s.loadCatalog(ctx)
 	if err != nil {
 		return VariantPage{}, err
 	}
@@ -589,13 +622,16 @@ func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (Va
 	err = s.inSnapshot(ctx, func(q *store.Queries) error {
 		var err error
 		rows, err = q.SearchVariants(ctx, store.SearchVariantsParams{
-			TypeIds: types.order, ProductTypeID: p.ProductTypeID, Search: pattern,
+			TypeIds: cat.typeOrder, CategoryIds: cat.categoryOrder,
+			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, Search: pattern,
 			RowLimit: int32(p.Limit), RowOffset: int32(p.Offset), //nolint:gosec // checked by checkPage
 		})
 		if err != nil {
 			return err
 		}
-		total, err = q.CountVariants(ctx, store.CountVariantsParams{ProductTypeID: p.ProductTypeID, Search: pattern})
+		total, err = q.CountVariants(ctx, store.CountVariantsParams{
+			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, Search: pattern,
+		})
 		return err
 	})
 	if err != nil {
@@ -603,15 +639,20 @@ func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (Va
 	}
 	items := make([]VariantSearchItem, len(rows))
 	for i, r := range rows {
-		pt, err := types.get(ctx, s.types, r.ProductTypeID)
+		pt, err := cat.typeOf(ctx, s, r.ProductTypeID)
+		if err != nil {
+			return VariantPage{}, err
+		}
+		c, err := cat.categoryOf(ctx, s, r.CategoryID)
 		if err != nil {
 			return VariantPage{}, err
 		}
 		items[i] = VariantSearchItem{
 			ID: r.ID, ProductID: r.ProductID, ProductTypeID: r.ProductTypeID, ProductType: typeRef(pt),
+			CategoryID: r.CategoryID, Category: categoryRef(c),
 			ModelNumber: r.ModelNumber, ProductName: r.ProductName, Name: r.Name, SKU: deref(r.Sku),
 			Price: formatPrice(r.Price), ImageFileID: r.ImageFileID,
-			Available: r.IsActive && r.ProductIsActive && pt.IsActive,
+			Available: r.IsActive && r.ProductIsActive && pt.IsActive && c.IsActive,
 		}
 	}
 	return VariantPage{Items: items, Total: total}, nil
@@ -691,15 +732,11 @@ func (s *Service) ReplaceAddons(ctx context.Context, productID, variantID uuid.U
 	if err != nil {
 		return Variant{}, notFound(err, "variant.not_found")
 	}
-	pt, err := s.types.Get(ctx, product.ProductTypeID)
-	if err != nil {
-		return Variant{}, err
-	}
-	return s.variantDetail(ctx, actor, product, pt, v)
+	return s.variantDetail(ctx, actor, product, v)
 }
 
 // addons returns the add-ons of the variants, by variant.
-func (s *Service) addons(ctx context.Context, types *catalogTypes, variantIDs []uuid.UUID) (map[uuid.UUID][]Addon, error) {
+func (s *Service) addons(ctx context.Context, cat *catalog, variantIDs []uuid.UUID) (map[uuid.UUID][]Addon, error) {
 	out := map[uuid.UUID][]Addon{}
 	if len(variantIDs) == 0 {
 		return out, nil
@@ -709,14 +746,18 @@ func (s *Service) addons(ctx context.Context, types *catalogTypes, variantIDs []
 		return nil, err
 	}
 	for _, r := range rows {
-		pt, err := types.get(ctx, s.types, r.ProductTypeID)
+		pt, err := cat.typeOf(ctx, s, r.ProductTypeID)
+		if err != nil {
+			return nil, err
+		}
+		c, err := cat.categoryOf(ctx, s, r.CategoryID)
 		if err != nil {
 			return nil, err
 		}
 		out[r.VariantID] = append(out[r.VariantID], Addon{
 			AddonVariantID: r.AddonVariantID, ProductID: r.ProductID, ModelNumber: r.ModelNumber,
 			ProductName: r.ProductName, VariantName: r.VariantName, Price: formatPrice(r.Price),
-			ImageFileID: r.ImageFileID, Available: r.IsActive && r.ProductIsActive && pt.IsActive,
+			ImageFileID: r.ImageFileID, Available: r.IsActive && r.ProductIsActive && pt.IsActive && c.IsActive,
 			Required: r.Required, SortOrder: r.SortOrder,
 		})
 	}
@@ -725,49 +766,86 @@ func (s *Service) addons(ctx context.Context, types *catalogTypes, variantIDs []
 
 // ---------------------------------------------------------------- helpers
 
-// catalogTypes is a snapshot of the product types (from producttypes.Service):
-// their catalog order and which are inactive, for queries and availability.
-type catalogTypes struct {
-	byID     map[uuid.UUID]producttypes.ProductType
-	order    []uuid.UUID
-	inactive []uuid.UUID
+// catalog is a snapshot of the product types and categories (from
+// producttypes.Service and categories.Service): their catalog order and which
+// are inactive, for queries and availability, and the categories' schemas.
+type catalog struct {
+	types              map[uuid.UUID]producttypes.ProductType
+	categories         map[uuid.UUID]categories.Category
+	typeOrder          []uuid.UUID
+	categoryOrder      []uuid.UUID
+	inactiveTypes      []uuid.UUID
+	inactiveCategories []uuid.UUID
 }
 
-func (s *Service) loadTypes(ctx context.Context) (*catalogTypes, error) {
-	list, err := s.types.List(ctx, true)
+func (s *Service) loadCatalog(ctx context.Context) (*catalog, error) {
+	types, err := s.types.List(ctx, true)
 	if err != nil {
 		return nil, err
 	}
-	c := &catalogTypes{byID: make(map[uuid.UUID]producttypes.ProductType, len(list)), order: make([]uuid.UUID, 0, len(list)), inactive: []uuid.UUID{}}
-	for _, t := range list {
-		c.byID[t.ID] = t
-		c.order = append(c.order, t.ID)
+	cats, err := s.cats.List(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	c := &catalog{
+		types: make(map[uuid.UUID]producttypes.ProductType, len(types)), categories: make(map[uuid.UUID]categories.Category, len(cats)),
+		typeOrder: make([]uuid.UUID, 0, len(types)), categoryOrder: make([]uuid.UUID, 0, len(cats)),
+		inactiveTypes: []uuid.UUID{}, inactiveCategories: []uuid.UUID{},
+	}
+	for _, t := range types {
+		c.types[t.ID] = t
+		c.typeOrder = append(c.typeOrder, t.ID)
 		if !t.IsActive {
-			c.inactive = append(c.inactive, t.ID)
+			c.inactiveTypes = append(c.inactiveTypes, t.ID)
+		}
+	}
+	for _, k := range cats {
+		c.categories[k.ID] = k
+		c.categoryOrder = append(c.categoryOrder, k.ID)
+		if !k.IsActive {
+			c.inactiveCategories = append(c.inactiveCategories, k.ID)
 		}
 	}
 	return c, nil
 }
 
-// get returns a type of the snapshot, or reads it if it was created after
+// typeOf returns a type of the snapshot, or reads it if it was created after
 // the snapshot was taken.
-func (c *catalogTypes) get(ctx context.Context, types *producttypes.Service, id uuid.UUID) (producttypes.ProductType, error) {
-	if t, ok := c.byID[id]; ok {
+func (c *catalog) typeOf(ctx context.Context, s *Service, id uuid.UUID) (producttypes.ProductType, error) {
+	if t, ok := c.types[id]; ok {
 		return t, nil
 	}
-	t, err := types.Get(ctx, id)
+	t, err := s.types.Get(ctx, id)
 	if err != nil {
 		return t, err
 	}
-	c.byID[id] = t
+	c.types[id] = t
 	return t, nil
 }
 
-func typeRef(t producttypes.ProductType) ProductTypeRef {
-	return ProductTypeRef{ID: t.ID, Key: t.Key, Name: t.Name, Color: t.Color, IsActive: t.IsActive}
+// categoryOf returns a category of the snapshot, or reads it if it was
+// created after the snapshot was taken.
+func (c *catalog) categoryOf(ctx context.Context, s *Service, id uuid.UUID) (categories.Category, error) {
+	if k, ok := c.categories[id]; ok {
+		return k, nil
+	}
+	k, err := s.cats.Get(ctx, id)
+	if err != nil {
+		return k, err
+	}
+	c.categories[id] = k
+	return k, nil
 }
 
-func variantOut(actor auth.Actor, v store.ProductVariant, pt producttypes.ProductType, productAvailable bool, addons []Addon) Variant {
+func typeRef(t producttypes.ProductType) ProductTypeRef {
+	return ProductTypeRef{ID: t.ID, Key: t.Key, Name: t.Name, Abbreviation: t.Abbreviation, Color: t.Color, IsActive: t.IsActive}
+}
+
+func categoryRef(c categories.Category) CategoryRef {
+	return CategoryRef{ID: c.ID, Key: c.Key, Name: c.Name, IsActive: c.IsActive}
+}
+
+func variantOut(actor auth.Actor, v store.ProductVariant, schema attrschema.Schema, productAvailable bool, addons []Addon) Variant {
 	write := actor.Can(auth.PermCatalogWrite)
 	out := Variant{
 		ID: v.ID, ProductID: v.ProductID, Name: v.Name, SKU: deref(v.Sku), Price: formatPrice(v.Price),
@@ -778,7 +856,7 @@ func variantOut(actor auth.Actor, v store.ProductVariant, pt producttypes.Produc
 	if out.Addons == nil {
 		out.Addons = []Addon{}
 	}
-	out.Attributes, out.StaleAttributes, out.AttributeErrors = readValues(pt.Attributes, attrschema.ScopeVariant, v.Attributes)
+	out.Attributes, out.StaleAttributes, out.AttributeErrors = readValues(schema, attrschema.ScopeVariant, v.Attributes)
 	return out
 }
 
@@ -935,6 +1013,10 @@ func errTypeNotFound() apperr.FieldError {
 	return apperr.Field("body.productTypeId", "product.type_not_found", "no such product type")
 }
 
+func errCategoryNotFound() apperr.FieldError {
+	return apperr.Field("body.categoryId", "product.category_not_found", "no such category")
+}
+
 func errFileNotFound() apperr.FieldError {
 	return apperr.Field("body.imageFileId", "file.not_found", "no such file")
 }
@@ -947,6 +1029,8 @@ func mapProductErr(err error, modelNumber string) error {
 			return apperr.Conflict("product.model_number_taken", "model number already exists").With("modelNumber", modelNumber)
 		case pgErr.Code == "23503" && pgErr.ConstraintName == "products_product_type_id_fkey":
 			return apperr.Validation(errTypeNotFound())
+		case pgErr.Code == "23503" && pgErr.ConstraintName == "products_category_id_fkey":
+			return apperr.Validation(errCategoryNotFound())
 		}
 	}
 	return err

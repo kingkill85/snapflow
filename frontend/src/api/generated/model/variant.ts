@@ -20,7 +20,7 @@ export interface Variant {
   attributeErrors: FieldError[];
   /** Variant-scope attribute values by key */
   attributes: VariantAttributes;
-  /** Variant, product and product type are active */
+  /** Variant, product, product type and category are active */
   available: boolean;
   can: Actions;
   createdAt: string;

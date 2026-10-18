@@ -5,25 +5,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
-import type { AttributeDefinition } from './attributeDefinition';
-import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
-import type { ProductTypeDescription } from './productTypeDescription';
 import type { ProductTypeName } from './productTypeName';
 
 export interface ProductType {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** Values stored on each product, or on each variant (scope) */
-  attributes: AttributeDefinition[];
+  /** Badge text, upper case, at most 6 characters */
+  abbreviation?: string;
   can: Actions;
   /** Badge colour, #rrggbb */
   color?: string;
   createdAt: string;
-  /** Description per locale */
-  description?: ProductTypeDescription;
   id: string;
-  /** Values per installed unit (bus address, MAC, ...), filled in projects */
-  instanceAttributes: InstanceAttributeDefinition[];
   /** Inactive types are hidden from lists unless asked for */
   isActive: boolean;
   /** Stable identifier, lower snake case */

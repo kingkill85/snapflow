@@ -10,7 +10,9 @@ package testdb
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,15 +24,19 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 )
 
-var pool *pgxpool.Pool
+var (
+	pool *pgxpool.Pool
+	// serverURL is the URL of the test database, for NewDatabase.
+	serverURL string
+)
 
 // Run starts the database, runs the package's tests and stops the database.
 // Set TEST_DATABASE_URL to use an existing database instead of a container.
 func Run(m *testing.M) int {
 	ctx := context.Background()
 
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
 		ctr, err := postgres.Run(ctx, "postgres:17-alpine",
 			postgres.WithDatabase("snapflow_test"),
 			postgres.WithUsername("snapflow"),
@@ -44,19 +50,20 @@ func Run(m *testing.M) int {
 			return 1
 		}
 		defer func() { _ = ctr.Terminate(ctx) }()
-		url, err = ctr.ConnectionString(ctx, "sslmode=disable")
+		dbURL, err = ctr.ConnectionString(ctx, "sslmode=disable")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "testdb: connection string:", err)
 			return 1
 		}
 	}
 
-	if err := database.Migrate(ctx, url); err != nil {
+	serverURL = dbURL
+	if err := database.Migrate(ctx, dbURL); err != nil {
 		fmt.Fprintln(os.Stderr, "testdb:", err)
 		return 1
 	}
 	var err error
-	pool, err = database.Open(ctx, url)
+	pool, err = database.Open(ctx, dbURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "testdb:", err)
 		return 1
@@ -86,4 +93,32 @@ END $$;`)
 		t.Fatalf("testdb: reset: %v", err)
 	}
 	return pool
+}
+
+var dbSeq atomic.Int64
+
+// NewDatabase creates an empty database (no migrations applied) on the test
+// server and returns its URL; it is dropped when the test ends. Migration
+// tests use it to build a database in an older shape.
+func NewDatabase(t *testing.T) string {
+	t.Helper()
+	if pool == nil {
+		t.Fatal("testdb: call testdb.Run from TestMain")
+	}
+	ctx := context.Background()
+	name := fmt.Sprintf("snapflow_scratch_%d_%d", os.Getpid(), dbSeq.Add(1))
+	if _, err := pool.Exec(ctx, "CREATE DATABASE "+name); err != nil {
+		t.Fatalf("testdb: create database: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
+			t.Errorf("testdb: drop database: %v", err)
+		}
+	})
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatalf("testdb: parse url: %v", err)
+	}
+	u.Path = "/" + name
+	return u.String()
 }

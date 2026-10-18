@@ -4,22 +4,15 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { AttributeDefinition } from './attributeDefinition';
-import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
-import type { ProductTypeInputDescription } from './productTypeInputDescription';
 import type { ProductTypeInputName } from './productTypeInputName';
 
 export interface ProductTypeInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** At most 200 */
-  attributes: AttributeDefinition[];
+  /** Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none */
+  abbreviation?: string;
   /** Badge colour, #rrggbb (stored lower case); empty for none */
   color?: string;
-  /** Description per locale (at most 2000 characters); if set, "en" is required */
-  description?: ProductTypeInputDescription;
-  /** At most 200 */
-  instanceAttributes: InstanceAttributeDefinition[];
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;

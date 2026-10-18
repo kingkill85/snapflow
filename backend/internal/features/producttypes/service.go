@@ -1,53 +1,52 @@
-// Package producttypes manages product types: the kinds of device in the
-// global catalog (dimmer actuator, wall switch, gateway, ...). A product type
-// defines which attributes its products have (attribute schemas, see
-// platform/attrschema). Reads need catalog.read, writes catalog.write.
+// Package producttypes manages product types: the systems or product lines of
+// the global catalog (Zigbee, KNX, HDL Buspro, ...), shown as a badge with an
+// abbreviation and a colour. Projects choose their product types (phase 2).
+// The kind of device and its attribute schema is the product's category
+// (features/categories). Reads need catalog.read, writes catalog.write.
 package producttypes
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
-	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 type ProductType struct {
-	ID          uuid.UUID         `json:"id"`
-	Key         string            `json:"key" doc:"Stable identifier, lower snake case" example:"dimmer_actuator"`
-	Name        i18n.Text         `json:"name" doc:"Display name per locale"`
-	Description i18n.Text         `json:"description,omitempty" doc:"Description per locale"`
-	Color       string            `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
-	SortOrder   int32             `json:"sortOrder" doc:"Position in the catalog, 1 first"`
-	IsActive    bool              `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
-	Attributes  attrschema.Schema `json:"attributes" doc:"Values stored on each product, or on each variant (scope)"`
-	// InstanceAttributes are filled in per installed unit in projects.
-	InstanceAttributes attrschema.InstanceSchema `json:"instanceAttributes" doc:"Values per installed unit (bus address, MAC, ...), filled in projects"`
-	CreatedAt          time.Time                 `json:"createdAt"`
-	UpdatedAt          time.Time                 `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can                auth.Actions              `json:"can"`
+	ID           uuid.UUID    `json:"id"`
+	Key          string       `json:"key" doc:"Stable identifier, lower snake case" example:"zigbee"`
+	Name         i18n.Text    `json:"name" doc:"Display name per locale"`
+	Abbreviation string       `json:"abbreviation,omitempty" doc:"Badge text, upper case, at most 6 characters" example:"ZB"`
+	Color        string       `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
+	SortOrder    int32        `json:"sortOrder" doc:"Position in the catalog, 1 first"`
+	IsActive     bool         `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
+	CreatedAt    time.Time    `json:"createdAt"`
+	UpdatedAt    time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can          auth.Actions `json:"can"`
 }
 
 type ProductTypeInput struct {
-	Key                string                    `json:"key" doc:"Lower snake case, 1-64 characters" example:"dimmer_actuator"`
-	Name               i18n.Text                 `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
-	Description        i18n.Text                 `json:"description,omitempty" doc:"Description per locale (at most 2000 characters); if set, \"en\" is required"`
-	Color              string                    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
-	IsActive           bool                      `json:"isActive"`
-	Attributes         attrschema.Schema         `json:"attributes" doc:"At most 200"`
-	InstanceAttributes attrschema.InstanceSchema `json:"instanceAttributes" doc:"At most 200"`
+	Key          string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
+	Name         i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
+	Abbreviation string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
+	Color        string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
+	IsActive     bool      `json:"isActive"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -59,9 +58,9 @@ type ProductTypeUpdate struct {
 
 // Limits of a product type.
 const (
-	MaxKeyLength         = 64
-	MaxNameLength        = 100
-	MaxDescriptionLength = 2000
+	MaxKeyLength          = 64
+	MaxNameLength         = 100
+	MaxAbbreviationLength = 6
 )
 
 // orderLockKey is the advisory lock (pg_advisory_xact_lock) that serialises
@@ -139,8 +138,8 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 			return err
 		}
 		row, err = q.CreateProductType(ctx, store.CreateProductTypeParams{
-			Key: in.Key, Name: in.Name, Description: textPtr(in.Description), Color: strPtr(in.Color),
-			IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
+			Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
+			IsActive: in.IsActive,
 		})
 		return err
 	})
@@ -163,8 +162,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 		return ProductType{}, err
 	}
 	row, err := s.q.UpdateProductType(ctx, store.UpdateProductTypeParams{
-		ID: id, Key: in.Key, Name: in.Name, Description: textPtr(in.Description), Color: strPtr(in.Color),
-		IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
+		ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
+		IsActive:          in.IsActive,
 		ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -250,7 +249,7 @@ func sameSet(ids, existing []uuid.UUID) bool {
 }
 
 // validate checks the input and returns it normalised. Every problem is
-// reported at once, at its exact location (e.g. body.attributes[2].key).
+// reported at once, at its exact location.
 func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	var errs []apperr.FieldError
 	if len(in.Key) > MaxKeyLength || !keyPattern.MatchString(in.Key) {
@@ -261,31 +260,22 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	if !in.Name.Valid() {
 		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
 	}
-	in.Description = in.Description.Trimmed()
-	errs = append(errs, in.Description.Check("body.description", MaxDescriptionLength)...)
-	if len(in.Description) > 0 && !in.Description.Valid() {
-		errs = append(errs, apperr.Field("body.description.en", "validation.required", "English description is required when a description is set"))
+	in.Abbreviation = strings.ToUpper(strings.TrimSpace(norm.NFC.String(in.Abbreviation)))
+	switch {
+	case strings.IndexFunc(in.Abbreviation, func(r rune) bool { return unicode.In(r, unicode.Cc, unicode.Cf) }) >= 0:
+		errs = append(errs, apperr.Field("body.abbreviation", "validation.control_chars", "control characters are not allowed"))
+	case utf8.RuneCountInString(in.Abbreviation) > MaxAbbreviationLength:
+		errs = append(errs, apperr.Field("body.abbreviation", "validation.too_long",
+			fmt.Sprintf("longer than %d characters", MaxAbbreviationLength)).With("max", MaxAbbreviationLength))
 	}
 	in.Color = strings.ToLower(strings.TrimSpace(in.Color))
 	if in.Color != "" && !colorPattern.MatchString(in.Color) {
 		errs = append(errs, apperr.Field("body.color", "product_type.color_format", "colour must be #rrggbb"))
 	}
-	var schemaErrs []apperr.FieldError
-	in.Attributes, schemaErrs = attrschema.CheckSchema(in.Attributes, "body.attributes")
-	errs = append(errs, schemaErrs...)
-	in.InstanceAttributes, schemaErrs = attrschema.CheckInstanceSchema(in.InstanceAttributes, "body.instanceAttributes")
-	errs = append(errs, schemaErrs...)
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
-}
-
-func textPtr(t i18n.Text) *i18n.Text {
-	if len(t) == 0 {
-		return nil
-	}
-	return &t
 }
 
 func strPtr(s string) *string {
@@ -323,21 +313,14 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 	write := actor.Can(auth.PermCatalogWrite)
 	pt := ProductType{
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
-		Attributes: r.Attributes, InstanceAttributes: r.InstanceAttributes,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Can: auth.Actions{Update: write, Delete: write},
 	}
-	if r.Description != nil {
-		pt.Description = *r.Description
+	if r.Abbreviation != nil {
+		pt.Abbreviation = *r.Abbreviation
 	}
 	if r.Color != nil {
 		pt.Color = *r.Color
-	}
-	if pt.Attributes == nil {
-		pt.Attributes = attrschema.Schema{}
-	}
-	if pt.InstanceAttributes == nil {
-		pt.InstanceAttributes = attrschema.InstanceSchema{}
 	}
 	return pt
 }

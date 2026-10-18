@@ -4,12 +4,15 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { CategoryRef } from './categoryRef';
 import type { ProductTypeRef } from './productTypeRef';
 import type { VariantSearchItemName } from './variantSearchItemName';
 import type { VariantSearchItemProductName } from './variantSearchItemProductName';
 
 export interface VariantSearchItem {
   available: boolean;
+  category: CategoryRef;
+  categoryId: string;
   id: string;
   imageFileId?: string;
   modelNumber: string;

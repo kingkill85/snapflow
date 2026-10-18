@@ -1,4 +1,5 @@
 export * from './auth/auth';
+export * from './categories/categories';
 export * from './files/files';
 export * from './function-types/function-types';
 export * from './product-types/product-types';

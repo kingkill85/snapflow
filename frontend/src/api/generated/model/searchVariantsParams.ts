@@ -11,6 +11,10 @@ export type SearchVariantsParams = {
  */
 productTypeId?: string;
 /**
+ * Only variants of products of this category
+ */
+categoryId?: string;
+/**
  * Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant
  * @maxLength 200
  */

@@ -14,8 +14,8 @@ SELECT pg_advisory_xact_lock(sqlc.arg(lock_key)::bigint);
 -- New types go to the end of the order (under LockProductTypeOrder, so two
 -- creates never get the same sort order).
 -- name: CreateProductType :one
-INSERT INTO product_types (key, name, description, color, is_active, attributes, instance_attributes, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+INSERT INTO product_types (key, name, abbreviation, color, is_active, sort_order)
+VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
 RETURNING *;
 
 -- UpdateProductType changes the type only if nobody else has since it was
@@ -23,7 +23,7 @@ RETURNING *;
 -- always moves forward, even for two updates within the same microsecond.
 -- name: UpdateProductType :one
 UPDATE product_types
-SET key = $2, name = $3, description = $4, color = $5, is_active = $6, attributes = $7, instance_attributes = $8,
+SET key = $2, name = $3, abbreviation = $4, color = $5, is_active = $6,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;

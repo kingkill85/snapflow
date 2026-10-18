@@ -1,6 +1,7 @@
--- Products, variants and add-ons are one aggregate. Product type facts
--- (catalog order, active flag) come from producttypes.Service and are passed
--- in as arrays: this feature never reads the product_types table.
+-- Products, variants and add-ons are one aggregate. Product type and category
+-- facts (catalog order, active flags) come from producttypes.Service and
+-- categories.Service and are passed in as arrays: this feature never reads
+-- the product_types or categories tables.
 
 
 -- name: GetProduct :one
@@ -21,15 +22,15 @@ SELECT id FROM products WHERE id = $1 FOR UPDATE;
 SELECT id FROM products WHERE id = $1 FOR KEY SHARE;
 
 -- name: CreateProduct :one
-INSERT INTO products (product_type_id, model_number, name, description, attributes, is_active)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- UpdateProduct changes the product only if nobody else has since it was
 -- read (expected_updated_at); no row means stale or deleted.
 -- name: UpdateProduct :one
 UPDATE products
-SET product_type_id = $2, model_number = $3, name = $4, description = $5, attributes = $6, is_active = $7,
+SET product_type_id = $2, category_id = $3, model_number = $4, name = $5, description = $6, attributes = $7, is_active = $8,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;
@@ -38,17 +39,21 @@ RETURNING *;
 DELETE FROM products WHERE id = $1;
 
 -- ListProducts is one page of the product list in catalog order: product
--- type order (type_ids, in order), then model number. search is an ILIKE
--- pattern ('' for none) over model number, English and German name and
--- description and the variants' SKUs. Without include_inactive only active products of active
--- types are listed.
+-- type order (type_ids, in order), category order (category_ids, in order),
+-- then model number. search is an ILIKE pattern ('' for none) over model
+-- number, English and German name and description and the variants' SKUs.
+-- Without include_inactive only active products of active types and active
+-- categories are listed.
 -- name: ListProducts :many
 SELECT p.*
 FROM products p
 LEFT JOIN unnest(sqlc.arg(type_ids)::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
+LEFT JOIN unnest(sqlc.arg(category_ids)::uuid[]) WITH ORDINALITY AS c (id, ord) ON c.id = p.category_id
 WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id))
   AND (sqlc.arg(include_inactive)::boolean
-       OR (p.is_active AND NOT p.product_type_id = ANY (sqlc.arg(inactive_type_ids)::uuid[])))
+       OR (p.is_active AND NOT p.product_type_id = ANY (sqlc.arg(inactive_type_ids)::uuid[])
+           AND NOT p.category_id = ANY (sqlc.arg(inactive_category_ids)::uuid[])))
   AND (sqlc.arg(search)::text = ''
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
@@ -56,7 +61,7 @@ WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg
        OR p.description ->> 'en' ILIKE sqlc.arg(search)
        OR p.description ->> 'de' ILIKE sqlc.arg(search)
        OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.sku ILIKE sqlc.arg(search)))
-ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id
+ORDER BY t.ord NULLS LAST, c.ord NULLS LAST, lower(p.model_number), p.id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- CountProducts counts what ListProducts lists without the page.
@@ -64,8 +69,10 @@ LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 SELECT count(*)
 FROM products p
 WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id))
   AND (sqlc.arg(include_inactive)::boolean
-       OR (p.is_active AND NOT p.product_type_id = ANY (sqlc.arg(inactive_type_ids)::uuid[])))
+       OR (p.is_active AND NOT p.product_type_id = ANY (sqlc.arg(inactive_type_ids)::uuid[])
+           AND NOT p.category_id = ANY (sqlc.arg(inactive_category_ids)::uuid[])))
   AND (sqlc.arg(search)::text = ''
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
@@ -120,16 +127,19 @@ FROM unnest(sqlc.arg(ids)::uuid[]) WITH ORDINALITY AS o (id, ord)
 WHERE v.id = o.id;
 
 -- SearchVariants is the add-on picker's list across the catalog, in catalog
--- order (product type order, model number, variant order): all variants
--- without a search, else those whose product (as in ListProducts) or own
--- name or SKU matches. product_type_id narrows it to one type.
+-- order (product type order, category order, model number, variant order):
+-- all variants without a search, else those whose product (as in
+-- ListProducts) or own name or SKU matches. product_type_id and category_id
+-- narrow it to one type or category.
 -- name: SearchVariants :many
 SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
-       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id
+       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id, p.category_id
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 LEFT JOIN unnest(sqlc.arg(type_ids)::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
+LEFT JOIN unnest(sqlc.arg(category_ids)::uuid[]) WITH ORDINALITY AS c (id, ord) ON c.id = p.category_id
 WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id))
   AND (sqlc.arg(search)::text = ''
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
@@ -139,7 +149,7 @@ WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg
        OR v.name ->> 'en' ILIKE sqlc.arg(search)
        OR v.name ->> 'de' ILIKE sqlc.arg(search)
        OR v.sku ILIKE sqlc.arg(search))
-ORDER BY t.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
+ORDER BY t.ord NULLS LAST, c.ord NULLS LAST, lower(p.model_number), p.id, v.sort_order, v.id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- CountVariants counts what SearchVariants lists without the page.
@@ -148,6 +158,7 @@ SELECT count(*)
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 WHERE (sqlc.narg(product_type_id)::uuid IS NULL OR p.product_type_id = sqlc.narg(product_type_id))
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id))
   AND (sqlc.arg(search)::text = ''
        OR p.model_number ILIKE sqlc.arg(search)
        OR p.name ->> 'en' ILIKE sqlc.arg(search)
@@ -187,7 +198,8 @@ FROM generate_subscripts(sqlc.arg(addon_ids)::uuid[], 1) AS i;
 -- name: ListAddons :many
 SELECT a.variant_id, a.addon_variant_id, a.required, a.sort_order,
        v.name AS variant_name, v.price, v.image_file_id, v.is_active,
-       p.id AS product_id, p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id
+       p.id AS product_id, p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id,
+       p.category_id
 FROM variant_addons a
 JOIN product_variants v ON v.id = a.addon_variant_id
 JOIN products p ON p.id = v.product_id

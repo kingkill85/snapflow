@@ -5,15 +5,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
+import type { CategoryRef } from './categoryRef';
 import type { ProductListItemName } from './productListItemName';
 import type { ProductTypeRef } from './productTypeRef';
 
 export interface ProductListItem {
   /** Attribute problems of the product and its variants against the current schema */
   attributeErrors: number;
-  /** Product and product type are active */
+  /** Product, product type and category are active */
   available: boolean;
   can: Actions;
+  category: CategoryRef;
+  categoryId: string;
   id: string;
   isActive: boolean;
   modelNumber: string;

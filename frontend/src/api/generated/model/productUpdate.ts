@@ -13,6 +13,8 @@ export interface ProductUpdate {
   readonly $schema?: string;
   /** Product-scope values by key; stale values are kept only if they are sent back */
   attributes?: ProductUpdateAttributes;
+  /** The kind of device, whose schema the attributes follow; must be active (product.category_inactive), except the category the product already has */
+  categoryId: string;
   /** At most 5000 characters; if set, "en" is required */
   description?: ProductUpdateDescription;
   /** updatedAt as last read; if the product changed since, the update fails with product.stale */
@@ -22,6 +24,6 @@ export interface ProductUpdate {
   modelNumber: string;
   /** At most 200 characters; "en" is required */
   name: ProductUpdateName;
-  /** Must be active (product.type_inactive), except the type the product already has */
+  /** The system or product line; must be active (product.type_inactive), except the type the product already has */
   productTypeId: string;
 }

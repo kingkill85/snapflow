@@ -8,4 +8,4 @@
 /**
  * Description per locale (at most 2000 characters); if set, "en" is required
  */
-export type ProductTypeInputDescription = {[key: string]: string};
+export type CategoryInputDescription = {[key: string]: string};

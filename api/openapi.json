@@ -231,6 +231,295 @@
         ],
         "type": "object"
       },
+      "Category": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Category.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "description": "Values stored on each product, or on each variant (scope)",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale",
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "instanceAttributes": {
+            "description": "Values per installed unit (bus address, MAC, ...), filled in projects",
+            "items": {
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
+            },
+            "type": "array"
+          },
+          "isActive": {
+            "description": "Inactive categories are hidden from lists unless asked for",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case",
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale",
+            "type": "object"
+          },
+          "sortOrder": {
+            "description": "Position in the catalog, 1 first",
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "sortOrder",
+          "isActive",
+          "attributes",
+          "instanceAttributes",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "CategoryInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CategoryInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
+            "type": "object"
+          },
+          "instanceAttributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
+            },
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale (at most 100 characters); \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "isActive",
+          "attributes",
+          "instanceAttributes"
+        ],
+        "type": "object"
+      },
+      "CategoryList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CategoryList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "CategoryOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CategoryOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every category id, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "CategoryRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "CategoryUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CategoryUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "type": "array"
+          },
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
+            "type": "object"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt of the category as last read; if it changed since, the update fails with category.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "instanceAttributes": {
+            "description": "At most 200",
+            "items": {
+              "$ref": "#/components/schemas/InstanceAttributeDefinition"
+            },
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per locale (at most 100 characters); \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "name",
+          "isActive",
+          "attributes",
+          "instanceAttributes"
+        ],
+        "type": "object"
+      },
       "Error": {
         "additionalProperties": false,
         "properties": {
@@ -730,11 +1019,17 @@
             "type": "object"
           },
           "available": {
-            "description": "Product and product type are active",
+            "description": "Product, product type and category are active",
             "type": "boolean"
           },
           "can": {
             "$ref": "#/components/schemas/Actions"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "categoryId": {
+            "type": "string"
           },
           "createdAt": {
             "format": "date-time",
@@ -773,7 +1068,7 @@
           },
           "staleAttributes": {
             "additionalProperties": {},
-            "description": "Values whose key the type's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them",
+            "description": "Values whose key the category's schema no longer has; kept until removed. Send them back in attributes to keep them, leave them out to remove them",
             "type": "object"
           },
           "updatedAt": {
@@ -789,7 +1084,7 @@
             "type": "array"
           },
           "variantsWithProblems": {
-            "description": "Variants with attributeErrors or staleAttributes against the current type's schema",
+            "description": "Variants with attributeErrors or staleAttributes against the current category's schema",
             "format": "int64",
             "type": "integer"
           }
@@ -798,6 +1093,8 @@
           "id",
           "productTypeId",
           "productType",
+          "categoryId",
+          "category",
           "modelNumber",
           "name",
           "attributes",
@@ -830,6 +1127,10 @@
             "description": "Product-scope values by key; stale values are kept only if they are sent back",
             "type": "object"
           },
+          "categoryId": {
+            "description": "The kind of device, whose schema the attributes follow; must be active (product.category_inactive), except the category the product already has",
+            "type": "string"
+          },
           "description": {
             "additionalProperties": {
               "type": "string"
@@ -855,12 +1156,13 @@
             "type": "object"
           },
           "productTypeId": {
-            "description": "Must be active (product.type_inactive), except the type the product already has",
+            "description": "The system or product line; must be active (product.type_inactive), except the type the product already has",
             "type": "string"
           }
         },
         "required": [
           "productTypeId",
+          "categoryId",
           "modelNumber",
           "name",
           "isActive"
@@ -876,11 +1178,17 @@
             "type": "integer"
           },
           "available": {
-            "description": "Product and product type are active",
+            "description": "Product, product type and category are active",
             "type": "boolean"
           },
           "can": {
             "$ref": "#/components/schemas/Actions"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "categoryId": {
+            "type": "string"
           },
           "id": {
             "type": "string"
@@ -936,6 +1244,8 @@
           "id",
           "productTypeId",
           "productType",
+          "categoryId",
+          "category",
           "modelNumber",
           "name",
           "isActive",
@@ -989,12 +1299,12 @@
             "readOnly": true,
             "type": "string"
           },
-          "attributes": {
-            "description": "Values stored on each product, or on each variant (scope)",
-            "items": {
-              "$ref": "#/components/schemas/AttributeDefinition"
-            },
-            "type": "array"
+          "abbreviation": {
+            "description": "Badge text, upper case, at most 6 characters",
+            "examples": [
+              "ZB"
+            ],
+            "type": "string"
           },
           "can": {
             "$ref": "#/components/schemas/Actions"
@@ -1010,22 +1320,8 @@
             "format": "date-time",
             "type": "string"
           },
-          "description": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Description per locale",
-            "type": "object"
-          },
           "id": {
             "type": "string"
-          },
-          "instanceAttributes": {
-            "description": "Values per installed unit (bus address, MAC, ...), filled in projects",
-            "items": {
-              "$ref": "#/components/schemas/InstanceAttributeDefinition"
-            },
-            "type": "array"
           },
           "isActive": {
             "description": "Inactive types are hidden from lists unless asked for",
@@ -1034,7 +1330,7 @@
           "key": {
             "description": "Stable identifier, lower snake case",
             "examples": [
-              "dimmer_actuator"
+              "zigbee"
             ],
             "type": "string"
           },
@@ -1062,8 +1358,6 @@
           "name",
           "sortOrder",
           "isActive",
-          "attributes",
-          "instanceAttributes",
           "createdAt",
           "updatedAt",
           "can"
@@ -1082,12 +1376,12 @@
             "readOnly": true,
             "type": "string"
           },
-          "attributes": {
-            "description": "At most 200",
-            "items": {
-              "$ref": "#/components/schemas/AttributeDefinition"
-            },
-            "type": "array"
+          "abbreviation": {
+            "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
+            "examples": [
+              "ZB"
+            ],
+            "type": "string"
           },
           "color": {
             "description": "Badge colour, #rrggbb (stored lower case); empty for none",
@@ -1096,27 +1390,13 @@
             ],
             "type": "string"
           },
-          "description": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
-            "type": "object"
-          },
-          "instanceAttributes": {
-            "description": "At most 200",
-            "items": {
-              "$ref": "#/components/schemas/InstanceAttributeDefinition"
-            },
-            "type": "array"
-          },
           "isActive": {
             "type": "boolean"
           },
           "key": {
             "description": "Lower snake case, 1-64 characters",
             "examples": [
-              "dimmer_actuator"
+              "zigbee"
             ],
             "type": "string"
           },
@@ -1131,9 +1411,7 @@
         "required": [
           "key",
           "name",
-          "isActive",
-          "attributes",
-          "instanceAttributes"
+          "isActive"
         ],
         "type": "object"
       },
@@ -1190,6 +1468,10 @@
       "ProductTypeRef": {
         "additionalProperties": false,
         "properties": {
+          "abbreviation": {
+            "description": "Badge text, e.g. ZB",
+            "type": "string"
+          },
           "color": {
             "description": "Badge colour, #rrggbb",
             "type": "string"
@@ -1230,12 +1512,12 @@
             "readOnly": true,
             "type": "string"
           },
-          "attributes": {
-            "description": "At most 200",
-            "items": {
-              "$ref": "#/components/schemas/AttributeDefinition"
-            },
-            "type": "array"
+          "abbreviation": {
+            "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
+            "examples": [
+              "ZB"
+            ],
+            "type": "string"
           },
           "color": {
             "description": "Badge colour, #rrggbb (stored lower case); empty for none",
@@ -1244,24 +1526,10 @@
             ],
             "type": "string"
           },
-          "description": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Description per locale (at most 2000 characters); if set, \"en\" is required",
-            "type": "object"
-          },
           "expectedUpdatedAt": {
             "description": "updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale",
             "format": "date-time",
             "type": "string"
-          },
-          "instanceAttributes": {
-            "description": "At most 200",
-            "items": {
-              "$ref": "#/components/schemas/InstanceAttributeDefinition"
-            },
-            "type": "array"
           },
           "isActive": {
             "type": "boolean"
@@ -1269,7 +1537,7 @@
           "key": {
             "description": "Lower snake case, 1-64 characters",
             "examples": [
-              "dimmer_actuator"
+              "zigbee"
             ],
             "type": "string"
           },
@@ -1285,9 +1553,7 @@
           "expectedUpdatedAt",
           "key",
           "name",
-          "isActive",
-          "attributes",
-          "instanceAttributes"
+          "isActive"
         ],
         "type": "object"
       },
@@ -1307,6 +1573,10 @@
             "additionalProperties": {},
             "description": "Product-scope values by key; stale values are kept only if they are sent back",
             "type": "object"
+          },
+          "categoryId": {
+            "description": "The kind of device, whose schema the attributes follow; must be active (product.category_inactive), except the category the product already has",
+            "type": "string"
           },
           "description": {
             "additionalProperties": {
@@ -1338,13 +1608,14 @@
             "type": "object"
           },
           "productTypeId": {
-            "description": "Must be active (product.type_inactive), except the type the product already has",
+            "description": "The system or product line; must be active (product.type_inactive), except the type the product already has",
             "type": "string"
           }
         },
         "required": [
           "expectedUpdatedAt",
           "productTypeId",
+          "categoryId",
           "modelNumber",
           "name",
           "isActive"
@@ -1703,7 +1974,7 @@
             "type": "object"
           },
           "available": {
-            "description": "Variant, product and product type are active",
+            "description": "Variant, product, product type and category are active",
             "type": "boolean"
           },
           "can": {
@@ -1888,6 +2159,12 @@
           "available": {
             "type": "boolean"
           },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "categoryId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -1934,6 +2211,8 @@
           "productId",
           "productTypeId",
           "productType",
+          "categoryId",
+          "category",
           "modelNumber",
           "productName",
           "name",
@@ -2231,6 +2510,257 @@
         "summary": "Change the logged-in user's password; ends their other sessions",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "description": "In catalog order (sortOrder, then key).",
+        "operationId": "listCategories",
+        "parameters": [
+          {
+            "description": "Also list inactive categories",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive categories",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List categories",
+        "tags": [
+          "categories"
+        ]
+      },
+      "post": {
+        "operationId": "createCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a category",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/api/categories/order": {
+      "put": {
+        "description": "ids must list every category (active or not) exactly once; they get sortOrder 1..n. Returns all categories in the new order.",
+        "operationId": "reorderCategories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of categories",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/api/categories/{id}": {
+      "delete": {
+        "operationId": "deleteCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a category",
+        "tags": [
+          "categories"
+        ]
+      },
+      "get": {
+        "operationId": "getCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a category",
+        "tags": [
+          "categories"
+        ]
+      },
+      "put": {
+        "description": "Fails with 409 category.stale if the category changed since expectedUpdatedAt.",
+        "operationId": "updateCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a category",
+        "tags": [
+          "categories"
         ]
       }
     },
@@ -2826,7 +3356,7 @@
     },
     "/api/products": {
       "get": {
-        "description": "One page in catalog order: product type order, then model number.",
+        "description": "One page in catalog order: product type order, category order, then model number.",
         "operationId": "listProducts",
         "parameters": [
           {
@@ -2836,6 +3366,17 @@
             "name": "productTypeId",
             "schema": {
               "description": "Only products of this type",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only products of this category",
+            "explode": false,
+            "in": "query",
+            "name": "categoryId",
+            "schema": {
+              "description": "Only products of this category",
               "format": "uuid",
               "type": "string"
             }
@@ -2852,12 +3393,12 @@
             }
           },
           {
-            "description": "Also list inactive products and products of inactive types",
+            "description": "Also list inactive products and products of inactive types or categories",
             "explode": false,
             "in": "query",
             "name": "includeInactive",
             "schema": {
-              "description": "Also list inactive products and products of inactive types",
+              "description": "Also list inactive products and products of inactive types or categories",
               "type": "boolean"
             }
           },
@@ -3033,7 +3574,7 @@
         ]
       },
       "put": {
-        "description": "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the type never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).",
+        "description": "The product's own fields; variants are unchanged. Fails with 409 product.stale if the product changed since expectedUpdatedAt. Changing the category never refuses because of the variants' values: they are flagged (variantsWithProblems, attributeErrors, staleAttributes).",
         "operationId": "updateProduct",
         "parameters": [
           {
@@ -3792,7 +4333,7 @@
     },
     "/api/variants": {
       "get": {
-        "description": "For the add-on picker; in catalog order (product type, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.",
+        "description": "For the add-on picker; in catalog order (product type, category, model number, variant order). Without search it lists every variant (browsing, paged with offset). Lists inactive variants too, flagged by available.",
         "operationId": "searchVariants",
         "parameters": [
           {
@@ -3802,6 +4343,17 @@
             "name": "productTypeId",
             "schema": {
               "description": "Only variants of products of this type",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only variants of products of this category",
+            "explode": false,
+            "in": "query",
+            "name": "categoryId",
+            "schema": {
+              "description": "Only variants of products of this category",
               "format": "uuid",
               "type": "string"
             }
