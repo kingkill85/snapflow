@@ -9,6 +9,7 @@ import type { SelectOption } from './select'
 
 type CheckboxGroupFieldProps = {
   label: string
+  /** `content` (e.g. a TypeBadge) replaces an option's label text when given. */
   options: SelectOption[]
   /**
    * The checked values, in option order. Values that are not options (e.g.
@@ -59,7 +60,7 @@ export function CheckboxGroupField({ label, options, value, onChange, unknownLab
         {options.map((o) => (
           <CheckboxField
             key={o.value}
-            label={o.label}
+            label={o.content ?? o.label}
             checked={checked.has(o.value)}
             onChange={(e) => toggle(o.value, e.target.checked)}
             aria-invalid={error ? true : undefined}

@@ -1,0 +1,86 @@
+{
+  "title": "Projects",
+  "description": "Customer projects with their versions.",
+  "empty": "No projects yet.",
+  "emptyFiltered": "No projects match the filters.",
+  "new": "New project",
+  "edit": "Edit project",
+  "search": "Search",
+  "searchHint": "Number, name or customer",
+  "statusFilter": "Status",
+  "tenantFilter": "Tenant",
+  "allTenants": "All tenants",
+  "deleteTitle": "Delete project",
+  "deleteMessage": "Delete project {{name}} with all its versions? This cannot be undone.",
+  "status": {
+    "active": "Active",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "all": "All"
+  },
+  "column": {
+    "number": "Number",
+    "name": "Name",
+    "customer": "Customer",
+    "tenant": "Tenant",
+    "status": "Status",
+    "versions": "Versions",
+    "updated": "Updated"
+  },
+  "section": {
+    "project": "Project",
+    "customer": "Customer",
+    "pricing": "Language and currency"
+  },
+  "field": {
+    "name": "Name",
+    "nameHint": "What the project is called, e.g. \"Villa Müller\"",
+    "tenant": "Tenant",
+    "status": "Status",
+    "productTypes": "Product types",
+    "productTypesHint": "The systems the project uses",
+    "inactiveType": "{{name}} (inactive)",
+    "language": "Language",
+    "languageHint": "The language of proposals",
+    "currency": "Currency",
+    "currencyHint": "Three-letter code, e.g. EUR",
+    "exchangeRate": "Exchange rate",
+    "exchangeRateHint": "{{currency}} per 1 USD",
+    "exchangeRateUsd": "Catalog prices are in USD: the rate is 1",
+    "customerName": "Name",
+    "customerCompany": "Company",
+    "customerEmail": "Email",
+    "customerPhone": "Phone",
+    "customerAddress": "Address",
+    "notes": "Notes"
+  },
+  "page": {
+    "noCustomer": "No customer yet",
+    "versionSelect": "Version",
+    "newVersion": "New version",
+    "renameVersion": "Rename",
+    "deleteVersion": "Delete version",
+    "lastVersionHint": "The last version cannot be deleted. Delete the project instead.",
+    "noPlans": "No plans yet.",
+    "readOnly": {
+      "completed": "This project is completed and can no longer be changed.",
+      "cancelled": "This project is cancelled and can no longer be changed."
+    },
+    "reopen": "Reopen",
+    "notFound": "This project does not exist or you cannot see it.",
+    "backToList": "All projects"
+  },
+  "version": {
+    "newTitle": "New version",
+    "renameTitle": "Rename version",
+    "name": "Name",
+    "notes": "Notes",
+    "start": "Start from",
+    "deleteTitle": "Delete version",
+    "deleteMessage": "Delete version {{name}} with everything in it? This cannot be undone.",
+    "copyOf": "Copy of {{name}}",
+    "emptyOption": "Empty version",
+    "emptyHint": "Starts without plans.",
+    "copyHint": "Copies everything of {{name}}."
+  }
+}

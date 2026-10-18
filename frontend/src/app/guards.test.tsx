@@ -62,7 +62,7 @@ describe('guards', () => {
     expect(screen.queryByText('users page')).not.toBeInTheDocument()
   })
 
-  it('sends a user to the function types', async () => {
+  it('sends a user to the projects', async () => {
     renderWithProviders(
       <Routes>
         <Route path="/" element={<Home />} />
@@ -71,7 +71,7 @@ describe('guards', () => {
       { me: userMe },
     )
 
-    expect(await screen.findByText('landed on /catalog/function-types')).toBeInTheDocument()
+    expect(await screen.findByText('landed on /projects')).toBeInTheDocument()
   })
 
   it.each([
