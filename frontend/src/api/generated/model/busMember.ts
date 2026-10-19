@@ -30,4 +30,6 @@ export interface BusMember {
   productName: BusMemberProductName;
   variantId: string;
   variantName: BusMemberVariantName;
+  /** The zone of a floorplan device; absent for none and for modules */
+  zoneId?: string;
 }

@@ -390,7 +390,7 @@ func (st *state) items() []item {
 			out = append(out, item{
 				ref: ItemRef{
 					PlanID: p.ID, PlanName: p.Name, PlanKind: p.Kind, ItemID: it.ID, Label: it.Label, VariantID: *it.VariantID,
-					ProductName: v.ProductName, VariantName: v.VariantName, ModelNumber: v.ModelNumber, Existing: it.Existing,
+					ProductName: v.ProductName, VariantName: v.VariantName, ModelNumber: v.ModelNumber, Existing: it.Existing, ZoneID: it.ZoneID,
 				},
 				planPos: pi, system: v.ProductType.ID, topo: v.ProductType.Topology, caps: c,
 				gateway: v.ProductType.Topology == TopologyWireless && c.WirelessPlacesSupplied != nil && *c.WirelessPlacesSupplied > 0,

@@ -227,6 +227,10 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -2072,6 +2076,10 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -3831,6 +3839,44 @@
         },
         "type": "object"
       },
+      "DocumentActions": {
+        "additionalProperties": false,
+        "properties": {
+          "delete": {
+            "description": "projects.delete",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "delete"
+        ],
+        "type": "object"
+      },
+      "DocumentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/DocumentInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "installation_manual",
+              "channel_labels"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
       "Error": {
         "additionalProperties": false,
         "properties": {
@@ -4368,6 +4414,10 @@
             "description": "Sum of the known places its devices use",
             "format": "double",
             "type": "number"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -4497,6 +4547,94 @@
         },
         "required": [
           "exporter"
+        ],
+        "type": "object"
+      },
+      "GeneratedDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/GeneratedDocument.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/DocumentActions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "description": "GET it to download the file",
+            "type": "string"
+          },
+          "exporter": {
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "fileName": {
+            "examples": [
+              "2026-0007-V2-IM01 Villa Sommer.docx"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "installation_manual",
+              "channel_labels"
+            ],
+            "type": "string"
+          },
+          "language": {
+            "description": "The project's language when it was generated",
+            "examples": [
+              "de"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "description": "\u003cproject number\u003e-\u003cversion name\u003e-\u003cIM|LB\u003e\u003csequence per version and kind\u003e",
+            "examples": [
+              "2026-0007-V2-IM01"
+            ],
+            "type": "string"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "kind",
+          "number",
+          "sequence",
+          "exporter",
+          "language",
+          "fileName",
+          "downloadUrl",
+          "createdAt",
+          "can"
         ],
         "type": "object"
       },
@@ -6788,6 +6926,13 @@
           "label": {
             "type": "string"
           },
+          "loadTypeId": {
+            "description": "null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "needId": {
             "type": "string"
           },
@@ -6830,7 +6975,8 @@
           "functionTypeKey",
           "quantity",
           "connectedUnits",
-          "powerW"
+          "powerW",
+          "loadTypeId"
         ],
         "type": "object"
       },
@@ -11659,6 +11805,10 @@
           },
           "wirelessPlacesUsedDefault": {
             "type": "boolean"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -12596,6 +12746,86 @@
         "summary": "List the currencies a project may use",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/documents/{id}": {
+      "delete": {
+        "description": "Needs projects.delete; also on completed or cancelled projects.",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a generated document",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/documents/{id}/file": {
+      "get": {
+        "operationId": "downloadDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Download a generated document's file",
+        "tags": [
+          "installation"
         ]
       }
     },
@@ -18629,6 +18859,283 @@
         "summary": "Change the units of a connection or move it to another channel",
         "tags": [
           "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/documents": {
+      "get": {
+        "description": "Installation manuals and channel labels, newest first (proposals have their own list).",
+        "operationId": "listDocuments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GeneratedDocument"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the generated installation documents of a version",
+        "tags": [
+          "installation"
+        ]
+      },
+      "post": {
+        "description": "DOCX in the project's language; needs projects.write, also on completed projects (like proposals).",
+        "operationId": "generateDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedDocument"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Generate an installation manual or the channel labels",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/hdl-commissioning.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway (D423).",
+        "operationId": "exportHdlCommissioning",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the HDL commissioning list (XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/knx-devices.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway (D423).",
+        "operationId": "exportKnxDevices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the KNX device list (XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/knx-group-addresses.csv": {
+      "get": {
+        "description": "ETS 3-level group address CSV (D422): UTF-8 with BOM, comma separated, every field quoted.",
+        "operationId": "exportKnxGroupAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The CSV file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the KNX group addresses (ETS CSV import)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/zigbee-devices.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway (D423).",
+        "operationId": "exportZigbeeDevices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the Zigbee device list (XLSX)",
+        "tags": [
+          "installation"
         ]
       }
     },

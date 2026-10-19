@@ -300,4 +300,11 @@ sql:
       go:
         <<: *go
         out: internal/features/wiring/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/installation/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/installation/store
   # scaffold:sqlc

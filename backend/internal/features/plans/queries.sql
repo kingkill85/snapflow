@@ -245,7 +245,7 @@ ORDER BY r.position;
 -- NetworkPlacements returns the placements of a version (networks
 -- feature, through NetworkItems).
 -- name: NetworkPlacements :many
-SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing, pp.zone_id
 FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
 WHERE p.version_id = $1
 ORDER BY pp.plan_id, pp.position;

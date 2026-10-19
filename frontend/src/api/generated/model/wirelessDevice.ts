@@ -25,4 +25,6 @@ export interface WirelessDevice {
   /** Absent when unknown */
   wirelessPlacesUsed?: number;
   wirelessPlacesUsedDefault: boolean;
+  /** The zone of a floorplan device; absent for none and for modules */
+  zoneId?: string;
 }

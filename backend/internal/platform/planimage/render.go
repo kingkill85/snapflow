@@ -33,6 +33,8 @@ type Plan struct {
 	Size       image.Point
 	Zones      []Zone
 	Placements []Placement
+	// Symbols are need (load) symbols: a numbered circle (3e).
+	Symbols []Symbol
 	// TextScale enlarges labels and zone names (0 or 1: the editor's size);
 	// documents print plans small, so they use more (D271).
 	TextScale float64
@@ -55,6 +57,14 @@ type Placement struct {
 	Color    color.RGBA
 	Label    string
 	Existing bool
+}
+
+// Symbol is a need's load symbol: a filled circle with a short text (its
+// number in the document's tables).
+type Symbol struct {
+	X, Y  float64
+	Text  string
+	Color color.RGBA // opaque; zero: ink
 }
 
 // Paper colours (the light theme's, D221).
@@ -100,10 +110,45 @@ func RenderMax(p Plan, maxSide int) *image.RGBA {
 			r.label(pl)
 		}
 	}
+	for _, sy := range p.Symbols {
+		r.symbol(sy)
+	}
 	for _, z := range p.Zones {
 		r.zoneName(z)
 	}
 	return out
+}
+
+// symbol draws a numbered circle of 9 screen pixels radius (× TextScale).
+func (r *renderer) symbol(sy Symbol) {
+	c := sy.Color
+	if c.A == 0 {
+		c = ink
+	}
+	rad := 9 * r.font
+	cx, cy := sy.X*r.s, sy.Y*r.s
+	pts := make([][2]float64, 0, 24)
+	for i := range 24 {
+		sin, cos := math.Sincos(float64(i) * 2 * math.Pi / 24)
+		pts = append(pts, [2]float64{cx + rad*cos, cy + rad*sin})
+	}
+	r.polygon(pts, image.NewUniform(c))
+	r.stroke(pts, r.unit, halo)
+	if sy.Text != "" {
+		face := r.faceOf(true, 10*r.font)
+		r.plainText(sy.Text, cx, cy, face, halo)
+	}
+}
+
+// plainText draws s centred on (x, y) in c without a halo.
+func (r *renderer) plainText(s string, x, y float64, face font.Face, c color.Color) {
+	m := face.Metrics()
+	width := font.MeasureString(face, s)
+	height := float64(m.Ascent+m.Descent) / 64
+	baseline := y - height/2 + float64(m.Ascent)/64
+	d := &font.Drawer{Dst: r.dst, Face: face, Src: image.NewUniform(c)}
+	d.Dot = fixed.Point26_6{X: fixed.Int26_6((x - float64(width)/64/2) * 64), Y: fixed.Int26_6(baseline * 64)}
+	d.DrawString(s)
 }
 
 type renderer struct {

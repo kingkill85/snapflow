@@ -10,6 +10,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
+	"github.com/kingkill85/snapflow/backend/internal/features/installation"
 	"github.com/kingkill85/snapflow/backend/internal/features/networks"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
@@ -76,7 +77,8 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	networkSvc := networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes)
 	networks.Register(api, networkSvc)
 	networks.RegisterAddresses(api, networkSvc)
-	wiring.Register(api, wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc))
+	wiringSvc := wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc)
+	wiring.Register(api, wiringSvc)
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
@@ -86,10 +88,18 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	}
 	projectSvc.OnDeleteVersions(proposalSvc.DeleteVersionFiles)
 	proposals.Register(api, proposalSvc)
+	installationSvc := installation.NewService(deps.DB, installation.Deps{Projects: projectSvc, Plans: planSvc, Wiring: wiringSvc,
+		Networks: networkSvc, Products: productSvc, Capabilities: capSvc, FunctionTypes: functionTypeSvc, Tenants: c.tenants,
+		Files: fileSvc, Users: c.users, DOCX: docx.Exporter{}})
+	if deps.ProposalGenerations > 0 {
+		installationSvc.SetConcurrency(deps.ProposalGenerations)
+	}
+	projectSvc.OnDeleteVersions(installationSvc.DeleteVersionFiles)
+	installation.Register(api, installationSvc)
 	// Every feature with a file id column answers the files feature's
 	// reference check (D269).
 	for _, r := range []files.Referencer{productSvc.ReferencedFiles, planSvc.ReferencedFiles, bomSvc.ReferencedFiles,
-		c.tenants.ReferencedFiles, proposalSvc.ReferencedFiles, importSvc.ReferencedFiles} {
+		c.tenants.ReferencedFiles, proposalSvc.ReferencedFiles, importSvc.ReferencedFiles, installationSvc.ReferencedFiles} {
 		fileSvc.OnReferences(r)
 	}
 	// scaffold:features

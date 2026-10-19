@@ -57,16 +57,17 @@ type SystemRef struct {
 
 // ItemRef is a placement (floorplan) or module (board) of the version.
 type ItemRef struct {
-	PlanID      uuid.UUID `json:"planId"`
-	PlanName    string    `json:"planName"`
-	PlanKind    string    `json:"planKind" enum:"floorplan,board"`
-	ItemID      uuid.UUID `json:"itemId" doc:"The placement or module id"`
-	Label       string    `json:"label"`
-	VariantID   uuid.UUID `json:"variantId"`
-	ProductName i18n.Text `json:"productName"`
-	VariantName i18n.Text `json:"variantName"`
-	ModelNumber string    `json:"modelNumber"`
-	Existing    bool      `json:"existing"`
+	PlanID      uuid.UUID  `json:"planId"`
+	PlanName    string     `json:"planName"`
+	PlanKind    string     `json:"planKind" enum:"floorplan,board"`
+	ItemID      uuid.UUID  `json:"itemId" doc:"The placement or module id"`
+	Label       string     `json:"label"`
+	VariantID   uuid.UUID  `json:"variantId"`
+	ProductName i18n.Text  `json:"productName"`
+	VariantName i18n.Text  `json:"variantName"`
+	ModelNumber string     `json:"modelNumber"`
+	Existing    bool       `json:"existing"`
+	ZoneID      *uuid.UUID `json:"zoneId,omitempty" doc:"The zone of a floorplan device; absent for none and for modules"`
 }
 
 // BusMember is a bus device on a line.

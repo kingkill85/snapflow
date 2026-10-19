@@ -56,6 +56,7 @@ type NeedInfo struct {
 	Quantity        int32      `json:"quantity"`
 	ConnectedUnits  int32      `json:"connectedUnits" doc:"Σ units of its connections (may exceed the quantity: a finding)"`
 	PowerW          *string    `json:"powerW" nullable:"true" doc:"Per unit, decimal string"`
+	LoadTypeID      *uuid.UUID `json:"loadTypeId" nullable:"true" doc:"null for none"`
 }
 
 // Wiring is the wiring view of a version.
@@ -166,7 +167,7 @@ func (s *Service) Wiring(ctx context.Context, versionID uuid.UUID) (Wiring, erro
 		for _, wn := range p.Needs {
 			n := st.needs[NeedKey{p.ID, wn.ID}]
 			info := NeedInfo{PlanID: p.ID, PlanName: p.Name, NeedID: wn.ID, Label: n.Label, FunctionTypeID: n.FunctionTypeID,
-				FunctionTypeKey: st.cat.FunctionKey[n.FunctionTypeID], Quantity: n.Quantity, PowerW: wn.PowerW}
+				FunctionTypeKey: st.cat.FunctionKey[n.FunctionTypeID], Quantity: n.Quantity, PowerW: wn.PowerW, LoadTypeID: wn.LoadTypeID}
 			zi := len(p.Zones)
 			if n.ZoneID != nil {
 				if v, ok := zoneIdx[*n.ZoneID]; ok {

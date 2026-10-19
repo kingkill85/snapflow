@@ -41,7 +41,7 @@ test-backend: test-db
 	cd backend && TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test ./...
 
 test-documents: test-db ## Convert generated documents to PDF with LibreOffice (run in `nix develop .#documents`)
-	cd backend && REQUIRE_SOFFICE=1 TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 -run 'LibreOffice' ./internal/platform/document/... ./internal/features/proposals/
+	cd backend && REQUIRE_SOFFICE=1 TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 -run 'LibreOffice' ./internal/platform/document/... ./internal/features/proposals/ ./internal/features/installation/
 
 test-db: ## Start the Postgres of the Go tests (kept running, shared by every checkout)
 	docker compose up -d --wait --no-recreate testdb

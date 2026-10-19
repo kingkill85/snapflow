@@ -34,4 +34,6 @@ export interface AddressedItem {
   systemId: string;
   variantId: string;
   variantName: AddressedItemVariantName;
+  /** The zone of a floorplan device; absent for none and for modules */
+  zoneId?: string;
 }

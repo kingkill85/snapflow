@@ -82,7 +82,7 @@ func (c content) build() document.Document {
 		Header: c.header(company),
 		Footer: &document.Footer{Text: company + " · " + l.t("number") + " " + c.number, PageLabel: l.t("page")},
 		// Only the company name: no 4 cm letterhead space needed.
-		CompactHeader: c.logo == nil && c.letterhead.Address == "" && c.letterhead.Phone == "" && c.letterhead.Email == "" && c.letterhead.Website == "",
+		CompactHeader: c.letterheadOf(company).Compact(),
 	}
 	main := document.Section{Orientation: document.Portrait}
 	add := func(b ...document.Block) { main.Blocks = append(main.Blocks, b...) }
@@ -124,44 +124,17 @@ func (c content) build() document.Document {
 }
 
 func (c content) header(company string) *document.Block {
-	lines := []document.Run{{Text: company, Bold: true}}
-	lh := c.letterhead
-	if lh.Address != "" {
-		lines = append(lines, document.Run{Text: "\n" + lh.Address})
-	}
-	var contact []string
-	for _, s := range []string{lh.Phone, lh.Email, lh.Website} {
-		if s != "" {
-			contact = append(contact, s)
-		}
-	}
-	// One line when it fits the column, else a line each (a wrapped
-	// website or email breaks at its hyphens, D271).
-	if joined := strings.Join(contact, " · "); len([]rune(joined)) <= maxContactLine {
-		lines = append(lines, document.Run{Text: "\n" + joined})
-	} else {
-		for _, s := range contact {
-			lines = append(lines, document.Run{Text: "\n" + s})
-		}
-	}
-	right := document.Cell{Runs: lines}
-	left := document.Cell{}
-	if c.logo != nil {
-		// At most 45 × 18 mm, aspect kept.
-		w, h := 45.0, 45.0*float64(c.logo.height)/float64(max(c.logo.width, 1))
-		if h > 18 {
-			w, h = w*18/h, 18
-		}
-		left.Image = &document.Image{PNG: c.logo.data, WidthMM: w, HeightMM: h}
-	}
-	var b document.Block = document.Table{Borderless: true, Columns: []document.Column{{Weight: 1}, {Weight: 2.4, Align: document.AlignRight}},
-		Rows: []document.Row{{Cells: []document.Cell{left, right}}}}
-	return &b
+	return c.letterheadOf(company).Header()
 }
 
-// maxContactLine: characters of "phone · email · website" that fit the
-// letterhead's text column (about 120 mm at 9.5 pt) on one line.
-const maxContactLine = 75
+func (c content) letterheadOf(company string) document.Letterhead {
+	lh := c.letterhead
+	out := document.Letterhead{Company: company, Address: lh.Address, Phone: lh.Phone, Email: lh.Email, Website: lh.Website}
+	if c.logo != nil {
+		out.LogoPNG, out.LogoWidth, out.LogoHeight = c.logo.data, c.logo.width, c.logo.height
+	}
+	return out
+}
 
 func (c content) titleBlock() document.Table {
 	l := c.lang

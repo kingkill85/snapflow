@@ -176,6 +176,9 @@ func (w *writer) render(ctx context.Context) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// twipsPerMM converts millimetres to twentieths of a point.
+const twipsPerMM = 1440 / 25.4
+
 func textWidth(o document.Orientation) int {
 	if o == document.Landscape {
 		return a4Long - 2*margin
@@ -266,6 +269,9 @@ func runs(rs []document.Run) string {
 		if r.Italic {
 			props += `<w:i/>`
 		}
+		if r.SizePt > 0 {
+			props += fmt.Sprintf(`<w:sz w:val="%d"/><w:szCs w:val="%d"/>`, int(math.Round(r.SizePt*2)), int(math.Round(r.SizePt*2)))
+		}
 		if props != "" {
 			props = `<w:rPr>` + props + `</w:rPr>`
 		}
@@ -301,6 +307,9 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	if len(t.Columns) == 0 {
 		return nil
 	}
+	if t.WidthMM > 0 && !w.relative {
+		width = min(width, int(math.Round(t.WidthMM*twipsPerMM)))
+	}
 	total := 0.0
 	for _, c := range t.Columns {
 		total += math.Max(c.Weight, 0)
@@ -319,7 +328,13 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	} else {
 		fmt.Fprintf(b, `<w:tblW w:w="%d" w:type="dxa"/>`, width)
 	}
-	if t.Borderless {
+	if t.CutLines {
+		b.WriteString(`<w:tblBorders>`)
+		for _, side := range []string{"top", "left", "bottom", "right", "insideH", "insideV"} {
+			fmt.Fprintf(b, `<w:%s w:val="dashed" w:sz="4" w:space="0" w:color="000000"/>`, side)
+		}
+		b.WriteString(`</w:tblBorders>`)
+	} else if t.Borderless {
 		b.WriteString(`<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>`)
 	} else {
 		b.WriteString(`<w:tblBorders>` +
@@ -343,11 +358,15 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	b.WriteString(`</w:tblGrid>`)
 	for _, r := range t.Rows {
 		b.WriteString(`<w:tr>`)
+		height := ""
+		if t.RowHeightMM > 0 {
+			height = fmt.Sprintf(`<w:trHeight w:val="%d" w:hRule="exact"/>`, int(math.Round(t.RowHeightMM*twipsPerMM)))
+		}
 		switch r.Kind {
 		case document.HeaderRow:
-			b.WriteString(`<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>`)
+			b.WriteString(`<w:trPr><w:tblHeader/><w:cantSplit/>` + height + `</w:trPr>`)
 		default:
-			b.WriteString(`<w:trPr><w:cantSplit/></w:trPr>`)
+			b.WriteString(`<w:trPr><w:cantSplit/>` + height + `</w:trPr>`)
 		}
 		col := 0
 		for _, c := range r.Cells {
@@ -373,7 +392,7 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 			if span > 1 {
 				fmt.Fprintf(b, `<w:gridSpan w:val="%d"/>`, span)
 			}
-			if !t.Borderless {
+			if !t.Borderless && !t.CutLines {
 				switch r.Kind {
 				case document.HeaderRow:
 					b.WriteString(`<w:shd w:val="clear" w:color="auto" w:fill="DCE3EC"/>`)

@@ -95,6 +95,9 @@ type Run struct {
 	// NoBreakHyphens keeps lines from breaking at the text's hyphens (model
 	// numbers, SKUs).
 	NoBreakHyphens bool
+	// SizePt sets the font size (e.g. small label texts); 0 is the
+	// paragraph's size.
+	SizePt float64
 }
 
 // Column is a table column.
@@ -145,6 +148,14 @@ type Table struct {
 	// Borderless tables (layout, e.g. the letterhead) have no lines or
 	// shading.
 	Borderless bool
+	// WidthMM fixes the table's width (e.g. labels at 17.5 mm per TE); 0
+	// is the text width. Wider than the text width is cut to it.
+	WidthMM float64
+	// RowHeightMM fixes every row's height (labels); 0 grows with the text.
+	RowHeightMM float64
+	// CutLines draws every cell border as a dashed black line to cut along
+	// (labels); it overrides Borderless.
+	CutLines bool
 }
 
 // Image is a PNG image shown at a size in millimetres.

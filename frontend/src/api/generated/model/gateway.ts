@@ -26,4 +26,6 @@ export interface Gateway {
   wirelessPlacesSupplied: number;
   /** Sum of the known places its devices use */
   wirelessPlacesUsed: number;
+  /** The zone of a floorplan device; absent for none and for modules */
+  zoneId?: string;
 }
