@@ -189,7 +189,8 @@
       "name": "Produktname",
       "description": "Beschreibung",
       "productType": "Produkttyp",
-      "category": "Kategorie"
+      "category": "Kategorie",
+      "mounting": "Montage"
     },
     "variant": {
       "name": "Variantenname",
@@ -217,7 +218,8 @@
     "price": "Preis",
     "image": "Bild",
     "addons": "Zubehör",
-    "localized": "{{name}} ({{language}})"
+    "localized": "{{name}} ({{language}})",
+    "mounting": "Montage"
   },
   "value": {
     "none": "–",
@@ -364,5 +366,65 @@
     "title": "Import löschen",
     "message": "Den Import von „{{name}}“ löschen? Seine Vorschau, Fehler und sein Änderungsprotokoll werden gelöscht; der Katalog ändert sich nicht.",
     "applied": "Dieser Import ist übernommen: Machen Sie ihn zuerst rückgängig und löschen Sie ihn dann."
+  },
+  "columns": {
+    "title": "Neue Spalten – was bedeuten sie?",
+    "description_one": "{{count}} Spalte passt noch zu keinem Katalogfeld. Gib an, was sie bedeutet: nur Information oder ein neues Katalogfeld, das SnapFlow für seine Prüfungen nutzen kann.",
+    "description_other": "{{count}} Spalten passen noch zu keinem Katalogfeld. Gib für jede an, was sie bedeutet: nur Information oder ein neues Katalogfeld, das SnapFlow für seine Prüfungen nutzen kann.",
+    "columnNamed": "Spalte „{{column}}“ ({{letter}})",
+    "columnLetter": "Spalte {{letter}}",
+    "attributeKey": "Attribut {{key}}",
+    "mode": "Diese Spalte ist",
+    "modeField": "Ein neues Katalogfeld",
+    "modeInformation": "Nur Information",
+    "key": "Feldschlüssel",
+    "label": "Bezeichnung",
+    "typeLabel": "Werttyp",
+    "type": {
+      "text": "Text",
+      "number": "Zahl",
+      "integer": "Ganze Zahl",
+      "boolean": "Ja/Nein",
+      "enum": "Auswahl"
+    },
+    "unit": "Einheit",
+    "options": "Auswahlwerte",
+    "optionsHint": "Wert eingeben und Enter drücken.",
+    "meaning": "Bedeutung für die Prüfungen",
+    "meaningHint": "Was SnapFlow mit dem Wert macht; „Keine Bedeutung“ behält ihn als Information am Produkt.",
+    "noMeaning": "Keine Bedeutung (nur Information)",
+    "outputKind": "Ausgangsart",
+    "loadType": "Lastart",
+    "productTypes": "Nur für diese Produkttypen",
+    "productTypesHint": "Keiner angehakt: Die Bedeutung gilt für alle Produkttypen.",
+    "back": "Zurück zur Zuordnung",
+    "save": "Antworten speichern und Vorschau",
+    "knownTitle": "Bekannte Spalten",
+    "knownDescription": "Diese Attributspalten sind bereits bekannt.",
+    "knownField": "Katalogfeld „{{field}}“ · {{meaning}}",
+    "status": {
+      "information": "Nur Information",
+      "category": "Attribut einer Kategorie (kein Katalogfeld)",
+      "field": "Katalogfeld"
+    },
+    "knownFieldKey": "Katalogfeld „{{key}}“"
+  },
+  "meaning": {
+    "channels_supplied": "Kanäle (Anzahl Ausgänge einer Art)",
+    "channel_limit_w": "Max. Watt je Kanal (je Lastart)",
+    "channel_limit_a": "Max. Ampere je Kanal",
+    "channel_min_load_w": "Mindestlast je Kanal (W)",
+    "module_total_a": "Max. Ampere für das ganze Modul",
+    "module_total_w": "Max. Watt für das ganze Modul",
+    "bus_current_used_ma": "Verbrauchter Busstrom (mA)",
+    "bus_current_supplied_ma": "Gelieferter Busstrom (mA)",
+    "bus_devices_max": "Max. Geräte je Buslinie",
+    "rail_width_te": "Breite auf der Hutschiene (TE)",
+    "enclosure_rows": "Reihen eines Verteilers",
+    "enclosure_te_per_row": "TE je Verteilerreihe",
+    "wireless_places_supplied": "Funkplätze (Gateway)",
+    "wireless_place_used": "Belegt einen Funkplatz",
+    "zigbee_router": "Zigbee-Router (ja/nein)",
+    "motor_type": "Motorart (AC/DC)"
   }
 }

@@ -30,6 +30,7 @@ import {
 import { useLocalized } from '@/i18n/localized'
 
 import { Counters } from './Counters'
+import { LinkedColumns } from './NewColumnsStep'
 import { compactRows } from './diff'
 import { changesSection, issuesSection, itemAnchor, offsetOf, useClampOffset, useFilters, useScrollToHash } from './filters'
 import { IssuesSection } from './IssuesSection'
@@ -127,6 +128,8 @@ export function PreviewStep({ run, onEditMapping, onApplied }: Props) {
       </Section>
 
       <IssuesSection run={run} counts={counts} linkItems />
+
+      <LinkedColumns mapping={run.mapping} />
 
       <Section title={t('preview.applyTitle')} description={t('preview.applyDescription')}>
         <SwitchField

@@ -189,7 +189,8 @@
       "name": "Product name",
       "description": "Description",
       "productType": "Product type",
-      "category": "Category"
+      "category": "Category",
+      "mounting": "Mounting"
     },
     "variant": {
       "name": "Variant name",
@@ -217,7 +218,8 @@
     "price": "Price",
     "image": "Image",
     "addons": "Add-ons",
-    "localized": "{{name}} ({{language}})"
+    "localized": "{{name}} ({{language}})",
+    "mounting": "Mounting"
   },
   "value": {
     "none": "–",
@@ -364,5 +366,65 @@
     "title": "Delete import",
     "message": "Delete the import of \"{{name}}\"? Its preview, errors and change log are deleted; the catalog does not change.",
     "applied": "This import is applied: undo it first, then delete it."
+  },
+  "columns": {
+    "title": "New columns – what do they mean?",
+    "description_one": "{{count}} column matches no catalog field yet. Say what it means: just information, or a new catalog field SnapFlow can use for its checks.",
+    "description_other": "{{count}} columns match no catalog field yet. Say what each means: just information, or a new catalog field SnapFlow can use for its checks.",
+    "columnNamed": "Column \"{{column}}\" ({{letter}})",
+    "columnLetter": "Column {{letter}}",
+    "attributeKey": "attribute {{key}}",
+    "mode": "This column is",
+    "modeField": "A new catalog field",
+    "modeInformation": "Just information",
+    "key": "Field key",
+    "label": "Label",
+    "typeLabel": "Value type",
+    "type": {
+      "text": "Text",
+      "number": "Number",
+      "integer": "Whole number",
+      "boolean": "Yes/no",
+      "enum": "Choice"
+    },
+    "unit": "Unit",
+    "options": "Choices",
+    "optionsHint": "Type a choice and press Enter.",
+    "meaning": "Meaning for the checks",
+    "meaningHint": "What SnapFlow does with the value; \"No meaning\" keeps it as information on the product.",
+    "noMeaning": "No meaning (just information)",
+    "outputKind": "Output kind",
+    "loadType": "Load type",
+    "productTypes": "Only for these product types",
+    "productTypesHint": "None ticked: the meaning applies to every product type.",
+    "back": "Back to the mapping",
+    "save": "Save answers and preview",
+    "knownTitle": "Known columns",
+    "knownDescription": "These attribute columns are already known.",
+    "knownField": "Catalog field \"{{field}}\" · {{meaning}}",
+    "status": {
+      "information": "Just information",
+      "category": "Attribute of a category (no catalog field)",
+      "field": "Catalog field"
+    },
+    "knownFieldKey": "Catalog field \"{{key}}\""
+  },
+  "meaning": {
+    "channels_supplied": "Channels supplied (number of outputs of a kind)",
+    "channel_limit_w": "Max watts per channel (per load type)",
+    "channel_limit_a": "Max amps per channel",
+    "channel_min_load_w": "Minimum load per channel (W)",
+    "module_total_a": "Max amps for the whole module",
+    "module_total_w": "Max watts for the whole module",
+    "bus_current_used_ma": "Bus current used (mA)",
+    "bus_current_supplied_ma": "Bus current supplied (mA)",
+    "bus_devices_max": "Max devices per bus line",
+    "rail_width_te": "Width on the DIN rail (TE)",
+    "enclosure_rows": "Rows of an enclosure",
+    "enclosure_te_per_row": "TE per enclosure row",
+    "wireless_places_supplied": "Wireless places supplied (gateway)",
+    "wireless_place_used": "Uses a wireless place",
+    "zigbee_router": "Zigbee router (yes/no)",
+    "motor_type": "Motor type (AC/DC)"
   }
 }
