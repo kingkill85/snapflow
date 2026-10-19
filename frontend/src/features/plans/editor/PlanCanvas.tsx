@@ -119,6 +119,8 @@ type Props = {
   stageRef?: RefObject<Konva.Stage | null>
   /** While the PNG export draws: one screen pixel is this many image pixels (strokes and labels relative to the image, not the zoom). */
   exportPixel?: number
+  /** Coverage badges per zone id ("✓", "2/5", "!"), drawn under the zone name as chrome (not exported). */
+  zoneBadges?: Map<string, ZoneBadge | null>
 }
 
 type PlanColors = typeof paperColors
@@ -162,6 +164,7 @@ export function PlanCanvas({
   measured,
   stageRef,
   exportPixel,
+  zoneBadges,
 }: Props) {
   const { t } = useTranslation('plans')
   // Drawn on the (light) plan image: the same colours in light and dark mode (D221).
@@ -544,7 +547,7 @@ export function PlanCanvas({
         </Layer>
         <Layer listening={false}>
           {zones.map((z) => (
-            <ZoneLabel key={z.id} zone={shownZone(z)} symbols={symbols} k={k} theme={theme} />
+            <ZoneLabel key={z.id} zone={shownZone(z)} symbols={symbols} k={k} theme={theme} badge={zoneBadges?.get(z.id) ?? null} />
           ))}
         </Layer>
         {/* Load symbols above the zone names: a symbol near a zone's centre stays legible and clickable (D352). */}
@@ -592,8 +595,28 @@ function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; sele
 }
 
 /** A zone's name with a halo (D221), in its own layer above the placements so a product never hides it (D224). */
-function ZoneLabel({ zone: z, symbols, k, theme }: { zone: PlanZone; symbols: PlanNeed[]; k: number; theme: PlanColors }) {
+type ZoneBadge = { text: string; tone: 'success' | 'warning' | 'danger' }
+
+/** Badge colours in the light theme's tokens, in dark mode too (D221). */
+const badgeColors = { success: '#2f7a4a', warning: paperColors.warning, danger: paperColors.danger }
+
+function ZoneLabel({ zone: z, symbols, k, theme, badge }: { zone: PlanZone; symbols: PlanNeed[]; k: number; theme: PlanColors; badge: ZoneBadge | null }) {
   const label = zoneLabelPoint(labelPoint(z), z.name, symbols, k)
+  const badgeWidth = badge ? (Math.max(1, badge.text.length) * 7 + 10) * k : 0
+  return (
+    <>
+      {badge && (
+        <Group name={chromeName} x={label.x - badgeWidth / 2} y={label.y + 9 * k} listening={false}>
+          <Rect width={badgeWidth} height={16 * k} cornerRadius={8 * k} fill={theme.surface} stroke={badgeColors[badge.tone]} strokeWidth={1.5 * k} />
+          <Text text={badge.text} width={badgeWidth} height={16 * k} align="center" verticalAlign="middle" fontSize={11 * k} fontStyle="bold" fill={badgeColors[badge.tone]} />
+        </Group>
+      )}
+      <ZoneName z={z} label={label} k={k} theme={theme} />
+    </>
+  )
+}
+
+function ZoneName({ z, label, k, theme }: { z: PlanZone; label: Point; k: number; theme: PlanColors }) {
   return (
     <Text
       text={z.name}

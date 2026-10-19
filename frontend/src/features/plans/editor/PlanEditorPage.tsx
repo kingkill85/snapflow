@@ -4,7 +4,7 @@ import { ArrowLeft, CircleDot, Download, Hand, Hexagon, Maximize, MousePointer2,
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Link, useBlocker, useParams } from 'react-router'
+import { Link, useBlocker, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { NeedWarning, Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
@@ -39,6 +39,8 @@ import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { type CopyItems, useShortcuts } from './use-shortcuts'
 import { ZonesPanel } from './ZonesPanel'
+import { PlanWiringProvider } from './connections'
+import { usePlanWiring, zoneBadge } from './plan-wiring'
 import { isFloorplan, saveOnUnload, type Floorplan } from '../api'
 
 /** /projects/:id/versions/:versionId/plans/:planId: loads what the editor needs. */
@@ -74,7 +76,12 @@ export function PlanEditorPage() {
   // contentUpdatedAt, so the first save would fail as stale.
   if (!plan.isFetchedAfterMount || !content.isFetchedAfterMount || !project.isFetchedAfterMount) return <Loading />
   if (!plan.data || !content.data || !project.data || !catalog.data || !isFloorplan(plan.data)) return <Loading />
-  return <PlanEditor key={plan.data.id} plan={plan.data} content={content.data} project={project.data} variants={catalog.data} />
+  const loaded = plan.data
+  return (
+    <PlanWiringProvider versionId={loaded.versionId} planId={loaded.id}>
+      {() => <PlanEditor key={loaded.id} plan={loaded} content={content.data} project={project.data} variants={catalog.data} />}
+    </PlanWiringProvider>
+  )
 }
 
 /** Wide enough for the full editor (tablets and up); phones get a view-only canvas with lists. */
@@ -126,6 +133,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   // Leaving saves what is pending, then releases the lock.
   const flushRef = useRef<() => Promise<void>>(async () => undefined)
   const pageHideRef = useRef<() => boolean>(() => false)
+  const planWiring = usePlanWiring()
+  const refreshWiring = useRef(planWiring?.refresh)
+  useEffect(() => {
+    refreshWiring.current = planWiring?.refresh
+  })
   const lock = usePlanLock(plan.id, mayEdit, { beforeRelease: () => flushRef.current(), onPageHide: () => pageHideRef.current() })
   const editable = lock.state.status === 'mine'
 
@@ -149,6 +161,26 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   }, [t])
   const [tool, setTool] = useState<Tool>('select')
   const [tab, setTab] = useState<PanelTab>('products')
+  // ?select=<zone, placement or need id> (links from the Checks tab): select it once, then drop the param.
+  const [params, setParams] = useSearchParams()
+  const selectParam = params.get('select')
+  useEffect(() => {
+    if (!selectParam) return
+    const d = docRef.current
+    const known = d.zones.some((z) => z.id === selectParam) || d.placements.some((p) => p.id === selectParam) || d.needs.some((n) => n.id === selectParam)
+    if (known) {
+      dispatchEditor({ type: 'select', ids: [selectionFor(selectParam, d)] })
+      setTab('inspector')
+    }
+    setParams(
+      (p) => {
+        const out = new URLSearchParams(p)
+        out.delete('select')
+        return out
+      },
+      { replace: true },
+    )
+  }, [selectParam, setParams])
   const [armed, setArmed] = useState<string | null>(null)
   // View state beside the document (not saved, not in the history).
   const [layers, setLayers] = useState<Layers>(allVisible)
@@ -210,6 +242,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         setSaveErrors(new Map())
         // The plan cards show counts: refreshed when the project page shows them again (also after a save on leave).
         void queryClient.invalidateQueries({ queryKey: getListPlansQueryKey(plan.versionId) })
+        // Needs changed: their connections and the zone statuses too (3d).
+        void refreshWiring.current?.()
       } catch (e) {
         const byItem = saveErrorsByItem(e, snapshot, (f) => errorMessage(new ApiError({ status: 422, code: f.code, params: f.params })))
         setSaveErrors(byItem)
@@ -363,6 +397,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     },
   }
 
+  const zoneBadges = new Map(doc.zones.map((z) => [z.id, zoneBadge(planWiring?.zoneStatus.get(z.id))] as const))
   const canvas = (
     <PlanCanvas
       plan={plan}
@@ -392,6 +427,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       measured={calibration}
       stageRef={stageRef}
       exportPixel={exporting ? exportPixel(plan.image) : undefined}
+      zoneBadges={zoneBadges}
     />
   )
   const canvasArea = (

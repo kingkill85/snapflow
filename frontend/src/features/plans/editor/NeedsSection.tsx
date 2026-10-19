@@ -8,6 +8,7 @@ import { Button, errorKey, Field, IconButton, Notice, SelectField, TextareaField
 import { formatWatts, maxPowerW, parsePower } from '@/features/needs'
 import { useLocalized } from '@/i18n/localized'
 
+import { NeedConnections } from './connections'
 import { isSymbol, type NeedPatch } from './document'
 import type { EditorAction } from './editor-state'
 import { functionTypeOptions, type NeedCatalog, useNeedText } from './need-catalog'
@@ -102,6 +103,7 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
                   )}
                 </div>
                 <NeedMessages errors={rowErrors} warnings={rowWarnings} />
+                <NeedConnections needId={n.id} name={name} />
                 {editable && open === n.id && (
                   <div className="space-y-3 border-t border-line pt-2">
                     <NeedFields need={n} catalog={catalog} editable={editable} dispatch={dispatch} />
@@ -308,6 +310,7 @@ export function NeedInspector({
         </p>
       </div>
       <NeedMessages errors={errors} warnings={warnings} />
+      <NeedConnections needId={need.id} name={text(need)} />
       <NeedFields need={need} catalog={catalog} editable={editable} dispatch={dispatch} />
       <Button variant="danger-quiet" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'remove', ids: [need.id] } })}>
         <Trash2 /> {tc('action.delete')}

@@ -293,5 +293,9 @@
     "enclosureDeleted": "Das Gehäuse wurde aus dem Katalog gelöscht. Es bleibt am Verteiler (und in der Stückliste wie zuletzt gespeichert), bis Sie es entfernen.",
     "removeEnclosure": "Gehäuse entfernen",
     "enclosureRemoved": "Das gelöschte Gehäuse wird beim nächsten Speichern entfernt."
+  },
+  "connections": {
+    "unsaved": "Verbindungen nach dem nächsten Speichern",
+    "label": "Verbindungen von {{name}}"
   }
 }

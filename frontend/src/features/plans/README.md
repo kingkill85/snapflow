@@ -141,6 +141,18 @@ selected symbol gets `NeedInspector`. Warnings come from `server.needWarnings`. 
 (`needCounts`, live, D334). The version's needs overview is `features/needs` (D335), room templates
 `features/room-templates` (D336).
 
+## Connections (3d)
+
+Connections are version data (no plan lock, D388). `PlanEditorPage` wraps the editor in `PlanWiringProvider`
+(`editor/connections.tsx`, context in `editor/plan-wiring.ts`): the wiring model and connect picker of
+`features/checks`, the zone statuses of `GET /checks` for this plan, one `ConnectDialog`. The Zones tab shows each
+zone's status (`ZoneStatusBadge`), the canvas a badge under the zone name ("✓", "2/5", "!", `zoneBadge`; light
+colours per D221, `chrome`, so not in the PNG export). Need rows in the zone inspector and the symbol inspector show
+`NeedConnections`: "2 × → D1 · Dimmer output 1 (Main board)" with Disconnect, and "Connect…" while units are missing
+(hidden without `can.update`); a need not saved yet says its connections come after the save. Each successful
+autosave refreshes the wiring view and checks. `?select=<zone, placement or need id>` (links from the Checks tab)
+selects the item once (a need without position selects its zone), opens the inspector and drops the param.
+
 ## Tests
 
 Vitest: `PlansSection.test.tsx` (list, dialogs), `editor/PlanEditorPage.test.tsx` (MSW; the Konva canvas

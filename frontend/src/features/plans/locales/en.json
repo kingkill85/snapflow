@@ -293,5 +293,9 @@
     "enclosureDeleted": "The enclosure was deleted from the catalog. It stays on the board (and in the bill of materials as last saved) until you remove it.",
     "removeEnclosure": "Remove enclosure",
     "enclosureRemoved": "The deleted enclosure is removed with the next save."
+  },
+  "connections": {
+    "unsaved": "Connections after the next save",
+    "label": "Connections of {{name}}"
   }
 }
