@@ -14,6 +14,7 @@ import {
 } from '@/api/generated/projects/projects'
 import { BomTab, PricingTab } from '@/features/bom'
 import { PlansSection } from '@/features/plans'
+import { ProposalsTab } from '@/features/proposals'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, Tabs, TextLink } from '@/components/ui'
 
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
@@ -204,10 +205,10 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
   )
 }
 
-const versionTabs = ['plans', 'bom', 'pricing'] as const
+const versionTabs = ['plans', 'bom', 'pricing', 'proposals'] as const
 type VersionTab = (typeof versionTabs)[number]
 
-/** Plans / Bill of materials / Pricing of a version; the tab is in the URL (?tab=bom, D236). */
+/** Plans / Bill of materials / Pricing / Proposals of a version; the tab is in the URL (?tab=bom, D236). */
 function VersionTabs({ project, version, canWrite }: { project: Project; version: ProjectVersion; canWrite: boolean }) {
   const { t } = useTranslation('bom')
   const [params, setParams] = useSearchParams()
@@ -237,6 +238,8 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
           content: <BomTab key={version.id} projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} />,
         },
         { key: 'pricing', label: t('tabs.pricing'), content: <PricingTab key={version.id} versionId={version.id} canWrite={canWrite} /> },
+        // Generating needs projects.write but no active project (D259): update or reopen says so.
+        { key: 'proposals', label: t('tabs.proposals'), content: <ProposalsTab key={version.id} versionId={version.id} canGenerate={project.can.update || project.can.reopen} /> },
       ]}
     />
   )

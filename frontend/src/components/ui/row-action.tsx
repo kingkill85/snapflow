@@ -12,6 +12,8 @@ type RowActionProps = Omit<ButtonProps, 'size' | 'children' | 'asChild'> & {
   /** Makes it a link, e.g. Edit to a page editor. */
   to?: To
   state?: unknown
+  /** Makes it a download link to this URL (an API file), e.g. Download of a generated document. */
+  download?: string
   /** Icon only below 1280 px, phones included, e.g. in narrow cards where the text would wrap the actions (D226). */
   compact?: boolean
 }
@@ -22,7 +24,7 @@ type RowActionProps = Omit<ButtonProps, 'size' | 'children' | 'asChild'> & {
  * the columns keep their room. The text stays in the accessible name either
  * way, the tooltip shows it on hover. Delete is `variant="danger-quiet"`.
  */
-export function RowAction({ icon, label, to, state, compact, variant = 'secondary', className, ...props }: RowActionProps) {
+export function RowAction({ icon, label, to, state, download, compact, variant = 'secondary', className, ...props }: RowActionProps) {
   const content = (
     <>
       {icon}
@@ -37,6 +39,15 @@ export function RowAction({ icon, label, to, state, compact, variant = 'secondar
         <Link to={to} state={state}>
           {content}
         </Link>
+      </Button>
+    )
+  }
+  if (download !== undefined) {
+    return (
+      <Button asChild size="sm" variant={variant} title={label} className={classes}>
+        <a href={download} download>
+          {content}
+        </a>
       </Button>
     )
   }

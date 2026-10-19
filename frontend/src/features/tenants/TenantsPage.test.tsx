@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { Tenant } from '@/api/generated/model'
 import { getListUsersQueryKey } from '@/api/generated/users/users'
@@ -26,7 +26,17 @@ const tenant = (over: Partial<Tenant>): Tenant => ({
 
 const distributor = tenant({ id: '00000000-0000-4000-8000-0000000000d1', name: 'Distributor', isDistributor: true, can: { update: true, delete: false } })
 
+const emptyLetterhead = { companyName: '', address: '', phone: '', email: '', website: '', logoFileId: null, logoUrl: null }
+
 describe('TenantsPage', () => {
+  // The edit dialog loads and saves the letterhead (admins, D261).
+  beforeEach(() => {
+    server.use(
+      http.get('/api/tenants/:id/letterhead', () => HttpResponse.json(emptyLetterhead)),
+      http.put('/api/tenants/:id/letterhead', async ({ request }) => HttpResponse.json({ ...emptyLetterhead, ...((await request.json()) as object), logoUrl: null })),
+    )
+  })
+
   it('lists tenants and protects the distributor', async () => {
     server.use(http.get('/api/tenants', () => HttpResponse.json({ items: [distributor, tenant({ isActive: false })] })))
     renderWithProviders(<TenantsPage />)

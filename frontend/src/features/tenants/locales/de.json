@@ -24,5 +24,21 @@
   "archiveTitle": "Mandant archivieren",
   "archiveMessage_one": "„{{name}}“ hat {{count}} Projekt und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
   "archiveMessage_other": "„{{name}}“ hat {{count}} Projekte und wird deshalb archiviert statt gelöscht: Er wird deaktiviert und ausgeblendet, Benutzer und Projekte bleiben erhalten. Sie können ihn später wiederherstellen.",
-  "archive": "Archivieren"
+  "archive": "Archivieren",
+  "letterhead": {
+    "title": "Briefkopf",
+    "description": "Steht oben auf jeder Seite der Angebote dieses Mandanten. Ohne Firmennamen wird der Mandantenname gedruckt.",
+    "companyName": "Firmenname",
+    "address": "Adresse",
+    "phone": "Telefon",
+    "email": "E-Mail",
+    "website": "Website",
+    "logo": "Logo",
+    "logoHint": "PNG, JPEG oder WebP, höchstens 5 MB. Gedruckt höchstens 45 × 18 mm.",
+    "saved": "Briefkopf gespeichert."
+  },
+  "profile": {
+    "title": "Firmenprofil",
+    "description": "So erscheint Ihre Firma in Angeboten."
+  }
 }

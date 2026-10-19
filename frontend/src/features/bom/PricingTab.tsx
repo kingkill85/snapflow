@@ -47,6 +47,8 @@ const schema = z
     servicesKind: z.enum(kinds),
     servicesValue: value,
     servicesLabel: translatableSchema({ max: 200, checkDefault: false }),
+    introText: translatableSchema({ max: 5000 }),
+    closingText: translatableSchema({ max: 5000 }),
   })
   .superRefine((v, ctx) => {
     for (const [kind, field] of [
@@ -61,8 +63,8 @@ const schema = z
   })
 type FormValues = z.infer<typeof schema>
 
-const fields = apiFields<FormValues>(['discountKind', 'discountValue', 'servicesKind', 'servicesValue', 'servicesLabel'])
-const allFields = { ...fields, ...translatableApiFields('servicesLabel') }
+const fields = apiFields<FormValues>(['discountKind', 'discountValue', 'servicesKind', 'servicesValue', 'servicesLabel', 'introText', 'closingText'])
+const allFields = { ...fields, ...translatableApiFields('servicesLabel'), ...translatableApiFields('introText'), ...translatableApiFields('closingText') }
 
 /** Whether two texts are the same in every content language. */
 const sameText = (a: LocalizedText, b: LocalizedText) => contentLocales.every((l) => (a[l] ?? '').trim() === (b[l] ?? '').trim())
@@ -85,6 +87,9 @@ function toInput(v: FormValues, defaultLabel: LocalizedText): PricingInput | und
     servicesKind: v.servicesKind,
     servicesValue,
     servicesLabel: label && !sameText(label, defaultLabel) ? label : {},
+    // Blank texts are sent as {} (none, D262).
+    introText: optionalTranslatable(v.introText) ?? {},
+    closingText: optionalTranslatable(v.closingText) ?? {},
   }
 }
 
@@ -125,13 +130,17 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
     servicesKind: p.servicesKind,
     servicesValue: p.servicesKind === 'none' ? '' : formatDecimal(wholeNumber(p.servicesValue), separator),
     servicesLabel: toTranslatable(p.servicesLabel),
+    introText: toTranslatable(p.introText),
+    closingText: toTranslatable(p.closingText),
   })
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toForm(pricing) })
   const { errors } = form.formState
   const values = useWatch({ control: form.control }) as FormValues
 
   // Debounced preview of the totals for the values as typed.
-  const input = toInput(values, pricing.servicesLabelDefault)
+  // The texts do not change the totals: typing them does not refresh the preview.
+  const full = toInput(values, pricing.servicesLabelDefault)
+  const input = full && { ...full, introText: undefined, closingText: undefined }
   const [debounced, setDebounced] = useState(input)
   const inputKey = JSON.stringify(input)
   useEffect(() => {
@@ -209,6 +218,8 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
               {valueField('servicesKind', 'servicesValue', t('pricing.servicesValue'))}
             </div>
             <FormTranslatableField control={form.control} name="servicesLabel" label={t('pricing.servicesLabel')} hint={t('pricing.servicesLabelHint')} />
+            <FormTranslatableField control={form.control} name="introText" label={t('pricing.introText')} hint={t('pricing.introTextHint')} multiline rows={4} />
+            <FormTranslatableField control={form.control} name="closingText" label={t('pricing.closingText')} hint={t('pricing.closingTextHint')} multiline rows={4} />
           </Fieldset>
           {canWrite && (
             <div className="flex justify-end">

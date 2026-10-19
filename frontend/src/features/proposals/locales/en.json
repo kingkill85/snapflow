@@ -1,0 +1,34 @@
+{
+  "title": "Proposals",
+  "description": "Documents generated from this version for the customer. Each one keeps the totals it was created with.",
+  "create": "Create proposal",
+  "empty": "No proposals yet.",
+  "emptyHint": "No proposals yet. Create one from the bill of materials of this version.",
+  "combined": "Combined",
+  "deletedUser": "Deleted user",
+  "download": "Download",
+  "created_one": "Proposal {{numbers}} created; the download has started.",
+  "created_other": "{{count}} proposals created ({{numbers}}); the downloads have started.",
+  "deleteTitle": "Delete proposal",
+  "deleteMessage": "Delete proposal “{{number}}” and its file? Its number is not used again.",
+  "column": {
+    "number": "Number",
+    "createdAt": "Created",
+    "type": "Document",
+    "language": "Language",
+    "grandTotal": "Grand total",
+    "createdBy": "Created by"
+  },
+  "dialog": {
+    "title": "Create proposal",
+    "format": "Format",
+    "documents": "Documents",
+    "combined": "One combined proposal",
+    "split": "One document per product type",
+    "splitHint": "Each document lists only its product type. Free-text lines are only in the combined proposal.",
+    "productTypes": "Product types",
+    "noProductTypes": "The bill of materials has no product types.",
+    "preview": "Totals per document",
+    "previewNone": "Choose at least one product type."
+  }
+}

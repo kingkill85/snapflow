@@ -69,8 +69,33 @@ describe('PricingTab', () => {
       servicesKind: 'none',
       servicesValue: '0',
       servicesLabel: { en: 'Programming', de: 'Programmierung' },
+      introText: {},
+      closingText: {},
       expectedUpdatedAt: bom.pricing.updatedAt,
     })
+  })
+
+  it('saves the introduction and closing texts with the pricing (D262)', async () => {
+    const previews = serve({ ...bom.pricing, closingText: { en: 'Valid for 30 days.' } })
+    let saved: unknown
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json(bom)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    expect(await screen.findByRole('textbox', { name: /^Closing text/ })).toHaveValue('Valid for 30 days.')
+    await waitFor(() => expect(previews.length).toBeGreaterThan(0))
+    const before = previews.length
+    await user.type(screen.getByRole('textbox', { name: /^Introduction/ }), 'Thank you for your enquiry.')
+    // The texts do not change the totals: no new preview.
+    await new Promise((r) => setTimeout(r, 500))
+    expect(previews).toHaveLength(before)
+    expect(previews[0]).not.toHaveProperty('introText')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toMatchObject({ introText: { en: 'Thank you for your enquiry.' }, closingText: { en: 'Valid for 30 days.' } }))
   })
 
   it('starts from the fresh pricing, not a cached copy (D44)', async () => {
@@ -142,7 +167,7 @@ describe('PricingTab', () => {
     const label = await screen.findByRole('textbox', { name: /^Services label/ })
     await user.clear(label)
     await user.type(label, 'System design')
-    await user.click(screen.getByRole('tab', { name: 'German' }))
+    await user.click(screen.getAllByRole('tab', { name: 'German' })[0])
     const de = screen.getByRole('textbox', { name: /^Services label/ })
     await user.clear(de)
     await user.type(de, 'Systemplanung')

@@ -24,5 +24,21 @@
   "archiveTitle": "Archive tenant",
   "archiveMessage_one": "\"{{name}}\" has {{count}} project, so it is archived instead of deleted: it is deactivated and hidden, its users and projects are kept. You can restore it later.",
   "archiveMessage_other": "\"{{name}}\" has {{count}} projects, so it is archived instead of deleted: it is deactivated and hidden, its users and projects are kept. You can restore it later.",
-  "archive": "Archive"
+  "archive": "Archive",
+  "letterhead": {
+    "title": "Letterhead",
+    "description": "Printed at the top of every page of this tenant's proposals. Without a company name the tenant name is printed.",
+    "companyName": "Company name",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
+    "website": "Website",
+    "logo": "Logo",
+    "logoHint": "PNG, JPEG or WebP, at most 5 MB. Printed at most 45 × 18 mm.",
+    "saved": "Letterhead saved."
+  },
+  "profile": {
+    "title": "Company profile",
+    "description": "How your company appears on proposals."
+  }
 }
