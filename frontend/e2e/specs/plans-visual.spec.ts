@@ -301,7 +301,7 @@ for (const lang of ['en', 'de'] as const) {
             await tab(p, l.zones)
             await p.getByRole('tabpanel', { name: l.zones }).getByRole('button', { name: l.zone.bath, exact: true }).click()
             await tab(p, l.inspector)
-            const needs = p.getByRole('tabpanel', { name: l.inspector }).getByRole('region', { name: lang === 'de' ? 'Bedarfe' : 'Needs' })
+            const needs = p.getByRole('tabpanel', { name: l.inspector }).getByRole('region', { name: lang === 'de' ? 'Bedarf' : 'Needs', exact: true })
             await needs.getByRole('button', { name: lang === 'de' ? /bearbeiten$/ : /^Edit / }).first().click()
             await needs.scrollIntoViewIfNeeded()
           },
