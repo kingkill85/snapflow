@@ -45,6 +45,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	categories.Register(api, cats)
 	fileSvc := files.NewService(filesstore.New(deps.DB), deps.Storage)
 	files.Register(api, fileSvc)
+	c.tenants.UseFiles(fileSvc)
 	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc)
 	products.Register(api, productSvc)
 	imports.Register(api, imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users))

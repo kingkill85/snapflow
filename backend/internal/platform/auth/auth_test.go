@@ -18,6 +18,7 @@ func TestMatrix(t *testing.T) {
 		PermProjectsDelete:   {true, true, false},
 		PermUsersManage:      {true, true, false},
 		PermTenantsManage:    {true, false, false},
+		PermTenantsProfile:   {true, true, false},
 		PermTenantsAccessAll: {true, false, false},
 	}
 	if len(want) != len(Permissions) {

@@ -19,6 +19,7 @@
     },
     "tenants": {
       "manage": { "label": "Mandanten verwalten", "description": "Partner-Mandanten anlegen, ändern und löschen." },
+      "profile": { "label": "Briefkopf bearbeiten", "description": "Firmendaten und Logo ändern, die auf den Angeboten des eigenen Mandanten stehen." },
       "access_all": { "label": "Alle Mandanten", "description": "Daten aller Mandanten sehen und ändern, nicht nur die eigenen." }
     }
   }

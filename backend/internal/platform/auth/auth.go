@@ -42,6 +42,9 @@ const (
 	PermProjectsDelete Permission = "projects.delete"
 	PermUsersManage    Permission = "users.manage"
 	PermTenantsManage  Permission = "tenants.manage"
+	// PermTenantsProfile edits the letterhead of the caller's own tenant
+	// (every tenant with PermTenantsAccessAll).
+	PermTenantsProfile Permission = "tenants.profile"
 	// PermTenantsAccessAll lifts the tenant boundary: the caller sees and
 	// changes data of every tenant, not only their own.
 	PermTenantsAccessAll Permission = "tenants.access_all"
@@ -51,7 +54,7 @@ const (
 var Permissions = []Permission{
 	PermCatalogRead, PermCatalogWrite,
 	PermProjectsRead, PermProjectsWrite, PermProjectsDelete,
-	PermUsersManage, PermTenantsManage, PermTenantsAccessAll,
+	PermUsersManage, PermTenantsManage, PermTenantsProfile, PermTenantsAccessAll,
 }
 
 // matrix is the permission matrix. Change it here and in matrix_test.go.
@@ -60,7 +63,7 @@ var matrix = map[Role][]Permission{
 	RoleTenantAdmin: {
 		PermCatalogRead,
 		PermProjectsRead, PermProjectsWrite, PermProjectsDelete,
-		PermUsersManage,
+		PermUsersManage, PermTenantsProfile,
 	},
 	RoleUser: {
 		PermCatalogRead,

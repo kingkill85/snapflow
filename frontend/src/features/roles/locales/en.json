@@ -19,6 +19,7 @@
     },
     "tenants": {
       "manage": { "label": "Manage tenants", "description": "Create, change and delete partner tenants." },
+      "profile": { "label": "Edit letterhead", "description": "Change the company details and logo printed on the proposals of their own tenant." },
       "access_all": { "label": "Access all tenants", "description": "See and change the data of every tenant, not only their own." }
     }
   }
