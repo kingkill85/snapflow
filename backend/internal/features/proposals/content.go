@@ -131,8 +131,14 @@ func (c content) header(company string) *document.Block {
 			contact = append(contact, s)
 		}
 	}
-	if len(contact) > 0 {
-		lines = append(lines, document.Run{Text: "\n" + strings.Join(contact, " · ")})
+	// One line when it fits the column, else a line each (a wrapped
+	// website or email breaks at its hyphens, D271).
+	if joined := strings.Join(contact, " · "); len([]rune(joined)) <= maxContactLine {
+		lines = append(lines, document.Run{Text: "\n" + joined})
+	} else {
+		for _, s := range contact {
+			lines = append(lines, document.Run{Text: "\n" + s})
+		}
 	}
 	right := document.Cell{Runs: lines}
 	left := document.Cell{}
@@ -144,10 +150,14 @@ func (c content) header(company string) *document.Block {
 		}
 		left.Image = &document.Image{PNG: c.logo.data, WidthMM: w, HeightMM: h}
 	}
-	var b document.Block = document.Table{Borderless: true, Columns: []document.Column{{Weight: 1}, {Weight: 1.4, Align: document.AlignRight}},
+	var b document.Block = document.Table{Borderless: true, Columns: []document.Column{{Weight: 1}, {Weight: 2.4, Align: document.AlignRight}},
 		Rows: []document.Row{{Cells: []document.Cell{left, right}}}}
 	return &b
 }
+
+// maxContactLine: characters of "phone · email · website" that fit the
+// letterhead's text column (about 120 mm at 9.5 pt) on one line.
+const maxContactLine = 75
 
 func (c content) titleBlock() document.Table {
 	l := c.lang
@@ -194,8 +204,23 @@ func (c content) groupAmount(usd string, converted *string) string {
 	return usd
 }
 
+// quantityPlans are the plans with a quantity on some line (a split
+// document leaves out the plans without its product type, D271).
+func (c content) quantityPlans() []bom.BOMPlanRef {
+	var out []bom.BOMPlanRef
+	for _, p := range c.bom.Plans {
+		for _, ln := range c.bom.Lines {
+			if ln.Quantities.Plans[p.ID.String()] != 0 {
+				out = append(out, p)
+				break
+			}
+		}
+	}
+	return out
+}
+
 func (c content) planColumns() bool {
-	n := len(c.bom.Plans)
+	n := len(c.quantityPlans())
 	return n >= minPlanColumns && n <= maxPlanColumns
 }
 
@@ -209,7 +234,7 @@ func (c content) bomTable() document.Table {
 	cols := []document.Column{{Weight: 1}, {Weight: 5}}
 	head := []document.Cell{document.TextCell(l.t("pos")), document.TextCell(l.t("description"))}
 	if c.planColumns() {
-		for i := range c.bom.Plans {
+		for i := range c.quantityPlans() {
 			cols = append(cols, document.Column{Weight: 0.8, Align: document.AlignRight})
 			head = append(head, document.TextCell(l.t("planColumn", i+1)))
 		}
@@ -262,7 +287,7 @@ func (c content) bomTable() document.Table {
 		}
 		cells := []document.Cell{document.TextCell(itoa(pos)), {Runs: desc, Indent: indent}}
 		if c.planColumns() {
-			for _, p := range c.bom.Plans {
+			for _, p := range c.quantityPlans() {
 				q := ln.Quantities.Plans[p.ID.String()]
 				s := ""
 				if q != 0 {
@@ -324,11 +349,12 @@ func (c content) totalsTable() document.Table {
 		rows = append(rows, document.Row{Cells: []document.Cell{document.TextCell(label), document.TextCell(l.money(amounts.Services, cur))}})
 	}
 	rows = append(rows, document.Row{Kind: document.TotalRow, Cells: []document.Cell{document.TextCell(l.t("grandTotal")), document.TextCell(l.money(amounts.GrandTotal, cur))}})
-	return document.Table{Borderless: true, Columns: []document.Column{{Weight: 2}, {Weight: 1.4, Align: document.AlignRight}, {Weight: 1.1, Align: document.AlignRight}},
+	return document.Table{Borderless: true, Columns: []document.Column{{Weight: 1.3}, {Weight: 2.1, Align: document.AlignRight}, {Weight: 1.1, Align: document.AlignRight}},
 		Rows: shift(rows)}
 }
 
-// shift puts the totals in the right two thirds of the width.
+// shift puts the totals in the right part of the width (the label column
+// fits a long services label such as "Programmierung und Inbetriebnahme").
 func shift(rows []document.Row) []document.Row {
 	for i := range rows {
 		rows[i].Cells = append([]document.Cell{{}}, rows[i].Cells...)
@@ -415,7 +441,8 @@ func (c content) zoneTables() []document.Block {
 }
 
 // maxZoneColumns: with more categories a plan's zone summary lists the
-// categories as rows and the zones as columns.
+// categories as rows and the zones as columns; with more zones too, a row
+// per zone and category.
 const maxZoneColumns = 5
 
 // zoneTableByCategory is the transposed zone summary of a plan: a row per
@@ -432,6 +459,25 @@ func (c content) zoneTableByCategory(p bom.BOMPlanRef, cats []uuid.UUID, catName
 	}
 	if len(counts[""]) > 0 {
 		zones = append(zones, zone{"", l.t("noZone")})
+	}
+	if len(zones) > maxZoneColumns {
+		// Too many of both for a matrix: a zone heading row with its
+		// devices, then a row per category (D271).
+		t := document.Table{Columns: []document.Column{{Weight: 5}, {Weight: 1, Align: document.AlignRight}},
+			Rows: []document.Row{{Kind: document.HeaderRow, Cells: []document.Cell{document.TextCell(p.Name), {Runs: []document.Run{{Text: l.t("quantity")}}, Align: &right}}}}}
+		for _, z := range zones {
+			var sum int64
+			for _, n := range counts[z.key] {
+				sum += n
+			}
+			t.Rows = append(t.Rows, document.Row{Kind: document.SubgroupRow, Cells: []document.Cell{document.TextCell(z.name), {Runs: []document.Run{{Text: itoa64(sum)}}, Align: &right}}})
+			for _, id := range cats {
+				if n := counts[z.key][id]; n > 0 {
+					t.Rows = append(t.Rows, document.Row{Cells: []document.Cell{{Runs: []document.Run{{Text: catNames[id]}}, Indent: 1}, document.TextCell(itoa64(n))}})
+				}
+			}
+		}
+		return t
 	}
 	cols := []document.Column{{Weight: 2.5}}
 	head := []document.Cell{document.TextCell(p.Name + " – " + l.t("category"))}

@@ -378,7 +378,15 @@ export class Api {
   /** Saves a version's pricing (discount, services, label) over whatever it has. */
   async savePricing(
     versionId: string,
-    pricing: { discountKind: string; discountValue?: string; servicesKind: string; servicesValue?: string; servicesLabel?: Localized },
+    pricing: {
+      discountKind: string
+      discountValue?: string
+      servicesKind: string
+      servicesValue?: string
+      servicesLabel?: Localized
+      introText?: Localized
+      closingText?: Localized
+    },
   ): Promise<void> {
     const current = await this.json<{ updatedAt: string | null }>(await this.ctx.get(`/api/versions/${versionId}/pricing`))
     await this.json(

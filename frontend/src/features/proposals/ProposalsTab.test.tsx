@@ -184,10 +184,11 @@ describe('ProposalsTab', () => {
     // None ticked: no preview, and creating says why.
     await user.click(within(types).getByRole('checkbox', { name: /Zigbee/ }))
     await user.click(within(types).getByRole('checkbox', { name: /KNX/ }))
-    expect(within(dialog).getAllByText('Choose at least one product type.')).toHaveLength(1)
+    expect(within(dialog).getByText('The totals appear once a product type is chosen.')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Choose at least one product type.')).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    // Now also at the product types, as their error.
-    expect(within(dialog).getAllByText('Choose at least one product type.')).toHaveLength(2)
+    // Now at the product types, as their error (once, D271).
+    expect(within(dialog).getAllByText('Choose at least one product type.')).toHaveLength(1)
     expect(generated).toBeUndefined()
 
     await user.click(within(types).getByRole('checkbox', { name: /KNX/ }))

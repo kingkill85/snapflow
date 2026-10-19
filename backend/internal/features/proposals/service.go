@@ -613,7 +613,7 @@ func placementVariant(p plans.PlanPlacement) uuid.UUID {
 // scaled down (coordinates refer to the plan's stored size).
 func renderPlan(p plans.DocumentPlan, bg image.Image, snaps map[uuid.UUID]bom.VariantSnapshot, images map[uuid.UUID]image.Image,
 	only *bom.SnapshotProductType, lang tr) (planPage, bool, error) {
-	in := planimage.Plan{Background: bg}
+	in := planimage.Plan{Background: bg, TextScale: planTextScale}
 	if p.Width > 0 && p.Height > 0 {
 		in.Size = image.Pt(int(p.Width), int(p.Height))
 	}
@@ -723,3 +723,8 @@ func notFound(err error) error {
 }
 
 func errNotFound() *apperr.Error { return apperr.NotFound("proposal.not_found") }
+
+// planTextScale: plans print at about 19-26 cm wide, where the editor's
+// label size (1 % of the long side) is under 2 mm; 1.5× gives about 7 pt
+// labels and 9 pt zone names (D271).
+const planTextScale = 1.5

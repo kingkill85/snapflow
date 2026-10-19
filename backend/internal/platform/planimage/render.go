@@ -33,6 +33,9 @@ type Plan struct {
 	Size       image.Point
 	Zones      []Zone
 	Placements []Placement
+	// TextScale enlarges labels and zone names (0 or 1: the editor's size);
+	// documents print plans small, so they use more (D271).
+	TextScale float64
 }
 
 // Zone is a polygon with a fill.
@@ -81,7 +84,11 @@ func RenderMax(p Plan, maxSide int) *image.RGBA {
 	xdraw.CatmullRom.Scale(out, out.Bounds(), p.Background, b, draw.Over, nil)
 
 	unit := math.Max(1, math.Max(w, h)/1200) * s // one screen pixel in output pixels
-	r := &renderer{dst: out, s: s, unit: unit}
+	ts := p.TextScale
+	if ts <= 0 {
+		ts = 1
+	}
+	r := &renderer{dst: out, s: s, unit: unit, font: unit * ts}
 	for _, z := range p.Zones {
 		r.zone(z)
 	}
@@ -103,6 +110,7 @@ type renderer struct {
 	dst   *image.RGBA
 	s     float64
 	unit  float64
+	font  float64 // unit × TextScale, for font sizes
 	faces map[faceKey]font.Face
 }
 
@@ -213,7 +221,7 @@ func (r *renderer) label(p Placement) {
 	for _, c := range cs {
 		maxY = math.Max(maxY, c[1])
 	}
-	face := r.faceOf(false, 11*r.unit)
+	face := r.faceOf(false, 11*r.font)
 	r.text(p.Label, p.X*r.s, maxY+2*r.unit, face, false)
 }
 
@@ -227,7 +235,7 @@ func (r *renderer) zoneName(z Zone) {
 		minX, maxX = math.Min(minX, p[0]), math.Max(maxX, p[0])
 		minY, maxY = math.Min(minY, p[1]), math.Max(maxY, p[1])
 	}
-	face := r.faceOf(true, 13*r.unit)
+	face := r.faceOf(true, 13*r.font)
 	r.text(z.Name, (minX+maxX)/2*r.s, (minY+maxY)/2*r.s, face, true)
 }
 

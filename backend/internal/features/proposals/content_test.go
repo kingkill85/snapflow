@@ -54,7 +54,43 @@ func testBOM(n int, cats int) bom.BOM {
 		g.Categories = append(g.Categories, cat)
 	}
 	b.Groups = []bom.BOMGroup{g}
+	// Every plan has a quantity (plan columns are for plans with one).
+	for _, p := range b.Plans[1:] {
+		for i := range b.Lines {
+			b.Lines[i].Quantities.Plans[p.ID.String()] = 1
+		}
+	}
 	return b
+}
+
+func TestPlanColumnsLeaveOutPlansWithoutQuantities(t *testing.T) {
+	// A split document: the third plan has none of its devices.
+	b := testBOM(3, 1)
+	for i := range b.Lines {
+		delete(b.Lines[i].Quantities.Plans, b.Plans[2].ID.String())
+	}
+	c := content{lang: "en", bom: b}
+	if head := c.bomTable().Rows[0].Cells; len(head) != 7 {
+		t.Errorf("%d columns, want 7 (P1 and P2 only)", len(head))
+	}
+}
+
+func TestZoneTableLongFormat(t *testing.T) {
+	// 6 categories and 6 zones: a zone row with its categories below.
+	b := testBOM(1, 6)
+	p := &b.Plans[0]
+	zone := p.Zones[0].ID.String()
+	for i := 1; i < 6; i++ {
+		z := uuid.New()
+		p.Zones = append(p.Zones, bom.BOMZoneRef{ID: z, Name: "Zone x" + itoa(i)})
+		for j := range b.Lines {
+			b.Lines[j].Quantities.Zones[z.String()] = b.Lines[j].Quantities.Zones[zone]
+		}
+	}
+	tbl := content{lang: "en", bom: b}.zoneTables()[0].(document.Table)
+	if len(tbl.Columns) != 2 || tbl.Rows[1].Kind != document.SubgroupRow || cellText(tbl.Rows[1].Cells[1]) != "12" || cellText(tbl.Rows[2].Cells[0]) != "Cat 1" {
+		t.Errorf("long zone table: %d columns, rows %+v", len(tbl.Columns), tbl.Rows[:3])
+	}
 }
 
 func TestPlanColumns(t *testing.T) {

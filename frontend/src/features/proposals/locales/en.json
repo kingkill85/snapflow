@@ -31,7 +31,7 @@
     "productTypes": "Product types",
     "noProductTypes": "The bill of materials has no product types.",
     "preview": "Totals per document",
-    "previewNone": "Choose at least one product type.",
+    "previewNone": "The totals appear once a product type is chosen.",
     "freeText": "Free-text lines (combined proposal only): {{total}}"
   }
 }
