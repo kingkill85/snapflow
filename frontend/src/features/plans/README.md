@@ -152,6 +152,8 @@ colours per D221, `chrome`, so not in the PNG export). Need rows in the zone ins
 (hidden without `can.update`); a need not saved yet says its connections come after the save. Each successful
 autosave refreshes the wiring view and checks. `?select=<zone, placement or need id>` (links from the Checks tab)
 selects the item once (a need without position selects its zone), opens the inspector and drops the param.
+Findings name items from the wiring view, else from the finding's `label` / `productName` params (items without
+channels, D412).
 
 ## Tests
 
