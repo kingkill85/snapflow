@@ -519,7 +519,7 @@ func zoneBlocks(d *data, pg planPage) []document.Block {
 		}
 		out = append(out, document.Heading{Level: 3, Text: z.name})
 		if len(devs) > 0 {
-			t := document.Table{Columns: cols(0.7, 1.5, 2.3, 1.4, 1.2), Rows: []document.Row{headerRow(l.t("colMark"), l.t("colDevice"), l.t("colProduct"),
+			t := document.Table{Columns: cols(0.6, 1.2, 2.3, 1.8, 1.2), Rows: []document.Row{headerRow(l.t("colMark"), l.t("colDevice"), l.t("colProduct"),
 				l.t("colAddress"), l.t("colNetwork"))}}
 			for _, pl := range devs {
 				product := d.productName(pl.VariantID)

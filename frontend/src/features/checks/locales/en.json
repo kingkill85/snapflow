@@ -34,6 +34,7 @@
     "network_assignment_dangling": "{{item}} is assigned to {{target}}",
     "address_duplicate": "{{item}}: address {{address}} is used by {{count}} devices",
     "address_outside_line": "{{item}}: address {{address}} is outside its line {{line}} ({{prefix}})",
+    "address_missing_one": "{{name}}: {{count}} device without address",
     "address_missing": "{{name}}: {{count}} devices without address",
     "bus_line_address_invalid": "{{name}}: the line address \"{{address}}\" cannot be read",
     "bus_line_address_duplicate": "{{name}}: {{count}} lines use the line address {{prefix}}",

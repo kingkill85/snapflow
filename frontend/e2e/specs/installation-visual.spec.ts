@@ -81,11 +81,17 @@ for (const lang of ['en', 'de'] as const) {
     const groundDevices = ground.content.placements as Placement[]
     const firstDevices = first.content.placements as Placement[]
     const byVariant = (list: Placement[], key: string) => list.filter((p) => p.variantId === cat.products[key].variantId)
-    const [knxType, , zigbeeType] = await Promise.all(cat.types.map((id) => api.productType(id)))
+    const [, knxType, zigbeeType] = await Promise.all(cat.types.map((id) => api.productType(id)))
 
     // Zone short name for the labels (D433).
     const zones = ground.content.zones as { id: string; name: string }[]
-    await api.savePlanContent(ground.id, { ...ground.content, zones: zones.map((z, i) => (i === 0 ? { ...z, shortName: lang === 'en' ? 'Drawing' : 'Salon' } : z)) })
+    // A door sensor on the ground floor, which has no Zigbee gateway: a device without gateway.
+    const lone = { id: crypto.randomUUID(), variantId: cat.products.sensor.variantId, x: 300, y: 600, label: 'S1' }
+    await api.savePlanContent(ground.id, {
+      ...ground.content,
+      placements: [...groundDevices, lone],
+      zones: zones.map((z, i) => (i === 0 ? { ...z, shortName: lang === 'en' ? 'Drawing' : 'Salon' } : z)),
+    })
 
     // The first floor's second gateway goes away while the door sensor is pinned to it: the sensor is without gateway.
     const [, gw2] = byVariant(firstDevices, 'gateway')
@@ -117,6 +123,7 @@ for (const lang of ['en', 'de'] as const) {
             { planId: first.id, itemId: gw1.id, ieee: '00:12:4B:00:1C:A1:B2:C3' },
             { planId: first.id, itemId: bulb.id, ieee: '00158D0004A1B2C4' },
             { planId: first.id, itemId: sensor.id, ieee: '00-15-8D-00-04-A1-B2-C5' },
+            { planId: ground.id, itemId: lone.id, ieee: '00 15 8d 00 04 a1 b2 c6' },
           ],
         },
       }),
@@ -205,7 +212,8 @@ for (const lang of ['en', 'de'] as const) {
         path: () => '/catalog/function-types',
         act: async (p) => {
           await p.getByRole('row').filter({ hasText: cat.fns.dimmable.key }).getByRole('button', { name: l.edit }).click()
-          await expect(p.getByRole('dialog')).toBeVisible()
+          // The KNX objects repeater (D436), scrolled into view.
+          await p.getByRole('dialog').getByRole('group').last().scrollIntoViewIfNeeded()
         },
       },
       {

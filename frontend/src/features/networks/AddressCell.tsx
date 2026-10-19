@@ -94,9 +94,12 @@ export function AddressCell({ device, name }: { device: { planId: string; itemId
     )
 
   return wrap(
-    <span className="flex flex-wrap items-center gap-2">
-      {value ? <span className="font-mono tabular-nums break-all">{value}</span> : <span className="text-muted">{t('address.none')}</span>}
-      {value && (item.address?.pinned ? <Badge variant="primary">{t('address.pinned')}</Badge> : <Badge>{t('address.automatic')}</Badge>)}
+    // The edit button stays beside the value; value and badge may wrap.
+    <span className="flex items-center gap-2">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {value ? <span className="font-mono tabular-nums break-all">{value}</span> : <span className="text-muted">{t('address.none')}</span>}
+        {value && (item.address?.pinned ? <Badge variant="primary">{t('address.pinned')}</Badge> : <Badge>{t('address.automatic')}</Badge>)}
+      </span>
       {canUpdate && (
         <IconButton
           label={t('address.edit', { device: name })}

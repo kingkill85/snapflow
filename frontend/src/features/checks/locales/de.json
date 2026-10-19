@@ -34,6 +34,7 @@
     "network_assignment_dangling": "{{item}} ist {{target}} zugeordnet",
     "address_duplicate": "{{item}}: Adresse {{address}} wird von {{count}} Geräten verwendet",
     "address_outside_line": "{{item}}: Adresse {{address}} liegt außerhalb ihrer Linie {{line}} ({{prefix}})",
+    "address_missing_one": "{{name}}: {{count}} Gerät ohne Adresse",
     "address_missing": "{{name}}: {{count}} Geräte ohne Adresse",
     "bus_line_address_invalid": "{{name}}: Die Linienadresse „{{address}}“ ist nicht lesbar",
     "bus_line_address_duplicate": "{{name}}: {{count}} Linien nutzen die Linienadresse {{prefix}}",
