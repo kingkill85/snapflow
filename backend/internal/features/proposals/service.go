@@ -537,11 +537,7 @@ func renderPlan(p plans.DocumentPlan, snaps map[uuid.UUID]bom.VariantSnapshot, i
 	for _, z := range p.Zones {
 		in.Zones = append(in.Zones, planimage.Zone{Name: z.Name, Color: hexColor(z.Color), Opacity: z.Opacity, Points: z.Points})
 	}
-	type typeCount struct {
-		name  string
-		count int
-	}
-	var legend []typeCount
+	var legend []legendEntry
 	existing := false
 	for _, pl := range p.Placements {
 		snap, ok := snaps[placementVariant(pl)]
@@ -555,10 +551,10 @@ func renderPlan(p plans.DocumentPlan, snaps map[uuid.UUID]bom.VariantSnapshot, i
 				item.Image = images[*snap.ImageFileID]
 			}
 			name := text(snap.ProductType.Name, lang)
-			if i := slices.IndexFunc(legend, func(t typeCount) bool { return t.name == name }); i >= 0 {
+			if i := slices.IndexFunc(legend, func(t legendEntry) bool { return t.name == name }); i >= 0 {
 				legend[i].count++
 			} else {
-				legend = append(legend, typeCount{name, 1})
+				legend = append(legend, legendEntry{name: name, count: 1})
 			}
 		}
 		existing = existing || pl.Existing
@@ -571,11 +567,7 @@ func renderPlan(p plans.DocumentPlan, snaps map[uuid.UUID]bom.VariantSnapshot, i
 	if err != nil {
 		return planPage{}, false, err
 	}
-	page := planPage{name: p.Name, image: img, existing: existing}
-	for _, t := range legend {
-		page.legend = append(page.legend, legendEntry{name: t.name, count: t.count})
-	}
-	return page, true, nil
+	return planPage{name: p.Name, image: img, existing: existing, legend: legend}, true, nil
 }
 
 func hexColor(s string) color.RGBA {

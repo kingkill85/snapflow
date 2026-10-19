@@ -18,6 +18,7 @@ const tenant = (over: Partial<Tenant>): Tenant => ({
   isActive: true,
   createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-18T10:00:00Z',
+  letterhead: { companyName: '', address: '', phone: '', email: '', website: '', logoFileId: null, logoUrl: null },
   projectCount: 0,
   can: { update: true, delete: true },
   ...over,

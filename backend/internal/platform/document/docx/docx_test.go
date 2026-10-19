@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -94,7 +95,7 @@ func wellFormed(t *testing.T, name string, data []byte) {
 	d := xml.NewDecoder(bytes.NewReader(data))
 	for {
 		_, err := d.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return
 		}
 		if err != nil {
