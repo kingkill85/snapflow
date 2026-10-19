@@ -79,7 +79,7 @@ export type Product = Required<Pick<ProductInput, 'productTypeId' | 'categoryId'
     variantsWithProblems: number
     updatedAt: string
   }
-export type Project = { id: string; number: string; name: string; status: string; updatedAt: string; versions: { id: string; name: string }[] }
+export type Project = { id: string; number: string; name: string; status: string; updatedAt: string; exchangeRate: string | null; versions: { id: string; name: string }[] }
 export type StoredFile = { id: string; contentType: string; size: number; width: number; height: number; sha256: string }
 /** A user created by a spec, with the password it signs in with. */
 export type Account = User & { password: string }

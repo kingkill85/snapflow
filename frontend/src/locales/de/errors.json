@@ -74,6 +74,10 @@
     "order_mismatch": "Die Kategorien wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
     "stale": "Jemand anderes hat diese Kategorie inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
+  "exchange_rate": {
+    "unavailable": "Der Wechselkursdienst ist nicht erreichbar. Versuchen Sie es später erneut oder geben Sie den Kurs von Hand ein.",
+    "unknown_currency": "Der Wechselkursdienst hat keinen Kurs für {{currency}}. Geben Sie den Kurs von Hand ein."
+  },
   "file": {
     "not_found": "Diese Datei existiert nicht mehr.",
     "tenant_forbidden": "Sie können keine Dateien eines anderen Mandanten speichern.",
@@ -179,7 +183,9 @@
   },
   "project": {
     "currency_format": "Geben Sie einen dreistelligen Währungscode wie EUR oder USD ein.",
+    "currency_unknown": "„{{currency}}“ ist keine unterstützte Währung. Wählen Sie eine aus der Liste.",
     "exchange_rate": "Geben Sie einen Wechselkurs über 0 ein (bis zu 6 Nachkommastellen); für USD ist er 1.",
+    "exchange_rate_usd": "USD-Projekte haben keinen Wechselkurs: Katalogpreise sind in USD.",
     "not_found": "Dieses Projekt existiert nicht mehr.",
     "product_type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
     "product_type_not_found": "Der gewählte Produkttyp existiert nicht mehr.",
@@ -200,7 +206,8 @@
     "exporter_unknown": "Dieses Dokumentformat ist nicht verfügbar ({{exporters}}).",
     "not_found": "Dieses Angebot existiert nicht mehr.",
     "product_type_not_in_bom": "Diese Version hat keine Positionen dieses Produkttyps.",
-    "product_types_required": "Wählen Sie mindestens einen Produkttyp."
+    "product_types_required": "Wählen Sie mindestens einen Produkttyp.",
+    "rate_missing": "Für dieses Projekt gibt es noch keinen Wechselkurs für {{currency}}. Rufen Sie ihn zuerst im Tab Stückliste oder Preise ab oder geben Sie ihn ein."
   },
   "request": {
     "bad": "Die Anfrage war ungültig.",

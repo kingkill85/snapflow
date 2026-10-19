@@ -19,6 +19,7 @@ import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page,
 
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
 import { ProjectFormDialog } from './ProjectFormDialog'
+import { RateBar } from './RateBar'
 import { ProjectStatusBadge } from './StatusBadge'
 import { TenantName } from './TenantName'
 import { VersionFormDialog } from './VersionFormDialog'
@@ -90,7 +91,7 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
           status: 'active',
           language: project.language,
           currency: project.currency,
-          exchangeRate: project.exchangeRate,
+          exchangeRate: project.exchangeRate ?? '',
           customer: project.customer,
           notes: project.notes,
           productTypeIds: project.productTypeIds,
@@ -235,9 +236,20 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
         {
           key: 'bom',
           label: t('tabs.bom'),
-          content: <BomTab key={version.id} projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} />,
+          content: (
+            <div className="space-y-4">
+              <RateBar project={project} versionId={version.id} />
+              <BomTab key={version.id} projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} />
+            </div>
+          ),
         },
-        { key: 'pricing', label: t('tabs.pricing'), content: <PricingTab key={version.id} versionId={version.id} canWrite={canWrite} /> },
+        { key: 'pricing', label: t('tabs.pricing'), content: (
+            <div className="space-y-4">
+              <RateBar project={project} versionId={version.id} />
+              <PricingTab key={version.id} versionId={version.id} canWrite={canWrite} />
+            </div>
+          ),
+        },
         // Generating needs projects.write but no active project (D259): update or reopen says so.
         { key: 'proposals', label: t('tabs.proposals'), content: <ProposalsTab key={version.id} versionId={version.id} canGenerate={project.can.update || project.can.reopen} /> },
       ]}

@@ -33,5 +33,6 @@
     "preview": "Summen je Dokument",
     "previewNone": "Die Summen erscheinen, sobald ein Produkttyp gewählt ist.",
     "freeText": "Freitextpositionen (nur im Gesamtangebot): {{total}}"
-  }
+  },
+  "rateMissing": "Für dieses Projekt gibt es noch keinen Wechselkurs für {{currency}}: Angebote lassen sich erstellen, sobald er im Tab Stückliste oder Preise abgerufen oder eingegeben ist."
 }

@@ -74,6 +74,10 @@
     "order_mismatch": "The categories have changed in the meantime. Please reload and try again.",
     "stale": "Someone else changed this category in the meantime. Reload it and make your changes again."
   },
+  "exchange_rate": {
+    "unavailable": "The exchange rate service cannot be reached. Try again later or enter the rate by hand.",
+    "unknown_currency": "The exchange rate service has no rate for {{currency}}. Enter the rate by hand."
+  },
   "file": {
     "not_found": "This file no longer exists.",
     "tenant_forbidden": "You cannot store files of another tenant.",
@@ -179,7 +183,9 @@
   },
   "project": {
     "currency_format": "Enter a three-letter currency code such as EUR or USD.",
+    "currency_unknown": "\"{{currency}}\" is not a supported currency. Choose one from the list.",
     "exchange_rate": "Enter an exchange rate above 0 (up to 6 decimals); for USD it is 1.",
+    "exchange_rate_usd": "USD projects have no exchange rate: catalog prices are in USD.",
     "not_found": "This project no longer exists.",
     "product_type_inactive": "This product type is inactive. Choose an active product type.",
     "product_type_not_found": "The selected product type no longer exists.",
@@ -200,7 +206,8 @@
     "exporter_unknown": "This document format is not available ({{exporters}}).",
     "not_found": "This proposal no longer exists.",
     "product_type_not_in_bom": "This version has no items of this product type.",
-    "product_types_required": "Choose at least one product type."
+    "product_types_required": "Choose at least one product type.",
+    "rate_missing": "This project has no exchange rate for {{currency}} yet. Fetch or set it on the BOM or Pricing tab first."
   },
   "request": {
     "bad": "The request was invalid.",

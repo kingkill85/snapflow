@@ -81,6 +81,9 @@ export function ProposalsTab({ versionId, canGenerate }: Props) {
         ) : undefined
       }
     >
+      {bom.data && bom.data.totals.currency !== 'USD' && bom.data.totals.rate === '' && (
+        <Notice tone="warning">{t('rateMissing', { currency: bom.data.totals.currency })}</Notice>
+      )}
       {created.length > 0 && (
         <Notice>
           {t('created', { count: created.length, numbers: created.map((p) => p.number).join(', ') })}{' '}

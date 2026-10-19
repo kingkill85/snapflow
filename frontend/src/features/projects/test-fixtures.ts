@@ -1,6 +1,6 @@
 import { HttpResponse } from 'msw'
 
-import type { ProductType, Project, ProjectListItem, ProjectVersion, Tenant } from '@/api/generated/model'
+import type { CurrencyList, ProductType, Project, ProjectListItem, ProjectVersion, Tenant } from '@/api/generated/model'
 
 // Test data of the projects tests (not shipped: only tests import it).
 
@@ -65,6 +65,12 @@ export const villa: Project = {
   language: 'en',
   currency: 'EUR',
   exchangeRate: '0.92',
+  exchangeRateDate: '2026-10-18T00:00:00Z',
+  exchangeRateSource: 'manual',
+  exchangeRateProvider: '',
+  exchangeRateAgeDays: 1,
+  exchangeRateStale: false,
+  exchangeRateMaxAgeDays: 7,
   customer: { name: 'Max Müller', company: 'Müller GmbH', email: 'max@example.com', phone: '+49 1', address: 'Street 1\nCity' },
   notes: 'Gate code 1234',
   productTypeIds: [zigbee.id],
@@ -88,4 +94,10 @@ export const villaRow: ProjectListItem = {
   productTypeIds: [zigbee.id],
   updatedAt: at,
   can: { update: true, delete: true, reopen: false },
+}
+
+/** GET /api/currencies: a few codes, EUR and PKR recently used by the tenant. */
+export const currencies: CurrencyList = {
+  items: ['CHF', 'EUR', 'JPY', 'PKR', 'USD'].map((code) => ({ code, minorUnits: code === 'JPY' ? 0 : 2, online: code !== 'CHF' })),
+  recent: ['PKR', 'EUR'],
 }

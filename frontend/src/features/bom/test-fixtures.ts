@@ -136,7 +136,7 @@ export const bom: Bom = {
     },
     { kind: 'freeText', productType: null, subtotal: '100.00', converted: null, categories: [], lines: [cabling.key] },
   ],
-  totals: { subtotal: '255.00', discount: '25.50', services: '50.00', grandTotal: '279.50', currency: 'USD', rate: '1', converted: null },
+  totals: { subtotal: '255.00', discount: '25.50', services: '50.00', grandTotal: '279.50', currency: 'USD', rate: '1', rateDate: null, rateSource: '', converted: null },
   pricing,
   manualLines: [manualCabling, manualBattery],
   warnings: [],

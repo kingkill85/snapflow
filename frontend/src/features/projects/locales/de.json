@@ -45,16 +45,16 @@
     "language": "Sprache",
     "languageHint": "Die Sprache der Angebote",
     "currency": "Währung",
-    "currencyHint": "Dreistelliger Code, z. B. EUR",
+    "currencyHint": "Katalogpreise sind in USD; den Wechselkurs später im Tab Stückliste oder Preise festlegen",
     "exchangeRate": "Wechselkurs",
     "exchangeRateHint": "{{currency}} je 1 USD",
-    "exchangeRateUsd": "Katalogpreise sind in USD: der Kurs ist 1",
     "customerName": "Name",
     "customerCompany": "Firma",
     "customerEmail": "E-Mail",
     "customerPhone": "Telefon",
     "customerAddress": "Adresse",
-    "notes": "Notizen"
+    "notes": "Notizen",
+    "currencyNoMatch": "Keine Währung gefunden."
   },
   "page": {
     "noCustomer": "Noch kein Kunde",
@@ -85,5 +85,22 @@
     "emptyOption": "Leere Version",
     "emptyHint": "Beginnt ohne Pläne.",
     "copyHint": "Kopiert alles aus {{name}}."
+  },
+  "rate": {
+    "value": "1 USD = {{rate}} {{currency}}",
+    "online": "online, {{date}}",
+    "manual": "manuell eingegeben am {{date}}",
+    "none": "Noch kein Wechselkurs – abrufen oder eingeben",
+    "update": "Kurs aktualisieren",
+    "set": "Kurs eingeben",
+    "setTitle": "Wechselkurs eingeben",
+    "setHint": "{{currency}} je 1 USD; bleibt, bis Sie ihn ändern",
+    "stale_one": "Der Kurs ist {{count}} Tag alt (älter als {{max}} Tage). Aktualisieren Sie ihn für aktuelle Preise.",
+    "stale_other": "Der Kurs ist {{count}} Tage alt (älter als {{max}} Tage). Aktualisieren Sie ihn für aktuelle Preise.",
+    "fetch": "Aktuellen Kurs abrufen",
+    "originTyped": "manuell eingegeben",
+    "originOnline": "Online-Kurs vom {{date}}",
+    "originManual": "manuell eingegeben am {{date}}",
+    "originNone": "noch kein Wechselkurs"
   }
 }
