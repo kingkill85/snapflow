@@ -14,7 +14,7 @@ import (
 const archiveTenant = `-- name: ArchiveTenant :one
 UPDATE tenants SET is_active = false, archived_at = now(), updated_at = now()
 WHERE id = $1 AND NOT is_distributor
-RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at
+RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id
 `
 
 // ArchiveTenant deactivates and archives a partner tenant (D13).
@@ -29,13 +29,19 @@ func (q *Queries) ArchiveTenant(ctx context.Context, id uuid.UUID) (Tenant, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }
 
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO tenants (name, is_distributor, is_active) VALUES ($1, $2, $3)
-RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at
+RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id
 `
 
 type CreateTenantParams struct {
@@ -55,6 +61,12 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Ten
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }
@@ -72,7 +84,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id uuid.UUID) (int64, error)
 }
 
 const getDistributor = `-- name: GetDistributor :one
-SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants WHERE is_distributor
+SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id FROM tenants WHERE is_distributor
 `
 
 func (q *Queries) GetDistributor(ctx context.Context) (Tenant, error) {
@@ -86,12 +98,18 @@ func (q *Queries) GetDistributor(ctx context.Context) (Tenant, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }
 
 const getTenant = `-- name: GetTenant :one
-SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants WHERE id = $1
+SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id FROM tenants WHERE id = $1
 `
 
 func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
@@ -105,12 +123,18 @@ func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }
 
 const getTenants = `-- name: GetTenants :many
-SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants WHERE id = ANY($1::uuid[])
+SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id FROM tenants WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, error) {
@@ -130,6 +154,12 @@ func (q *Queries) GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, er
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
+			&i.CompanyName,
+			&i.Address,
+			&i.Phone,
+			&i.Email,
+			&i.Website,
+			&i.LogoFileID,
 		); err != nil {
 			return nil, err
 		}
@@ -142,7 +172,7 @@ func (q *Queries) GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, er
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at FROM tenants
+SELECT id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id FROM tenants
 WHERE $1::boolean OR archived_at IS NULL
 ORDER BY is_distributor DESC, lower(name)
 `
@@ -164,6 +194,12 @@ func (q *Queries) ListTenants(ctx context.Context, includeArchived bool) ([]Tena
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
+			&i.CompanyName,
+			&i.Address,
+			&i.Phone,
+			&i.Email,
+			&i.Website,
+			&i.LogoFileID,
 		); err != nil {
 			return nil, err
 		}
@@ -178,7 +214,7 @@ func (q *Queries) ListTenants(ctx context.Context, includeArchived bool) ([]Tena
 const restoreTenant = `-- name: RestoreTenant :one
 UPDATE tenants SET archived_at = NULL, updated_at = now()
 WHERE id = $1 AND archived_at IS NOT NULL
-RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at
+RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id
 `
 
 // RestoreTenant takes a tenant out of the archive; it stays inactive.
@@ -193,6 +229,58 @@ func (q *Queries) RestoreTenant(ctx context.Context, id uuid.UUID) (Tenant, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
+	)
+	return i, err
+}
+
+const updateLetterhead = `-- name: UpdateLetterhead :one
+UPDATE tenants SET company_name = $2, address = $3, phone = $4, email = $5, website = $6,
+    logo_file_id = $7, updated_at = now()
+WHERE id = $1
+RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id
+`
+
+type UpdateLetterheadParams struct {
+	ID          uuid.UUID
+	CompanyName string
+	Address     string
+	Phone       string
+	Email       string
+	Website     string
+	LogoFileID  *uuid.UUID
+}
+
+func (q *Queries) UpdateLetterhead(ctx context.Context, arg UpdateLetterheadParams) (Tenant, error) {
+	row := q.db.QueryRow(ctx, updateLetterhead,
+		arg.ID,
+		arg.CompanyName,
+		arg.Address,
+		arg.Phone,
+		arg.Email,
+		arg.Website,
+		arg.LogoFileID,
+	)
+	var i Tenant
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IsDistributor,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }
@@ -200,7 +288,7 @@ func (q *Queries) RestoreTenant(ctx context.Context, id uuid.UUID) (Tenant, erro
 const updateTenant = `-- name: UpdateTenant :one
 UPDATE tenants SET name = $2, is_active = $3, updated_at = now()
 WHERE id = $1 AND (archived_at IS NULL OR NOT $3)
-RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at
+RETURNING id, name, is_distributor, is_active, created_at, updated_at, archived_at, company_name, address, phone, email, website, logo_file_id
 `
 
 type UpdateTenantParams struct {
@@ -222,6 +310,12 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Ten
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.CompanyName,
+		&i.Address,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.LogoFileID,
 	)
 	return i, err
 }

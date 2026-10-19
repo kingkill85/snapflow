@@ -89,17 +89,19 @@ SELECT * FROM version_pricing WHERE version_id = $1 FOR UPDATE;
 
 -- name: UpsertPricing :one
 INSERT INTO version_pricing (version_id, tenant_id, discount_kind, discount_value, services_kind, services_value,
-    services_label)
+    services_label, intro_text, closing_text)
 VALUES (sqlc.arg(version_id), sqlc.arg(tenant_id), sqlc.arg(discount_kind), sqlc.arg(discount_value),
-    sqlc.arg(services_kind), sqlc.arg(services_value), sqlc.narg(services_label))
+    sqlc.arg(services_kind), sqlc.arg(services_value), sqlc.narg(services_label), sqlc.narg(intro_text),
+    sqlc.narg(closing_text))
 ON CONFLICT (version_id) DO UPDATE SET discount_kind = excluded.discount_kind,
     discount_value = excluded.discount_value, services_kind = excluded.services_kind,
-    services_value = excluded.services_value, services_label = excluded.services_label, updated_at = now()
+    services_value = excluded.services_value, services_label = excluded.services_label,
+    intro_text = excluded.intro_text, closing_text = excluded.closing_text, updated_at = now()
 RETURNING *;
 
 -- name: CopyPricing :exec
 INSERT INTO version_pricing (version_id, tenant_id, discount_kind, discount_value, services_kind, services_value,
-    services_label, updated_at)
+    services_label, intro_text, closing_text, updated_at)
 SELECT sqlc.arg(target_id)::uuid, sqlc.arg(tenant_id)::uuid, discount_kind, discount_value, services_kind,
-    services_value, services_label, updated_at
+    services_value, services_label, intro_text, closing_text, updated_at
 FROM version_pricing WHERE version_id = sqlc.arg(source_id)::uuid;
