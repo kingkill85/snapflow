@@ -96,6 +96,16 @@ The catalog has two independent axes (D99, replacing D14): the **product type** 
 - **Cross-feature**: versions and the read-only rule come from `projects.Service.ReadVersion`/`WriteVersion` inside the plans transaction (it locks the project row), the version copy runs the copier plans registers with `projects.Service.OnCopyVersion`, catalog facts come from `products.Service.PlacementVariants`, lock holder names from `users.Service.DisplayName` (D197).
 - **API**: `GET/POST /api/versions/{versionId}/plans` (create: multipart `name` + `image`), `PUT /api/versions/{versionId}/plans/order`, `GET/PUT/DELETE /api/plans/{id}` (update: multipart `name`, `expectedUpdatedAt`, optional `image`), `GET /api/plans/{id}/images/{fileId}` (the current image only, D211), `GET/PUT /api/plans/{id}/content`, `POST/DELETE /api/plans/{id}/lock`.
 
+## BOM and pricing
+
+- **Snapshots** (`features/bom`, step 2c; tenant-owned, RLS like plans): `version_items` freezes what a version quotes of each catalog variant it uses (names, model number, SKU, product type and category with their catalog positions, USD unit price, image, available required add-ons). Taken at the variant's first appearance (plan content save through the `plans.Service.OnContentSave` hook, manual-line save), never changed implicitly; only "Update from catalog" re-snapshots (D229, D230, D234).
+- **BOM** (`GET /api/versions/{versionId}/bom`): computed on every request from the placements (through `plans.Service.BOMPlacements`; existing ones left out, D185), required add-ons from the snapshot, chosen optional add-ons and manual lines; one line per variant with quantities per plan, zone, unzoned and manual, live catalog status (`available`/`deleted`/`inactive`/`outdated`), groups product type → category with subtotals, free-text lines last (D231).
+- **Money**: every rule in `platform/money` (decimals, half-up rounding, discount cap, services on subtotal − discount, ISO 4217 minor units, conversion per amount); no VAT in phase 2 (D227, D228).
+- **Pricing** (`version_pricing`, defaults while absent): discount and services as none/percent/amount, services label (i18n), stale check; `POST …/pricing/preview` returns totals for unsaved values (D232).
+- **Manual lines** (`version_manual_lines`): catalog or free-text lines with quantity, note and order (D233).
+- **Version copy** copies snapshots, manual lines and pricing (copier registered with `projects.Service.OnCopyVersion`).
+- **API**: `GET /api/versions/{versionId}/bom`, `GET/PUT …/pricing`, `POST …/pricing/preview`, `GET/POST …/manual-lines`, `PUT/DELETE …/manual-lines/{id}`, `PUT …/manual-lines/order`, `GET …/catalog-changes`, `POST …/catalog-changes/apply`.
+
 ## Extension points
 
 | Extension | Contract |
