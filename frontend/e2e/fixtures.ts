@@ -320,6 +320,42 @@ export class Api {
     return this.json<PlanContent>(await this.ctx.get(`/api/plans/${planId}/content`))
   }
 
+  /** Saves a plan's content as the editor does: take the lock, save against the current content, release the lock. */
+  async savePlanContent(
+    planId: string,
+    content: { zones?: PlanContent['zones']; placements: { variantId: string; x: number; y: number; existing?: boolean }[] },
+  ): Promise<void> {
+    await this.json(await this.ctx.post(`/api/plans/${planId}/lock`))
+    const current = await this.json<{ contentUpdatedAt: string }>(await this.ctx.get(`/api/plans/${planId}/content`))
+    const placements = content.placements.map((p) => ({
+      id: crypto.randomUUID(),
+      width: 40,
+      height: 40,
+      rotation: 0,
+      label: '',
+      instanceValues: {},
+      addonVariantIds: [],
+      existing: false,
+      ...p,
+    }))
+    await this.json(
+      await this.ctx.put(`/api/plans/${planId}/content`, {
+        data: { expectedContentUpdatedAt: current.contentUpdatedAt, scale: null, zones: content.zones ?? [], placements },
+      }),
+    )
+    await this.ctx.delete(`/api/plans/${planId}/lock`)
+  }
+
+  /** Changes a variant's price as the catalog editor would. */
+  async setVariantPrice(productId: string, variant: Variant, price: string): Promise<Variant> {
+    const { name, sku, imageFileId, attributes, isActive, updatedAt } = variant
+    return this.json<Variant>(
+      await this.ctx.put(`/api/products/${productId}/variants/${variant.id}`, {
+        data: { name, sku, imageFileId, attributes, isActive, price, expectedUpdatedAt: updatedAt },
+      }),
+    )
+  }
+
   async dispose() {
     await this.ctx.dispose()
   }
