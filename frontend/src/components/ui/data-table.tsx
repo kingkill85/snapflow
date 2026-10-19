@@ -4,6 +4,8 @@ import { cn } from '@/lib/cn'
 
 export type Column<T> = {
   header: string
+  /** React key of the column, when headers may repeat (e.g. one column per plan); default the header. */
+  key?: string
   cell: (row: T) => ReactNode
   className?: string
   /**
@@ -35,7 +37,16 @@ type DataTableProps<T> = {
    * labels say it all (e.g. the fields of something new in a diff).
    */
   hideHeader?: boolean
+  /**
+   * Rows under group header rows (e.g. a bill of materials by product type
+   * and category): each group's `header` spans the whole row, its rows
+   * follow. When given, it replaces `rows` for rendering (`rows` still
+   * decides whether the table is empty).
+   */
+  groups?: TableGroup<T>[]
 }
+
+export type TableGroup<T> = { key: string; header: ReactNode; rows: T[]; level?: 1 | 2 }
 
 /**
  * A table; on phones (below `md`) each row is a card: the title column on
@@ -44,7 +55,7 @@ type DataTableProps<T> = {
  * explicitly (table, rowgroup, row, columnheader, cell), because browsers drop
  * table semantics from elements whose display changes (D117).
  */
-export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat, hideHeader }: DataTableProps<T>) {
+export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, flat, hideHeader, groups }: DataTableProps<T>) {
   const scroller = useRef<HTMLDivElement>(null)
   const cue = useScrollCue(scroller, rows.length > 0)
   if (rows.length === 0) return <>{empty}</>
@@ -73,7 +84,7 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
           <thead role="rowgroup" className={cn('border-b border-line text-left text-muted max-md:sr-only', flat && 'text-xs', hideHeader && 'sr-only')}>
             <tr role="row">
               {columns.map((c) => (
-                <th key={c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
+                <th key={c.key ?? c.header} role="columnheader" scope="col" className={cn('px-3 font-medium', flat ? 'py-1.5 first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4', c.className)}>
                   {c.header}
                 </th>
               ))}
@@ -81,7 +92,19 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
             </tr>
           </thead>
           <tbody role="rowgroup" className={cn('max-md:block', flat ? 'max-md:space-y-2' : 'max-md:space-y-3')}>
-            {rows.map((row) => {
+            {(groups ?? [{ key: '', header: null, rows }]).map((group) => [
+              group.header != null && (
+                <tr key={`group-${group.key}`} role="row" className={cn('border-b border-line max-md:block max-md:border-0', group.level === 2 ? 'bg-canvas/50' : 'bg-canvas')}>
+                  <td
+                    role="cell"
+                    colSpan={columns.length + (actions ? 1 : 0)}
+                    className={cn('px-3 py-2 first:pl-4 last:pr-4 max-md:block max-md:px-0', group.level === 2 ? 'text-sm' : 'font-semibold')}
+                  >
+                    {group.header}
+                  </td>
+                </tr>
+              ),
+              ...group.rows.map((row) => {
               const rowActions = actions?.(row)
               return (
                 <tr
@@ -99,7 +122,7 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
                     const block = c.mobile === 'block'
                     return (
                       <td
-                        key={c.header}
+                        key={c.key ?? c.header}
                         role="cell"
                         // On a phone a line's label is the header, as CSS content with empty alternative text
                         // (index.css): not part of the cell's text, not read twice by screen readers.
@@ -127,7 +150,8 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
                   )}
                 </tr>
               )
-            })}
+            }),
+            ])}
           </tbody>
         </table>
       </div>

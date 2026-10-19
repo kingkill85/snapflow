@@ -11,6 +11,8 @@ type TabsProps<K extends string> = {
   value: K
   onValueChange: (key: K) => void
   className?: string
+  /** Replaces the panel's padding, e.g. for page-level tabs (default `p-3`). */
+  panelClassName?: string
 }
 
 /**
@@ -18,7 +20,7 @@ type TabsProps<K extends string> = {
  * between tabs; only the active panel is rendered. Used e.g. by the plan
  * editor's side panel.
  */
-export function Tabs<K extends string>({ label, tabs, value, onValueChange, className }: TabsProps<K>) {
+export function Tabs<K extends string>({ label, tabs, value, onValueChange, className, panelClassName }: TabsProps<K>) {
   const id = useId()
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const active = tabs.find((t) => t.key === value) ?? tabs[0]
@@ -62,7 +64,7 @@ export function Tabs<K extends string>({ label, tabs, value, onValueChange, clas
         })}
       </div>
       {active && (
-        <div role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`} className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`} className={cn('min-h-0 flex-1 overflow-y-auto', panelClassName ?? 'p-3')}>
           {active.content}
         </div>
       )}

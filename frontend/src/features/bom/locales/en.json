@@ -1,0 +1,129 @@
+{
+  "tabs": {
+    "label": "Version contents",
+    "plans": "Plans",
+    "bom": "Bill of materials",
+    "pricing": "Pricing"
+  },
+  "bom": {
+    "title": "Bill of materials",
+    "empty": "Nothing to list yet: place products in a plan or add a manual line.",
+    "filterPlan": "Plan",
+    "filterZone": "Zone",
+    "allPlans": "All plans",
+    "allZones": "All zones",
+    "noZone": "No zone",
+    "zoneNeedsPlan": "Choose a plan first",
+    "filtered": "Quantities of the chosen plan or zone only. Prices and totals are for the whole version.",
+    "noneInFilter": "Nothing in this plan or zone.",
+    "columns": {
+      "image": "Image",
+      "product": "Product",
+      "manual": "Manual",
+      "quantity": "Qty",
+      "unitPrice": "Unit price",
+      "total": "Total"
+    },
+    "addOnFor": "Add-on for {{names}}",
+    "freeText": "Other items",
+    "subtotal": "Subtotal {{amount}}",
+    "status": {
+      "unavailable": "Unavailable",
+      "deleted": "Deleted",
+      "inactive": "Inactive",
+      "outdated": "Outdated"
+    },
+    "statusAction": "Update from catalog: {{name}}",
+    "updateFromCatalog": "Update from catalog",
+    "warning": "A placement on “{{plan}}” has no price snapshot and is not counted.",
+    "openPlan": "Open plan",
+    "totals": {
+      "title": "Totals",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "grandTotal": "Grand total",
+      "rate": "Exchange rate: 1 USD = {{rate}} {{currency}}"
+    }
+  },
+  "manual": {
+    "title": "Manual lines",
+    "description": "Products and items that are not placed in a plan.",
+    "empty": "No manual lines.",
+    "addCatalog": "Add product",
+    "addFreeText": "Add free-text line",
+    "newCatalogTitle": "Add product",
+    "newFreeTextTitle": "Add free-text line",
+    "editTitle": "Edit line",
+    "product": "Product",
+    "search": "Search",
+    "searchHint": "Name, model number or SKU",
+    "noMatch": "No product matches.",
+    "noProducts": "No products of this project's product types.",
+    "chooseProduct": "Choose a product.",
+    "variant": "Variant",
+    "name": "Name",
+    "unitPrice": "Unit price (USD)",
+    "unitPriceHint": "e.g. 27.50 or 27,50",
+    "quantity": "Quantity",
+    "note": "Note",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "deleteTitle": "Delete line",
+    "deleteMessage": "Delete “{{name}}” from the manual lines?",
+    "kindCatalog": "Product",
+    "kindFreeText": "Free text",
+    "columns": {
+      "item": "Item",
+      "unitPrice": "Unit price",
+      "quantity": "Qty",
+      "note": "Note"
+    }
+  },
+  "pricing": {
+    "title": "Pricing",
+    "discount": "Discount",
+    "services": "Services",
+    "kind": "Kind",
+    "kinds": {
+      "none": "None",
+      "percent": "Percent",
+      "amount": "Amount (USD)"
+    },
+    "discountValue": "Discount",
+    "servicesValue": "Services",
+    "percentHint": "0 to 100, e.g. 7,5 or 7.5",
+    "amountHint": "USD, e.g. 250 or 250,50",
+    "servicesLabel": "Services label",
+    "servicesLabelHint": "Printed on the proposal; empty for the default.",
+    "preview": "Totals with these values",
+    "previewPending": "Updating…",
+    "saved": "Pricing saved.",
+    "save": "Save"
+  },
+  "changes": {
+    "title": "Update from catalog",
+    "description": "Prices and data that changed in the catalog since they were taken into this version.",
+    "none": "Everything matches the catalog.",
+    "selectAll": "Select all",
+    "apply": "Apply",
+    "effect": "Effect on the grand total: {{amount}}",
+    "totals": "Grand total {{before}} → {{after}} if everything is updated",
+    "notApplicable": "Deleted from the catalog: stays as quoted",
+    "unavailable": "Unavailable in the catalog",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "applied": "{{count}} items updated.",
+    "fields": {
+      "unitPrice": "Price",
+      "productName": "Product name",
+      "variantName": "Variant name",
+      "modelNumber": "Model number",
+      "sku": "SKU",
+      "image": "Image",
+      "requiredAddons": "Required add-ons"
+    },
+    "noImage": "No image",
+    "noAddons": "None"
+  }
+}
