@@ -40,27 +40,30 @@ test('connections: checks, auto-connect, a hand move, a bus line near its limit,
   await expect(zones).toContainText('All covered')
   await expect(unconnected.getByText('Every need is connected.')).toBeVisible()
 
-  // A hand move in the board editor (a second tab, so the undo notice stays here): the living room's blind
-  // moves from J1 channel 1 to channel 2.
+  // A hand move in the board editor (a second tab, so the undo notice stays here). Auto-connect gave the
+  // kitchen's windows the native blind outputs of J1 and the living room's door a relay pair of Q1 (D409); the
+  // door moves from Q1's blind output 1 (relays 1–2) to blind output 2 (relays 3–4).
   const editor = await page.context().newPage()
   await editor.setViewportSize({ width: 1400, height: 900 })
   await editor.goto(`/projects/${s.project.id}/versions/${s.versionId}/boards/${s.board.id}`)
-  await editor.getByRole('button', { name: new RegExp(`^${s.blindAct.name}, J1, 4 TE`) }).click()
-  // The module badge counts used channels.
-  await expect(editor.getByRole('button', { name: new RegExp(`^${s.blindAct.name}, J1, 4 TE, 1 of 2 channels used`) })).toBeVisible()
+  await expect(editor.getByRole('button', { name: new RegExp(`^${s.blindAct.name}, J1, 4 TE, 2 of 2 channels used`) })).toBeVisible()
+  await editor.getByRole('button', { name: new RegExp(`^${s.relay.name}, Q1, 4 TE`) }).click()
+  // The module badge counts used channels: the pair's blind output and its two relays.
+  const q1 = new RegExp(`^${s.relay.name}, Q1, 4 TE, 3 of 6 channels used`)
+  await expect(editor.getByRole('button', { name: q1 })).toBeVisible()
   const channels = editor.getByRole('region', { name: 'Channels' })
   const door = `1 × ${s.blindName} · Door`
   const disconnect = channels.getByRole('button', { name: `Disconnect ${door}` })
   await expect(disconnect).toBeVisible()
   await disconnect.click()
   await expect(disconnect).toHaveCount(0)
-  const second = channels.getByRole('button', { name: /^Connect a need to .* 2$/ })
+  const second = channels.getByRole('button', { name: /^Connect a need to Blind output .* 2$/ })
   await second.click()
   const picker = editor.getByRole('dialog', { name: /^Connect a need to / })
   await picker.getByRole('button', { name: `Connect to ${door} — Ground floor · Living room` }).click()
   await expect(picker).toBeHidden()
   await expect(disconnect).toHaveCount(1)
-  await expect(editor.getByRole('button', { name: new RegExp(`^${s.blindAct.name}, J1, 4 TE, 1 of 2 channels used`) })).toBeVisible()
+  await expect(editor.getByRole('button', { name: q1 })).toBeVisible()
 
   // The catalog raises the dimmer's bus current: the line is near its limit (130 of 160 mA > 80 %).
   const product = (await (await api.ctx.get(`/api/products/${s.dimmer.id}`)).json()) as { attributes: Record<string, unknown> }
