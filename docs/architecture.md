@@ -106,6 +106,12 @@ The catalog has two independent axes (D99, replacing D14): the **product type** 
 - **Version copy** copies snapshots, manual lines and pricing (copier registered with `projects.Service.OnCopyVersion`).
 - **API**: `GET /api/versions/{versionId}/bom`, `GET/PUT …/pricing`, `POST …/pricing/preview`, `GET/POST …/manual-lines`, `PUT/DELETE …/manual-lines/{id}`, `PUT …/manual-lines/order`, `GET …/catalog-changes`, `POST …/catalog-changes/apply`.
 
+## Proposals
+
+A proposal is a document generated from one version (step 2d, `features/proposals`). The service reads everything through the other features' services — the version and project (`projects`), the BOM with its totals and the split per product type (`bom`, money rules in `platform/money`: `Split`, `Allocate`), the plans with zones, placements and image bytes (`plans.DocumentPlans`), the snapshots of placed variants (`bom.Snapshots`), the tenant's letterhead (`tenants`) and files (`files`) — and builds the format-neutral `platform/document` model in the project's language (en/de message catalog in the feature). Plan pages are drawn by `platform/planimage`. An exporter from the `document.Registry` renders the model (DOCX: `platform/document/docx`, OOXML written directly). The file is stored in the tenant's scope; the immutable `proposals` row (RLS) keeps number, language, product type, file and totals snapshot.
+
+Generation holds no transaction while it renders: the sequence is reserved in a short transaction (`proposal_counters`), the rows are written in a final one. Endpoints: `GET /api/exporters`, `GET|POST /api/versions/{versionId}/proposals`, `POST …/proposals/preview`, `GET /api/proposals/{id}/file`, `DELETE /api/proposals/{id}`; letterhead: `GET|PUT /api/tenants/{id}/letterhead`, `POST /api/tenants/{id}/logo` (`tenants.profile`). Decisions D253–D262.
+
 ## Extension points
 
 | Extension | Contract |
