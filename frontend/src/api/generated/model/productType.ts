@@ -12,10 +12,14 @@ export interface ProductType {
   readonly $schema?: string;
   /** Badge text, upper case, at most 6 characters */
   abbreviation?: string;
+  /** Default maximum devices per bus line; empty = not checked */
+  busDevicesMax?: number;
   can: Actions;
   /** Badge colour, #rrggbb */
   color?: string;
   createdAt: string;
+  /** Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown */
+  defaultBusCurrentMa?: number;
   id: string;
   /** Inactive types are hidden from lists unless asked for */
   isActive: boolean;
@@ -23,6 +27,8 @@ export interface ProductType {
   key: string;
   /** Display name per locale */
   name: ProductTypeName;
+  /** Capacity kept in reserve: amber above 100 − reserve %, red when exceeded */
+  reservePercent: number;
   /** Position in the catalog, 1 first */
   sortOrder: number;
   /** Send it back as expectedUpdatedAt when updating */

@@ -9,10 +9,14 @@ import type { FunctionTypeName } from './functionTypeName';
 export interface FunctionType {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Several needs of this function may share one channel (a circuit) */
+  allowsCircuit: boolean;
   createdAt: string;
   id: string;
   /** Stable identifier, lower snake case */
   key: string;
+  /** The load types a need of this function may have; empty = any */
+  loadTypeIds: string[];
   /** Display name per locale */
   name: FunctionTypeName;
   updatedAt: string;

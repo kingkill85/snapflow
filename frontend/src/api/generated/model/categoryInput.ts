@@ -6,6 +6,7 @@
  */
 import type { AttributeDefinition } from './attributeDefinition';
 import type { CategoryInputDescription } from './categoryInputDescription';
+import type { CategoryInputMounting } from './categoryInputMounting';
 import type { CategoryInputName } from './categoryInputName';
 import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
 
@@ -21,6 +22,8 @@ export interface CategoryInput {
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;
+  /** Default floorplan */
+  mounting?: CategoryInputMounting;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: CategoryInputName;
 }

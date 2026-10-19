@@ -15,6 +15,8 @@ const dimmer: FunctionType = {
   id: '6f1c2b8e-0000-4000-8000-000000000001',
   key: 'dimmer',
   name: { en: 'Dimmer', de: 'Dimmer' },
+  allowsCircuit: false,
+  loadTypeIds: [],
   createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-18T10:00:00Z',
 }

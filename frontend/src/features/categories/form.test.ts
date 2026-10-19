@@ -7,6 +7,7 @@ import { toFormValues, toInput } from './form'
 const category: Category = {
   id: 'c1',
   key: 'dimmers',
+  mounting: 'floorplan',
   name: { en: 'Dimmers' },
   isActive: true,
   sortOrder: 1,

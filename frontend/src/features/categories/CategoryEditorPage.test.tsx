@@ -26,6 +26,7 @@ const routes = [
 const existing: Category = {
   id: '6f1c2b8e-0000-4000-8000-000000000001',
   key: 'dimmer_actuator',
+  mounting: 'floorplan',
   name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
   description: { en: 'DIN rail dimmer' },
   sortOrder: 1,

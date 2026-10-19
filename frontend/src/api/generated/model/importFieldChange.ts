@@ -8,6 +8,6 @@
 export interface ImportFieldChange {
   after?: unknown;
   before?: unknown;
-  /** modelNumber, productType, category, name.<locale>, description.<locale>, attributes.<key>, isActive, sku, price, image, addons */
+  /** modelNumber, productType, category, name.<locale>, description.<locale>, attributes.<key>, mounting, isActive, sku, price, image, addons */
   field: string;
 }

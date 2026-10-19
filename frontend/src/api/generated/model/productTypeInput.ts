@@ -11,11 +11,17 @@ export interface ProductTypeInput {
   readonly $schema?: string;
   /** Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none */
   abbreviation?: string;
+  /** 1-100000; leave out for none */
+  busDevicesMax?: number;
   /** Badge colour, #rrggbb (stored lower case); empty for none */
   color?: string;
+  /** 1-100000 mA; leave out for none */
+  defaultBusCurrentMa?: number;
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: ProductTypeInputName;
+  /** 0-90; default 20 */
+  reservePercent?: number;
 }

@@ -20,6 +20,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   key: 'zigbee',
   name: { en: 'Zigbee', de: 'Zigbee' },
   sortOrder: 1,
+  reservePercent: 20,
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',

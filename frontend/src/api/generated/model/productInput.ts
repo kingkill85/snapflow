@@ -6,6 +6,7 @@
  */
 import type { ProductInputAttributes } from './productInputAttributes';
 import type { ProductInputDescription } from './productInputDescription';
+import type { ProductInputMounting } from './productInputMounting';
 import type { ProductInputName } from './productInputName';
 
 export interface ProductInput {
@@ -20,6 +21,8 @@ export interface ProductInput {
   isActive: boolean;
   /** Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   modelNumber: string;
+  /** Override of the category's mounting; leave out for the category's */
+  mounting?: ProductInputMounting;
   /** At most 200 characters; "en" is required */
   name: ProductInputName;
   /** The system or product line; must be active (product.type_inactive), except the type the product already has */

@@ -186,6 +186,11 @@
             "description": "Help text per locale; if set, \"en\" is required",
             "type": "object"
           },
+          "fieldKey": {
+            "description": "Key of the catalog field the attribute is linked to (type, unit, options and meaning come from it); empty for none",
+            "maxLength": 64,
+            "type": "string"
+          },
           "itemType": {
             "description": "Type of a list's items",
             "enum": [
@@ -636,6 +641,84 @@
         ],
         "type": "object"
       },
+      "Capabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "busCurrentSuppliedMa": {
+            "format": "double",
+            "type": "number"
+          },
+          "busCurrentUsedMa": {
+            "format": "double",
+            "type": "number"
+          },
+          "busDevicesMax": {
+            "format": "double",
+            "type": "number"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelCapability"
+            },
+            "type": "array"
+          },
+          "enclosureRows": {
+            "format": "double",
+            "type": "number"
+          },
+          "enclosureTePerRow": {
+            "format": "double",
+            "type": "number"
+          },
+          "moduleTotalA": {
+            "description": "Limit for the whole module (A)",
+            "format": "double",
+            "type": "number"
+          },
+          "moduleTotalW": {
+            "description": "Limit for the whole module (W)",
+            "format": "double",
+            "type": "number"
+          },
+          "motorType": {
+            "description": "Motor type of blind outputs",
+            "enum": [
+              "ac",
+              "dc"
+            ],
+            "type": "string"
+          },
+          "mounting": {
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
+            ],
+            "type": "string"
+          },
+          "railWidthTe": {
+            "description": "Width on the DIN rail in TE (17.5 mm), decimal",
+            "format": "double",
+            "type": "number"
+          },
+          "wirelessPlacesSupplied": {
+            "format": "double",
+            "type": "number"
+          },
+          "wirelessPlacesUsed": {
+            "format": "double",
+            "type": "number"
+          },
+          "zigbeeRouter": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mounting",
+          "channels"
+        ],
+        "type": "object"
+      },
       "CatalogChange": {
         "additionalProperties": false,
         "properties": {
@@ -730,6 +813,357 @@
         ],
         "type": "object"
       },
+      "CatalogField": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CatalogField.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "etimFeature": {
+            "description": "ETIM feature code, informational",
+            "examples": [
+              "EF000008"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "examples": [
+              "dimmer_outputs"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "loadTypeId": {
+            "description": "Parameter of channel_limit_w",
+            "type": "string"
+          },
+          "meaning": {
+            "description": "What the value means for the checks; empty = just information",
+            "enum": [
+              "channels_supplied",
+              "channel_limit_w",
+              "channel_limit_a",
+              "channel_min_load_w",
+              "module_total_a",
+              "module_total_w",
+              "bus_current_used_ma",
+              "bus_current_supplied_ma",
+              "bus_devices_max",
+              "rail_width_te",
+              "enclosure_rows",
+              "enclosure_te_per_row",
+              "wireless_places_supplied",
+              "wireless_place_used",
+              "zigbee_router",
+              "motor_type"
+            ],
+            "type": "string"
+          },
+          "options": {
+            "description": "Allowed values of an enum field",
+            "items": {
+              "$ref": "#/components/schemas/AttributeOption"
+            },
+            "type": "array"
+          },
+          "outputKindId": {
+            "description": "Parameter of the channel meanings",
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "The meaning applies only to products of these product types; empty = all",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "boolean",
+              "enum"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "examples": [
+              "W"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "label",
+          "type",
+          "options",
+          "productTypeIds",
+          "sortOrder",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "CatalogFieldInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CatalogFieldInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "etimFeature": {
+            "description": "ETIM feature code, e.g. EF000008",
+            "maxLength": 20,
+            "type": "string"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "dimmer_outputs"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          },
+          "loadTypeId": {
+            "description": "Required by channel_limit_w, else not allowed",
+            "type": "string"
+          },
+          "meaning": {
+            "description": "Leave out for just information",
+            "enum": [
+              "channels_supplied",
+              "channel_limit_w",
+              "channel_limit_a",
+              "channel_min_load_w",
+              "module_total_a",
+              "module_total_w",
+              "bus_current_used_ma",
+              "bus_current_supplied_ma",
+              "bus_devices_max",
+              "rail_width_te",
+              "enclosure_rows",
+              "enclosure_te_per_row",
+              "wireless_places_supplied",
+              "wireless_place_used",
+              "zigbee_router",
+              "motor_type"
+            ],
+            "type": "string"
+          },
+          "options": {
+            "description": "Enum fields: the allowed values (at least one)",
+            "items": {
+              "$ref": "#/components/schemas/AttributeOption"
+            },
+            "type": "array"
+          },
+          "outputKindId": {
+            "description": "Required by the channel meanings, else not allowed",
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "Limit the meaning to these product types; empty = all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "boolean",
+              "enum"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "description": "Display only, at most 16 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "type"
+        ],
+        "type": "object"
+      },
+      "CatalogFieldList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CatalogFieldList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogField"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "CatalogFieldUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CatalogFieldUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "etimFeature": {
+            "description": "ETIM feature code, e.g. EF000008",
+            "maxLength": 20,
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if it changed since, the update fails with catalog_field.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "dimmer_outputs"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          },
+          "loadTypeId": {
+            "description": "Required by channel_limit_w, else not allowed",
+            "type": "string"
+          },
+          "meaning": {
+            "description": "Leave out for just information",
+            "enum": [
+              "channels_supplied",
+              "channel_limit_w",
+              "channel_limit_a",
+              "channel_min_load_w",
+              "module_total_a",
+              "module_total_w",
+              "bus_current_used_ma",
+              "bus_current_supplied_ma",
+              "bus_devices_max",
+              "rail_width_te",
+              "enclosure_rows",
+              "enclosure_te_per_row",
+              "wireless_places_supplied",
+              "wireless_place_used",
+              "zigbee_router",
+              "motor_type"
+            ],
+            "type": "string"
+          },
+          "options": {
+            "description": "Enum fields: the allowed values (at least one)",
+            "items": {
+              "$ref": "#/components/schemas/AttributeOption"
+            },
+            "type": "array"
+          },
+          "outputKindId": {
+            "description": "Required by the channel meanings, else not allowed",
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "Limit the meaning to these product types; empty = all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "integer",
+              "boolean",
+              "enum"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "description": "Display only, at most 16 characters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "label",
+          "type"
+        ],
+        "type": "object"
+      },
       "Category": {
         "additionalProperties": false,
         "properties": {
@@ -784,6 +1218,15 @@
             ],
             "type": "string"
           },
+          "mounting": {
+            "description": "Where products are placed: the floorplan, the distribution board, or both",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
+            ],
+            "type": "string"
+          },
           "name": {
             "additionalProperties": {
               "type": "string"
@@ -810,6 +1253,7 @@
           "isActive",
           "attributes",
           "instanceAttributes",
+          "mounting",
           "createdAt",
           "updatedAt",
           "can"
@@ -856,6 +1300,15 @@
             "description": "Lower snake case, 1-64 characters",
             "examples": [
               "dimmer_actuator"
+            ],
+            "type": "string"
+          },
+          "mounting": {
+            "description": "Default floorplan",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
             ],
             "type": "string"
           },
@@ -1001,6 +1454,15 @@
             ],
             "type": "string"
           },
+          "mounting": {
+            "description": "Default floorplan",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
+            ],
+            "type": "string"
+          },
           "name": {
             "additionalProperties": {
               "type": "string"
@@ -1064,6 +1526,81 @@
           "sku",
           "imageUrl",
           "requiredAddons"
+        ],
+        "type": "object"
+      },
+      "ChannelAlternative": {
+        "additionalProperties": false,
+        "properties": {
+          "max": {
+            "description": "How many of that kind these channels give at most",
+            "format": "int64",
+            "type": "integer"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "outputKindKey": {
+            "type": "string"
+          },
+          "per": {
+            "description": "Channels used for one",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "outputKindKey",
+          "per",
+          "max"
+        ],
+        "type": "object"
+      },
+      "ChannelCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "alternatives": {
+            "description": "Other kinds these channels can act as, per group of channels",
+            "items": {
+              "$ref": "#/components/schemas/ChannelAlternative"
+            },
+            "type": "array"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "limitA": {
+            "description": "Max A per channel",
+            "format": "double",
+            "type": "number"
+          },
+          "limitsW": {
+            "description": "Max W per channel by load type",
+            "items": {
+              "$ref": "#/components/schemas/LoadLimit"
+            },
+            "type": "array"
+          },
+          "minLoadW": {
+            "description": "Minimum load per channel (W)",
+            "format": "double",
+            "type": "number"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "outputKindKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "outputKindKey",
+          "count",
+          "limitsW",
+          "alternatives"
         ],
         "type": "object"
       },
@@ -1411,6 +1948,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "allowsCircuit": {
+            "description": "Several needs of this function may share one channel (a circuit)",
+            "type": "boolean"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1424,6 +1965,13 @@
               "dimmer"
             ],
             "type": "string"
+          },
+          "loadTypeIds": {
+            "description": "The load types a need of this function may have; empty = any",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "name": {
             "additionalProperties": {
@@ -1441,6 +1989,8 @@
           "id",
           "key",
           "name",
+          "allowsCircuit",
+          "loadTypeIds",
           "createdAt",
           "updatedAt"
         ],
@@ -1458,6 +2008,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "allowsCircuit": {
+            "description": "Several needs may share one channel (default false)",
+            "type": "boolean"
+          },
           "key": {
             "examples": [
               "dimmer"
@@ -1465,6 +2019,14 @@
             "maxLength": 64,
             "minLength": 1,
             "type": "string"
+          },
+          "loadTypeIds": {
+            "description": "Allowed load types (existing ones, each once); empty = any",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
           },
           "name": {
             "additionalProperties": {
@@ -1769,6 +2331,164 @@
         ],
         "type": "object"
       },
+      "ImportColumn": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "description": "Header text",
+            "type": "string"
+          },
+          "columnLetter": {
+            "type": "string"
+          },
+          "field": {
+            "$ref": "#/components/schemas/CatalogField",
+            "description": "The catalog field (status field)"
+          },
+          "fieldIndex": {
+            "description": "Index in mapping.fields",
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "description": "The attribute key",
+            "examples": [
+              "dimmer_outputs"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "field",
+              "information",
+              "category",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "examples": [
+              "attribute.dimmer_outputs"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "fieldIndex",
+          "target",
+          "key",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ImportColumnAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/CatalogFieldInput",
+            "description": "Create this catalog field and link the column to it"
+          },
+          "information": {
+            "description": "Just information: no catalog field",
+            "type": "boolean"
+          },
+          "target": {
+            "description": "The attribute target of the column, e.g. attribute.dimmer_outputs",
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "ImportColumnAnswers": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportColumnAnswers.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ImportColumnAnswer"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          }
+        },
+        "required": [
+          "mapping",
+          "answers"
+        ],
+        "type": "object"
+      },
+      "ImportColumns": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportColumns.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "columns": {
+            "description": "Every attribute column, in mapping order",
+            "items": {
+              "$ref": "#/components/schemas/ImportColumn"
+            },
+            "type": "array"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping",
+            "description": "The mapping with fieldKey set on the columns that match a catalog field; save it in the profile to keep the links"
+          },
+          "unknown": {
+            "description": "Columns that must be answered before the preview",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mapping",
+          "columns",
+          "unknown"
+        ],
+        "type": "object"
+      },
+      "ImportColumnsInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ImportColumnsInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/ImportMapping"
+          }
+        },
+        "required": [
+          "mapping"
+        ],
+        "type": "object"
+      },
       "ImportCounter": {
         "additionalProperties": false,
         "properties": {
@@ -1868,8 +2588,17 @@
             "maxLength": 3,
             "type": "string"
           },
+          "fieldKey": {
+            "description": "attribute.\u003ckey\u003e targets: the catalog field the column is (filled in by the column check; kept by profiles)",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "information": {
+            "description": "attribute.\u003ckey\u003e targets: the column was answered as just information",
+            "type": "boolean"
+          },
           "target": {
-            "description": "product.modelNumber, product.name.\u003clocale\u003e, product.description.\u003clocale\u003e, product.productType, product.category, variant.name.\u003clocale\u003e, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.\u003ckey\u003e (see GET /api/import-targets)",
+            "description": "product.modelNumber, product.name.\u003clocale\u003e, product.description.\u003clocale\u003e, product.productType, product.category, product.mounting, variant.name.\u003clocale\u003e, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.\u003ckey\u003e (see GET /api/import-targets)",
             "maxLength": 100,
             "type": "string"
           },
@@ -1890,7 +2619,7 @@
           "after": {},
           "before": {},
           "field": {
-            "description": "modelNumber, productType, category, name.\u003clocale\u003e, description.\u003clocale\u003e, attributes.\u003ckey\u003e, isActive, sku, price, image, addons",
+            "description": "modelNumber, productType, category, name.\u003clocale\u003e, description.\u003clocale\u003e, attributes.\u003ckey\u003e, mounting, isActive, sku, price, image, addons",
             "type": "string"
           }
         },
@@ -2695,6 +3424,11 @@
             "description": "Help text per locale; if set, \"en\" is required",
             "type": "object"
           },
+          "fieldKey": {
+            "description": "Key of the catalog field the attribute is linked to (type, unit, options and meaning come from it); empty for none",
+            "maxLength": 64,
+            "type": "string"
+          },
           "itemType": {
             "description": "Type of a list's items",
             "enum": [
@@ -2950,6 +3684,190 @@
         ],
         "type": "object"
       },
+      "LoadLimit": {
+        "additionalProperties": false,
+        "properties": {
+          "loadTypeId": {
+            "type": "string"
+          },
+          "loadTypeKey": {
+            "type": "string"
+          },
+          "maxW": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "loadTypeId",
+          "loadTypeKey",
+          "maxW"
+        ],
+        "type": "object"
+      },
+      "LoadType": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/LoadType.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "examples": [
+              "led"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "sortOrder",
+          "isActive",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "LoadTypeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/LoadTypeInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "led"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "LoadTypeList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/LoadTypeList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LoadType"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "LoadTypeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/LoadTypeUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if it changed since, the update fails with load_type.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "led"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
       "LoginInput": {
         "additionalProperties": false,
         "properties": {
@@ -3195,6 +4113,60 @@
           "tenantName",
           "permissions",
           "assignableRoles"
+        ],
+        "type": "object"
+      },
+      "MeaningList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/MeaningList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MeaningSpec"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "MeaningSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "loadType": {
+            "description": "Needs a load type (loadTypeId)",
+            "type": "boolean"
+          },
+          "meaning": {
+            "type": "string"
+          },
+          "outputKind": {
+            "description": "Needs an output kind (outputKindId)",
+            "type": "boolean"
+          },
+          "types": {
+            "description": "Value types a field with this meaning may have",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "meaning",
+          "outputKind",
+          "loadType",
+          "types"
         ],
         "type": "object"
       },
@@ -3486,6 +4458,32 @@
           "null"
         ]
       },
+      "Order": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Order.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every id, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
       "OrderInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3508,6 +4506,225 @@
         },
         "required": [
           "ids"
+        ],
+        "type": "object"
+      },
+      "OutputKind": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/OutputKind.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "alternative": {
+            "$ref": "#/components/schemas/OutputKindAlternative",
+            "description": "N channels of another kind act as one of this kind (e.g. 2 relay outputs = 1 blind output)"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "functionTypeIds": {
+            "description": "The function types a channel of this kind serves",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "examples": [
+              "blind_output"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "sortOrder",
+          "isActive",
+          "functionTypeIds",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "OutputKindAlternative": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "How many channels of that kind make one of this kind",
+            "format": "int32",
+            "maximum": 16,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "outputKindId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "count"
+        ],
+        "type": "object"
+      },
+      "OutputKindInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/OutputKindInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "alternative": {
+            "$ref": "#/components/schemas/OutputKindAlternative",
+            "description": "Leave out for none"
+          },
+          "functionTypeIds": {
+            "description": "Function types it serves (existing ones, each once)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "blind_output"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "OutputKindList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/OutputKindList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OutputKind"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "OutputKindUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/OutputKindUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "alternative": {
+            "$ref": "#/components/schemas/OutputKindAlternative",
+            "description": "Leave out for none"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if it changed since, the update fails with output_kind.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "functionTypeIds": {
+            "description": "Function types it serves (existing ones, each once)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "blind_output"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "name",
+          "isActive"
         ],
         "type": "object"
       },
@@ -4387,6 +5604,10 @@
           "can": {
             "$ref": "#/components/schemas/Actions"
           },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities",
+            "description": "What SnapFlow knows about the product for the board checks, from its values and the linked fields' meanings"
+          },
           "category": {
             "$ref": "#/components/schemas/CategoryRef"
           },
@@ -4413,6 +5634,15 @@
           "modelNumber": {
             "examples": [
               "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "mounting": {
+            "description": "The product's own mounting; empty = the category's (capabilities.mounting is the effective one)",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
             ],
             "type": "string"
           },
@@ -4464,6 +5694,7 @@
           "attributeErrors",
           "isActive",
           "available",
+          "capabilities",
           "variants",
           "variantsWithProblems",
           "createdAt",
@@ -4507,6 +5738,15 @@
             "description": "Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "examples": [
               "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "mounting": {
+            "description": "Override of the category's mounting; leave out for the category's",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
             ],
             "type": "string"
           },
@@ -4668,6 +5908,11 @@
             ],
             "type": "string"
           },
+          "busDevicesMax": {
+            "description": "Default maximum devices per bus line; empty = not checked",
+            "format": "int32",
+            "type": "integer"
+          },
           "can": {
             "$ref": "#/components/schemas/Actions"
           },
@@ -4681,6 +5926,11 @@
           "createdAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "defaultBusCurrentMa": {
+            "description": "Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown",
+            "format": "int32",
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -4703,6 +5953,11 @@
             "description": "Display name per locale",
             "type": "object"
           },
+          "reservePercent": {
+            "description": "Capacity kept in reserve: amber above 100 − reserve %, red when exceeded",
+            "format": "int32",
+            "type": "integer"
+          },
           "sortOrder": {
             "description": "Position in the catalog, 1 first",
             "format": "int32",
@@ -4720,6 +5975,7 @@
           "name",
           "sortOrder",
           "isActive",
+          "reservePercent",
           "createdAt",
           "updatedAt",
           "can"
@@ -4745,12 +6001,22 @@
             ],
             "type": "string"
           },
+          "busDevicesMax": {
+            "description": "1-100000; leave out for none",
+            "format": "int32",
+            "type": "integer"
+          },
           "color": {
             "description": "Badge colour, #rrggbb (stored lower case); empty for none",
             "examples": [
               "#1f6feb"
             ],
             "type": "string"
+          },
+          "defaultBusCurrentMa": {
+            "description": "1-100000 mA; leave out for none",
+            "format": "int32",
+            "type": "integer"
           },
           "isActive": {
             "type": "boolean"
@@ -4768,6 +6034,11 @@
             },
             "description": "Display name per locale (at most 100 characters); \"en\" is required",
             "type": "object"
+          },
+          "reservePercent": {
+            "description": "0-90; default 20",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [
@@ -4881,12 +6152,22 @@
             ],
             "type": "string"
           },
+          "busDevicesMax": {
+            "description": "1-100000; leave out for none",
+            "format": "int32",
+            "type": "integer"
+          },
           "color": {
             "description": "Badge colour, #rrggbb (stored lower case); empty for none",
             "examples": [
               "#1f6feb"
             ],
             "type": "string"
+          },
+          "defaultBusCurrentMa": {
+            "description": "1-100000 mA; leave out for none",
+            "format": "int32",
+            "type": "integer"
           },
           "expectedUpdatedAt": {
             "description": "updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale",
@@ -4909,6 +6190,11 @@
             },
             "description": "Display name per locale (at most 100 characters); \"en\" is required",
             "type": "object"
+          },
+          "reservePercent": {
+            "description": "0-90; default 20",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [
@@ -4959,6 +6245,15 @@
             "description": "Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC",
             "examples": [
               "M485/GW-ZB.10"
+            ],
+            "type": "string"
+          },
+          "mounting": {
+            "description": "Override of the category's mounting; leave out for the category's",
+            "enum": [
+              "floorplan",
+              "board",
+              "both"
             ],
             "type": "string"
           },
@@ -6202,6 +7497,10 @@
           "can": {
             "$ref": "#/components/schemas/Actions"
           },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities",
+            "description": "As on the product, with the variant's own values"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -6264,6 +7563,7 @@
           "isActive",
           "available",
           "addons",
+          "capabilities",
           "createdAt",
           "updatedAt",
           "can"
@@ -6732,6 +8032,289 @@
         "summary": "Change the logged-in user's password; ends their other sessions",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/catalog-field-meanings": {
+      "get": {
+        "description": "With their parameters (output kind, load type) and the value types each accepts.",
+        "operationId": "listCatalogFieldMeanings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeaningList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the meanings a catalog field can have",
+        "tags": [
+          "catalog-fields"
+        ]
+      }
+    },
+    "/api/catalog-fields": {
+      "get": {
+        "description": "In catalog order (sortOrder, then key).",
+        "operationId": "listCatalogFields",
+        "parameters": [
+          {
+            "description": "Also list inactive entries",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive entries",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogFieldList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List catalog fields",
+        "tags": [
+          "catalog-fields"
+        ]
+      },
+      "post": {
+        "operationId": "createCatalogField",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogFieldInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogField"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a catalog field",
+        "tags": [
+          "catalog-fields"
+        ]
+      }
+    },
+    "/api/catalog-fields/order": {
+      "put": {
+        "description": "ids must list every entry (active or not) exactly once.",
+        "operationId": "reorderCatalogFields",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogFieldList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of catalog fields",
+        "tags": [
+          "catalog-fields"
+        ]
+      }
+    },
+    "/api/catalog-fields/{id}": {
+      "delete": {
+        "operationId": "deleteCatalogField",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a catalog field",
+        "tags": [
+          "catalog-fields"
+        ]
+      },
+      "get": {
+        "operationId": "getCatalogField",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogField"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a catalog field",
+        "tags": [
+          "catalog-fields"
+        ]
+      },
+      "put": {
+        "description": "Fails with 409 \u003centity\u003e.stale if it changed since expectedUpdatedAt.",
+        "operationId": "updateCatalogField",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogFieldUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogField"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a catalog field",
+        "tags": [
+          "catalog-fields"
         ]
       }
     },
@@ -7443,6 +9026,90 @@
         "summary": "Liveness and database check",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/import-columns": {
+      "post": {
+        "description": "D188: every attribute.\u003ckey\u003e column is matched with the catalog fields (a link kept in fieldKey, else the key and the header text against field keys and labels, ignoring case, spacing and punctuation). Returns the mapping with the matches linked and each column's status; unknown columns block the preview (import.columns_unknown) until answered (POST /api/import-columns/answers).",
+        "operationId": "checkImportColumns",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportColumnsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportColumns"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Check a mapping's attribute columns against the catalog fields",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import-columns/answers": {
+      "post": {
+        "description": "Each answer creates a catalog field (all in one transaction; errors at body.answers[i].field.*) and links the column to it, or marks the column as just information. Returns the column check of the answered mapping: preview with that mapping, and save it in the profile to keep the answers.",
+        "operationId": "answerImportColumns",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportColumnAnswers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportColumns"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Answer what unknown columns mean",
+        "tags": [
+          "imports"
         ]
       }
     },
@@ -8420,6 +10087,508 @@
         "summary": "Undo an applied import",
         "tags": [
           "imports"
+        ]
+      }
+    },
+    "/api/load-types": {
+      "get": {
+        "description": "In catalog order (sortOrder, then key).",
+        "operationId": "listLoadTypes",
+        "parameters": [
+          {
+            "description": "Also list inactive entries",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive entries",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadTypeList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List load types",
+        "tags": [
+          "load-types"
+        ]
+      },
+      "post": {
+        "operationId": "createLoadType",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadTypeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadType"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a load type",
+        "tags": [
+          "load-types"
+        ]
+      }
+    },
+    "/api/load-types/order": {
+      "put": {
+        "description": "ids must list every entry (active or not) exactly once.",
+        "operationId": "reorderLoadTypes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadTypeList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of load types",
+        "tags": [
+          "load-types"
+        ]
+      }
+    },
+    "/api/load-types/{id}": {
+      "delete": {
+        "operationId": "deleteLoadType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a load type",
+        "tags": [
+          "load-types"
+        ]
+      },
+      "get": {
+        "operationId": "getLoadType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadType"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a load type",
+        "tags": [
+          "load-types"
+        ]
+      },
+      "put": {
+        "description": "Fails with 409 \u003centity\u003e.stale if it changed since expectedUpdatedAt.",
+        "operationId": "updateLoadType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadTypeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadType"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a load type",
+        "tags": [
+          "load-types"
+        ]
+      }
+    },
+    "/api/output-kinds": {
+      "get": {
+        "description": "In catalog order (sortOrder, then key).",
+        "operationId": "listOutputKinds",
+        "parameters": [
+          {
+            "description": "Also list inactive entries",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive entries",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputKindList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List output kinds",
+        "tags": [
+          "output-kinds"
+        ]
+      },
+      "post": {
+        "operationId": "createOutputKind",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutputKindInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputKind"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a output kind",
+        "tags": [
+          "output-kinds"
+        ]
+      }
+    },
+    "/api/output-kinds/order": {
+      "put": {
+        "description": "ids must list every entry (active or not) exactly once.",
+        "operationId": "reorderOutputKinds",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputKindList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of output kinds",
+        "tags": [
+          "output-kinds"
+        ]
+      }
+    },
+    "/api/output-kinds/{id}": {
+      "delete": {
+        "operationId": "deleteOutputKind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a output kind",
+        "tags": [
+          "output-kinds"
+        ]
+      },
+      "get": {
+        "operationId": "getOutputKind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputKind"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a output kind",
+        "tags": [
+          "output-kinds"
+        ]
+      },
+      "put": {
+        "description": "Fails with 409 \u003centity\u003e.stale if it changed since expectedUpdatedAt.",
+        "operationId": "updateOutputKind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutputKindUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputKind"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a output kind",
+        "tags": [
+          "output-kinds"
         ]
       }
     },
