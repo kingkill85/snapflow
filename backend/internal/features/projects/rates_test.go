@@ -62,7 +62,7 @@ func TestRefreshAndSetRate(t *testing.T) {
 		t.Fatalf("refresh: %+v", r)
 	}
 
-	resp = api.Put(base, api.Admin.Cookie, map[string]any{"rate": "0.95"})
+	resp = api.Put(base, api.Admin.Cookie, map[string]any{"rate": "0.95", "currency": "EUR"})
 	wantCode(t, resp, http.StatusOK, "")
 	m := decode[projects.Project](t, resp)
 	if deref(m.ExchangeRate) != "0.95" || m.ExchangeRateSource != projects.RateSourceManual || m.ExchangeRateStale {
@@ -86,14 +86,14 @@ func TestRefreshAndSetRate(t *testing.T) {
 	// only if the clock says so; stale is computed against the server's
 	// clock, so it is not asserted here.
 
-	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "0"}), http.StatusUnprocessableEntity, "project.exchange_rate")
+	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "0", "currency": "EUR"}), http.StatusUnprocessableEntity, "project.exchange_rate")
 	usd := create(t, api, api.Admin.Cookie, map[string]any{"name": "USD"})
 	wantCode(t, api.Post("/api/projects/"+usd.ID.String()+"/exchange-rate/refresh", api.Admin.Cookie, map[string]any{}), http.StatusConflict, "project.exchange_rate_usd")
 
 	// Another tenant's user does not see the project.
 	other := api.NewUser(api.NewTenant("Other"), auth.RoleTenantAdmin)
 	wantCode(t, api.Post(base+"/refresh", other.Cookie, map[string]any{}), http.StatusNotFound, "")
-	wantCode(t, api.Put(base, other.Cookie, map[string]any{"rate": "1.2"}), http.StatusNotFound, "")
+	wantCode(t, api.Put(base, other.Cookie, map[string]any{"rate": "1.2", "currency": "EUR"}), http.StatusNotFound, "")
 
 	// Provider down, cache still fresh: works; read-only projects refuse.
 	fail.Store(true)
@@ -103,7 +103,7 @@ func TestRefreshAndSetRate(t *testing.T) {
 	body["status"] = "completed"
 	wantCode(t, api.Put("/api/projects/"+p.ID.String(), api.Admin.Cookie, body), http.StatusOK, "")
 	wantCode(t, api.Post(base+"/refresh", api.Admin.Cookie, map[string]any{}), http.StatusConflict, "project.read_only")
-	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "1.2"}), http.StatusConflict, "project.read_only")
+	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "1.2", "currency": "EUR"}), http.StatusConflict, "project.read_only")
 }
 
 func TestUnavailable(t *testing.T) {
@@ -125,10 +125,12 @@ func TestCurrenciesAndRate(t *testing.T) {
 	api, _ := ratesAPI(t)
 	create(t, api, api.Admin.Cookie, map[string]any{"name": "A", "currency": "PKR"})
 	create(t, api, api.Admin.Cookie, map[string]any{"name": "B", "currency": "EUR", "exchangeRate": "0.9"})
+	// The list asks the cache only; a rate lookup fills it.
+	wantCode(t, api.Get("/api/exchange-rates/EUR", api.Admin.Cookie), http.StatusOK, "")
 	resp := api.Get("/api/currencies", api.Admin.Cookie)
 	wantCode(t, resp, http.StatusOK, "")
 	l := decode[projects.CurrencyList](t, resp)
-	if !slices.Equal(l.Recent, []string{"EUR", "PKR"}) {
+	if !l.OnlineKnown || !slices.Equal(l.Recent, []string{"EUR", "PKR"}) {
 		t.Fatalf("recent: %v", l.Recent)
 	}
 	byCode := map[string]projects.Currency{}
@@ -144,6 +146,16 @@ func TestCurrenciesAndRate(t *testing.T) {
 	if l := decode[projects.CurrencyList](t, resp); len(l.Recent) != 0 {
 		t.Fatalf("other tenant's recent: %v", l.Recent)
 	}
+	// The admin asks for the recent currencies of the project's tenant;
+	// a user of another tenant gets none of a tenant they do not see.
+	resp = api.Get("/api/currencies?tenantId="+other.TenantID.String(), api.Admin.Cookie)
+	if l := decode[projects.CurrencyList](t, resp); len(l.Recent) != 0 {
+		t.Fatalf("other tenant via admin: %v", l.Recent)
+	}
+	resp = api.Get("/api/currencies?tenantId="+api.Admin.TenantID.String(), other.Cookie)
+	if l := decode[projects.CurrencyList](t, resp); len(l.Recent) != 0 {
+		t.Fatalf("unseen tenant: %v", l.Recent)
+	}
 
 	resp = api.Get("/api/exchange-rates/EUR", api.Admin.Cookie)
 	wantCode(t, resp, http.StatusOK, "")
@@ -153,4 +165,63 @@ func TestCurrenciesAndRate(t *testing.T) {
 	wantCode(t, api.Get("/api/exchange-rates/XYZ", api.Admin.Cookie), http.StatusNotFound, "project.currency_unknown")
 	wantCode(t, api.Get("/api/exchange-rates/CHF", api.Admin.Cookie), http.StatusNotFound, "exchange_rate.unknown_currency")
 	wantCode(t, api.Get("/api/exchange-rates/EUR"), http.StatusUnauthorized, "")
+}
+
+func TestSetRateStaleCurrency(t *testing.T) {
+	api, _ := ratesAPI(t)
+	p := create(t, api, api.Admin.Cookie, map[string]any{"name": "House", "currency": "EUR"})
+	base := "/api/projects/" + p.ID.String() + "/exchange-rate"
+	// The client saw PKR (another tab changed the currency meanwhile).
+	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "280", "currency": "PKR"}), http.StatusConflict, "project.stale")
+	wantCode(t, api.Post(base+"/refresh", api.Admin.Cookie, map[string]any{"currency": "PKR"}), http.StatusConflict, "project.stale")
+	wantCode(t, api.Put(base, api.Admin.Cookie, map[string]any{"rate": "0.95"}), http.StatusUnprocessableEntity, "")
+	wantCode(t, api.Post(base+"/refresh", api.Admin.Cookie, map[string]any{"currency": "EUR"}), http.StatusOK, "")
+	wantCode(t, api.Post(base+"/refresh", api.Admin.Cookie, map[string]any{}), http.StatusOK, "")
+}
+
+func TestUpdateRatePaths(t *testing.T) {
+	api, _ := ratesAPI(t)
+	p := create(t, api, api.Admin.Cookie, map[string]any{"name": "House", "currency": "EUR", "exchangeRate": "0.95"})
+	path := "/api/projects/" + p.ID.String()
+	put := func(change func(map[string]any)) *httptest.ResponseRecorder {
+		body := updateBody(get(t, api, api.Admin.Cookie, p.ID))
+		change(body)
+		return api.Put(path, api.Admin.Cookie, body)
+	}
+
+	// A new currency without a rate: none.
+	resp := put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "PKR", "" })
+	wantCode(t, resp, http.StatusOK, "")
+	if u := decode[projects.Project](t, resp); u.ExchangeRate != nil || u.ExchangeRateSource != projects.RateSourceNone {
+		t.Fatalf("currency change without rate: %+v", u)
+	}
+	// Online with a currency the provider does not have.
+	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"], b["exchangeRateSource"] = "CHF", "", "online" }),
+		http.StatusNotFound, "exchange_rate.unknown_currency")
+	wantCode(t, put(func(b map[string]any) { b["currency"] = "XYZ" }), http.StatusUnprocessableEntity, "project.currency_unknown")
+	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "USD", "1.1" }), http.StatusUnprocessableEntity, "project.exchange_rate")
+
+	// The same number sent as manual: a new date.
+	resp = put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "EUR", "0.95" })
+	wantCode(t, resp, http.StatusOK, "")
+	first := decode[projects.Project](t, resp)
+	resp = put(func(b map[string]any) { b["exchangeRate"], b["exchangeRateSource"] = "0.95", "manual" })
+	wantCode(t, resp, http.StatusOK, "")
+	if u := decode[projects.Project](t, resp); u.ExchangeRateSource != projects.RateSourceManual || !u.ExchangeRateDate.After(*first.ExchangeRateDate) {
+		t.Fatalf("manual again: %+v (was %v)", u, first.ExchangeRateDate)
+	}
+
+	// A rate typed for the old currency (EUR 0.95 sent with PKR) is far
+	// off PKR's online rate: refused unless confirmed. Only the cache is
+	// asked, so fill it first.
+	wantCode(t, api.Get("/api/exchange-rates/PKR", api.Admin.Cookie), http.StatusOK, "")
+	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "PKR", "0.95" }),
+		http.StatusUnprocessableEntity, "project.exchange_rate_implausible")
+	resp = put(func(b map[string]any) { b["currency"], b["exchangeRate"], b["exchangeRateConfirmed"] = "PKR", "0.95", true })
+	wantCode(t, resp, http.StatusOK, "")
+	if u := decode[projects.Project](t, resp); deref(u.ExchangeRate) != "0.95" || u.ExchangeRateSource != projects.RateSourceManual {
+		t.Fatalf("confirmed: %+v", u)
+	}
+	// A plausible rate of a new currency needs no confirmation.
+	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "EUR", "0.93" }), http.StatusOK, "")
 }

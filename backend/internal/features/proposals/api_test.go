@@ -523,7 +523,7 @@ func TestRateMissing(t *testing.T) {
 		t.Fatalf("BOM without rate: %+v", b.Totals)
 	}
 	wantCode(t, generate(api, api.Admin.Cookie, v, map[string]any{"exporter": "docx"}), http.StatusConflict, "proposal.rate_missing")
-	wantCode(t, api.Put("/api/projects/"+pr.ID.String()+"/exchange-rate", api.Admin.Cookie, map[string]any{"rate": "0.9"}), http.StatusOK, "")
+	wantCode(t, api.Put("/api/projects/"+pr.ID.String()+"/exchange-rate", api.Admin.Cookie, map[string]any{"rate": "0.9", "currency": "EUR"}), http.StatusOK, "")
 	b = decode[bom.BOM](t, api.Get("/api/versions/"+v.String()+"/bom", api.Admin.Cookie))
 	if b.Totals.Converted == nil || b.Totals.Converted.GrandTotal != "90.00" || b.Totals.RateSource != "manual" {
 		t.Fatalf("BOM with rate: %+v", b.Totals)

@@ -179,6 +179,11 @@ func Register(api huma.API, svc *Service) {
 	registerRates(api, svc)
 }
 
+type refreshRateInput struct {
+	ID   uuid.UUID `path:"id" format:"uuid"`
+	Body *ExchangeRateRefresh `required:"false"`
+}
+
 type setRateInput struct {
 	ID   uuid.UUID `path:"id" format:"uuid"`
 	Body ExchangeRateSet
@@ -191,8 +196,14 @@ func registerRates(api huma.API, svc *Service) {
 		Path:        "/api/currencies",
 		Summary:     "List the currencies a project may use",
 		Tags:        []string{tag},
-	}, func(ctx context.Context, _ *struct{}) (*struct{ Body CurrencyList }, error) {
-		l, err := svc.Currencies(ctx)
+	}, func(ctx context.Context, in *struct {
+		TenantID uuid.UUID `query:"tenantId" format:"uuid" doc:"Whose recently used currencies to list (default: the caller's tenant)"`
+	}) (*struct{ Body CurrencyList }, error) {
+		var tenant *uuid.UUID
+		if in.TenantID != uuid.Nil {
+			tenant = &in.TenantID
+		}
+		l, err := svc.Currencies(ctx, tenant)
 		if err != nil {
 			return nil, err
 		}
@@ -223,8 +234,12 @@ func registerRates(api huma.API, svc *Service) {
 		Summary:     "Store the online provider's current rate in a project",
 		Description: "Non-USD, active projects only (409 project.exchange_rate_usd, project.read_only). The rate is marked online with the provider's date.",
 		Tags:        []string{tag},
-	}, func(ctx context.Context, in *idParam) (*projectOutput, error) {
-		p, err := svc.RefreshRate(ctx, in.ID)
+	}, func(ctx context.Context, in *refreshRateInput) (*projectOutput, error) {
+		var currency string
+		if in.Body != nil {
+			currency = in.Body.Currency
+		}
+		p, err := svc.RefreshRate(ctx, in.ID, currency)
 		if err != nil {
 			return nil, err
 		}

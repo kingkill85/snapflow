@@ -1115,8 +1115,12 @@
             },
             "type": "array"
           },
+          "onlineKnown": {
+            "description": "false while the provider's rates are not loaded (online is then false for all but USD; they are being fetched, ask again)",
+            "type": "boolean"
+          },
           "recent": {
-            "description": "Currencies other than USD of the caller's tenant's projects, most recently changed first (at most 5)",
+            "description": "Currencies other than USD of the tenant's projects (tenantId, else the caller's), most recently changed first (at most 5)",
             "items": {
               "type": "string"
             },
@@ -1125,7 +1129,8 @@
         },
         "required": [
           "items",
-          "recent"
+          "recent",
+          "onlineKnown"
         ],
         "type": "object"
       },
@@ -1221,6 +1226,25 @@
         ],
         "type": "object"
       },
+      "ExchangeRateRefresh": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ExchangeRateRefresh.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "description": "The project's currency as the client saw it: 409 project.stale when it changed meanwhile",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ExchangeRateSet": {
         "additionalProperties": false,
         "properties": {
@@ -1233,13 +1257,19 @@
             "readOnly": true,
             "type": "string"
           },
+          "currency": {
+            "description": "The project's currency as the client saw it: 409 project.stale when it changed meanwhile",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
           "rate": {
             "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0",
             "type": "string"
           }
         },
         "required": [
-          "rate"
+          "rate",
+          "currency"
         ],
         "type": "object"
       },
@@ -5195,6 +5225,10 @@
             "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet",
             "type": "string"
           },
+          "exchangeRateConfirmed": {
+            "description": "With a new currency, a manual exchangeRate more than 10 times off the cached online rate is refused (422 project.exchange_rate_implausible) unless this is true",
+            "type": "boolean"
+          },
           "exchangeRateSource": {
             "description": "online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above",
             "type": "string"
@@ -5427,6 +5461,10 @@
           "exchangeRate": {
             "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet",
             "type": "string"
+          },
+          "exchangeRateConfirmed": {
+            "description": "With a new currency, a manual exchangeRate more than 10 times off the cached online rate is refused (422 project.exchange_rate_implausible) unless this is true",
+            "type": "boolean"
           },
           "exchangeRateSource": {
             "description": "online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above",
@@ -6951,6 +6989,19 @@
     "/api/currencies": {
       "get": {
         "operationId": "listCurrencies",
+        "parameters": [
+          {
+            "description": "Whose recently used currencies to list (default: the caller's tenant)",
+            "explode": false,
+            "in": "query",
+            "name": "tenantId",
+            "schema": {
+              "description": "Whose recently used currencies to list (default: the caller's tenant)",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9899,6 +9950,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeRateRefresh"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

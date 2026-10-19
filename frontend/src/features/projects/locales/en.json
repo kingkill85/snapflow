@@ -101,6 +101,7 @@
     "originTyped": "entered manually",
     "originOnline": "online rate of {{date}}",
     "originManual": "entered manually on {{date}}",
-    "originNone": "no exchange rate yet"
+    "originNone": "no exchange rate yet",
+    "noOnline": "No online rate for {{currency}} – enter it by hand."
   }
 }

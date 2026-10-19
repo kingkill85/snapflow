@@ -101,6 +101,7 @@
     "originTyped": "manuell eingegeben",
     "originOnline": "Online-Kurs vom {{date}}",
     "originManual": "manuell eingegeben am {{date}}",
-    "originNone": "noch kein Wechselkurs"
+    "originNone": "noch kein Wechselkurs",
+    "noOnline": "Für {{currency}} gibt es keinen Online-Kurs – geben Sie ihn von Hand ein."
   }
 }

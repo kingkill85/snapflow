@@ -11,6 +11,8 @@ export interface CurrencyList {
   readonly $schema?: string;
   /** Sorted by code */
   items: Currency[];
-  /** Currencies other than USD of the caller's tenant's projects, most recently changed first (at most 5) */
+  /** false while the provider's rates are not loaded (online is then false for all but USD; they are being fetched, ask again) */
+  onlineKnown: boolean;
+  /** Currencies other than USD of the tenant's projects (tenantId, else the caller's), most recently changed first (at most 5) */
   recent: string[];
 }

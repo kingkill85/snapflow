@@ -54,7 +54,7 @@ export function RateBar({ project, versionId }: Props) {
   }
   const update = async () => {
     try {
-      await saved(await refresh.mutateAsync({ id: project.id }))
+      await saved(await refresh.mutateAsync({ id: project.id, data: { currency: project.currency } }))
     } catch {
       return // shown by ErrorMessage via refresh.error
     }
@@ -127,7 +127,7 @@ function SetRateDialog({ open, onOpenChange, project, onSaved }: { open: boolean
 
   const submit = form.handleSubmit(async (v) => {
     try {
-      const p = await set.mutateAsync({ id: project.id, data: { rate: parseDecimal(v.rate) ?? v.rate } })
+      const p = await set.mutateAsync({ id: project.id, data: { rate: parseDecimal(v.rate) ?? v.rate, currency: project.currency } })
       onOpenChange(false)
       await onSaved(p)
     } catch (error) {

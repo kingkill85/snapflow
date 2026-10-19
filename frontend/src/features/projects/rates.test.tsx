@@ -19,9 +19,10 @@ function serveDialog() {
   server.use(
     http.get('/api/product-types', () => HttpResponse.json({ items: productTypes })),
     http.get('/api/currencies', () => HttpResponse.json(currencies)),
+    http.get('/api/tenants', () => HttpResponse.json({ items: [] })),
     http.get('/api/exchange-rates/:currency', ({ params }) => {
       rateRequests.push(params.currency as string)
-      if (params.currency === 'CHF') return problem(503, { code: 'exchange_rate.unavailable' })
+      if (params.currency === 'JPY') return problem(503, { code: 'exchange_rate.unavailable' })
       return HttpResponse.json({ currency: params.currency, rate: params.currency === 'PKR' ? '278.5' : '0.9237', date: '2026-10-18T00:00:00Z', provider: 'open.er-api.com' })
     }),
   )
@@ -87,8 +88,89 @@ describe('ProjectFormDialog exchange rate', () => {
     expect(sent[0]).toMatchObject({ exchangeRate: '', exchangeRateSource: 'online' })
   })
 
-  it('edit: a new currency prefills its rate unless one was typed; failures are shown', async () => {
+  it('edit: a new currency always clears the rate and fetches its own; typed rates come back with their currency', async () => {
     const requests = serveDialog()
+    const user = userEvent.setup()
+    renderWithProviders(<ProjectFormDialog open onOpenChange={() => {}} item={villa} />)
+    const dialog = await screen.findByRole('dialog')
+    const currency = await within(dialog).findByRole('combobox', { name: /Currency/ })
+    await waitFor(() => expect(currency).toHaveValue('EUR – Euro'))
+    const rate = () => within(dialog).getByLabelText(/Exchange rate/)
+    // A rate typed for EUR does not survive the switch to PKR.
+    await user.clear(rate())
+    await user.type(rate(), '0,95')
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'PKR – Pakistani Rupee' }))
+    await waitFor(() => expect(rate()).toHaveValue('278.5'))
+
+    // The provider has no CHF: said so, nothing fetched.
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'CHF – Swiss Franc' }))
+    expect(within(dialog).getByText('No online rate for CHF – enter it by hand.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Fetch current rate' })).toBeDisabled()
+    expect(rate()).toHaveValue('')
+
+    // Typed for CHF, then JPY (provider down): cleared, the failure shown.
+    await user.type(rate(), '1,1')
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'JPY – Japanese Yen' }))
+    expect(await within(dialog).findByText(/exchange rate service cannot be reached/)).toBeInTheDocument()
+    expect(rate()).toHaveValue('')
+
+    // Back to CHF and EUR: the rates typed for them return.
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'CHF – Swiss Franc' }))
+    expect(rate()).toHaveValue('1,1')
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'EUR – Euro' }))
+    expect(rate()).toHaveValue('0,95')
+    expect(requests).toEqual(['PKR', 'JPY'])
+  })
+
+  it('edit: a fetch failure of a currency no longer chosen is not shown', async () => {
+    let release = () => {}
+    serveDialog()
+    server.use(
+      http.get('/api/exchange-rates/:currency', async ({ params }) => {
+        if (params.currency === 'JPY') {
+          await new Promise<void>((resolve) => (release = resolve))
+          return problem(503, { code: 'exchange_rate.unavailable' })
+        }
+        return HttpResponse.json({ currency: params.currency, rate: '278.5', date: '2026-10-18T00:00:00Z', provider: 'open.er-api.com' })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<ProjectFormDialog open onOpenChange={() => {}} item={villa} />)
+    const dialog = await screen.findByRole('dialog')
+    const currency = await within(dialog).findByRole('combobox', { name: /Currency/ })
+    await waitFor(() => expect(currency).toHaveValue('EUR – Euro'))
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'JPY – Japanese Yen' }))
+    await user.click(currency)
+    await user.click(await screen.findByRole('option', { name: 'PKR – Pakistani Rupee' }))
+    await waitFor(() => expect(within(dialog).getByLabelText(/Exchange rate/)).toHaveValue('278.5'))
+    release()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(within(dialog).queryByText(/exchange rate service cannot be reached/)).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/Exchange rate/)).toHaveValue('278.5')
+  })
+
+  it('edit: a rate far off the online rate is saved only when saved again', async () => {
+    serveDialog()
+    const sent: Record<string, unknown>[] = []
+    server.use(
+      http.put('/api/projects/:id', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>
+        sent.push(body)
+        if (!body.exchangeRateConfirmed) {
+          return problem(422, {
+            code: 'validation.failed',
+            fields: [{ location: 'body.exchangeRate', code: 'project.exchange_rate_implausible', params: { currency: 'PKR', online: '278.5' } }],
+          })
+        }
+        return HttpResponse.json(villa)
+      }),
+    )
     const user = userEvent.setup()
     renderWithProviders(<ProjectFormDialog open onOpenChange={() => {}} item={villa} />)
     const dialog = await screen.findByRole('dialog')
@@ -96,31 +178,29 @@ describe('ProjectFormDialog exchange rate', () => {
     await waitFor(() => expect(currency).toHaveValue('EUR – Euro'))
     await user.click(currency)
     await user.click(await screen.findByRole('option', { name: 'PKR – Pakistani Rupee' }))
-    await waitFor(() => expect(within(dialog).getByLabelText(/Exchange rate/)).toHaveValue('278.5'))
-
-    await user.click(currency)
-    await user.click(await screen.findByRole('option', { name: 'CHF – Swiss Franc' }))
-    expect(await within(dialog).findByText(/exchange rate service cannot be reached/)).toBeInTheDocument()
-    expect(within(dialog).getByLabelText(/Exchange rate/)).toHaveValue('')
-
-    // Typed by hand: changing the currency no longer replaces it.
-    await user.type(within(dialog).getByLabelText(/Exchange rate/), '1,1')
-    await user.click(currency)
-    await user.click(await screen.findByRole('option', { name: 'JPY – Japanese Yen' }))
-    expect(within(dialog).getByLabelText(/Exchange rate/)).toHaveValue('1,1')
-    expect(requests).toEqual(['PKR', 'CHF'])
+    const rate = within(dialog).getByLabelText(/Exchange rate/)
+    await waitFor(() => expect(rate).toHaveValue('278.5'))
+    await user.clear(rate)
+    await user.type(rate, '2,785')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    expect(await within(dialog).findByText(/far off today's online rate of PKR \(1 USD = 278.5\)/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(sent).toHaveLength(2))
+    expect(sent[0]).not.toHaveProperty('exchangeRateConfirmed')
+    expect(sent[1]).toMatchObject({ currency: 'PKR', exchangeRate: '2.785', exchangeRateConfirmed: true })
   })
 })
 
 function serveRate() {
   const calls: string[] = []
   server.use(
-    http.post('/api/projects/:id/exchange-rate/refresh', () => {
-      calls.push('refresh')
+    http.post('/api/projects/:id/exchange-rate/refresh', async ({ request }) => {
+      calls.push(`refresh ${((await request.json()) as { currency: string }).currency}`)
       return HttpResponse.json(online)
     }),
     http.put('/api/projects/:id/exchange-rate', async ({ request }) => {
-      calls.push(`set ${((await request.json()) as { rate: string }).rate}`)
+      const body = (await request.json()) as { rate: string; currency: string }
+      calls.push(`set ${body.rate} ${body.currency}`)
       return HttpResponse.json({ ...villa, exchangeRate: '0.95' })
     }),
   )
@@ -134,7 +214,7 @@ describe('RateBar', () => {
     renderWithProviders(<RateBar project={noRate} versionId={villa.versions[0].id} />)
     expect(screen.getByText('No exchange rate yet – fetch or set one')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Update rate' }))
-    await waitFor(() => expect(calls).toEqual(['refresh']))
+    await waitFor(() => expect(calls).toEqual(['refresh EUR']))
   })
 
   it('online: rate, date, no warning while fresh; a warning when stale', () => {
@@ -159,7 +239,7 @@ describe('RateBar', () => {
     await user.clear(rate)
     await user.type(rate, '0,95')
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
-    await waitFor(() => expect(calls).toEqual(['set 0.95']))
+    await waitFor(() => expect(calls).toEqual(['set 0.95 EUR']))
   })
 
   it('read-only projects and USD projects', () => {

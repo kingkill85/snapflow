@@ -96,8 +96,9 @@ export const villaRow: ProjectListItem = {
   can: { update: true, delete: true, reopen: false },
 }
 
-/** GET /api/currencies: a few codes, EUR and PKR recently used by the tenant. */
+/** GET /api/currencies: a few codes, EUR and PKR recently used by the tenant; the provider has no CHF. */
 export const currencies: CurrencyList = {
   items: ['CHF', 'EUR', 'JPY', 'PKR', 'USD'].map((code) => ({ code, minorUnits: code === 'JPY' ? 0 : 2, online: code !== 'CHF' })),
   recent: ['PKR', 'EUR'],
+  onlineKnown: true,
 }

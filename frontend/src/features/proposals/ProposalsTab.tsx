@@ -2,11 +2,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Download, FilePlus2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 
 import { useGetBom } from '@/api/generated/bom/bom'
 import type { Proposal } from '@/api/generated/model'
 import { getListProposalsQueryKey, useDeleteProposal, useListProposals } from '@/api/generated/proposals/proposals'
-import { Button, ConfirmDialog, DataTable, DownloadLink, EmptyState, ErrorMessage, Loading, Notice, RowAction, Section, TypeBadge } from '@/components/ui'
+import { Button, ConfirmDialog, DataTable, DownloadLink, EmptyState, ErrorMessage, Loading, Notice, RowAction, Section, TextLink, TypeBadge } from '@/components/ui'
 import { fresh } from '@/features/bom/format'
 import { useLocalized } from '@/i18n/localized'
 
@@ -39,6 +40,12 @@ export function ProposalsTab({ versionId, canGenerate }: Props) {
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<Proposal | null>(null)
   const [created, setCreated] = useState<Proposal[]>([])
+
+  // A non-USD project without a rate: no proposal until it is set (D274) on the Pricing tab.
+  const rateMissing = !!bom.data && bom.data.totals.currency !== 'USD' && bom.data.totals.rate === ''
+  const [params] = useSearchParams()
+  const pricingTab = new URLSearchParams(params)
+  pricingTab.set('tab', 'pricing')
 
   const types = (bom.data?.groups ?? []).flatMap((g) => (g.productType ? [g.productType] : []))
   const refresh = () => queryClient.invalidateQueries({ queryKey: getListProposalsQueryKey(versionId) })
@@ -75,14 +82,16 @@ export function ProposalsTab({ versionId, canGenerate }: Props) {
       description={t('description')}
       actions={
         canGenerate ? (
-          <Button onClick={() => setCreating(true)}>
+          <Button disabled={rateMissing} onClick={() => setCreating(true)}>
             <FilePlus2 /> {t('create')}
           </Button>
         ) : undefined
       }
     >
-      {bom.data && bom.data.totals.currency !== 'USD' && bom.data.totals.rate === '' && (
-        <Notice tone="warning">{t('rateMissing', { currency: bom.data.totals.currency })}</Notice>
+      {rateMissing && (
+        <Notice tone="warning">
+          {t('rateMissing', { currency: bom.data!.totals.currency })} <TextLink to={`?${pricingTab.toString()}`}>{t('rateMissingLink')}</TextLink>
+        </Notice>
       )}
       {created.length > 0 && (
         <Notice>

@@ -9,6 +9,7 @@ package projects
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -99,7 +100,36 @@ func (s *Service) validateRate(ctx context.Context, currency string, in ProjectI
 		in.ExchangeRateSource != RateSourceManual {
 		return storedRate(current), nil, nil
 	}
+	if !sameCurrency && !in.ExchangeRateConfirmed {
+		if f := s.implausible(currency, sent); f != nil {
+			return rateValue{}, f, nil
+		}
+	}
 	return s.manualRate(sent), nil, nil
+}
+
+// PlausibleFactor is how far a rate typed in with a new currency may be off
+// the cached online rate before it needs exchangeRateConfirmed (D278).
+const PlausibleFactor = 10
+
+// implausible refuses a manual rate of a new currency that is more than
+// PlausibleFactor off the cached online rate (a rate typed for the old
+// currency); only the cache is asked, never the provider.
+func (s *Service) implausible(currency, sent string) *apperr.FieldError {
+	online, ok := s.rates.Cached(currency)
+	if !ok {
+		return nil
+	}
+	r, err := money.Parse(sent)
+	if err != nil || r.Sign() <= 0 {
+		return nil
+	}
+	f := money.MustParse(fmt.Sprint(PlausibleFactor))
+	if r.GreaterThan(online.Mul(f)) || r.Mul(f).LessThan(online) {
+		return ptr(apperr.Field("body.exchangeRate", "project.exchange_rate_implausible", "far off the online rate; confirm to store it").
+			With("currency", currency).With("online", online.String()))
+	}
+	return nil
 }
 
 func checkRate(location, rate string) *apperr.FieldError {
@@ -144,8 +174,10 @@ func (s *Service) setRate(p *Project, row store.Project) {
 // RefreshRate stores the provider's current rate in a non-USD project
 // (projects.write; the project active). One action: no stale check, the
 // project's updatedAt moves.
-func (s *Service) RefreshRate(ctx context.Context, id uuid.UUID) (Project, error) {
-	return s.changeRate(ctx, id, func(currency string) (rateValue, error) {
+// currency, when given, is the currency the client saw: project.stale (409)
+// when the project's differs.
+func (s *Service) RefreshRate(ctx context.Context, id uuid.UUID, currency string) (Project, error) {
+	return s.changeRate(ctx, id, currency, func(currency string) (rateValue, error) {
 		r, err := s.rates.Get(ctx, currency)
 		if err != nil {
 			return rateValue{}, err
@@ -163,13 +195,14 @@ func (s *Service) SetRate(ctx context.Context, id uuid.UUID, in ExchangeRateSet)
 		}
 		return Project{}, apperr.Validation(*f)
 	}
-	return s.changeRate(ctx, id, func(string) (rateValue, error) { return s.manualRate(rate), nil })
+	return s.changeRate(ctx, id, in.Currency, func(string) (rateValue, error) { return s.manualRate(rate), nil })
 }
 
 // changeRate reads the project, gets the new rate outside any transaction
 // (the provider may be slow, D243), then stores it under the project's lock
-// (as Update, D169/D171) if the currency is still the same.
-func (s *Service) changeRate(ctx context.Context, id uuid.UUID, get func(currency string) (rateValue, error)) (Project, error) {
+// (as Update, D169/D171) if the currency is still the same. seen is the
+// currency the client saw (empty: not checked).
+func (s *Service) changeRate(ctx context.Context, id uuid.UUID, seen string, get func(currency string) (rateValue, error)) (Project, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
 		return Project{}, err
@@ -184,6 +217,9 @@ func (s *Service) changeRate(ctx context.Context, id uuid.UUID, get func(currenc
 	}
 	if ProjectStatus(current.Status) != StatusActive {
 		return Project{}, errReadOnly()
+	}
+	if seen != "" && seen != current.Currency {
+		return Project{}, errStale()
 	}
 	if current.Currency == DefaultCurrency {
 		return Project{}, apperr.Conflict("project.exchange_rate_usd", "USD projects have no exchange rate to set")
@@ -214,19 +250,28 @@ func (s *Service) changeRate(ctx context.Context, id uuid.UUID, get func(currenc
 	return s.detail(ctx, actor, id)
 }
 
-// Currencies lists the currencies a project may use (projects.read).
-func (s *Service) Currencies(ctx context.Context) (CurrencyList, error) {
+// Currencies lists the currencies a project may use (projects.read); the
+// recent ones are tenantID's (nil: the caller's; a tenant the caller does
+// not see has none).
+func (s *Service) Currencies(ctx context.Context, tenantID *uuid.UUID) (CurrencyList, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
 		return CurrencyList{}, err
 	}
-	online := s.rates.Has(ctx)
-	out := CurrencyList{Items: []Currency{}, Recent: []string{}}
+	tenant := actor.TenantID
+	if tenantID != nil {
+		tenant = *tenantID
+	}
+	online, known := s.rates.Has(ctx)
+	out := CurrencyList{Items: []Currency{}, Recent: []string{}, OnlineKnown: known}
+	if !actor.SeesTenant(tenant) {
+		tenant = uuid.Nil
+	}
 	for _, c := range money.Currencies() {
 		out.Items = append(out.Items, Currency{Code: c, MinorUnits: money.MinorUnits(c), Online: online[c] || c == DefaultCurrency})
 	}
 	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(q *store.Queries) error {
-		recent, err := q.RecentCurrencies(ctx, actor.TenantID)
+		recent, err := q.RecentCurrencies(ctx, tenant)
 		if err != nil {
 			return err
 		}

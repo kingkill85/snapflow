@@ -8,6 +8,11 @@
 export interface ExchangeRateSet {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /**
+     * The project's currency as the client saw it: 409 project.stale when it changed meanwhile
+     * @pattern ^[A-Z]{3}$
+     */
+  currency: string;
   /** Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0 */
   rate: string;
 }

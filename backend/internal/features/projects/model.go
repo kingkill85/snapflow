@@ -148,6 +148,7 @@ type ProjectInput struct {
 	Currency           string                `json:"currency,omitempty" doc:"ISO 4217, three upper-case letters; defaults to USD"`
 	ExchangeRate       string                `json:"exchangeRate,omitempty" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet"`
 	ExchangeRateSource string                `json:"exchangeRateSource,omitempty" doc:"online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above"`
+	ExchangeRateConfirmed bool `json:"exchangeRateConfirmed,omitempty" doc:"With a new currency, a manual exchangeRate more than 10 times off the cached online rate is refused (422 project.exchange_rate_implausible) unless this is true"`
 	Customer           *ProjectCustomerInput `json:"customer,omitempty" doc:"Left out: the stored customer stays (create: none)"`
 	Notes              *string               `json:"notes,omitempty" doc:"At most 5000 characters; empty clears, left out keeps the stored notes"`
 	ProductTypeIDs     []uuid.UUID           `json:"productTypeIds,omitempty" maxItems:"1000" doc:"At least one; new choices must be active. Create without it: every active product type"`
@@ -195,8 +196,9 @@ type Currency struct {
 
 // CurrencyList are the currencies a project may use.
 type CurrencyList struct {
-	Items  []Currency `json:"items" doc:"Sorted by code"`
-	Recent []string   `json:"recent" doc:"Currencies other than USD of the caller's tenant's projects, most recently changed first (at most 5)"`
+	Items       []Currency `json:"items" doc:"Sorted by code"`
+	Recent      []string   `json:"recent" doc:"Currencies other than USD of the tenant's projects (tenantId, else the caller's), most recently changed first (at most 5)"`
+	OnlineKnown bool       `json:"onlineKnown" doc:"false while the provider's rates are not loaded (online is then false for all but USD; they are being fetched, ask again)"`
 }
 
 // ExchangeRate is a provider's current rate of a currency.
@@ -209,5 +211,11 @@ type ExchangeRate struct {
 
 // ExchangeRateSet enters a project's rate by hand.
 type ExchangeRateSet struct {
-	Rate string `json:"rate" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0"`
+	Rate     string `json:"rate" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0"`
+	Currency string `json:"currency" pattern:"^[A-Z]{3}$" doc:"The project's currency as the client saw it: 409 project.stale when it changed meanwhile"`
+}
+
+// ExchangeRateRefresh asks for the provider's current rate.
+type ExchangeRateRefresh struct {
+	Currency string `json:"currency,omitempty" doc:"The project's currency as the client saw it: 409 project.stale when it changed meanwhile"`
 }
