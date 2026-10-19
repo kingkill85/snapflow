@@ -296,6 +296,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
         }
       })
 
+      test('the bill of materials and pricing fit the screen', async ({ page, api }, testInfo) => {
+        const kind = await api.createKind({ name: { en: 'Switches with a rather long category name' } }, { abbreviation: 'ZB', color: '#1f6feb' })
+        const product = await api.createProduct({ ...kind.ids, name: { en: 'Wall switch with a long product name' } })
+        const variant = await api.createVariant(product.id, { name: { en: 'White' }, price: '1234.50' })
+        const project = await api.createProject({ name: unique('Villa Mustermann-Schmidt') })
+        const version = project.versions[0].id
+        const image = { name: 'floorplan.png', mimeType: 'image/png', buffer: readFileSync(fileURLToPath(new URL('../assets/floorplan.png', import.meta.url))) }
+        // Several plans: one quantity column each, so the table scrolls inside its box on narrow screens.
+        for (const name of ['Ground floor with a long plan name', 'Upper floor', 'Attic', 'Basement']) {
+          const plan = await api.createPlan(version, name, image)
+          await api.savePlanContent(plan.id, { placements: [{ variantId: variant.id, x: 100, y: 100 }] })
+        }
+        for (const lang of ['en', 'de'] as const) {
+          await page.goto('/profile')
+          await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
+          for (const tab of ['bom', 'pricing']) {
+            await page.goto(`/projects/${project.id}?tab=${tab}`)
+            await expect(page.getByTestId('total-grandTotal')).toBeVisible()
+            await expectNoHorizontalOverflow(page)
+            await screenshot(page, testInfo, `${tab}-${viewport.name}-${colorScheme}-${lang}`, true)
+          }
+        }
+        await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
+      })
+
       test('the product pages fit the screen', async ({ page, api }, testInfo) => {
         const image = await api.uploadFile('blue.png', 'image/png', readFileSync(fileURLToPath(new URL('../assets/blue.png', import.meta.url))))
         const { type, ids } = await api.createKind({

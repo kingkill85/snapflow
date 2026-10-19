@@ -13,7 +13,6 @@
     "allPlans": "All plans",
     "allZones": "All zones",
     "noZone": "No zone",
-    "zoneNeedsPlan": "Choose a plan first",
     "filtered": "Quantities of the chosen plan or zone only. Prices and totals are for the whole version.",
     "noneInFilter": "Nothing in this plan or zone.",
     "columns": {

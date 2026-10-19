@@ -72,7 +72,6 @@ export function BomTab({ projectId, versionId, canWrite, productTypeIds }: Props
             label={t('bom.filterZone')}
             value={zone}
             disabled={!planRef}
-            hint={planRef ? undefined : t('bom.zoneNeedsPlan')}
             options={[
               { value: all, label: t('bom.allZones') },
               ...(planRef?.zones ?? []).map((z) => ({ value: z.id, label: z.name })),

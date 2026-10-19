@@ -13,7 +13,6 @@
     "allPlans": "Alle Pläne",
     "allZones": "Alle Zonen",
     "noZone": "Keine Zone",
-    "zoneNeedsPlan": "Zuerst einen Plan wählen",
     "filtered": "Nur Mengen des gewählten Plans bzw. der Zone. Preise und Summen gelten für die ganze Version.",
     "noneInFilter": "Nichts in diesem Plan bzw. dieser Zone.",
     "columns": {

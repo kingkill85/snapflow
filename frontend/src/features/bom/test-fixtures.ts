@@ -12,7 +12,7 @@ const zigbee = { id: id(111), key: 'zigbee', name: { en: 'Zigbee' }, abbreviatio
 const sensors = { id: id(601), name: { en: 'Sensors', de: 'Sensoren' } }
 const switches = { id: id(602), name: { en: 'Switches' } }
 
-const snapshot = (product: string, model: string, category = sensors) => ({
+const snapshot = (product: string, model: string, category: { id: string; name: { en: string; de?: string } } = sensors) => ({
   productName: { en: product },
   variantName: { en: '' },
   modelNumber: model,
