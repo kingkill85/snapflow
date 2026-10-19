@@ -166,11 +166,43 @@ All money rules live in one backend package; the frontend only displays what the
 - Frontend: Vitest + MSW for BOM table (grouping, filters, statuses), manual lines, pricing form with preview, update-from-catalog dialog.
 - E2E: place products in a plan → BOM shows them with quantities per plan and zone; add a manual line; set discount/services; change a catalog price → outdated badge → update from catalog → totals change; existing placement not in the BOM.
 
-## 2d – Proposals (outline)
+## 2d – Proposals
 
-- Exporter registry in the backend (`GET /api/exporters`), canonical proposal document model built from project + version + BOM + pricing + plans, rendered by a DOCX exporter (Go, OOXML). Language = project language (Q1 assumption). Content: header with tenant and customer data, project number/name/version, quantity table with one column per plan and category rows, totals block (discount, services, grand total, local currency), zone summary per plan, plan images with placements (rendered server-side or uploaded from the editor's PNG export — decide).
-- Split per product type (one document per selected type, discount/services handling decided and recorded — SnapFlow 1 applied them in full to every document).
-- Each generated proposal is recorded (who, when, version, file) and downloadable again; tenant letterhead (logo, address) as tenant settings if cheap, else later.
+A proposal is a document generated from one version: what the customer receives. Built in the backend from one canonical document model, rendered by exporters (DOCX now; PDF, Excel and other formats later). The frontend never assembles proposal content.
+
+### Exporters and the document model
+- `platform/document` (or `features/proposals/document`): a format-neutral model — sections, headings, paragraphs (runs: bold/italic), tables (column widths, header rows, group rows, right-aligned numeric cells, spans), images (bytes + size), page breaks, page orientation per section, header/footer (letterhead, page numbers). No HTML, no format specifics.
+- Exporter interface: `Key()`, `Name(locale)`, `ContentType`, `FileExtension`, `Render(doc) ([]byte, error)`; a registry; `GET /api/exporters` lists them (key, translated name, extension).
+- DOCX exporter: writes OOXML itself (`archive/zip` + `encoding/xml` or templates; no commercial library): styles (a sans font that exists on Windows/macOS/LibreOffice, e.g. Calibri/Arial fallback), tables with borders and shading, images (PNG), headers/footers with page numbers, A4, landscape sections for plan images. Must open cleanly in Word, LibreOffice and Google Docs (validated in tests by unzipping and checking the XML parts against the schema rules we rely on; plus one manual LibreOffice conversion check in the click-through: `soffice --headless --convert-to pdf`).
+
+### Content of the proposal (language = the project's language, Q1 → decision)
+1. **Letterhead** (header of every page): the tenant's logo, company name, address, phone, email, website — new optional tenant profile fields (edited on the tenant dialog by admins and the tenant's own tenant admin; logo as a tenant-scoped image). Without them: the tenant name only.
+2. **Title block**: "Proposal" / "Angebot", proposal number (`<project number>-<version name>-<sequence>`, e.g. `2026-0007-V2-03`), date (creation date, formatted for the language), project name, version name, customer block (name, company, address, email, phone).
+3. **Bill of materials table**: grouped by product type then category (group rows), columns # | description (product name, variant, model number; add-ons as indented "for …" lines) | one quantity column per plan (only when the version has 2–5 plans; otherwise only the total) | quantity | unit price | total. Free-text lines in their own group. Existing devices (D185) are not listed. Amounts in the project currency (USD if the project is in USD); when converted, a footnote states the exchange rate and that prices are converted from USD.
+4. **Totals block**: subtotal, discount (label "Discount" + percent if percent), services (the version's services label + percent if percent), grand total. Exactly the BOM API's numbers (same service, no recomputation).
+5. **Zone summary** per plan: a table zones × categories with device counts (existing devices counted and marked separately? → no: excluded, consistent with the BOM), "No zone" row; empty plans skipped.
+6. **Plan images**: one landscape page per plan, rendered server-side (Go: the floorplan image, zones filled with their colour/opacity and their names, placements as the variant images with labels, existing devices hatched; same look as the editor export; embedded font for labels, e.g. Go fonts), with a legend of product types.
+7. Optional free texts per version: an introduction and closing terms (translatable, stored with the version's pricing settings) — shown before the BOM and after the totals.
+
+### Split per product type
+- The generate dialog lets the user pick product types; "one document per product type" generates one proposal per selected type with only that type's lines (free-text lines go into a separate "Other items" document or are included in each? → decision: free-text lines only in the combined proposal, and a split run produces the per-type documents plus nothing else).
+- Discount and services in split documents: percent values apply to the document's own subtotal; absolute amounts are allocated in proportion to the document's share of the goods subtotal (rounded per document, the remainder cent goes to the largest document) so that the split documents add up to the combined proposal. (SnapFlow 1 applied absolute amounts in full to every document, inflating the sum.) Computed in the BOM/money package, tested.
+
+### Records
+- `proposals` (tenant-owned, RLS): id, version id, number, sequence per version, exporter key, language, product type id (null = combined), file id (tenant-scoped file), totals snapshot (subtotal, discount, services, grand total, currency), created_by, created_at. Proposals are immutable records; regenerating creates a new one. Deleting the version deletes its proposals (files stay content-addressed; cleanup not in scope).
+- `POST /api/versions/{versionId}/proposals` `{exporter, productTypeIds?: [], split: bool}` → the created proposal(s); `GET /api/versions/{versionId}/proposals`; `GET /api/proposals/{id}/file` (download with a good file name: `<number> <project name>.docx`, sanitised); `DELETE /api/proposals/{id}` (`projects.delete`).
+- Read-only projects may still generate proposals (generating changes nothing in the plan) — decision; `projects.read` to list/download, `projects.write` to generate.
+- Version copy does not copy proposals.
+
+### Frontend
+- Version area: a fourth tab **Proposals**: list of generated proposals (number, date, type, language, grand total, created by, download, delete), "Create proposal" dialog (exporter select — only DOCX for now, combined or per product type with type checkboxes, a preview of the totals per document from the API), download after creation.
+- Tenant dialog: letterhead fields (company name, address, phone, email, website, logo upload).
+- Version pricing tab gains the introduction and closing texts (translatable).
+
+### Tests
+- Backend: document model → DOCX (unzip, check parts, relationships, images, tables, header/footer, landscape section), golden-ish checks of text content per language, split allocation maths (sums equal combined), numbering per version under concurrency, RLS, permissions, plan image rendering (dimensions, not blank, zones and placements drawn), file names.
+- Frontend: Vitest for the proposals tab and dialog, tenant letterhead fields.
+- E2E: generate a combined and a split proposal, download, check the file is a DOCX (zip with word/document.xml) containing the project number and totals; click-through converts one with LibreOffice to PDF and looks at it.
 
 ---
 
