@@ -157,9 +157,12 @@ func labels(d *data, h header) document.Document {
 				}
 			}
 			slices.SortFunc(mods, func(a, c *itemRef) int { return posNo(a.position) - posNo(c.position) })
-			ss := strips(mods, r.CapacityTE)
+			ss := printedStrips(strips(mods, r.CapacityTE))
 			for i, s := range ss {
 				title := p.Name + " · " + l.t("row", ri+1) + " · " + l.t("teRange", teNo(s.from), teNo(s.to-1))
+				for _, f := range s.free {
+					title += " · " + l.t("teFree", teNo(f[0]), teNo(f[1]-1))
+				}
 				if i > 0 {
 					title = "→ " + title
 				}
@@ -167,7 +170,7 @@ func labels(d *data, h header) document.Document {
 					title += " →"
 				}
 				add(document.Paragraph{Runs: []document.Run{{Text: title, Bold: true, SizePt: labelTitlePt}}, KeepWithNext: true},
-					stripTable(d, s), document.Spacer{})
+					stripTable(d, s.strip), document.Spacer{})
 			}
 		}
 	}
@@ -224,6 +227,50 @@ func strips(mods []*itemRef, capacity float64) []strip {
 		flush(math.Max(end, cur.from+1))
 	}
 	return out
+}
+
+// printed is a strip to print with the free TE ranges of the strips left
+// out next to it.
+type printed struct {
+	strip
+	free [][2]float64
+}
+
+// printedStrips leaves out strips holding only free TE (nothing to label)
+// and notes their range on the previous printed strip ("TE 15–16 free"),
+// on the next one when none is before. A row without modules prints its
+// first strip.
+func printedStrips(ss []strip) []printed {
+	var out []printed
+	var pending [][2]float64
+	note := func(free *[][2]float64, from, to float64) {
+		if n := len(*free); n > 0 && math.Abs((*free)[n-1][1]-from) < 1e-6 {
+			(*free)[n-1][1] = to
+			return
+		}
+		*free = append(*free, [2]float64{from, to})
+	}
+	for _, s := range ss {
+		switch {
+		case len(s.mods) > 0 || (len(out) == 0 && len(pending) == 0 && !hasMods(ss)):
+			out = append(out, printed{strip: s, free: pending})
+			pending = nil
+		case len(out) > 0:
+			note(&out[len(out)-1].free, s.from, s.to)
+		default:
+			note(&pending, s.from, s.to)
+		}
+	}
+	return out
+}
+
+func hasMods(ss []strip) bool {
+	for _, s := range ss {
+		if len(s.mods) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // subCell is a bottom-band cell of a module: one or more physical

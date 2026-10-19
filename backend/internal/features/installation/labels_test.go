@@ -56,6 +56,44 @@ func TestStrips(t *testing.T) {
 			}
 		})
 	}
+	// Strips holding only free TE are not printed; their range is noted.
+	type note struct {
+		from, to float64
+		free     [][2]float64
+	}
+	for _, tc := range []struct {
+		name     string
+		mods     []*itemRef
+		capacity float64
+		want     []note
+	}{
+		{"free rest noted", []*itemRef{mod(0, 4), mod(4, 8), mod(12, 2)}, 16, []note{{0, 14, [][2]float64{{14, 16}}}}},
+		{"long free gap noted", []*itemRef{mod(0, 2), mod(30, 2)}, 32, []note{{0, 14, [][2]float64{{14, 28}}}, {28, 32, nil}}},
+		{"free start noted on the next", []*itemRef{mod(20, 2)}, 22, []note{{14, 22, [][2]float64{{0, 14}}}}},
+		{"empty long row", nil, 30, []note{{0, 14, [][2]float64{{14, 30}}}}},
+		{"split keeps both", []*itemRef{mod(0, 6), mod(6, 6), mod(12, 4), mod(16, 6)}, 24, []note{{0, 12, nil}, {12, 24, nil}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ps := printedStrips(strips(tc.mods, tc.capacity))
+			if len(ps) != len(tc.want) {
+				t.Fatalf("printed %+v, want %+v", ps, tc.want)
+			}
+			for i, p := range ps {
+				w := tc.want[i]
+				if p.from != w.from || p.to != w.to || len(p.free) != len(w.free) {
+					t.Fatalf("printed %d: %v–%v free %v, want %+v", i, p.from, p.to, p.free, w)
+				}
+				for j := range w.free {
+					if p.free[j] != w.free[j] {
+						t.Fatalf("printed %d free %v, want %v", i, p.free, w.free)
+					}
+				}
+			}
+		})
+	}
+	if l := tr("de").t("teFree", 15, 16); l != "TE 15–16 frei" {
+		t.Errorf("free note %q", l)
+	}
 	// The ruler label of a continued strip.
 	if l := tr("en").t("teRange", teNo(14), teNo(24-1)); l != "TE 15–24" {
 		t.Errorf("ruler label %q", l)
