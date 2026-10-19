@@ -180,7 +180,7 @@ func Register(api huma.API, svc *Service) {
 }
 
 type refreshRateInput struct {
-	ID   uuid.UUID `path:"id" format:"uuid"`
+	ID   uuid.UUID            `path:"id" format:"uuid"`
 	Body *ExchangeRateRefresh `required:"false"`
 }
 

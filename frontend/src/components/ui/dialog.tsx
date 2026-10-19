@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from './button'
-import { keepDialogOnComboboxEscape } from './combobox'
+import { keepDialogOnComboboxEscape } from './combobox-escape'
 
 type DialogProps = {
   open: boolean

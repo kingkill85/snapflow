@@ -3,10 +3,10 @@ package exchangerate_test
 import (
 	"context"
 	"errors"
-	"strings"
-	"sync"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"

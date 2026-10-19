@@ -39,16 +39,6 @@ const matches = (o: ComboboxOption, query: string) => {
   return q === '' || o.label.toLocaleLowerCase().includes(q) || (o.keywords?.toLocaleLowerCase().includes(q) ?? false)
 }
 
-/**
- * For a dialog's `onEscapeKeyDown`: Escape in an open combobox closes its
- * list, not the dialog. Radix catches Escape on the document before the
- * input sees it, so the combobox cannot stop it itself.
- */
-export function keepDialogOnComboboxEscape(e: globalThis.KeyboardEvent) {
-  const target = e.target
-  if (target instanceof HTMLElement && target.getAttribute('role') === 'combobox' && target.getAttribute('aria-expanded') === 'true') e.preventDefault()
-}
-
 /** Where the list is drawn: in the dialog around the input (so focus trap and outside clicks keep working), else the body. */
 const listContainer = (input: HTMLElement | null) => (input?.closest<HTMLElement>('[role="dialog"]') ?? input?.ownerDocument.body) || null
 

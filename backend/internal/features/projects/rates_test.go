@@ -196,7 +196,9 @@ func TestUpdateRatePaths(t *testing.T) {
 		t.Fatalf("currency change without rate: %+v", u)
 	}
 	// Online with a currency the provider does not have.
-	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"], b["exchangeRateSource"] = "CHF", "", "online" }),
+	wantCode(t, put(func(b map[string]any) {
+		b["currency"], b["exchangeRate"], b["exchangeRateSource"] = "CHF", "", "online"
+	}),
 		http.StatusNotFound, "exchange_rate.unknown_currency")
 	wantCode(t, put(func(b map[string]any) { b["currency"] = "XYZ" }), http.StatusUnprocessableEntity, "project.currency_unknown")
 	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "USD", "1.1" }), http.StatusUnprocessableEntity, "project.exchange_rate")
@@ -217,7 +219,9 @@ func TestUpdateRatePaths(t *testing.T) {
 	wantCode(t, api.Get("/api/exchange-rates/PKR", api.Admin.Cookie), http.StatusOK, "")
 	wantCode(t, put(func(b map[string]any) { b["currency"], b["exchangeRate"] = "PKR", "0.95" }),
 		http.StatusUnprocessableEntity, "project.exchange_rate_implausible")
-	resp = put(func(b map[string]any) { b["currency"], b["exchangeRate"], b["exchangeRateConfirmed"] = "PKR", "0.95", true })
+	resp = put(func(b map[string]any) {
+		b["currency"], b["exchangeRate"], b["exchangeRateConfirmed"] = "PKR", "0.95", true
+	})
 	wantCode(t, resp, http.StatusOK, "")
 	if u := decode[projects.Project](t, resp); deref(u.ExchangeRate) != "0.95" || u.ExchangeRateSource != projects.RateSourceManual {
 		t.Fatalf("confirmed: %+v", u)

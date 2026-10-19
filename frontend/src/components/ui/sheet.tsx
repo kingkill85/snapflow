@@ -2,7 +2,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import { keepDialogOnComboboxEscape } from './combobox'
+import { keepDialogOnComboboxEscape } from './combobox-escape'
 import { IconButton } from './icon-button'
 
 type SheetProps = {
