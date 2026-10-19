@@ -89,8 +89,8 @@
       "percent": "Percent",
       "amount": "Amount (USD)"
     },
-    "discountValue": "Discount",
-    "servicesValue": "Services",
+    "discountValue": "Discount value",
+    "servicesValue": "Services value",
     "percentHint": "0 to 100, e.g. 7,5 or 7.5",
     "amountHint": "USD, e.g. 250 or 250,50",
     "servicesLabel": "Services label",

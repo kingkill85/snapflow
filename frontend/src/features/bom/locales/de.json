@@ -89,8 +89,8 @@
       "percent": "Prozent",
       "amount": "Betrag (USD)"
     },
-    "discountValue": "Rabatt",
-    "servicesValue": "Dienstleistungen",
+    "discountValue": "Rabattwert",
+    "servicesValue": "Wert der Dienstleistungen",
     "percentHint": "0 bis 100, z. B. 7,5 oder 7.5",
     "amountHint": "USD, z. B. 250 oder 250,50",
     "servicesLabel": "Bezeichnung der Dienstleistungen",
