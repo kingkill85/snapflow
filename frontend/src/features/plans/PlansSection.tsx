@@ -23,7 +23,8 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
   const { t } = useTranslation('plans')
   const { t: tCommon } = useTranslation()
   const queryClient = useQueryClient()
-  const query = useListPlans(versionId)
+  // Counts and locks change in the editor: fetched on every visit.
+  const query = useListPlans(versionId, { query: { staleTime: 0, refetchOnMount: 'always' } })
   const reorder = useReorderPlans()
   const remove = useDeletePlan()
   // undefined: closed; null: a new plan; a plan: edit it.

@@ -6,7 +6,7 @@ import { Link, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
-import { getGetPlanContentQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
+import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { type Point, useViewport } from '@/canvas'
 import { Button, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
@@ -130,6 +130,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         contentVersion.current = saved.contentUpdatedAt
         setServer(saved)
         setSaveErrors(new Map())
+        // The plan cards show counts: refreshed when the project page shows them again (also after a save on leave).
+        void queryClient.invalidateQueries({ queryKey: getListPlansQueryKey(plan.versionId) })
       } catch (e) {
         const byItem = saveErrorsByItem(e, snapshot, (f) => errorMessage(new ApiError({ status: 422, code: f.code, params: f.params })))
         setSaveErrors(byItem)
@@ -141,7 +143,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         throw e
       }
     },
-    [plan.id, errorMessage],
+    [plan.id, plan.versionId, errorMessage, queryClient],
   )
   const autosave = useAutosave({ document: doc, save, enabled: editable })
 
