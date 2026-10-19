@@ -112,6 +112,8 @@ A proposal is a document generated from one version (step 2d, `features/proposal
 
 Generation holds no transaction while it renders: the sequence is reserved in a short transaction (`proposal_counters`), the rows are written in a final one. Endpoints: `GET /api/exporters`, `GET|POST /api/versions/{versionId}/proposals`, `POST …/proposals/preview`, `GET /api/proposals/{id}/file`, `DELETE /api/proposals/{id}`; letterhead: `GET|PUT /api/tenants/{id}/letterhead`, `POST /api/tenants/{id}/logo` (`tenants.profile`). Decisions D253–D262.
 
+Frontend (`src/features/proposals`): the version's Proposals tab (`?tab=proposals`) lists the records and opens the Create proposal dialog, whose totals per document come from the preview endpoint; it computes nothing. The letterhead is edited in the admins' tenant dialog and on Administration → Company profile (`src/features/tenants`, `tenants.profile`); the pricing tab gains the introduction and closing texts. Decisions D263–D266.
+
 ## Extension points
 
 | Extension | Contract |

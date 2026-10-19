@@ -129,7 +129,7 @@ describe('ProposalsTab', () => {
     renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />)
     await user.click(await screen.findByRole('button', { name: 'Create proposal' }))
     const dialog = await screen.findByRole('dialog', { name: 'Create proposal' })
-    expect(await within(dialog).findByRole('combobox', { name: /Format/ })).toHaveTextContent('Word document (.docx)')
+    expect(await within(dialog).findByRole('combobox', { name: /Format/ })).toHaveTextContent('Word document')
     expect(await within(dialog).findByTestId('preview-total')).toHaveTextContent('$279.50')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 

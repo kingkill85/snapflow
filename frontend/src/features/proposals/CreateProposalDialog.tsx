@@ -40,7 +40,7 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
   const [mode, setMode] = useState<Mode>('combined')
   const [typeIds, setTypeIds] = useState<string[]>(() => productTypes.map((p) => p.id))
   const [typesError, setTypesError] = useState(false)
-  const exporterOptions = (exporters.data ?? []).map((e) => ({ value: e.key, label: `${localize(e.name)} (.${e.fileExtension})` }))
+  const exporterOptions = (exporters.data ?? []).map((e) => ({ value: e.key, label: localize(e.name) }))
   const chosenExporter = exporterOptions.some((o) => o.value === exporter) ? exporter : (exporterOptions[0]?.value ?? '')
 
   const split = mode === 'split'
