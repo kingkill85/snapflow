@@ -43,6 +43,7 @@ type ProductType struct {
 	// Topology selects the defaults capabilities fall back to (D304).
 	Topology                  string       `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
 	DefaultWirelessPlacesUsed *int32       `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
+	NominalVoltage            int32        `json:"nominalVoltage" doc:"Nominal voltage (V) of the system's devices: converts the W of needs into A for limits in A (3d)"`
 	CreatedAt                 time.Time    `json:"createdAt"`
 	UpdatedAt                 time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
 	Can                       auth.Actions `json:"can"`
@@ -59,6 +60,7 @@ type ProductTypeInput struct {
 	BusDevicesMax             *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
 	Topology                  string    `json:"topology,omitempty" enum:"bus,wireless,none" doc:"Default none; on update, left out keeps the stored value (D294)"`
 	DefaultWirelessPlacesUsed *int32    `json:"defaultWirelessPlacesUsed,omitempty" doc:"1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	NominalVoltage            *int32    `json:"nominalVoltage,omitempty" doc:"1-1000 V; default 230; on update, left out keeps the stored value (D294)"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -159,6 +161,7 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 			Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
 			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
 			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
+			NominalVoltage: *in.NominalVoltage,
 		})
 		return err
 	})
@@ -176,7 +179,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 	if err != nil {
 		return ProductType{}, err
 	}
-	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil || in.Topology == "" || in.DefaultWirelessPlacesUsed == nil {
+	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil || in.Topology == "" || in.DefaultWirelessPlacesUsed == nil || in.NominalVoltage == nil {
 		// Left-out settings keep the stored values (D294).
 		current, err := s.q.GetProductType(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -200,6 +203,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 		if in.DefaultWirelessPlacesUsed == nil {
 			in.DefaultWirelessPlacesUsed = orZero(current.DefaultWirelessPlacesUsed)
 		}
+		if in.NominalVoltage == nil {
+			in.NominalVoltage = &current.NominalVoltage
+		}
 	}
 	in.ProductTypeInput, err = validate(in.ProductTypeInput)
 	if err != nil {
@@ -212,7 +218,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 			ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
 			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
 			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
-			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+			NominalVoltage: *in.NominalVoltage, ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
 	})
@@ -339,6 +345,10 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	in.DefaultBusCurrentMa, in.BusDevicesMax = noneIfZero(in.DefaultBusCurrentMa), noneIfZero(in.BusDevicesMax)
 	rangeErr("body.defaultBusCurrentMa", in.DefaultBusCurrentMa, 1, 100000)
 	rangeErr("body.reservePercent", in.ReservePercent, 0, 90)
+	if in.NominalVoltage == nil {
+		in.NominalVoltage = ptr(int32(DefaultNominalVoltage))
+	}
+	rangeErr("body.nominalVoltage", in.NominalVoltage, 1, 1000)
 	rangeErr("body.busDevicesMax", in.BusDevicesMax, 1, 100000)
 	in.DefaultWirelessPlacesUsed = noneIfZero(in.DefaultWirelessPlacesUsed)
 	rangeErr("body.defaultWirelessPlacesUsed", in.DefaultWirelessPlacesUsed, 1, 1000)
@@ -357,6 +367,10 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 
 // DefaultReservePercent is the reserve of a product type unless set (spec 3a, Q9).
 const DefaultReservePercent = 20
+
+// DefaultNominalVoltage is the nominal voltage of a product type unless set
+// (spec 3d).
+const DefaultNominalVoltage = 230
 
 func ptr[T any](v T) *T { return &v }
 
@@ -397,7 +411,7 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		DefaultBusCurrentMa: r.DefaultBusCurrentMa, ReservePercent: r.ReservePercent, BusDevicesMax: r.BusDevicesMax,
-		Topology: r.Topology, DefaultWirelessPlacesUsed: r.DefaultWirelessPlacesUsed,
+		Topology: r.Topology, DefaultWirelessPlacesUsed: r.DefaultWirelessPlacesUsed, NominalVoltage: r.NominalVoltage,
 		Can: auth.Actions{Update: write, Delete: write},
 	}
 	if r.Abbreviation != nil {

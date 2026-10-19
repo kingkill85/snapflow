@@ -89,6 +89,22 @@ type CategoryFieldLink struct {
 	FieldKey   string
 }
 
+type Connection struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	VersionID    uuid.UUID
+	NeedPlanID   uuid.UUID
+	NeedID       uuid.UUID
+	Units        int32
+	TargetPlanID uuid.UUID
+	TargetItemID uuid.UUID
+	OutputKindID uuid.UUID
+	ChannelNo    int32
+	Pinned       bool
+	BatchID      *uuid.UUID
+	CreatedAt    time.Time
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -325,6 +341,7 @@ type ProductType struct {
 	BusDevicesMax             *int32
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
+	NominalVoltage            int32
 }
 
 type ProductVariant struct {
