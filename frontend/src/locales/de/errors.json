@@ -157,6 +157,8 @@
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
+    "knx_object_duplicate": "Der Objektschlüssel \"{{key}}\" ist doppelt vergeben.",
+    "dpst_format": "Datenpunkt-Subtyp wie DPST-1-1 eingeben.",
     "not_found": "Dieser Funktionstyp existiert nicht mehr."
   },
   "import": {
@@ -397,6 +399,7 @@
   },
   "export": {
     "too_many_group_addresses": "Zu viele Etagen, Zonen oder Funktionen für KNX-Gruppenadressen (höchstens {{max}}).",
-    "unknown": "Diesen Export gibt es nicht."
+    "unknown": "Diesen Export gibt es nicht.",
+    "format_unknown": "Dieses Exportformat gibt es nicht."
   }
 }

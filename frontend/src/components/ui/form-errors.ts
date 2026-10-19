@@ -46,6 +46,7 @@ export const errorParamNames = {
   'file.too_large': ['maxMb'],
   'file.too_many_pixels': ['megapixels'],
   'function_type.key_taken': ['key'],
+  'function_type.knx_object_duplicate': ['key'],
   'import.addon_ambiguous': ['ref'],
   'import.addon_not_found': ['ref'],
   'import.addon_skipped': ['ref'],

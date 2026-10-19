@@ -22,6 +22,7 @@ const functionType = (over: Partial<FunctionType>): FunctionType => ({
   key: 'dimmer',
   name: { en: 'Dimmable light' },
   allowsCircuit: true,
+  knxObjects: [],
   loadTypeIds: [],
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',

@@ -24,6 +24,13 @@ type idParam struct {
 	ID uuid.UUID `path:"id" format:"uuid"`
 }
 
+type groupAddressCSVInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Format    string    `query:"format" enum:"1-1,3-1" doc:"ETS layout: 1-1 (default, one name column, TAB separated) or 3-1 (main/middle/sub columns, comma separated)"`
+}
+
+type groupAddressSummaryOutput struct{ Body GroupAddressSummary }
+
 type documentsOutput struct{ Body []GeneratedDocument }
 
 type documentOutput struct{ Body GeneratedDocument }
@@ -122,29 +129,50 @@ func Register(api huma.API, svc *Service) {
 		Method:      http.MethodGet,
 		Path:        "/api/versions/{versionId}/exports/knx-group-addresses.csv",
 		Summary:     "Export the KNX group addresses (ETS CSV import)",
-		Description: "ETS 3-level group address CSV (D422): UTF-8 with BOM, comma separated, every field quoted.",
-		Tags:        []string{tag},
-		Responses:   fileResponse("The CSV file"),
-	}, func(ctx context.Context, in *versionParam) (*huma.StreamResponse, error) {
-		e, err := svc.GroupAddressesCSV(ctx, in.VersionID)
+		Description: "ETS 3-level group address CSV (D422): UTF-8 with BOM, CRLF, every field quoted; the stored group addresses " +
+			"(assigned now when none are stored yet).",
+		Tags:      []string{tag},
+		Responses: fileResponse("The CSV file"),
+	}, func(ctx context.Context, in *groupAddressCSVInput) (*huma.StreamResponse, error) {
+		e, err := svc.GroupAddressesCSV(ctx, in.VersionID, in.Format)
 		if err != nil {
 			return nil, err
 		}
 		return exportResponse(ctx, e), nil
 	})
 
-	for _, kind := range []struct{ key, id, summary string }{
-		{ListHDL, "exportHdlCommissioning", "Export the HDL commissioning list (XLSX)"},
-		{ListZigbee, "exportZigbeeDevices", "Export the Zigbee device list (XLSX)"},
-		{ListKNX, "exportKnxDevices", "Export the KNX device list (XLSX)"},
+	huma.Register(api, huma.Operation{
+		OperationID: "assignGroupAddresses",
+		Method:      http.MethodPost,
+		Path:        "/api/versions/{versionId}/group-addresses/assign",
+		Summary:     "Assign KNX group addresses to new needs and objects",
+		Description: "Stored numbers never change (D422); needs projects.write, refused on completed or cancelled projects.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *versionParam) (*groupAddressSummaryOutput, error) {
+		out, err := svc.AssignGroupAddresses(ctx, in.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		return &groupAddressSummaryOutput{Body: out}, nil
+	})
+
+	for _, kind := range []struct {
+		key, id, summary string
+		hidden           bool
+	}{
+		{ListHDL, "exportHdlCommissioning", "Export the HDL commissioning list (XLSX)", false},
+		{ListWireless, "exportWirelessDevices", "Export the wireless device list (EUI-64, XLSX)", false},
+		{ListZigbee, "exportZigbeeDevices", "Former path of the wireless device list", true},
+		{ListKNX, "exportKnxDevices", "Export the KNX device list (XLSX)", false},
 	} {
 		huma.Register(api, huma.Operation{
 			OperationID: kind.id,
 			Method:      http.MethodGet,
 			Path:        "/api/versions/{versionId}/exports/" + kind.key + ".xlsx",
 			Summary:     kind.summary,
-			Description: "One sheet per bus line or gateway (D423).",
+			Description: "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
 			Tags:        []string{tag},
+			Hidden:      kind.hidden,
 			Responses:   fileResponse("The XLSX file"),
 		}, func(ctx context.Context, in *versionParam) (*huma.StreamResponse, error) {
 			e, err := svc.CommissioningList(ctx, in.VersionID, kind.key)

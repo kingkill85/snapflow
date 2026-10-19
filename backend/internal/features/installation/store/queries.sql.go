@@ -11,6 +11,59 @@ import (
 	"github.com/google/uuid"
 )
 
+const copyGroupAddressGroups = `-- name: CopyGroupAddressGroups :exec
+INSERT INTO group_address_groups (tenant_id, version_id, plan_id, zone_id, main, middle)
+SELECT $1::uuid, $2::uuid, COALESCE((m.map ->> g.plan_id::text)::uuid, g.plan_id), g.zone_id, g.main, g.middle
+FROM group_address_groups g, (SELECT $3::jsonb AS map) m
+WHERE g.version_id = $4::uuid
+`
+
+type CopyGroupAddressGroupsParams struct {
+	TenantID uuid.UUID
+	TargetID uuid.UUID
+	PlanMap  []byte
+	SourceID uuid.UUID
+}
+
+// CopyGroupAddressGroups copies the groups of a version into another with
+// the plan ids mapped (a JSON object source id -> copy id); groups of
+// removed plans keep their plan id, so their numbers stay reserved.
+func (q *Queries) CopyGroupAddressGroups(ctx context.Context, arg CopyGroupAddressGroupsParams) error {
+	_, err := q.db.Exec(ctx, copyGroupAddressGroups,
+		arg.TenantID,
+		arg.TargetID,
+		arg.PlanMap,
+		arg.SourceID,
+	)
+	return err
+}
+
+const copyGroupAddresses = `-- name: CopyGroupAddresses :exec
+INSERT INTO group_addresses (tenant_id, version_id, need_plan_id, need_id, object_key, main, middle, sub, name)
+SELECT $1::uuid, $2::uuid, COALESCE((m.map ->> a.need_plan_id::text)::uuid, a.need_plan_id), a.need_id,
+    a.object_key, a.main, a.middle, a.sub, a.name
+FROM group_addresses a, (SELECT $3::jsonb AS map) m
+WHERE a.version_id = $4::uuid
+`
+
+type CopyGroupAddressesParams struct {
+	TenantID uuid.UUID
+	TargetID uuid.UUID
+	PlanMap  []byte
+	SourceID uuid.UUID
+}
+
+// CopyGroupAddresses: as CopyGroupAddressGroups.
+func (q *Queries) CopyGroupAddresses(ctx context.Context, arg CopyGroupAddressesParams) error {
+	_, err := q.db.Exec(ctx, copyGroupAddresses,
+		arg.TenantID,
+		arg.TargetID,
+		arg.PlanMap,
+		arg.SourceID,
+	)
+	return err
+}
+
 const deleteDocument = `-- name: DeleteDocument :execrows
 DELETE FROM generated_documents WHERE id = $1
 `
@@ -121,6 +174,32 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 	return i, err
 }
 
+const insertGroupAddressGroup = `-- name: InsertGroupAddressGroup :exec
+INSERT INTO group_address_groups (tenant_id, version_id, plan_id, zone_id, main, middle)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertGroupAddressGroupParams struct {
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	PlanID    uuid.UUID
+	ZoneID    uuid.UUID
+	Main      int16
+	Middle    int16
+}
+
+func (q *Queries) InsertGroupAddressGroup(ctx context.Context, arg InsertGroupAddressGroupParams) error {
+	_, err := q.db.Exec(ctx, insertGroupAddressGroup,
+		arg.TenantID,
+		arg.VersionID,
+		arg.PlanID,
+		arg.ZoneID,
+		arg.Main,
+		arg.Middle,
+	)
+	return err
+}
+
 const listDocuments = `-- name: ListDocuments :many
 SELECT id, tenant_id, version_id, kind, seq, number, exporter, language, file_id, file_name, created_by, created_at FROM generated_documents WHERE version_id = $1 ORDER BY created_at DESC, kind, seq DESC
 `
@@ -147,6 +226,72 @@ func (q *Queries) ListDocuments(ctx context.Context, versionID uuid.UUID) ([]Gen
 			&i.FileName,
 			&i.CreatedBy,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupAddressGroups = `-- name: ListGroupAddressGroups :many
+SELECT tenant_id, version_id, plan_id, zone_id, main, middle FROM group_address_groups WHERE version_id = $1 ORDER BY main, middle
+`
+
+func (q *Queries) ListGroupAddressGroups(ctx context.Context, versionID uuid.UUID) ([]GroupAddressGroup, error) {
+	rows, err := q.db.Query(ctx, listGroupAddressGroups, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GroupAddressGroup{}
+	for rows.Next() {
+		var i GroupAddressGroup
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.VersionID,
+			&i.PlanID,
+			&i.ZoneID,
+			&i.Main,
+			&i.Middle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupAddresses = `-- name: ListGroupAddresses :many
+SELECT tenant_id, version_id, need_plan_id, need_id, object_key, main, middle, sub, name, updated_at FROM group_addresses WHERE version_id = $1 ORDER BY main, middle, sub
+`
+
+func (q *Queries) ListGroupAddresses(ctx context.Context, versionID uuid.UUID) ([]GroupAddress, error) {
+	rows, err := q.db.Query(ctx, listGroupAddresses, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GroupAddress{}
+	for rows.Next() {
+		var i GroupAddress
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.VersionID,
+			&i.NeedPlanID,
+			&i.NeedID,
+			&i.ObjectKey,
+			&i.Main,
+			&i.Middle,
+			&i.Sub,
+			&i.Name,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -204,4 +349,40 @@ func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertGroupAddress = `-- name: UpsertGroupAddress :exec
+INSERT INTO group_addresses (tenant_id, version_id, need_plan_id, need_id, object_key, main, middle, sub, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (version_id, need_plan_id, need_id, object_key) DO UPDATE SET name = EXCLUDED.name, updated_at = now()
+WHERE group_addresses.name <> EXCLUDED.name
+`
+
+type UpsertGroupAddressParams struct {
+	TenantID   uuid.UUID
+	VersionID  uuid.UUID
+	NeedPlanID uuid.UUID
+	NeedID     uuid.UUID
+	ObjectKey  string
+	Main       int16
+	Middle     int16
+	Sub        int16
+	Name       string
+}
+
+// UpsertGroupAddress inserts a new group address or renames an existing one
+// (its number never changes).
+func (q *Queries) UpsertGroupAddress(ctx context.Context, arg UpsertGroupAddressParams) error {
+	_, err := q.db.Exec(ctx, upsertGroupAddress,
+		arg.TenantID,
+		arg.VersionID,
+		arg.NeedPlanID,
+		arg.NeedID,
+		arg.ObjectKey,
+		arg.Main,
+		arg.Middle,
+		arg.Sub,
+		arg.Name,
+	)
+	return err
 }

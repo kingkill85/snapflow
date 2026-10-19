@@ -109,6 +109,7 @@ export const functionType = (n: number, over: Partial<FunctionType> = {}): Funct
   key: n === 1 ? 'dimmable_light' : `function_${n}`,
   name: { en: n === 1 ? 'Dimmable light' : `Function ${n}` },
   allowsCircuit: false,
+  knxObjects: [],
   isActive: true,
   loadTypeIds: [],
   createdAt: at,

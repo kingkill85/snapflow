@@ -5,9 +5,12 @@ package functiontypes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +33,7 @@ type FunctionType struct {
 	AllowsCircuit bool        `json:"allowsCircuit" doc:"Several needs of this function may share one channel (a circuit)"`
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds" doc:"The load types a need of this function may have; empty = any"`
 	IsActive      bool        `json:"isActive" doc:"Inactive: kept on existing needs (with a warning), not chosen for new ones"`
+	KNXObjects    []KNXObject `json:"knxObjects" doc:"The KNX communication objects of a need of this function (one group address each)"`
 	CreatedAt     time.Time   `json:"createdAt"`
 	UpdatedAt     time.Time   `json:"updatedAt"`
 }
@@ -40,7 +44,21 @@ type FunctionTypeInput struct {
 	AllowsCircuit *bool       `json:"allowsCircuit,omitempty" doc:"Several needs may share one channel (default false); on update, left out keeps the stored value (D294)"`
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)"`
 	IsActive      *bool       `json:"isActive,omitempty" doc:"Default true; on update, left out keeps the stored value (D294)"`
+	KNXObjects    []KNXObject `json:"knxObjects,omitempty" maxItems:"32" doc:"KNX communication objects (keys unique); on update, left out keeps the stored ones (D294)"`
 }
+
+// KNXObject is a KNX communication object of a function: a group address
+// per need in the KNX export (D422).
+type KNXObject struct {
+	Key  string    `json:"key" minLength:"1" maxLength:"64" example:"switch_status" doc:"Stable identifier, lower snake case, unique per function type"`
+	Name i18n.Text `json:"name" doc:"Object name per locale (part of the group address name); \"en\" is required"`
+	DPST string    `json:"dpst" maxLength:"32" example:"DPST-1-1" doc:"ETS datapoint subtype"`
+}
+
+// MaxKNXObjects bounds the objects of a function type.
+const MaxKNXObjects = 32
+
+var dpstPattern = regexp.MustCompile(`^DPST-\d{1,3}-\d{1,5}$`)
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
@@ -116,14 +134,22 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 	}
 	// Names are stored trimmed, blank translations dropped (as for the other catalog texts).
 	in.Name = in.Name.Trimmed()
+	in.KNXObjects = trimObjects(in.KNXObjects)
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
+	objects, err := marshalObjects(in.KNXObjects)
+	if err != nil {
+		return FunctionType{}, err
+	}
+	if objects == nil {
+		objects = []byte("[]")
+	}
 	var row store.FunctionType
-	err := s.inTx(ctx, func(q *store.Queries) error {
+	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name,
-			AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit, IsActive: in.IsActive == nil || *in.IsActive})
+			AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit, IsActive: in.IsActive == nil || *in.IsActive, KnxObjects: objects})
 		if err != nil {
 			return err
 		}
@@ -141,11 +167,16 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	}
 	// Names are stored trimmed, blank translations dropped (as for the other catalog texts).
 	in.Name = in.Name.Trimmed()
+	in.KNXObjects = trimObjects(in.KNXObjects)
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
+	objects, err := marshalObjects(in.KNXObjects)
+	if err != nil {
+		return FunctionType{}, err
+	}
 	var row store.FunctionType
-	err := s.inTx(ctx, func(q *store.Queries) error {
+	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		// Left-out flags keep the stored values (D294).
 		allowsCircuit, isActive := in.AllowsCircuit, in.IsActive
@@ -162,7 +193,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 			}
 		}
 		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name,
-			AllowsCircuit: *allowsCircuit, IsActive: *isActive})
+			AllowsCircuit: *allowsCircuit, IsActive: *isActive, KnxObjects: objects})
 		if err != nil || in.LoadTypeIDs == nil {
 			return err
 		}
@@ -214,10 +245,61 @@ func validate(in FunctionTypeInput) error {
 		}
 		seen[id] = true
 	}
+	if len(in.KNXObjects) > MaxKNXObjects {
+		errs = append(errs, apperr.Field("body.knxObjects", "validation.too_many", "too many objects").With("max", MaxKNXObjects))
+	}
+	keys := map[string]bool{}
+	for i, o := range in.KNXObjects {
+		at := fmt.Sprintf("body.knxObjects[%d]", i)
+		switch {
+		case !keyPattern.MatchString(o.Key):
+			errs = append(errs, apperr.Field(at+".key", "function_type.key_format", "key must be lower snake case"))
+		case keys[o.Key]:
+			errs = append(errs, apperr.Field(at+".key", "function_type.knx_object_duplicate", "object key listed twice").With("key", o.Key))
+		}
+		keys[o.Key] = true
+		errs = append(errs, o.Name.Check(at+".name", 100)...)
+		if !o.Name.Valid() {
+			errs = append(errs, apperr.Field(at+".name.en", "validation.required", "English name is required"))
+		}
+		if !dpstPattern.MatchString(o.DPST) {
+			errs = append(errs, apperr.Field(at+".dpst", "function_type.dpst_format", "datapoint subtype like DPST-1-1"))
+		}
+	}
 	if len(errs) > 0 {
 		return apperr.Validation(errs...)
 	}
 	return nil
+}
+
+func trimObjects(os []KNXObject) []KNXObject {
+	for i := range os {
+		os[i].Key = strings.TrimSpace(os[i].Key)
+		os[i].Name = os[i].Name.Trimmed()
+		os[i].DPST = strings.TrimSpace(os[i].DPST)
+	}
+	return os
+}
+
+// marshalObjects: nil for nil (keep the stored objects on update).
+func marshalObjects(os []KNXObject) ([]byte, error) {
+	if os == nil {
+		return nil, nil
+	}
+	return json.Marshal(os)
+}
+
+func objectsOf(raw []byte) []KNXObject {
+	var out []KNXObject
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &out); err != nil {
+			slog.Warn("function type: knx objects unreadable", "error", err)
+		}
+	}
+	if out == nil {
+		out = []KNXObject{}
+	}
+	return out
 }
 
 func mapErr(err error, key ...string) error {
@@ -256,5 +338,5 @@ func fromRow(r store.FunctionType, loadTypes []uuid.UUID) FunctionType {
 		loadTypes = []uuid.UUID{}
 	}
 	return FunctionType{ID: r.ID, Key: r.Key, Name: r.Name, AllowsCircuit: r.AllowsCircuit, LoadTypeIDs: loadTypes,
-		IsActive: r.IsActive, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+		IsActive: r.IsActive, KNXObjects: objectsOf(r.KnxObjects), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }

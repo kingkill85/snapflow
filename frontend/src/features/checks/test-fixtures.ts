@@ -44,8 +44,8 @@ export const outputKinds: OutputKind[] = [
   kind(blindKind, 'blind_output', 'Blind output', 'Jalousieausgang', [blind], 3),
 ]
 export const functionTypes: FunctionType[] = [
-  { id: light, key: 'light', name: { en: 'Light', de: 'Licht' }, allowsCircuit: true, isActive: true, loadTypeIds: [], createdAt: stamp, updatedAt: stamp },
-  { id: blind, key: 'blind', name: { en: 'Blind', de: 'Jalousie' }, allowsCircuit: false, isActive: true, loadTypeIds: [], createdAt: stamp, updatedAt: stamp },
+  { id: light, key: 'light', name: { en: 'Light', de: 'Licht' }, allowsCircuit: true, isActive: true, loadTypeIds: [], knxObjects: [], createdAt: stamp, updatedAt: stamp },
+  { id: blind, key: 'blind', name: { en: 'Blind', de: 'Jalousie' }, allowsCircuit: false, isActive: true, loadTypeIds: [], knxObjects: [], createdAt: stamp, updatedAt: stamp },
 ]
 export const loadTypes: LoadType[] = []
 

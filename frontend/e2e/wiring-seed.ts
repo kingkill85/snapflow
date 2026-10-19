@@ -30,8 +30,19 @@ export async function wiringSeed(api: Api, { systemKey = 'knx' }: { systemKey?: 
   // Own function types and output kinds, so other specs' catalog data does not take part.
   const lightName = unique('Light')
   const blindName = unique('Blind')
-  const light = await post('/api/function-types', { key: uniqueKey('light'), name: text(lightName), allowsCircuit: true })
-  const blind = await post('/api/function-types', { key: uniqueKey('blind'), name: text(blindName) })
+  // KNX objects (catalog data, D422): the group addresses of a need.
+  const object = (key: string, en: string, dpst: string) => ({ key, name: { en }, dpst })
+  const light = await post('/api/function-types', {
+    key: uniqueKey('light'),
+    name: text(lightName),
+    allowsCircuit: true,
+    knxObjects: [object('switch', 'Switch', 'DPST-1-1'), object('switch_status', 'Switch status', 'DPST-1-1')],
+  })
+  const blind = await post('/api/function-types', {
+    key: uniqueKey('blind'),
+    name: text(blindName),
+    knxObjects: [object('up_down', 'Up/Down', 'DPST-1-8'), object('stop_step', 'Stop/Step', 'DPST-1-7')],
+  })
   const kind = (key: string, en: string, functionTypeIds: string[], alternatives: object[] = []) =>
     post('/api/output-kinds', { key: uniqueKey(key), name: text(unique(en)), isActive: true, functionTypeIds, alternatives })
   const dimmerKind = await kind('dim', 'Dimmer output', [light.id])

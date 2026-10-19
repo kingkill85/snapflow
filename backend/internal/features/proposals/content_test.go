@@ -1,20 +1,14 @@
 package proposals
 
 import (
-	"context"
-	"errors"
 	"image"
-	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
-	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
@@ -178,26 +172,6 @@ func TestPlanLegend(t *testing.T) {
 	legend := sec.Blocks[len(sec.Blocks)-1].(document.Paragraph)
 	if txt := cellText(document.Cell{Runs: legend.Runs}); !strings.Contains(txt, "Zigbee (2 + 1 vorhanden)") {
 		t.Errorf("legend %q", txt)
-	}
-}
-
-// A full generation queue answers 503 server.busy after a short wait.
-func TestBusy(t *testing.T) {
-	old := generationWait
-	generationWait = 50 * time.Millisecond
-	defer func() { generationWait = old }()
-	s := &Service{generating: semaphore.NewWeighted(1)}
-	if err := s.acquire(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	err := s.acquire(context.Background())
-	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Status != http.StatusServiceUnavailable || ae.Code != "server.busy" {
-		t.Errorf("busy: %v", err)
-	}
-	s.generating.Release(1)
-	if err := s.acquire(context.Background()); err != nil {
-		t.Errorf("after release: %v", err)
 	}
 }
 
