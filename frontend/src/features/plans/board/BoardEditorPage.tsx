@@ -15,7 +15,7 @@ import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 
 import { saveOnUnload } from '../api'
-import { paletteProducts, useCatalogVariants } from '../editor/catalog'
+import { useCatalogVariants } from '../editor/catalog'
 import { canRedo, canUndo } from '../editor/history'
 import { LockBanner } from '../editor/LockBanner'
 import { Palette } from '../editor/Palette'
@@ -28,13 +28,12 @@ import {
   type BoardModuleDoc,
   boardCapacity,
   boardDocumentOf,
+  boardPaletteProducts,
   boardUsed,
   copyModules,
-  enclosureSize,
   enclosureVariants,
   moduleWidth,
   newModule,
-  onBoard,
   slotIn,
   toBoardInput,
 } from './board'
@@ -130,10 +129,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
   // Capabilities: the catalog's (current) or, for a variant no longer listed, the last response's.
   const caps = useCallback((variantId: string): Capabilities | undefined => variantsById.get(variantId)?.capabilities ?? server.capabilities[variantId], [variantsById, server.capabilities])
   const widthOf = useCallback((m: BoardModuleDoc) => moduleWidth(m.variantId, caps), [caps])
-  const products = useMemo(
-    () => paletteProducts(variants.filter((v) => onBoard(v.capabilities) && !enclosureSize(v.capabilities)), project.productTypeIds),
-    [variants, project.productTypeIds],
-  )
+  const products = useMemo(() => boardPaletteProducts(variants, project.productTypeIds), [variants, project.productTypeIds])
   const enclosures = useMemo(() => enclosureVariants(variants, project.productTypeIds), [variants, project.productTypeIds])
 
   const warnings = useMemo(() => {

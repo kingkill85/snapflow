@@ -1,5 +1,7 @@
 import type { BoardContent, BoardContentInput, BoardModule, Capabilities, VariantSearchItem } from '@/api/generated/model'
 
+import { type PaletteProduct, paletteProducts } from '../editor/catalog'
+
 // The board editor's document (step 3c): what PUT /api/plans/{id}/board takes,
 // without the server-computed widths and totals. Immutable like the floorplan
 // document; `applyBoardAction` returns the same object when nothing changes.
@@ -258,4 +260,9 @@ export const onBoard = (caps: Capabilities | undefined) => caps?.mounting === 'b
 /** A new module of a variant at a place. */
 export function newModule(variantId: string, rowId: string, offsetTe: number): BoardModuleDoc {
   return { id: newId(), variantId, rowId, offsetTe, label: '', existing: false, addonVariantIds: [], instanceValues: {} }
+}
+
+/** The board palette: available products of the project's types whose effective mounting is board or both; enclosures are chosen on the Board tab instead. */
+export function boardPaletteProducts(variants: VariantSearchItem[], productTypeIds: string[]): PaletteProduct[] {
+  return paletteProducts(variants.filter((v) => onBoard(v.capabilities) && enclosureSize(v.capabilities) === null), productTypeIds)
 }
