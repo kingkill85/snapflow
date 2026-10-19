@@ -4,7 +4,7 @@ import { ApiError } from '@/api/client'
 
 import { catalog, placement, variant, zigbeeId } from '../test-fixtures'
 import { defaultPlacementSize, groupPalette, paletteProducts } from './catalog'
-import { duplicatePlacements } from './placements'
+import { clampGeometry, clampMove, duplicatePlacements } from './placements'
 import { saveErrorsByItem } from './save-errors'
 import { shortcutOf } from './use-shortcuts'
 
@@ -78,5 +78,31 @@ describe('shortcuts', () => {
     const [copy] = duplicatePlacements([placement(1, { zoneId: 'z' })], 20, 20)
     expect(copy.id).not.toBe(placement(1).id)
     expect(copy).toMatchObject({ x: 120, y: 120, zoneId: null, variantId: placement(1).variantId })
+  })
+})
+
+describe('keeping edits inside the image', () => {
+  const image = { width: 1000, height: 800 }
+  const zone = { id: 'z', name: 'Z', color: '#000000', opacity: 1, points: [[900, 700], [990, 700], [990, 790]] }
+
+  it('stops a move of placements and zones at the image edge', () => {
+    const doc = { placements: [placement(1, { x: 100, y: 100 }), placement(2, { x: 950, y: 100 })], zones: [zone] }
+    const ids = [placement(1).id, placement(2).id]
+    expect(clampMove(doc, ids, 100, 0, image)).toEqual({ dx: 50, dy: 0 })
+    expect(clampMove(doc, ids, -200, -500, image)).toEqual({ dx: -100, dy: -100 })
+    expect(clampMove(doc, ['z'], 30, 30, image)).toEqual({ dx: 10, dy: 10 })
+    expect(clampMove(doc, ['z'], -5, -5, image)).toEqual({ dx: -5, dy: -5 })
+  })
+
+  it('keeps duplicates at the edge inside the image', () => {
+    const [copy] = duplicatePlacements([placement(1, { x: 990, y: 795 })], 20, 20, image)
+    expect(copy).toMatchObject({ x: 1000, y: 800 })
+    const [free] = duplicatePlacements([placement(1, { x: 100, y: 100 })], 20, 20, image)
+    expect(free).toMatchObject({ x: 120, y: 120 })
+  })
+
+  it('clamps inspector positions and sizes', () => {
+    expect(clampGeometry({ x: -5, y: 900 }, image)).toEqual({ x: 0, y: 800 })
+    expect(clampGeometry({ width: 2000, height: 50 }, image)).toEqual({ width: 1000, height: 50 })
   })
 })

@@ -97,6 +97,21 @@ describe('canvas geometry', () => {
     expect(resizeBox(box, 'nw', { x: 100, y: 100 }, false, 1)).toMatchObject({ width: 1, height: 1 })
   })
 
+  it('keeps a resized box within the image: size at most the image, centre inside', () => {
+    const image = { width: 100, height: 80 }
+    const box = { x: 90, y: 40, width: 20, height: 10, rotation: 0 }
+    const free = resizeBox(box, 'se', { x: 500, y: 500 }, false, 1, image)
+    expect(free.width).toBeLessThanOrEqual(100)
+    expect(free.height).toBeLessThanOrEqual(80)
+    expect(free.x).toBeLessThanOrEqual(100)
+    expect(free.y).toBeLessThanOrEqual(80)
+    const kept = resizeBox(box, 'se', { x: 900, y: 500 }, true, 1, image)
+    expect(kept.width).toBeLessThanOrEqual(100)
+    expect(kept.height).toBeLessThanOrEqual(80)
+    expect(kept.width / kept.height).toBeCloseTo(2)
+    expect(resizeBox(box, 'nw', { x: -500, y: -500 }, false, 1, image)).toMatchObject({ width: 100, height: 80 })
+  })
+
   it('resizes a rotated box in its own frame', () => {
     const box = { x: 0, y: 0, width: 10, height: 10, rotation: 90 }
     // The se corner of a box turned by 90° sits at the screen's bottom left.

@@ -202,6 +202,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     state,
     dispatch,
     editable,
+    image: plan.image,
     onEscape: () => setArmed(null),
     selectable: () => visibleIds(state.history.present, layers, variantsById),
   })
@@ -386,6 +387,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           placements={selectedPlacements}
           zones={selectedZones}
           allPlacements={doc.placements}
+          image={plan.image}
           resizeAll={resizeAll}
           onResizeAll={setResizeAll}
           activeVertex={activeVertex}

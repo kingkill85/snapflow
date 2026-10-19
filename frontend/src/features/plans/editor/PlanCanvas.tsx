@@ -33,7 +33,7 @@ import type { PlanDocument } from './document'
 import type { EditorAction } from './editor-state'
 import { chromeName } from './export'
 import { type Layers, placementVisible, zoneVisible } from './layers'
-import { duplicatePlacements, resizeChanges } from './placements'
+import { clampMove, duplicatePlacements, resizeChanges } from './placements'
 import {
   canClose,
   clampToImage,
@@ -302,12 +302,15 @@ export function PlanCanvas({
     if (draft) setDraft({ ...draft, cursor: clampPoint(point) })
     if (!interaction) return
     switch (interaction.kind) {
-      case 'move':
-        setInteraction({ ...interaction, dx: point.x - interaction.start.x, dy: point.y - interaction.start.y })
+      case 'move': {
+        // Every moved centre and corner stays inside the image.
+        const d = clampMove(document, interaction.ids, point.x - interaction.start.x, point.y - interaction.start.y, plan.image)
+        setInteraction({ ...interaction, ...d })
         break
+      }
       case 'resize': {
         const p = placementById.get(interaction.id)
-        if (p) setInteraction({ ...interaction, preview: { ...p, ...resizeBox(p, interaction.corner, point, !evt.shiftKey) } })
+        if (p) setInteraction({ ...interaction, preview: { ...p, ...resizeBox(p, interaction.corner, point, !evt.shiftKey, 1, plan.image) } })
         break
       }
       case 'rotate': {
@@ -337,10 +340,10 @@ export function PlanCanvas({
       case 'move': {
         // A click without moving (less than 2 screen px) is no step.
         if (Math.hypot(done.dx, done.dy) < 2 * k) return
-        const dx = Math.round(done.dx)
-        const dy = Math.round(done.dy)
+        // Rounded to whole pixels, still inside the image.
+        const { dx, dy } = clampMove(document, done.ids, Math.round(done.dx), Math.round(done.dy), plan.image)
         if (done.copy) {
-          const copies = duplicatePlacements(document.placements.filter((p) => done.ids.includes(p.id)), dx, dy)
+          const copies = duplicatePlacements(document.placements.filter((p) => done.ids.includes(p.id)), dx, dy, plan.image)
           if (copies.length > 0) dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select: copies.map((c) => c.id) })
         } else {
           dispatch({ type: 'change', action: { type: 'moveBy', ids: done.ids, dx, dy } })

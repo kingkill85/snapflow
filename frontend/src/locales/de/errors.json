@@ -123,6 +123,7 @@
   },
   "plan": {
     "not_found": "Dieser Plan existiert nicht mehr.",
+    "image_not_found": "Dieses Planbild wurde ersetzt. Laden Sie die Seite neu.",
     "name_taken": "Diese Version hat bereits einen Plan namens „{{name}}“.",
     "stale": "Jemand anderes hat diesen Plan inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor.",
     "locked": "{{name}} bearbeitet diesen Plan (bis {{expiresAt}}).",

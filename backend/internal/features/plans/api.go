@@ -23,6 +23,11 @@ type idParam struct {
 	ID uuid.UUID `path:"id" format:"uuid"`
 }
 
+type imageParam struct {
+	ID     uuid.UUID `path:"id" format:"uuid"`
+	FileID uuid.UUID `path:"fileId" format:"uuid"`
+}
+
 type versionParam struct {
 	VersionID uuid.UUID `path:"versionId" format:"uuid"`
 }
@@ -198,9 +203,10 @@ func Register(api huma.API, svc *Service) {
 	huma.Register(api, huma.Operation{
 		OperationID: "getPlanImage",
 		Method:      http.MethodGet,
-		Path:        "/api/plans/{id}/image",
+		Path:        "/api/plans/{id}/images/{fileId}",
 		Summary:     "Download a plan's image",
-		Description: "As GET /api/files/{id}, for whoever may read the plan.",
+		Description: "As GET /api/files/{id}, for whoever may read the plan. Use the plan's image.url: only the current " +
+			"image is served (plan.image_not_found otherwise), so the URL changes when the image is replaced.",
 		Tags:        []string{tag},
 		Responses: map[string]*huma.Response{
 			"200": {Description: "The image", Content: map[string]*huma.MediaType{
@@ -208,8 +214,8 @@ func Register(api huma.API, svc *Service) {
 			}},
 			"304": {Description: "Not modified"},
 		},
-	}, func(ctx context.Context, in *idParam) (*huma.StreamResponse, error) {
-		file, contents, err := svc.Image(ctx, in.ID)
+	}, func(ctx context.Context, in *imageParam) (*huma.StreamResponse, error) {
+		file, contents, err := svc.Image(ctx, in.ID, in.FileID)
 		if err != nil {
 			return nil, err
 		}

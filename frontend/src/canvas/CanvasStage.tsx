@@ -6,7 +6,7 @@ import { Image as KonvaImage, Layer, Stage } from 'react-konva'
 import { cn } from '@/lib/cn'
 
 import { distance, midpoint, type Point, type Size, screenToImage, type Viewport, wheelFactor, zoomAt } from './geometry'
-import { isTypingTarget } from './keyboard'
+import { isCanvasKeyTarget } from './keyboard'
 import { useHtmlImage } from './use-html-image'
 
 /** A pointer event on the canvas, with its position in image pixels. */
@@ -79,10 +79,10 @@ export function CanvasStage({
     return () => observer.disconnect()
   }, [onSize])
 
-  // Space held = pan (not while typing).
+  // Space held = pan, only when focus is not on a control that uses Space itself (a button, switch, field, ...).
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !isTypingTarget(e.target)) {
+      if (e.code === 'Space' && isCanvasKeyTarget(e.target)) {
         e.preventDefault()
         setSpace(true)
       }

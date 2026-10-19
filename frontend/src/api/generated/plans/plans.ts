@@ -482,17 +482,18 @@ export const useSavePlanContent = <TError = ErrorType<Error>,
       return useMutation(getSavePlanContentMutationOptions(options), queryClient);
     }
     /**
- * As GET /api/files/{id}, for whoever may read the plan.
+ * As GET /api/files/{id}, for whoever may read the plan. Use the plan's image.url: only the current image is served (plan.image_not_found otherwise), so the URL changes when the image is replaced.
  * @summary Download a plan's image
  */
 export const getPlanImage = (
     id: string,
+    fileId: string,
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<Blob>(
-      {url: `/api/plans/${id}/image`, method: 'GET',
+      {url: `/api/plans/${id}/images/${fileId}`, method: 'GET',
         responseType: 'blob', signal
     },
       );
@@ -501,29 +502,31 @@ export const getPlanImage = (
 
 
 
-export const getGetPlanImageQueryKey = (id: string,) => {
+export const getGetPlanImageQueryKey = (id: string,
+    fileId: string,) => {
     return [
-    `/api/plans/${id}/image`
+    `/api/plans/${id}/images/${fileId}`
     ] as const;
     }
 
 
-export const getGetPlanImageQueryOptions = <TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
+export const getGetPlanImageQueryOptions = <TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(id: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlanImageQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetPlanImageQueryKey(id,fileId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlanImage>>> = ({ signal }) => getPlanImage(id, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlanImage>>> = ({ signal }) => getPlanImage(id,fileId, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetPlanImageQueryResult = NonNullable<Awaited<ReturnType<typeof getPlanImage>>>
@@ -531,7 +534,8 @@ export type GetPlanImageQueryError = ErrorType<void>
 
 
 export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>> & Pick<
+ id: string,
+    fileId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPlanImage>>,
           TError,
@@ -541,7 +545,8 @@ export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>> & Pick<
+ id: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPlanImage>>,
           TError,
@@ -551,7 +556,8 @@ export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
+ id: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -559,11 +565,12 @@ export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>
  */
 
 export function useGetPlanImage<TData = Awaited<ReturnType<typeof getPlanImage>>, TError = ErrorType<void>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
+ id: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlanImage>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlanImageQueryOptions(id,options)
+  const queryOptions = getGetPlanImageQueryOptions(id,fileId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

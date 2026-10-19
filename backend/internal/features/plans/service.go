@@ -302,20 +302,32 @@ func (s *Service) Reorder(ctx context.Context, versionID uuid.UUID, ids []uuid.U
 	return s.List(ctx, versionID)
 }
 
-// Image opens a plan's image for download.
-func (s *Service) Image(ctx context.Context, id uuid.UUID) (files.File, io.ReadSeekCloser, error) {
+// imageURL is the download path of a plan's image. It names the file, so it
+// changes when the image is replaced and the response can be cached forever
+// (D211); the file id is only accepted for the plan's current image.
+func imageURL(planID, fileID uuid.UUID) string {
+	return "/api/plans/" + planID.String() + "/images/" + fileID.String()
+}
+
+// Image opens a plan's image for download. fileID must be the plan's current
+// image (an old URL after a replacement is plan.image_not_found).
+func (s *Service) Image(ctx context.Context, id, fileID uuid.UUID) (files.File, io.ReadSeekCloser, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
 		return files.File{}, nil, err
 	}
-	var fileID uuid.UUID
 	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
 		if _, err := s.readPlanVersion(ctx, actor, tx, q, id); err != nil {
 			return err
 		}
 		row, err := q.GetPlan(ctx, id)
-		fileID = row.ImageFileID
-		return notFound(err)
+		if err != nil {
+			return notFound(err)
+		}
+		if row.ImageFileID != fileID {
+			return apperr.NotFound("plan.image_not_found")
+		}
+		return nil
 	})
 	if err != nil {
 		return files.File{}, nil, err
@@ -442,7 +454,7 @@ func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.Ver
 	p := Plan{
 		ID: r.ID, VersionID: r.VersionID, ProjectID: ref.ProjectID, Kind: r.Kind, Name: r.Name, Position: r.Position,
 		Image: PlanImage{
-			FileID: r.ImageFileID, URL: "/api/plans/" + r.ID.String() + "/image", Width: r.ImageWidth, Height: r.ImageHeight,
+			URL: imageURL(r.ID, r.ImageFileID), Width: r.ImageWidth, Height: r.ImageHeight,
 		},
 		Scale: r.Scale, ZoneCount: r.ZoneCount, PlacementCount: r.PlacementCount,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, ContentUpdatedAt: r.ContentUpdatedAt,

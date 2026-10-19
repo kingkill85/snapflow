@@ -106,9 +106,11 @@ export type Corner = 'nw' | 'ne' | 'se' | 'sw'
 /**
  * Resizes a box by dragging one corner to `pointer` (image px); the opposite
  * corner stays put. With `keepAspect` the box keeps its width:height ratio
- * (the larger of both scale factors wins). Sizes stay at least `min`.
+ * (the larger of both scale factors wins). Sizes stay at least `min`; with
+ * `bounds` (the image size) they stay at most its width and height (keeping
+ * the aspect ratio when asked) and the centre stays inside it.
  */
-export function resizeBox(b: Box, corner: Corner, pointer: Point, keepAspect: boolean, min = 1): Box {
+export function resizeBox(b: Box, corner: Corner, pointer: Point, keepAspect: boolean, min = 1, bounds?: Size): Box {
   const centre = { x: b.x, y: b.y }
   // Work in the box's own (unrotated) frame.
   const local = rotatePoint(pointer, centre, -b.rotation)
@@ -122,8 +124,19 @@ export function resizeBox(b: Box, corner: Corner, pointer: Point, keepAspect: bo
     width = Math.max(min, b.width * f)
     height = Math.max(min, b.height * f)
   }
+  if (bounds) {
+    if (keepAspect) {
+      const f = Math.min(1, bounds.width / width, bounds.height / height)
+      width *= f
+      height *= f
+    } else {
+      width = Math.min(width, bounds.width)
+      height = Math.min(height, bounds.height)
+    }
+  }
   const localCentre = { x: anchor.x + (sx * width) / 2, y: anchor.y + (sy * height) / 2 }
   const c = rotatePoint(localCentre, centre, b.rotation)
+  if (bounds) return { ...b, x: clamp(c.x, 0, bounds.width), y: clamp(c.y, 0, bounds.height), width, height }
   return { ...b, x: c.x, y: c.y, width, height }
 }
 

@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react'
 
 import type { PlanPlacement } from '@/api/generated/model'
-import { isModKey, isTypingTarget } from '@/canvas'
+import { isCanvasKeyTarget, isModKey, isTypingTarget, type Size } from '@/canvas'
 
 import type { EditorAction, EditorState } from './editor-state'
-import { duplicateOffset, duplicatePlacements } from './placements'
+import { clampMove, duplicateOffset, duplicatePlacements } from './placements'
 
 type Options = {
   state: EditorState
   dispatch: (action: EditorAction) => void
   editable: boolean
+  /** The plan image: nudges, duplicates and pastes stay inside it. */
+  image: Size
   /** Esc also disarms a palette product. */
   onEscape: () => void
   /** What select-all selects (visible placements and zones); all placements by default. */
@@ -37,11 +39,11 @@ export function shortcutOf(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' 
  * the arrows (1 px, shift 10 px), duplicate, copy/paste within the plan,
  * select all, Esc. Never while typing in a field or with a dialog open.
  */
-export function useShortcuts({ state, dispatch, editable, onEscape, selectable }: Options) {
+export function useShortcuts({ state, dispatch, editable, image, onEscape, selectable }: Options) {
   const clipboard = useRef<PlanPlacement[]>([])
-  const latest = useRef({ state, editable, onEscape, selectable })
+  const latest = useRef({ state, editable, image, onEscape, selectable })
   useEffect(() => {
-    latest.current = { state, editable, onEscape, selectable }
+    latest.current = { state, editable, image, onEscape, selectable }
   })
 
   useEffect(() => {
@@ -49,7 +51,9 @@ export function useShortcuts({ state, dispatch, editable, onEscape, selectable }
       if (e.defaultPrevented || isTypingTarget(e.target)) return
       const command = shortcutOf(e)
       if (!command) return
-      const { state, editable, onEscape, selectable } = latest.current
+      // Plain keys (arrows, Delete, Backspace) belong to a focused control (button, switch, tab, ...).
+      if ((command === 'nudge' || command === 'delete') && !isCanvasKeyTarget(e.target)) return
+      const { state, editable, image, onEscape, selectable } = latest.current
       const doc = state.history.present
       const selected = doc.placements.filter((p) => state.selection.includes(p.id))
       const ids = state.selection
@@ -79,8 +83,15 @@ export function useShortcuts({ state, dispatch, editable, onEscape, selectable }
         case 'nudge': {
           if (ids.length === 0) return
           const step = e.shiftKey ? 10 : 1
-          const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
-          const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
+          const move = clampMove(
+            doc,
+            ids,
+            e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0,
+            e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0,
+            image,
+          )
+          const { dx, dy } = move
+          if (dx === 0 && dy === 0) return
           dispatch({ type: 'change', action: { type: 'moveBy', ids, dx, dy } })
           return
         }
@@ -88,7 +99,7 @@ export function useShortcuts({ state, dispatch, editable, onEscape, selectable }
         case 'paste': {
           const source = command === 'duplicate' ? selected : clipboard.current
           if (source.length === 0) return
-          const copies = duplicatePlacements(source, duplicateOffset, duplicateOffset)
+          const copies = duplicatePlacements(source, duplicateOffset, duplicateOffset, image)
           // Pasting again goes further down-right.
           if (command === 'paste') clipboard.current = copies
           dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select: copies.map((c) => c.id) })

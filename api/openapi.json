@@ -2333,17 +2333,14 @@
       "PlanImage": {
         "additionalProperties": false,
         "properties": {
-          "fileId": {
-            "type": "string"
-          },
           "height": {
             "format": "int32",
             "type": "integer"
           },
           "url": {
-            "description": "Download path: the plan's image endpoint (works also after the project moved to another tenant)",
+            "description": "Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant)",
             "examples": [
-              "/api/plans/3f2c…/image"
+              "/api/plans/3f2c…/images/9a1b…"
             ],
             "type": "string"
           },
@@ -2354,7 +2351,6 @@
           }
         },
         "required": [
-          "fileId",
           "url",
           "width",
           "height"
@@ -6576,14 +6572,23 @@
         ]
       }
     },
-    "/api/plans/{id}/image": {
+    "/api/plans/{id}/images/{fileId}": {
       "get": {
-        "description": "As GET /api/files/{id}, for whoever may read the plan.",
+        "description": "As GET /api/files/{id}, for whoever may read the plan. Use the plan's image.url: only the current image is served (plan.image_not_found otherwise), so the URL changes when the image is replaced.",
         "operationId": "getPlanImage",
         "parameters": [
           {
             "in": "path",
             "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fileId",
             "required": true,
             "schema": {
               "format": "uuid",

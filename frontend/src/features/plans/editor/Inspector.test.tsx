@@ -69,6 +69,7 @@ function Harness({ doc, selection, spy, initialVertex = null, resizeAll: initial
       allPlacements={present.placements}
       variants={variants}
       allVariants={catalog}
+      image={{ width: 1000, height: 800 }}
       warnings={new Map()}
       errors={new Map()}
       editable

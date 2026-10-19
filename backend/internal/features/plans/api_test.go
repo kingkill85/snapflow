@@ -3,6 +3,7 @@ package plans_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -503,9 +504,12 @@ func TestImageReplaceScales(t *testing.T) {
 		map[string]string{"name": "Ground", "expectedUpdatedAt": pl.UpdatedAt.Format(time.RFC3339Nano)}, pngImage(t, 2000, 1000))
 	wantCode(t, resp, http.StatusOK, "")
 	replaced := decode[plans.Plan](t, resp)
-	if replaced.Image.Width != 2000 || replaced.Image.FileID == pl.Image.FileID || !replaced.ContentUpdatedAt.After(before.ContentUpdatedAt) {
+	if replaced.Image.Width != 2000 || replaced.Image.URL == pl.Image.URL || !replaced.ContentUpdatedAt.After(before.ContentUpdatedAt) {
 		t.Errorf("replaced: %+v", replaced)
 	}
+	// The new image is served under its own URL; the old URL is gone (D211).
+	wantCode(t, api.Get(replaced.Image.URL, user.Cookie), http.StatusOK, "")
+	wantCode(t, api.Get(pl.Image.URL, user.Cookie), http.StatusNotFound, "plan.image_not_found")
 	after := getContent(t, api, user.Cookie, pl.ID)
 	got := after.Placements[0]
 	if got.X != 400 || got.Y != 400 || got.Width != 40 || got.Height != 40 || got.ZoneID == nil || *got.ZoneID != z {
@@ -545,7 +549,7 @@ func TestVersionCopy(t *testing.T) {
 	target := decode[struct{ ID uuid.UUID }](t, resp).ID
 	copied := decode[[]plans.Plan](t, api.Get("/api/versions/"+target.String()+"/plans", user.Cookie))
 	if len(copied) != 2 || copied[0].Name != "Ground" || copied[1].Name != "First" || copied[0].ID == pl.ID ||
-		copied[0].Image.FileID != pl.Image.FileID || copied[0].Lock != nil {
+		path.Base(copied[0].Image.URL) != path.Base(pl.Image.URL) || copied[0].Lock != nil {
 		t.Fatalf("copied plans: %+v", copied)
 	}
 	content := getContent(t, api, user.Cookie, copied[0].ID)

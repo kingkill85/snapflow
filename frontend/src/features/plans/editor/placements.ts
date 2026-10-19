@@ -1,4 +1,4 @@
-import type { PlanPlacement, VariantSearchItem } from '@/api/generated/model'
+import type { PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import { clamp, type Point, type Size } from '@/canvas'
 
 import { newId } from './document'
@@ -21,9 +21,53 @@ export function newPlacement(variant: VariantSearchItem, at: Point, size: Size, 
   }
 }
 
-/** Copies with new ids, moved by (dx, dy): duplicate, alt-drag and paste. */
-export function duplicatePlacements(placements: PlanPlacement[], dx: number, dy: number): PlanPlacement[] {
-  return placements.map((p) => ({ ...p, id: newId(), x: p.x + dx, y: p.y + dy, zoneId: null }))
+/**
+ * Copies with new ids, moved by (dx, dy): duplicate, alt-drag and paste. With
+ * the image size every copy's centre is kept inside the image (a copy at the
+ * edge stays at the edge instead of failing the save with plan.outside_image).
+ */
+export function duplicatePlacements(placements: PlanPlacement[], dx: number, dy: number, image?: Size): PlanPlacement[] {
+  return placements.map((p) => ({
+    ...p,
+    id: newId(),
+    x: image ? clamp(p.x + dx, 0, image.width) : p.x + dx,
+    y: image ? clamp(p.y + dy, 0, image.height) : p.y + dy,
+    zoneId: null,
+  }))
+}
+
+/**
+ * The move (dx, dy) of the items `ids` (placements and zones) limited so that
+ * every moved placement centre and zone corner stays inside the image (the
+ * backend refuses others with plan.outside_image). A drag or nudge past the
+ * edge stops at it.
+ */
+export function clampMove(doc: { placements: PlanPlacement[]; zones: PlanZone[] }, ids: string[], dx: number, dy: number, image: Size): { dx: number; dy: number } {
+  const set = new Set(ids)
+  const points: number[][] = [
+    ...doc.placements.filter((p) => set.has(p.id)).map((p) => [p.x, p.y]),
+    ...doc.zones.filter((z) => set.has(z.id)).flatMap((z) => z.points),
+  ]
+  if (points.length === 0) return { dx, dy }
+  const xs = points.map((p) => p[0])
+  const ys = points.map((p) => p[1])
+  // Never push items further out than they are (e.g. after an image replacement).
+  const lo = (min: number) => Math.min(0, -min)
+  const hi = (max: number, size: number) => Math.max(0, size - max)
+  return {
+    dx: clamp(dx, lo(Math.min(...xs)), hi(Math.max(...xs), image.width)),
+    dy: clamp(dy, lo(Math.min(...ys)), hi(Math.max(...ys), image.height)),
+  }
+}
+
+/** A placement geometry patch (inspector X/Y/W/H) kept valid for the image: centre inside, size above 0 and at most the image's. */
+export function clampGeometry(patch: { x?: number; y?: number; width?: number; height?: number }, image: Size) {
+  const out: { x?: number; y?: number; width?: number; height?: number } = {}
+  if (patch.x !== undefined) out.x = clamp(patch.x, 0, image.width)
+  if (patch.y !== undefined) out.y = clamp(patch.y, 0, image.height)
+  if (patch.width !== undefined) out.width = Math.min(patch.width, image.width)
+  if (patch.height !== undefined) out.height = Math.min(patch.height, image.height)
+  return out
 }
 
 /** How far duplicates and pastes are offset, in image pixels. */

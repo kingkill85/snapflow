@@ -29,25 +29,50 @@ export function polygonArea(points: number[][]): number {
   return Math.abs(sum) / 2
 }
 
-/** Ray casting: is the point inside the polygon (as the backend decides membership). */
+/** Whether p lies on the segment a-b (tiny tolerance for floating point); as `onSegment` in the backend's geometry.go. */
+function onSegment(p: Point, a: number[], b: number[]): boolean {
+  const eps = 1e-9
+  const cross = (b[0] - a[0]) * (p.y - a[1]) - (b[1] - a[1]) * (p.x - a[0])
+  const scale = Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1]))
+  if (Math.abs(cross) > eps * scale) return false
+  return (
+    p.x >= Math.min(a[0], b[0]) - eps &&
+    p.x <= Math.max(a[0], b[0]) + eps &&
+    p.y >= Math.min(a[1], b[1]) - eps &&
+    p.y <= Math.max(a[1], b[1]) + eps
+  )
+}
+
+/**
+ * Whether the point is inside the polygon or on its boundary: an exact port of
+ * the backend's `contains` (ray casting; a point on an edge or a corner counts
+ * as inside, so a device on a wall line belongs to the room).
+ */
 export function pointInPolygon(p: Point, points: number[][]): boolean {
   let inside = false
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const [xi, yi] = points[i]
-    const [xj, yj] = points[j]
-    if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) inside = !inside
+    const a = points[i]
+    const b = points[j]
+    if (onSegment(p, a, b)) return true
+    if (a[1] > p.y !== b[1] > p.y) {
+      const x = ((b[0] - a[0]) * (p.y - a[1])) / (b[1] - a[1]) + a[0]
+      if (p.x < x) inside = !inside
+    }
   }
   return inside
 }
 
-/** The zone a point belongs to: the smallest containing polygon (backend rule), else undefined. */
+/**
+ * The zone a point belongs to, as the backend's `zoneOf`: the smallest
+ * containing polygon by area; of equal areas the zone drawn last wins.
+ */
 export function zoneAt(p: Point, zones: PlanZone[]): PlanZone | undefined {
   let best: PlanZone | undefined
   let bestArea = Infinity
   for (const z of zones) {
-    if (z.points.length < minZonePoints || !pointInPolygon(p, z.points)) continue
+    if (!pointInPolygon(p, z.points)) continue
     const area = polygonArea(z.points)
-    if (area < bestArea) {
+    if (best === undefined || area <= bestArea) {
       best = z
       bestArea = area
     }
@@ -67,7 +92,7 @@ export function zoneCounts(saved: PlanPlacement[], current: PlanPlacement[], zon
   return { saved: savedCounts, estimate }
 }
 
-/** "Zone n" with the next free number (n = 1 + the highest number used by a zone named "<prefix> n"). */
+/** "Zone n" with the lowest free number: the smallest n ≥ 1 not used by a zone named "<prefix> n" (D205). */
 export function nextZoneName(zones: PlanZone[], prefix: string): string {
   const pattern = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (\\d+)$`)
   const used = new Set(zones.flatMap((z) => (pattern.exec(z.name.trim()) ? [Number(pattern.exec(z.name.trim())?.[1])] : [])))

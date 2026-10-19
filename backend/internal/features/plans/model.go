@@ -41,10 +41,9 @@ type PlanLock struct {
 
 // PlanImage is a plan's background image.
 type PlanImage struct {
-	FileID uuid.UUID `json:"fileId"`
-	URL    string    `json:"url" doc:"Download path: the plan's image endpoint (works also after the project moved to another tenant)" example:"/api/plans/3f2c…/image"`
-	Width  int32     `json:"width" doc:"Natural pixels of the stored image; all coordinates are image pixels"`
-	Height int32     `json:"height"`
+	URL    string `json:"url" doc:"Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant)" example:"/api/plans/3f2c…/images/9a1b…"`
+	Width  int32  `json:"width" doc:"Natural pixels of the stored image; all coordinates are image pixels"`
+	Height int32  `json:"height"`
 }
 
 // Plan is a plan of a project version, without its content.

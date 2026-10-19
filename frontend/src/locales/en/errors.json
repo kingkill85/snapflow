@@ -123,6 +123,7 @@
   },
   "plan": {
     "not_found": "This plan no longer exists.",
+    "image_not_found": "This plan image has been replaced. Reload the page.",
     "name_taken": "This version already has a plan named \"{{name}}\".",
     "stale": "Someone else changed this plan in the meantime. Reload it and make your changes again.",
     "locked": "{{name}} is editing this plan (until {{expiresAt}}).",

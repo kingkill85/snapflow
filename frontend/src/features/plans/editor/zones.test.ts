@@ -40,6 +40,34 @@ describe('zone geometry', () => {
     expect(pointInPolygon({ x: -1, y: 5 }, triangle)).toBe(false)
   })
 
+  it('decides membership exactly as the backend (cases of geometry_test.go)', () => {
+    const sq = [[0, 0], [10, 0], [10, 10], [0, 10]]
+    const concave = [[0, 0], [10, 0], [10, 10], [5, 5], [0, 10]] // a notch at the top
+    const cases: [number[][], number, number, boolean][] = [
+      [sq, 5, 5, true],
+      [sq, 0, 0, true], // vertex
+      [sq, 10, 3, true], // edge
+      [sq, 10.001, 3, false],
+      [sq, -1, 5, false],
+      [concave, 5, 8, false], // in the notch
+      [concave, 5, 3, true],
+      [concave, 7.5, 7.5, true], // on the notch edge
+    ]
+    for (const [points, x, y, want] of cases) expect(pointInPolygon({ x, y }, points), `${x},${y}`).toBe(want)
+  })
+
+  it('gives equal areas to the zone drawn last, as the backend', () => {
+        const big = zone('big', [[0, 0], [100, 0], [100, 100], [0, 100]])
+    const small = zone('small', [[10, 10], [20, 10], [20, 20], [10, 20]])
+    const same = zone('same', [[10, 10], [20, 10], [20, 20], [10, 20]])
+    expect(zoneAt({ x: 15, y: 15 }, [small, big, same])?.id).toBe('same')
+    expect(zoneAt({ x: 50, y: 50 }, [small, big, same])?.id).toBe('big')
+    // On the shared wall of two rooms: the later one.
+    const left = zone('left', [[0, 0], [10, 0], [10, 10], [0, 10]])
+    const right = zone('right', [[10, 0], [20, 0], [20, 10], [10, 10]])
+    expect(zoneAt({ x: 10, y: 5 }, [left, right])?.id).toBe('right')
+  })
+
   it('assigns a point to the smallest containing zone', () => {
     const outer = zone('outer', square(0, 0, 100))
     const inner = zone('inner', square(10, 10, 20))

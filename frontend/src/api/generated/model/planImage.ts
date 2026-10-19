@@ -6,9 +6,8 @@
  */
 
 export interface PlanImage {
-  fileId: string;
   height: number;
-  /** Download path: the plan's image endpoint (works also after the project moved to another tenant) */
+  /** Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant) */
   url: string;
   /** Natural pixels of the stored image; all coordinates are image pixels */
   width: number;

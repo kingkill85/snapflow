@@ -9,13 +9,14 @@ import { AttributeValuesEditor } from '@/catalog/AttributeValuesEditor'
 import { type AttributeFormValue, toApiValue, toFormValue } from '@/catalog/attribute-values'
 import { useDecimalSeparator } from '@/catalog/decimal'
 import { Button, CheckboxField, ColorField, Field, SelectField, SwitchField, useFieldError } from '@/components/ui'
+import type { Size } from '@/canvas'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
 import type { PlacementPatch, ZonePatch } from './document'
 import type { EditorAction } from './editor-state'
 import type { ActiveVertex } from './PlanCanvas'
-import { resizeChanges } from './placements'
+import { clampGeometry, resizeChanges } from './placements'
 import { minZonePoints, removeVertex, zoneColors } from './zones'
 
 type Props = {
@@ -25,6 +26,8 @@ type Props = {
   allPlacements: PlanPlacement[]
   variants: Map<string, VariantSearchItem>
   allVariants: VariantSearchItem[]
+  /** The plan image: positions and sizes stay inside it. */
+  image: Size
   warnings: Map<string, PlanWarning[]>
   /** Save errors per item id, translated. */
   errors: Map<string, string[]>
@@ -166,7 +169,7 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
 }
 
 /** One placement: product, variant, add-ons, instance values, label, geometry, existing. */
-function PlacementInspector({ placement: p, allPlacements, variants, allVariants, warnings, errors, editable, dispatch, resizeAll, onResizeAll }: Props & { placement: PlanPlacement }) {
+function PlacementInspector({ placement: p, allPlacements, variants, allVariants, image, warnings, errors, editable, dispatch, resizeAll, onResizeAll }: Props & { placement: PlanPlacement }) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
 
@@ -204,10 +207,10 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
       <Field label={t('inspector.label')} value={p.label} maxLength={100} disabled={!editable} onChange={(e) => update({ label: e.target.value }, 'label')} />
       {variant && <InstanceValues key={p.id} placement={p} categoryId={variant.categoryId} editable={editable} dispatch={dispatch} />}
       <div className="grid grid-cols-2 gap-3">
-        <NumberField label={t('inspector.x')} value={p.x} suffix="px" disabled={!editable} onCommit={(x) => update({ x }, 'x')} />
-        <NumberField label={t('inspector.y')} value={p.y} suffix="px" disabled={!editable} onCommit={(y) => update({ y }, 'y')} />
-        <NumberField label={t('inspector.width')} value={p.width} suffix="px" disabled={!editable} onCommit={(width) => width > 0 && resize({ width }, 'width')} />
-        <NumberField label={t('inspector.height')} value={p.height} suffix="px" disabled={!editable} onCommit={(height) => height > 0 && resize({ height }, 'height')} />
+        <NumberField label={t('inspector.x')} value={p.x} suffix="px" disabled={!editable} onCommit={(x) => update(clampGeometry({ x }, image), 'x')} />
+        <NumberField label={t('inspector.y')} value={p.y} suffix="px" disabled={!editable} onCommit={(y) => update(clampGeometry({ y }, image), 'y')} />
+        <NumberField label={t('inspector.width')} value={p.width} suffix="px" disabled={!editable} onCommit={(width) => width > 0 && resize(clampGeometry({ width }, image), 'width')} />
+        <NumberField label={t('inspector.height')} value={p.height} suffix="px" disabled={!editable} onCommit={(height) => height > 0 && resize(clampGeometry({ height }, image), 'height')} />
         <NumberField label={t('inspector.rotation')} value={p.rotation} suffix="°" disabled={!editable} onCommit={(rotation) => update({ rotation }, 'rotation')} />
       </div>
       {variant && (
