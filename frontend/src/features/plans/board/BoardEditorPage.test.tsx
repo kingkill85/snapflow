@@ -14,7 +14,7 @@ import { BoardEditorPage } from './BoardEditorPage'
 
 const project: Project = { ...villa, id: projectId, productTypeIds: [zigbeeId] }
 const lock = { userId: 'me', name: 'Admin', expiresAt: '2026-10-18T10:02:00Z', mine: true }
-const board = plan(2, { kind: 'board', name: 'Main board', image: null, board: { enclosureVariantId: null, moduleCount: 0, capacityTe: 12, usedTe: 0 } })
+const board = plan(2, { kind: 'board', name: 'Main board', image: null, board: { enclosureVariantId: null, moduleCount: 0, capacityTe: 12, usedTe: 0, sketch: { rows: [{ capacityTe: 12 }], modules: [] } } })
 const row = pid(41)
 const catalog = [
   variant(1, { productName: { en: 'Power supply' }, capabilities: boardCaps(2) }),
@@ -25,6 +25,8 @@ const content = (over: Partial<BoardContent> = {}): BoardContent => ({
   contentUpdatedAt: '2026-10-18T10:00:00Z',
   enclosureVariantId: null,
   rowsFromEnclosure: false,
+  enclosureExisting: false,
+  enclosureDeleted: false,
   rows: [{ id: row, capacityTe: 12, usedTe: 0 }],
   modules: [],
   capacityTe: 12,
@@ -40,7 +42,11 @@ function serve(c = content(), p: Project = project) {
     http.get('/api/plans/:id', () => HttpResponse.json(board)),
     http.get('/api/plans/:id/board', () => HttpResponse.json(c)),
     http.get('/api/projects/:id', () => HttpResponse.json(p)),
-    http.get('/api/variants', () => HttpResponse.json({ items: catalog, total: catalog.length })),
+    http.get('/api/variants', ({ request }) => {
+      // The board palette needs the capabilities (mounting, widths).
+      if (new URL(request.url).searchParams.get('withCapabilities') !== 'true') return new HttpResponse(null, { status: 400 })
+      return HttpResponse.json({ items: catalog, total: catalog.length })
+    }),
     http.get('/api/output-kinds', () => HttpResponse.json({ items: [] })),
     http.get('/api/load-types', () => HttpResponse.json({ items: [] })),
     http.get('/api/products/:id', () => HttpResponse.json({ id: catalog[0].productId, variants: [{ id: catalog[0].id, addons: [] }] })),

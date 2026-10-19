@@ -55,7 +55,9 @@
     "editTitle": "Edit line",
     "name": "Name",
     "address": "Address",
-    "addressHint": "Optional, e.g. the KNX area/line or HDL subnet for programming"
+    "addressHint": "Optional, e.g. the KNX area/line or HDL subnet for programming",
+    "devicesMax": "Max. devices",
+    "devicesMaxHint": "Optional; empty uses the system's limit"
   },
   "wireless": {
     "systemDescription": "Wireless system",

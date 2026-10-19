@@ -160,7 +160,7 @@ The leave guard (save on leave, ask only when the save fails) is in `editor/Plan
 
 # Board editor (step 3c)
 
-Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab). Spec: `docs/specs/phase-3.md` → 3c.
+Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab), D372–D381 (review fixes). Spec: `docs/specs/phase-3.md` → 3c.
 
 | Where | What |
 | --- | --- |
@@ -170,11 +170,15 @@ Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab). Spec: `doc
 | `board/BoardEditorPage.tsx` | Loads plan, board content, project, catalog; `BoardEditor` wires lock, autosave, leave guard, shortcuts, toolbar (undo/redo, board totals), grid and panel (Products, Board, Inspector) |
 | `board/BoardGrid.tsx` | The DOM grid (D364): rails with ticks and row totals, module boxes, drag and drop (palette products and modules, preview of the landing slot), arrows/Delete/Enter on a focused module, Enter on a focused rail places the armed product |
 | `board/BoardPanels.tsx` | Board tab (`BoardSettings`: enclosure with the D357 notice, rows editor, `CapacityField`) and `ModuleInspector` (product/variant change refused when wider than the gap, row, add-ons, label, instance values, capability summary and channels, existing, delete) |
-| `board/BoardFormDialog.tsx`, `board/BoardThumbnail.tsx` | Add board (name + enclosure or rows) / rename; the card's SVG schematic |
+| `board/BoardFormDialog.tsx`, `board/BoardThumbnail.tsx` | Add board (name + enclosure or rows; enclosures loaded only while the dialog is open for create) / rename; the card's SVG schematic from `plan.board.sketch` (no request per card, D379) |
 | `board/board-errors.ts` | `body.modules[i].…` field errors of a refused save by module id |
 
 Rules: placements never overlap (D365) — every drop, move and copy goes through `slotIn`/`slotAnywhere`; a change that
-cannot find a free gap is refused with a notice. Widths come from the catalog's capabilities (D367), falling back to the
+cannot find a free gap is refused with a notice. Stored modules that overlap after a catalog width change keep their place
+(warning `module_overlap`, D374). Widths are `railWidthTe` rounded to 0.1 TE like the backend (D376); the enclosure fit
+is the backend's rule, and after a save whose rows differ (server-added rows) the editor adopts the saved content (D380).
+Arrow moves of one module merge into one undo step; after Delete the focus goes to a neighbour or the rail (D381).
+Cut/paste between boards gives modules new ids, so 3d connections do not follow them (D378). Widths come from the catalog's capabilities (D367), falling back to the
 last response's `capabilities` for variants no longer listed. Warnings per module come from the last load/save.
 
 Tests: `board/board.test.ts` (document, history, slots, keyboard moves, copies, enclosure fit, palette/enclosure filters,

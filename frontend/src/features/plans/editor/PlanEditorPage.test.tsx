@@ -90,6 +90,17 @@ const open = (prepare?: (client: QueryClient) => void) =>
   )
 
 describe('PlanEditorPage', () => {
+  it('says a board does not exist on the floorplan route, without asking for floorplan content', async () => {
+    // No handler for /content: a request for it would fail the test.
+    server.use(
+      http.get('/api/plans/:id', () => HttpResponse.json(plan(1, { kind: 'board', image: null }))),
+      http.get('/api/projects/:id', () => HttpResponse.json(project)),
+      http.get('/api/variants', () => HttpResponse.json({ items: catalog, total: catalog.length })),
+    )
+    open()
+    expect(await screen.findByText('This plan does not exist (anymore).')).toBeInTheDocument()
+  })
+
   it('takes the lock, places a palette product and autosaves it', async () => {
     const { saved, locks } = serve()
     const user = userEvent.setup()

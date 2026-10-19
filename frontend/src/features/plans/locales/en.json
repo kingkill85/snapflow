@@ -130,7 +130,8 @@
     "module_width_unknown": "The product's rail width is unknown: counted as 1 TE.",
     "module_mounting_floorplan": "This product is not meant for a board.",
     "row_overflow": "The module reaches beyond the row's capacity.",
-    "enclosure_size_unknown": "The enclosure's rows and TE per row are unknown: enter the rows yourself."
+    "enclosure_size_unknown": "The enclosure's rows and TE per row are unknown: enter the rows yourself.",
+    "module_overlap": "The module overlaps another one (its width changed in the catalog): move it."
   },
   "save": {
     "saved": "Saved",
@@ -286,6 +287,11 @@
     "phoneHint": "Boards are edited on larger screens. Here you can view the board.",
     "paletteHint": "Drag a product onto a rail, or click it and then the rail (or focus the rail and press Enter).",
     "armedHint": "Click a rail to place the product in the nearest free space. Esc cancels.",
-    "keyboardHint": "A selected module: arrows move it (left/right by 0.5 TE, up/down to another row), Delete removes it, Ctrl+D duplicates."
+    "keyboardHint": "A selected module: arrows move it (left/right by 0.5 TE, up/down to another row), Delete removes it, Ctrl+D duplicates.",
+    "enclosureExisting": "Enclosure already exists",
+    "enclosureExistingHint": "The customer already has it: it is not in the bill of materials.",
+    "enclosureDeleted": "The enclosure was deleted from the catalog. It stays on the board (and in the bill of materials as last saved) until you remove it.",
+    "removeEnclosure": "Remove enclosure",
+    "enclosureRemoved": "The deleted enclosure is removed with the next save."
   }
 }

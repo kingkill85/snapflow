@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
-import { type DragEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type DragEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { BoardWarning, VariantSearchItem } from '@/api/generated/model'
@@ -8,7 +8,7 @@ import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
 import { paletteDrag, productDragType } from '../editor/catalog'
-import { type BoardDocument, type BoardModuleDoc, keyboardMove, rowOverflows, rowUsed, slotIn } from './board'
+import { type BoardDocument, type BoardModuleDoc, focusAfterDelete, keyboardMove, rowOverflows, rowUsed, slotIn } from './board'
 import type { BoardEditorAction } from './board-state'
 
 /** The drag data type of a module moved on the board. */
@@ -122,14 +122,20 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
       e.preventDefault()
       if (!editable) return
       const to = keyboardMove(doc, m.id, direction, widthOf)
-      if (to) dispatch({ type: 'change', action: { type: 'updateModules', changes: [{ id: m.id, patch: to }] }, select: [m.id] })
+      // A run of arrow presses on one module is one undo step.
+      if (to) dispatch({ type: 'change', action: { type: 'updateModules', changes: [{ id: m.id, patch: to }] }, key: `${m.id}:move`, select: [m.id] })
       // Keep the focus on the moved module (it is re-rendered in another row).
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-module-id="${m.id}"]`)?.focus())
       return
     }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
-      if (editable) dispatch({ type: 'change', action: { type: 'remove', ids: selection.includes(m.id) ? selection : [m.id] } })
+      if (!editable) return
+      const ids = selection.includes(m.id) ? selection : [m.id]
+      const target = focusAfterDelete(doc, m, new Set(ids))
+      dispatch({ type: 'change', action: { type: 'remove', ids } })
+      // The focus stays on the board: the next module of the row, else the previous one, else the rail.
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(target.moduleId ? `[data-module-id="${target.moduleId}"]` : `[data-row-id="${target.rowId}"]`)?.focus())
       return
     }
     if (e.key === 'Enter' || e.key === ' ') {
@@ -180,12 +186,13 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
                       }
                     }}
                   >
-                    {/* The DIN rail with a tick per TE (every 5th longer). */}
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 border-y border-line bg-canvas" style={{ width }}>
-                      {Array.from({ length: Math.floor(row.capacityTe) + 1 }, (_, i) => (
-                        <span key={i} className={cn('absolute top-0 w-px bg-line', i % 5 === 0 ? 'h-3' : 'h-1.5')} style={{ left: i * pxPerTe }} />
-                      ))}
-                    </div>
+                    {/* The DIN rail with a tick per TE (every 5th longer), drawn by CSS gradients. */}
+                    <div
+                      aria-hidden="true"
+                      data-testid="rail"
+                      className="board-rail-ticks pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 border-y border-line bg-canvas"
+                      style={{ width, '--te': `${pxPerTe}px` } as CSSProperties}
+                    />
                     {/* Beyond the capacity: overflowing modules sit on a marked area. */}
                     {reach > width && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 border-l-2 border-dashed border-warning" style={{ left: width }} />}
                     {preview?.rowId === row.id && (

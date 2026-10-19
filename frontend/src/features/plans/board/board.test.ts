@@ -9,7 +9,9 @@ import {
   type BoardModuleDoc,
   boardPaletteProducts,
   copyModules,
+  enclosureSize,
   enclosureVariants,
+  fittedBySave,
   fitToEnclosure,
   keyboardMove,
   moduleWidth,
@@ -29,6 +31,8 @@ const mod = (n: number, rowId: string, offsetTe: number, variantId = 'w2'): Boar
 const widthOf = (m: BoardModuleDoc) => moduleWidth(m.variantId, (id) => (id === 'w2' ? boardCaps(2) : id === 'w4' ? boardCaps(4) : undefined))
 const doc = (modules: BoardModuleDoc[] = []): BoardDocument => ({
   enclosureVariantId: null,
+  enclosureExisting: false,
+  removeEnclosure: false,
   rows: [
     { id: r1, capacityTe: 12 },
     { id: r2, capacityTe: 12 },
@@ -134,6 +138,98 @@ describe('enclosure (D357)', () => {
     const grown = fitToEnclosure(doc(), { rows: 3, te: 12 }, widthOf)
     expect(grown.rows).toHaveLength(3)
     expect(grown.rows[2].id).not.toBe(r2)
+  })
+})
+
+// The same cases as the backend's enclosureSize / fitRows (plans/board.go):
+// client and server must fit a board identically (D357).
+describe('enclosure rule as the backend applies it', () => {
+  const enc = (rows: number, te: number) => boardCaps(0, { enclosureRows: rows, enclosureTePerRow: te, railWidthTe: undefined })
+  it.each([
+    [2, 12, { rows: 2, te: 12 }],
+    [2.7, 12, { rows: 2, te: 12 }],
+    [3, 12.34, { rows: 3, te: 12.3 }],
+    [3, 12.35, { rows: 3, te: 12.4 }],
+    [50, 999.9, { rows: 50, te: 999.9 }],
+    [51, 12, null],
+    [0.5, 12, null],
+    [2, 1000, null],
+    [2, 0.04, null],
+  ])('enclosureRows %s × %s TE → %j', (rows, te, want) => {
+    expect(enclosureSize(enc(rows, te))).toEqual(want)
+  })
+  it('is unknown without both values', () => {
+    expect(enclosureSize(boardCaps(0, { enclosureRows: 2, enclosureTePerRow: undefined }))).toBeNull()
+    expect(enclosureSize(undefined)).toBeNull()
+  })
+
+  it('moves modules of dropped rows to the end of the last row, one after another, from the furthest end', () => {
+    const r3 = pid(3)
+    const d: BoardDocument = {
+      enclosureVariantId: null,
+      enclosureExisting: false,
+      removeEnclosure: false,
+      rows: [
+        { id: r1, capacityTe: 12 },
+        { id: r2, capacityTe: 12 },
+        { id: r3, capacityTe: 12 },
+      ],
+      // Row 2 ends at 6.5 (a half TE module), row 3's modules follow it.
+      modules: [mod(1, r2, 0), mod(2, r2, 4.5), mod(3, r3, 0, 'w4'), mod(4, r3, 6, 'x'), mod(5, r1, 0)],
+    }
+    const fitted = fitToEnclosure(d, { rows: 2, te: 10 }, widthOf)
+    expect(fitted.rows).toEqual([
+      { id: r1, capacityTe: 10 },
+      { id: r2, capacityTe: 10 },
+    ])
+    expect(fitted.modules.map((m) => [m.id, m.rowId, m.offsetTe])).toEqual([
+      ['m1', r2, 0],
+      ['m2', r2, 4.5],
+      ['m3', r2, 6.5],
+      ['m4', r2, 10.5],
+      ['m5', r1, 0],
+    ])
+  })
+
+  it('keeps everything when the rows already match', () => {
+    const d = doc([mod(1, r1, 0)])
+    expect(fitToEnclosure(d, { rows: 2, te: 12 }, widthOf)).toEqual({ rows: d.rows, modules: d.modules })
+  })
+
+  it('rounds capability widths to 0.1 TE like the backend', () => {
+    expect(moduleWidth('v', () => boardCaps(1.24))).toBe(1.2)
+    expect(moduleWidth('v', () => boardCaps(1.25))).toBe(1.3)
+    expect(moduleWidth('v', () => boardCaps(0.04))).toBe(1)
+    expect(moduleWidth('v', () => undefined)).toBe(1)
+  })
+})
+
+describe('adopting what a save stored', () => {
+  it('returns the rows and places the server fitted, else null', () => {
+    const d = doc([mod(1, r1, 0), mod(2, r2, 3)])
+    const content = (rows: { id: string; capacityTe: number }[], places: [string, string, number][]) =>
+      ({
+        rows: rows.map((r) => ({ ...r, usedTe: 0 })),
+        modules: places.map(([id, rowId, offsetTe]) => ({ ...d.modules.find((m) => m.id === id)!, rowId, offsetTe, widthTe: 2 })),
+      }) as unknown as Parameters<typeof fittedBySave>[1]
+    expect(fittedBySave(d, content(d.rows, [['m1', r1, 0], ['m2', r2, 3]]))).toBeNull()
+    const r3 = pid(3)
+    const fitted = fittedBySave(d, content([{ id: r1, capacityTe: 18 }, { id: r3, capacityTe: 18 }], [['m1', r1, 0], ['m2', r1, 2]]))
+    expect(fitted?.rows).toEqual([{ id: r1, capacityTe: 18 }, { id: r3, capacityTe: 18 }])
+    expect(fitted?.modules[1]).toMatchObject({ id: 'm2', rowId: r1, offsetTe: 2 })
+    expect(fitted?.modules[0]).toBe(d.modules[0])
+  })
+
+  it('replaces the present document only while it is the one saved, without an undo step', () => {
+    const d = doc()
+    let state = boardReducer(initBoard(d), { type: 'change', action: { type: 'addModules', modules: [mod(1, r1, 0)] } })
+    const saved = state.history.present
+    const fitted = { ...saved, rows: [{ id: r1, capacityTe: 18 }, { id: r2, capacityTe: 18 }] }
+    const adopted = boardReducer(state, { type: 'adopt', from: saved, document: fitted })
+    expect(adopted.history.present).toBe(fitted)
+    expect(adopted.history.past).toEqual(state.history.past)
+    state = boardReducer(state, { type: 'change', action: { type: 'remove', ids: ['m1'] } })
+    expect(boardReducer(state, { type: 'adopt', from: saved, document: fitted })).toBe(state)
   })
 })
 

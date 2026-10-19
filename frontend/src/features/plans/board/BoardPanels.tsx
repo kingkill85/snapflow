@@ -27,10 +27,12 @@ type SettingsProps = {
   editable: boolean
   dispatch: (action: BoardEditorAction) => void
   warnings: BoardWarning[]
+  /** The stored enclosure's variant was deleted from the catalog (kept until removed explicitly). */
+  enclosureDeleted?: boolean
 }
 
 /** The Board tab: the enclosure (D357 explained) and, without an enclosure of known size, the rows editor. */
-export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editable, dispatch, warnings }: SettingsProps) {
+export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editable, dispatch, warnings, enclosureDeleted = false }: SettingsProps) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const separator = useDecimalSeparator()
@@ -57,6 +59,25 @@ export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editab
   return (
     <div className="space-y-4">
       <SelectField label={t('board.enclosure')} value={doc.enclosureVariantId ?? none} options={options} disabled={!editable} onValueChange={chooseEnclosure} hint={t('board.enclosureHint')} />
+      {enclosureDeleted && !doc.enclosureVariantId && (
+        <div className="space-y-2">
+          <Notice tone="warning">{doc.removeEnclosure ? t('board.enclosureRemoved') : t('board.enclosureDeleted')}</Notice>
+          {!doc.removeEnclosure && (
+            <Button variant="secondary" size="sm" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'setEnclosureFlags', patch: { removeEnclosure: true } } })}>
+              <Trash2 /> {t('board.removeEnclosure')}
+            </Button>
+          )}
+        </div>
+      )}
+      {(doc.enclosureVariantId || (enclosureDeleted && !doc.removeEnclosure)) && (
+        <SwitchField
+          label={t('board.enclosureExisting')}
+          hint={t('board.enclosureExistingHint')}
+          checked={doc.enclosureExisting}
+          disabled={!editable}
+          onChange={(e) => dispatch({ type: 'change', action: { type: 'setEnclosureFlags', patch: { enclosureExisting: e.target.checked } } })}
+        />
+      )}
       {warnings.some((w) => w.code === 'enclosure_size_unknown') && <Notice tone="warning">{t('warning.enclosure_size_unknown')}</Notice>}
       {size ? (
         <Notice>{t('board.fromEnclosure', { rows: size.rows, te: formatDecimal(size.te, separator) })}</Notice>

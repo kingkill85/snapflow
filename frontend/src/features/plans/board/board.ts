@@ -10,6 +10,10 @@ export type BoardModuleDoc = Omit<BoardModule, 'widthTe'>
 export type BoardRowDoc = { id: string; capacityTe: number }
 export type BoardDocument = {
   enclosureVariantId: string | null
+  /** The customer already has the enclosure (never in the BOM). */
+  enclosureExisting: boolean
+  /** Remove an enclosure whose variant was deleted from the catalog with the next save (explicit, D357 as amended). */
+  removeEnclosure: boolean
   rows: BoardRowDoc[]
   modules: BoardModuleDoc[]
 }
@@ -24,6 +28,8 @@ export type BoardAction =
   | { type: 'setRows'; rows: BoardRowDoc[] }
   /** The enclosure with the rows and modules fitted to it (`fitToEnclosure`), one step. */
   | { type: 'setEnclosure'; enclosureVariantId: string | null; rows: BoardRowDoc[]; modules: BoardModuleDoc[] }
+  /** The enclosure's flags (existing, remove a deleted one). */
+  | { type: 'setEnclosureFlags'; patch: Partial<Pick<BoardDocument, 'enclosureExisting' | 'removeEnclosure'>> }
   | { type: 'batch'; actions: BoardAction[] }
 
 export const newId = () => crypto.randomUUID()
@@ -31,13 +37,46 @@ export const newId = () => crypto.randomUUID()
 export function boardDocumentOf(content: BoardContent): BoardDocument {
   return {
     enclosureVariantId: content.enclosureVariantId,
+    enclosureExisting: content.enclosureExisting,
+    removeEnclosure: false,
     rows: content.rows.map((r) => ({ id: r.id, capacityTe: r.capacityTe })),
     modules: content.modules.map(({ widthTe: _width, ...m }) => m),
   }
 }
 
+/**
+ * The document with the rows and module places of a save's response when
+ * the server fitted them differently (an enclosure added rows or moved
+ * modules, D357); null when they match.
+ */
+export function fittedBySave(doc: BoardDocument, saved: BoardContent): BoardDocument | null {
+  const rows = saved.rows.map((r) => ({ id: r.id, capacityTe: r.capacityTe }))
+  const places = new Map(saved.modules.map((m) => [m.id, m]))
+  const sameRows = rows.length === doc.rows.length && rows.every((r, i) => r.id === doc.rows[i].id && r.capacityTe === doc.rows[i].capacityTe)
+  const sameModules = doc.modules.every((m) => {
+    const s = places.get(m.id)
+    return !s || (s.rowId === m.rowId && s.offsetTe === m.offsetTe)
+  })
+  if (sameRows && sameModules) return null
+  return {
+    ...doc,
+    rows,
+    modules: doc.modules.map((m) => {
+      const s = places.get(m.id)
+      return s && (s.rowId !== m.rowId || s.offsetTe !== m.offsetTe) ? { ...m, rowId: s.rowId, offsetTe: s.offsetTe } : m
+    }),
+  }
+}
+
 export function toBoardInput(doc: BoardDocument, expectedContentUpdatedAt: string): BoardContentInput {
-  return { expectedContentUpdatedAt, enclosureVariantId: doc.enclosureVariantId, rows: doc.rows, modules: doc.modules }
+  return {
+    expectedContentUpdatedAt,
+    enclosureVariantId: doc.enclosureVariantId,
+    enclosureExisting: doc.enclosureExisting,
+    ...(doc.removeEnclosure && { removeEnclosure: true }),
+    rows: doc.rows,
+    modules: doc.modules,
+  }
 }
 
 export const boardItemIds = (doc: BoardDocument) => new Set(doc.modules.map((m) => m.id))
@@ -72,7 +111,11 @@ export function applyBoardAction(doc: BoardDocument, action: BoardAction): Board
     }
     case 'setEnclosure':
       if (action.enclosureVariantId === doc.enclosureVariantId && JSON.stringify(action.rows) === JSON.stringify(doc.rows)) return doc
-      return { enclosureVariantId: action.enclosureVariantId, rows: action.rows, modules: action.modules }
+      return { ...doc, enclosureVariantId: action.enclosureVariantId, rows: action.rows, modules: action.modules }
+    case 'setEnclosureFlags': {
+      const next = { ...doc, ...action.patch }
+      return next.enclosureExisting === doc.enclosureExisting && next.removeEnclosure === doc.removeEnclosure ? doc : next
+    }
     case 'batch':
       return action.actions.reduce(applyBoardAction, doc)
   }
@@ -85,10 +128,12 @@ export const teStep = 0.5
 const round1 = (n: number) => Math.round(n * 10) / 10
 export const snapTe = (n: number) => round1(Math.round(n / teStep) * teStep)
 
-/** A module's width: its variant's railWidthTe, 1 TE when unknown (as the backend counts it, D356). */
+/** A module's width: its variant's railWidthTe rounded to 0.1 TE, 1 TE when unknown (as the backend counts it, D356). */
 export function moduleWidth(variantId: string | null, caps: (variantId: string) => Capabilities | undefined): number {
   const width = variantId ? caps(variantId)?.railWidthTe : undefined
-  return width && width > 0 ? width : 1
+  if (width === undefined || width === null || !Number.isFinite(width)) return 1
+  const rounded = round1(width)
+  return rounded > 0 ? rounded : 1
 }
 
 export type Interval = { start: number; end: number }
@@ -203,6 +248,13 @@ export function keyboardMove(doc: BoardDocument, id: string, direction: 'left' |
   return offset === null ? null : { rowId: target.id, offsetTe: offset }
 }
 
+/** Where the focus goes when `m` (and the other removed ids) is deleted: its right neighbour in the row, else the left one, else the rail. */
+export function focusAfterDelete(doc: BoardDocument, m: BoardModuleDoc, removed: Set<string>): { moduleId?: string; rowId: string } {
+  const row = doc.modules.filter((x) => x.rowId === m.rowId && !removed.has(x.id)).sort((a, b) => a.offsetTe - b.offsetTe)
+  const next = row.find((x) => x.offsetTe > m.offsetTe) ?? row.findLast((x) => x.offsetTe < m.offsetTe)
+  return next ? { moduleId: next.id, rowId: m.rowId } : { rowId: m.rowId }
+}
+
 // ---------------------------------------------------------------- totals
 
 export function rowUsed(doc: BoardDocument, rowId: string, widthOf: (m: BoardModuleDoc) => number): number {
@@ -221,10 +273,24 @@ export const boardUsed = (doc: BoardDocument, widthOf: (m: BoardModuleDoc) => nu
 
 // ---------------------------------------------------------------- enclosure
 
-/** The rows × TE an enclosure gives, or null when its size is not known (rows stay manual). */
+/** Bounds of a board (as the backend's MaxBoardRows and MaxRowTE). */
+export const maxBoardRows = 50
+export const maxRowTe = 999.9
+
+/**
+ * The rows × TE an enclosure gives, or null when its size is not known (rows
+ * stay manual). The backend's rule exactly: rows floored, TE rounded to one
+ * decimal, sizes outside 1–50 rows or above 0–999.9 TE count as unknown.
+ */
 export function enclosureSize(caps: Capabilities | undefined): { rows: number; te: number } | null {
-  if (!caps?.enclosureRows || !caps.enclosureTePerRow) return null
-  return { rows: caps.enclosureRows, te: caps.enclosureTePerRow }
+  const rawRows = caps?.enclosureRows
+  const rawTe = caps?.enclosureTePerRow
+  if (rawRows === undefined || rawRows === null || rawTe === undefined || rawTe === null) return null
+  if (!Number.isFinite(rawRows) || !Number.isFinite(rawTe)) return null
+  const rows = Math.floor(rawRows)
+  const te = round1(rawTe)
+  if (rows < 1 || rows > maxBoardRows || te <= 0 || te > maxRowTe) return null
+  return { rows, te }
 }
 
 /**
@@ -238,11 +304,12 @@ export function fitToEnclosure(doc: BoardDocument, size: { rows: number; te: num
   for (let i = 0; i < size.rows; i++) rows.push({ id: doc.rows[i]?.id ?? newId(), capacityTe: size.te })
   const kept = new Set(rows.map((r) => r.id))
   const last = rows[rows.length - 1]
-  let end = round1(Math.max(0, ...doc.modules.filter((m) => m.rowId === last.id).map((m) => m.offsetTe + widthOf(m))))
+  // As the backend's fitRows: the end of the last row, then one module after another.
+  let end = Math.max(0, ...doc.modules.filter((m) => m.rowId === last.id).map((m) => m.offsetTe + widthOf(m)))
   const modules = doc.modules.map((m) => {
     if (kept.has(m.rowId)) return m
-    const moved = { ...m, rowId: last.id, offsetTe: end }
-    end = round1(end + widthOf(m))
+    const moved = { ...m, rowId: last.id, offsetTe: round1(end) }
+    end = moved.offsetTe + widthOf(m)
     return moved
   })
   return { rows, modules }

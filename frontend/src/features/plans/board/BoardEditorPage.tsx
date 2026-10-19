@@ -32,6 +32,7 @@ import {
   boardUsed,
   copyModules,
   enclosureVariants,
+  fittedBySave,
   moduleWidth,
   newModule,
   slotIn,
@@ -50,7 +51,7 @@ export function BoardEditorPage() {
   const project = useGetProject(id, { query: fresh })
   const isBoard = plan.data?.kind === 'board'
   const content = useGetBoardContent(planId, { query: { ...fresh, enabled: isBoard } })
-  const catalog = useCatalogVariants()
+  const catalog = useCatalogVariants({ withCapabilities: true })
 
   const notFound = (
     <Page title={t('board.title')}>
@@ -145,6 +146,9 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         contentVersion.current = saved.contentUpdatedAt
         setServer(saved)
         setSaveErrors(new Map())
+        // The server fitted rows or modules to the enclosure (D357): show what it stored.
+        const fitted = fittedBySave(snapshot, saved)
+        if (fitted) dispatch({ type: 'adopt', from: snapshot, document: fitted })
         void queryClient.invalidateQueries({ queryKey: getListPlansQueryKey(plan.versionId) })
       } catch (e) {
         const byItem = boardErrorsByModule(e, snapshot, (f) => errorMessage(new ApiError({ status: 422, code: f.code, params: f.params })))
@@ -405,7 +409,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
     {
       key: 'board',
       label: t('board.tab'),
-      content: <BoardSettings doc={doc} enclosures={enclosures} variants={variantsById} caps={caps} widthOf={widthOf} editable={editable} dispatch={dispatch} warnings={server.warnings} />,
+      content: <BoardSettings doc={doc} enclosures={enclosures} variants={variantsById} caps={caps} widthOf={widthOf} editable={editable} dispatch={dispatch} warnings={server.warnings} enclosureDeleted={server.enclosureDeleted} />,
     },
     {
       key: 'inspector',

@@ -80,6 +80,7 @@ const line = (lineId: string, name: string, position: number, members: BusMember
   productTypeId: knx.id,
   name,
   address: '',
+  devicesMax: null,
   position,
   createdAt: '2026-10-01T10:00:00Z',
   updatedAt: '2026-10-01T10:00:00Z',

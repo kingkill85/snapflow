@@ -14,6 +14,12 @@ export type BoardEditorAction =
   | { type: 'select'; ids: string[] }
   | { type: 'toggleSelect'; ids: string[] }
   | { type: 'load'; document: BoardDocument }
+  /**
+   * The rows and module places the server fitted on save (D357) differ from
+   * the document saved: when that document is still the present one, it is
+   * replaced in place (no new undo step; an undo goes back to the step before).
+   */
+  | { type: 'adopt'; from: BoardDocument; document: BoardDocument }
 
 export const initBoard = (document: BoardDocument): BoardState => ({ history: initHistory(document), selection: [] })
 
@@ -51,5 +57,8 @@ export function boardReducer(state: BoardState, action: BoardEditorAction): Boar
     }
     case 'load':
       return initBoard(action.document)
+    case 'adopt':
+      if (state.history.present !== action.from) return state
+      return { history: { ...state.history, present: action.document }, selection: prune(state.selection, action.document) }
   }
 }

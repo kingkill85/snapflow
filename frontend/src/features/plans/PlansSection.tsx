@@ -100,7 +100,7 @@ export function PlansSection({ projectId, versionId, canWrite, productTypeIds = 
                 className="group block focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <span className="block aspect-[4/3] border-b border-line bg-canvas">
-                  {plan.kind === 'board' ? <BoardThumbnail planId={plan.id} /> : plan.image && <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />}
+                  {plan.kind === 'board' ? plan.board && <BoardThumbnail sketch={plan.board.sketch} /> : plan.image && <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />}
                 </span>
                 <span className="flex items-center gap-2 px-3 pt-2 font-medium group-hover:underline">
                   {plan.name}

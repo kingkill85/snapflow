@@ -130,7 +130,8 @@
     "module_width_unknown": "Die Breite des Produkts auf der Hutschiene ist unbekannt: gezählt als 1 TE.",
     "module_mounting_floorplan": "Dieses Produkt ist nicht für den Verteiler gedacht.",
     "row_overflow": "Das Gerät reicht über die Kapazität der Reihe hinaus.",
-    "enclosure_size_unknown": "Reihen und TE pro Reihe des Gehäuses sind unbekannt: Reihen selbst eingeben."
+    "enclosure_size_unknown": "Reihen und TE pro Reihe des Gehäuses sind unbekannt: Reihen selbst eingeben.",
+    "module_overlap": "Das Gerät überlappt ein anderes (seine Breite hat sich im Katalog geändert): verschieben."
   },
   "save": {
     "saved": "Gespeichert",
@@ -286,6 +287,11 @@
     "phoneHint": "Verteiler werden auf größeren Bildschirmen bearbeitet. Hier können Sie den Verteiler ansehen.",
     "paletteHint": "Ziehen Sie ein Produkt auf eine Hutschiene, oder klicken Sie es und dann die Schiene an (oder fokussieren Sie die Schiene und drücken Sie Enter).",
     "armedHint": "Klicken Sie auf eine Schiene, um das Produkt im nächsten freien Platz zu setzen. Esc bricht ab.",
-    "keyboardHint": "Ein ausgewähltes Gerät: Pfeiltasten verschieben es (links/rechts um 0,5 TE, hoch/runter in eine andere Reihe), Entf entfernt es, Strg+D dupliziert es."
+    "keyboardHint": "Ein ausgewähltes Gerät: Pfeiltasten verschieben es (links/rechts um 0,5 TE, hoch/runter in eine andere Reihe), Entf entfernt es, Strg+D dupliziert es.",
+    "enclosureExisting": "Gehäuse bereits vorhanden",
+    "enclosureExistingHint": "Der Kunde hat es schon: Es steht nicht in der Stückliste.",
+    "enclosureDeleted": "Das Gehäuse wurde aus dem Katalog gelöscht. Es bleibt am Verteiler (und in der Stückliste wie zuletzt gespeichert), bis Sie es entfernen.",
+    "removeEnclosure": "Gehäuse entfernen",
+    "enclosureRemoved": "Das gelöschte Gehäuse wird beim nächsten Speichern entfernt."
   }
 }

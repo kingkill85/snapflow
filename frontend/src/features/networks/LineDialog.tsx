@@ -13,6 +13,11 @@ import { useRefreshNetworks } from './refresh'
 const schema = z.object({
   name: z.string().trim().min(1, errorKey('validation.required')).max(100, errorKey('validation.too_long', { max: 100 })),
   address: z.string().trim().max(50, errorKey('validation.too_long', { max: 50 })),
+  // Empty = the system's default (busDevicesMax); else a whole number 1-10000.
+  devicesMax: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 10000), errorKey('validation.range', { min: 1, max: 10000 })),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -26,7 +31,7 @@ type Props = {
   item: BusLineNetwork | null
 }
 
-/** Name (unique per system) and optional address of a bus line. */
+/** Name (unique per system), optional address and device limit of a bus line. */
 export function LineDialog({ open, onOpenChange, versionId, productTypeId, item }: Props) {
   const { t } = useTranslation('networks')
   const { t: tCommon } = useTranslation()
@@ -35,7 +40,7 @@ export function LineDialog({ open, onOpenChange, versionId, productTypeId, item 
   const create = useCreateBusLine()
   const update = useUpdateBusLine()
   const mutation = item ? update : create
-  const fields = apiFields<FormValues>(['name', 'address'])
+  const fields = apiFields<FormValues>(['name', 'address', 'devicesMax'])
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
   const { errors } = form.formState
   const { reset } = form
@@ -44,7 +49,7 @@ export function LineDialog({ open, onOpenChange, versionId, productTypeId, item 
 
   useEffect(() => {
     if (!open) return
-    reset({ name: item?.name ?? '', address: item?.address ?? '' })
+    reset({ name: item?.name ?? '', address: item?.address ?? '', devicesMax: item?.devicesMax == null ? '' : String(item.devicesMax) })
     resetCreate()
     resetUpdate()
     // Only when the dialog opens or switches line.
@@ -53,8 +58,9 @@ export function LineDialog({ open, onOpenChange, versionId, productTypeId, item 
 
   const submit = form.handleSubmit(async (v) => {
     try {
-      if (item) await update.mutateAsync({ versionId, id: item.id, data: { name: v.name, address: v.address } })
-      else await create.mutateAsync({ versionId, data: { productTypeId, name: v.name, ...(v.address ? { address: v.address } : {}) } })
+      const devicesMax = v.devicesMax === '' ? null : Number(v.devicesMax)
+      if (item) await update.mutateAsync({ versionId, id: item.id, data: { name: v.name, address: v.address, devicesMax } })
+      else await create.mutateAsync({ versionId, data: { productTypeId, name: v.name, ...(v.address ? { address: v.address } : {}), devicesMax } })
     } catch (error) {
       setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
@@ -80,6 +86,14 @@ export function LineDialog({ open, onOpenChange, versionId, productTypeId, item 
         hint={t('lineDialog.addressHint')}
         error={fieldError(errors.address?.message)}
         {...form.register('address')}
+      />
+      <Field
+        label={t('lineDialog.devicesMax')}
+        autoComplete="off"
+        inputMode="numeric"
+        hint={t('lineDialog.devicesMaxHint')}
+        error={fieldError(errors.devicesMax?.message)}
+        {...form.register('devicesMax')}
       />
     </FormDialog>
   )

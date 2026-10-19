@@ -55,7 +55,9 @@
     "editTitle": "Linie bearbeiten",
     "name": "Name",
     "address": "Adresse",
-    "addressHint": "Optional, z. B. KNX-Bereich/Linie oder HDL-Subnetz für die Programmierung"
+    "addressHint": "Optional, z. B. KNX-Bereich/Linie oder HDL-Subnetz für die Programmierung",
+    "devicesMax": "Max. Geräte",
+    "devicesMaxHint": "Optional; leer bedeutet die Grenze des Systems"
   },
   "wireless": {
     "systemDescription": "Funksystem",

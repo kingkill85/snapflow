@@ -26,6 +26,8 @@ const widthOf = (m: BoardModuleDoc) => moduleWidth(m.variantId, caps)
 const module = (id: string, rowId: string, offsetTe: number): BoardModuleDoc => ({ id, rowId, offsetTe, variantId: actuator.id, label: '', existing: false, addonVariantIds: [], instanceValues: {} })
 const start = (modules: BoardModuleDoc[] = []): BoardDocument => ({
   enclosureVariantId: null,
+  enclosureExisting: false,
+  removeEnclosure: false,
   rows: [
     { id: r1, capacityTe: 12 },
     { id: r2, capacityTe: 12 },
@@ -34,13 +36,13 @@ const start = (modules: BoardModuleDoc[] = []): BoardDocument => ({
 })
 
 const seen: { doc?: BoardDocument } = {}
-function Harness({ initial, panel, selection = [] }: { initial: BoardDocument; panel: 'settings' | 'inspector'; selection?: string[] }) {
+function Harness({ initial, panel, selection = [], enclosureDeleted = false }: { initial: BoardDocument; panel: 'settings' | 'inspector'; selection?: string[]; enclosureDeleted?: boolean }) {
   const [state, dispatch] = useReducer(boardReducer, initial, (d) => ({ ...initBoard(d), selection }))
   useEffect(() => {
     seen.doc = state.history.present
   })
   return panel === 'settings' ? (
-    <BoardSettings doc={state.history.present} enclosures={[enclosure]} variants={byId} caps={caps} widthOf={widthOf} editable dispatch={dispatch} warnings={[]} />
+    <BoardSettings doc={state.history.present} enclosures={[enclosure]} variants={byId} caps={caps} widthOf={widthOf} editable dispatch={dispatch} warnings={[]} enclosureDeleted={enclosureDeleted} />
   ) : (
     <ModuleInspector
       doc={state.history.present}
@@ -100,6 +102,30 @@ describe('rows editor', () => {
     expect(seen.doc!.modules.find((m) => m.id === 'm2')).toMatchObject({ rowId: r1, offsetTe: 4 })
     expect(screen.getByText('The enclosure gives 1 rows of 18 TE.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
+  })
+})
+
+describe('enclosure flags', () => {
+  it('marks an enclosure as existing (not in the BOM), undoable', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<Harness initial={start()} panel="settings" />)
+    expect(screen.queryByRole('switch', { name: /Enclosure already exists/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Enclosure' }))
+    await user.click(screen.getByRole('option', { name: /Cabinet/ }))
+    await user.click(screen.getByRole('switch', { name: /Enclosure already exists/ }))
+    expect(seen.doc!.enclosureExisting).toBe(true)
+    expect(screen.getByText(/not in the bill of materials/)).toBeInTheDocument()
+  })
+
+  it('keeps a deleted enclosure until it is removed explicitly', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<Harness initial={start()} panel="settings" enclosureDeleted />)
+    expect(screen.getByText(/The enclosure was deleted from the catalog/)).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: /Enclosure already exists/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove enclosure' }))
+    expect(seen.doc!.removeEnclosure).toBe(true)
+    expect(screen.getByText('The deleted enclosure is removed with the next save.')).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /Enclosure already exists/ })).not.toBeInTheDocument()
   })
 })
 

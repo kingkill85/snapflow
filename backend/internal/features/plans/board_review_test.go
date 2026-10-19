@@ -68,8 +68,6 @@ func (w boardWorld) bomQty(t *testing.T, plan uuid.UUID) map[uuid.UUID]int64 {
 	return qty
 }
 
-func withExisting(m map[string]any) map[string]any { m["existing"] = true; return m }
-
 // D374, D376: overlap after a catalog width change is a warning; only a
 // moved or new module must not overlap. Half TE and decimal widths touch.
 func TestBoardOverlapRules(t *testing.T) {

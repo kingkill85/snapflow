@@ -46,7 +46,8 @@ export function BoardFormDialog({ open, onOpenChange, versionId, productTypeIds,
   const separator = useDecimalSeparator()
   const fieldError = useFieldError()
   const fields = apiFields<FormValues>(['name'])
-  const catalog = useCatalogVariants()
+  // The enclosures are only offered when creating a board.
+  const catalog = useCatalogVariants({ enabled: open && !item, withCapabilities: true })
   const enclosures = useMemo(() => enclosureVariants(catalog.data ?? [], productTypeIds), [catalog.data, productTypeIds])
   const [enclosure, setEnclosure] = useState(none)
   const [rows, setRows] = useState<number[]>([12])

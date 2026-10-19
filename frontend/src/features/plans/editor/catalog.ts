@@ -17,15 +17,18 @@ const pageSize = 200
 /**
  * Every catalog variant, active or not (the canvas resolves placed variants,
  * the palette offers the available ones of the project's product types).
- * Loaded once per editor in pages of 200 (D203).
+ * Loaded once per editor in pages of 200 (D203). `withCapabilities` asks for
+ * each variant's capability summary (the board palette and dialog: mounting, widths,
+ * enclosure sizes); computing it costs the server, so other lists do without.
  */
-export function useCatalogVariants() {
+export function useCatalogVariants({ enabled = true, withCapabilities = false }: { enabled?: boolean; withCapabilities?: boolean } = {}) {
   return useQuery({
-    queryKey: ['/api/variants', 'plan-editor'],
+    enabled,
+    queryKey: ['/api/variants', 'plan-editor', { withCapabilities }],
     queryFn: async ({ signal }) => {
       const items: VariantSearchItem[] = []
       for (;;) {
-        const page = await searchVariants({ limit: pageSize, offset: items.length }, signal)
+        const page = await searchVariants({ limit: pageSize, offset: items.length, ...(withCapabilities && { withCapabilities }) }, signal)
         items.push(...page.items)
         if (page.items.length < pageSize || items.length >= page.total) return items
       }

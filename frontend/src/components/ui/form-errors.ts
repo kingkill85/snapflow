@@ -72,6 +72,7 @@ export const errorParamNames = {
   'board.offset_invalid': ['max'],
   'bus_line.in_use': ['count'],
   'bus_line.name_taken': ['name'],
+  'bus_line.devices_max_invalid': ['max'],
   'import_profile.name_taken': ['name'],
   'load_type.key_taken': ['key'],
   'need.power_invalid': ['max'],
