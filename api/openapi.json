@@ -118,6 +118,214 @@
         ],
         "type": "object"
       },
+      "AddressInput": {
+        "additionalProperties": false,
+        "properties": {
+          "hdl": {
+            "description": "subnet.device (0-254 each); only for HDL items",
+            "type": "string"
+          },
+          "ieee": {
+            "description": "16 hex digits (separators : - and spaces ignored); only for wireless items",
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "knx": {
+            "description": "area.line.device (0-15.0-15.0-255); only for KNX items",
+            "type": "string"
+          },
+          "note": {
+            "description": "At most 200 characters",
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "itemId"
+        ],
+        "type": "object"
+      },
+      "AddressedItem": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/DeviceAddress",
+            "description": "Absent: no address"
+          },
+          "busLineId": {
+            "type": "string"
+          },
+          "existing": {
+            "type": "boolean"
+          },
+          "gateway": {
+            "type": "boolean"
+          },
+          "gatewayItemId": {
+            "type": "string"
+          },
+          "gatewayPlanId": {
+            "description": "A wireless device's gateway",
+            "type": "string"
+          },
+          "itemId": {
+            "description": "The placement or module id",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "powerSupply": {
+            "description": "Power supplies get no address (D419)",
+            "type": "boolean"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "scheme": {
+            "enum": [
+              "knx",
+              "hdl",
+              "ieee",
+              "none"
+            ],
+            "type": "string"
+          },
+          "systemId": {
+            "description": "The item's product type",
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "systemId",
+          "scheme",
+          "gateway",
+          "powerSupply",
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "variantId",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "Addresses": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Addresses.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/AddressesActions"
+          },
+          "items": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/AddressedItem"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "description": "In line order",
+            "items": {
+              "$ref": "#/components/schemas/LinePrefix"
+            },
+            "type": "array"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "items",
+          "lines",
+          "can"
+        ],
+        "type": "object"
+      },
+      "AddressesActions": {
+        "additionalProperties": false,
+        "properties": {
+          "update": {
+            "description": "Edit, assign and clear addresses (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update"
+        ],
+        "type": "object"
+      },
+      "AddressesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AddressesInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/AddressInput"
+            },
+            "maxItems": 2000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "addresses"
+        ],
+        "type": "object"
+      },
       "ApplyInput": {
         "additionalProperties": false,
         "properties": {
@@ -173,6 +381,82 @@
         "required": [
           "updated",
           "skipped"
+        ],
+        "type": "object"
+      },
+      "AssignInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AssignInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "busLineIds": {
+            "description": "Empty or absent: every line",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "AssignResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AssignResult.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "assigned": {
+            "description": "Items that got an automatic address",
+            "format": "int64",
+            "type": "integer"
+          },
+          "can": {
+            "$ref": "#/components/schemas/AddressesActions"
+          },
+          "items": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/AddressedItem"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "description": "In line order",
+            "items": {
+              "$ref": "#/components/schemas/LinePrefix"
+            },
+            "type": "array"
+          },
+          "unassigned": {
+            "description": "Items left without address (line full or its address field malformed)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assigned",
+          "unassigned",
+          "versionId",
+          "items",
+          "lines",
+          "can"
         ],
         "type": "object"
       },
@@ -3483,6 +3767,34 @@
         ],
         "type": "object"
       },
+      "DeviceAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "hdl": {
+            "description": "HDL Buspro subnet.device id, e.g. 1.12",
+            "type": "string"
+          },
+          "ieee": {
+            "description": "Zigbee IEEE address, 16 hex digits upper case",
+            "type": "string"
+          },
+          "knx": {
+            "description": "KNX individual address area.line.device, e.g. 1.1.5",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "pinned": {
+            "description": "Set by hand; auto-assign never changes it",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pinned"
+        ],
+        "type": "object"
+      },
       "DisconnectInput": {
         "additionalProperties": false,
         "properties": {
@@ -5870,6 +6182,41 @@
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "LinePrefix": {
+        "additionalProperties": false,
+        "properties": {
+          "busLineId": {
+            "type": "string"
+          },
+          "default": {
+            "description": "The line's address field is empty: the prefix is the default (KNX 1.\u003cn\u003e, HDL \u003cn\u003e for the n-th line of the system)",
+            "type": "boolean"
+          },
+          "invalid": {
+            "description": "The line's address field cannot be parsed (no automatic addresses)",
+            "type": "boolean"
+          },
+          "prefix": {
+            "description": "KNX area.line or HDL subnet the line's devices get; empty for scheme none or a malformed address",
+            "type": "string"
+          },
+          "scheme": {
+            "enum": [
+              "knx",
+              "hdl",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "busLineId",
+          "scheme",
+          "default",
+          "invalid"
         ],
         "type": "object"
       },
@@ -17133,6 +17480,205 @@
         "summary": "List or search variants across the catalog",
         "tags": [
           "products"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/addresses": {
+      "delete": {
+        "description": "Needs auto=true; addresses set by hand stay.",
+        "operationId": "clearAutomaticAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Must be true: removes the automatic addresses (addresses set by hand stay)",
+            "explode": false,
+            "in": "query",
+            "name": "auto",
+            "required": true,
+            "schema": {
+              "description": "Must be true: removes the automatic addresses (addresses set by hand stay)",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove the automatic addresses",
+        "tags": [
+          "networks"
+        ]
+      },
+      "get": {
+        "description": "Every bus and wireless item with its addressing scheme, line or gateway and address; the line prefixes.",
+        "operationId": "getAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the device addresses of a version",
+        "tags": [
+          "networks"
+        ]
+      },
+      "put": {
+        "description": "Addresses set here are pinned (auto-assign keeps them). Every field empty clears an item's address. Unique per version (422 address.taken).",
+        "operationId": "setAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set or clear device addresses",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/addresses/assign": {
+      "post": {
+        "description": "KNX and HDL devices of the lines in scope, deterministic (D419); pinned addresses never change.",
+        "operationId": "assignAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Assign addresses automatically",
+        "tags": [
+          "networks"
         ]
       }
     },

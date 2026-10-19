@@ -75,6 +75,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	plans.Register(api, planSvc)
 	networkSvc := networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes)
 	networks.Register(api, networkSvc)
+	networks.RegisterAddresses(api, networkSvc)
 	wiring.Register(api, wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc))
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)

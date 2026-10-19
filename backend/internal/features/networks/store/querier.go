@@ -11,6 +11,9 @@ import (
 )
 
 type Querier interface {
+	// CopyAddresses copies the addresses of a version into another with the
+	// plan ids mapped (a JSON object source id -> copy id).
+	CopyAddresses(ctx context.Context, arg CopyAddressesParams) error
 	// CopyAssignments copies the assignments of a version into another with
 	// the plan ids mapped (a JSON object source id -> copy id).
 	CopyAssignments(ctx context.Context, arg CopyAssignmentsParams) error
@@ -19,9 +22,13 @@ type Querier interface {
 	// CreateBusLine adds a line after the version's last one (the caller holds
 	// the project's lock).
 	CreateBusLine(ctx context.Context, arg CreateBusLineParams) (BusLine, error)
+	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAssignment(ctx context.Context, arg DeleteAssignmentParams) error
+	DeleteAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error)
 	DeleteBusLine(ctx context.Context, arg DeleteBusLineParams) (int64, error)
 	GetBusLine(ctx context.Context, arg GetBusLineParams) (BusLine, error)
+	// ---------------------------------------------------------------- addresses
+	ListAddresses(ctx context.Context, versionID uuid.UUID) ([]DeviceAddress, error)
 	ListAssignments(ctx context.Context, versionID uuid.UUID) ([]NetworkAssignment, error)
 	// Every query of this feature runs in database.InScope: row-level security
 	// limits it to the tenants the caller may see.
@@ -35,6 +42,7 @@ type Querier interface {
 	// SetBusLineOrder sets the positions to the order of ids (1..n).
 	SetBusLineOrder(ctx context.Context, arg SetBusLineOrderParams) error
 	UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (BusLine, error)
+	UpsertAddress(ctx context.Context, arg UpsertAddressParams) error
 	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) error
 }
 

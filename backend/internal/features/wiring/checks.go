@@ -95,7 +95,45 @@ func (s *Service) Checks(ctx context.Context, versionID uuid.UUID) (Checks, erro
 	if err != nil {
 		return Checks{}, err
 	}
-	return evaluateChecks(sn, members, lines), nil
+	issues, err := s.networks.AddressIssues(ctx, versionID)
+	if err != nil {
+		return Checks{}, err
+	}
+	out := evaluateChecks(sn, members, lines)
+	addAddressFindings(&out, sn.st, issues)
+	return out, nil
+}
+
+// addAddressFindings adds the address rules' findings (3e, D419) to the
+// checks: duplicates are errors, addresses outside their line and malformed
+// line addresses warnings, devices without address one info per line.
+func addAddressFindings(out *Checks, st *state, issues []networks.AddressIssue) {
+	if len(issues) == 0 {
+		return
+	}
+	findings := out.Findings
+	for _, is := range issues {
+		sev := Severity(is.Severity)
+		var f Finding
+		if is.ItemID != nil {
+			f = itemFinding(st, sev, is.Code, *is.PlanID, *is.ItemID, is.Params)
+		} else {
+			f = Finding{Severity: sev, Code: is.Code, Params: is.Params}
+		}
+		f.Refs.BusLineID = is.BusLineID
+		findings = append(findings, f)
+		switch sev {
+		case SeverityError:
+			out.Counts.Errors++
+		case SeverityWarning:
+			out.Counts.Warnings++
+		default:
+			out.Counts.Infos++
+		}
+	}
+	rank := map[Severity]int{SeverityError: 0, SeverityWarning: 1, SeverityInfo: 2}
+	slices.SortStableFunc(findings, func(a, b Finding) int { return rank[a.Severity] - rank[b.Severity] })
+	out.Findings = findings
 }
 
 // evaluateChecks is the pure part of Checks.

@@ -65,3 +65,30 @@ SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, (m.map ->> a.plan_i
 FROM network_assignments a, (SELECT sqlc.arg(plan_map)::jsonb AS map) m
 WHERE a.version_id = sqlc.arg(source_id)::uuid AND m.map ? a.plan_id::text
     AND (a.gateway_plan_id IS NULL OR m.map ? a.gateway_plan_id::text);
+
+-- ---------------------------------------------------------------- addresses
+
+-- name: ListAddresses :many
+SELECT * FROM device_addresses WHERE version_id = $1 ORDER BY plan_id, item_id;
+
+-- name: UpsertAddress :exec
+INSERT INTO device_addresses (tenant_id, version_id, plan_id, item_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+ON CONFLICT (plan_id, item_id) DO UPDATE SET knx_area = EXCLUDED.knx_area, knx_line = EXCLUDED.knx_line,
+    knx_device = EXCLUDED.knx_device, hdl_subnet = EXCLUDED.hdl_subnet, hdl_device = EXCLUDED.hdl_device,
+    ieee = EXCLUDED.ieee, note = EXCLUDED.note, pinned = EXCLUDED.pinned, updated_at = now();
+
+-- name: DeleteAddress :exec
+DELETE FROM device_addresses WHERE version_id = $1 AND plan_id = $2 AND item_id = $3;
+
+-- name: DeleteAutoAddresses :execrows
+DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned;
+
+-- CopyAddresses copies the addresses of a version into another with the
+-- plan ids mapped (a JSON object source id -> copy id).
+-- name: CopyAddresses :exec
+INSERT INTO device_addresses (tenant_id, version_id, plan_id, item_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.knx_area, a.knx_line,
+    a.knx_device, a.hdl_subnet, a.hdl_device, a.ieee, a.note, a.pinned
+FROM device_addresses a, (SELECT sqlc.arg(plan_map)::jsonb AS map) m
+WHERE a.version_id = sqlc.arg(source_id)::uuid AND m.map ? a.plan_id::text;

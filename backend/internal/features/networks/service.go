@@ -114,6 +114,9 @@ func (s *Service) CreateBusLine(ctx context.Context, versionID uuid.UUID, in Bus
 	if !t.IsActive {
 		return BusLine{}, apperr.Invalid("body.productTypeId", "bus_line.product_type_inactive", "the product type is inactive")
 	}
+	if err := validateLineAddress(t, address); err != nil {
+		return BusLine{}, err
+	}
 	var row store.BusLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
@@ -149,6 +152,35 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 	name, address, err := validateLine(in.Name, in.Address, in.DevicesMax)
 	if err != nil {
 		return BusLine{}, err
+	}
+	if address != "" {
+		// The line's system decides the address format; read before the
+		// write transaction (the catalog outside it, D243). The system of a
+		// line never changes.
+		var cur store.BusLine
+		err := s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
+			if _, err := s.projects.ReadVersion(ctx, tx, versionID); err != nil {
+				return err
+			}
+			var err error
+			cur, err = q.GetBusLine(ctx, store.GetBusLineParams{VersionID: versionID, ID: id})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errLineNotFound()
+			}
+			return err
+		})
+		if err != nil {
+			return BusLine{}, err
+		}
+		if address != cur.Address {
+			t, err := s.types.Get(ctx, cur.ProductTypeID)
+			if err != nil {
+				return BusLine{}, err
+			}
+			if err := validateLineAddress(t, address); err != nil {
+				return BusLine{}, err
+			}
+		}
 	}
 	var row store.BusLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
@@ -257,6 +289,8 @@ type state struct {
 	// types are all product types (also inactive), by id: names, badges
 	// and order of systems that have lines but no members.
 	types map[uuid.UUID]producttypes.ProductType
+	// addresses are the stored device addresses (3e), by (plan, item).
+	addresses map[[2]uuid.UUID]store.DeviceAddress
 }
 
 func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUID) (state, error) {
@@ -317,6 +351,14 @@ func (st *state) read(ctx context.Context, s *Service, tx pgx.Tx, q *store.Queri
 	st.assignments = make(map[[2]uuid.UUID]store.NetworkAssignment, len(rows))
 	for _, a := range rows {
 		st.assignments[[2]uuid.UUID{a.PlanID, a.ItemID}] = a
+	}
+	addrs, err := q.ListAddresses(ctx, st.ref.ID)
+	if err != nil {
+		return err
+	}
+	st.addresses = make(map[[2]uuid.UUID]store.DeviceAddress, len(addrs))
+	for _, a := range addrs {
+		st.addresses[[2]uuid.UUID{a.PlanID, a.ItemID}] = a
 	}
 	return nil
 }
@@ -811,7 +853,10 @@ func (s *Service) copyPlans(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUI
 	if err != nil {
 		return err
 	}
-	return q.CopyAssignments(ctx, store.CopyAssignmentsParams{TenantID: target.TenantID, TargetID: target.ID, SourceID: source.ID, PlanMap: data})
+	if err := q.CopyAssignments(ctx, store.CopyAssignmentsParams{TenantID: target.TenantID, TargetID: target.ID, SourceID: source.ID, PlanMap: data}); err != nil {
+		return err
+	}
+	return copyAddresses(ctx, q, data, target.TenantID, source.ID, target.ID)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -872,6 +917,11 @@ func mapNameErr(err error, name string) error {
 		return apperr.Conflict("bus_line.name_taken", "the system already has a line of this name").With("name", name)
 	}
 	return err
+}
+
+func isFKViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 func errLineNotFound() *apperr.Error { return apperr.NotFound("bus_line.not_found") }

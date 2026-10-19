@@ -107,6 +107,22 @@ type Connection struct {
 	CreatedAt           time.Time
 }
 
+type DeviceAddress struct {
+	PlanID    uuid.UUID
+	ItemID    uuid.UUID
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	KnxArea   *int16
+	KnxLine   *int16
+	KnxDevice *int16
+	HdlSubnet *int16
+	HdlDevice *int16
+	Ieee      *string
+	Note      string
+	Pinned    bool
+	UpdatedAt time.Time
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -137,6 +153,28 @@ type FunctionType struct {
 type FunctionTypeLoadType struct {
 	FunctionTypeID uuid.UUID
 	LoadTypeID     uuid.UUID
+}
+
+type GeneratedDocument struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	Kind      string
+	Seq       int32
+	Number    string
+	Exporter  string
+	Language  string
+	FileID    uuid.UUID
+	FileName  string
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+}
+
+type GeneratedDocumentCounter struct {
+	VersionID uuid.UUID
+	Kind      string
+	TenantID  uuid.UUID
+	LastSeq   int32
 }
 
 type ImportChange struct {
