@@ -172,14 +172,28 @@ export class Api {
     return this.json<ProductType>(await this.ctx.post('/api/product-types', { data }))
   }
 
-  /** A project (in the caller's tenant unless tenantId); needs an active product type to exist. */
-  async createProject(input: { name?: string; tenantId?: string; status?: string; customer?: { name?: string; company?: string } } = {}): Promise<Project> {
+  /**
+   * A project (in the caller's tenant unless tenantId); needs an active product type to exist.
+   * currency + exchangeRate (units per 1 USD) give the BOM converted amounts (D228).
+   */
+  async createProject(
+    input: {
+      name?: string
+      tenantId?: string
+      status?: string
+      customer?: { name?: string; company?: string }
+      currency?: string
+      exchangeRate?: string
+      productTypeIds?: string[]
+    } = {},
+  ): Promise<Project> {
+    const settings = { currency: input.currency, exchangeRate: input.exchangeRate, productTypeIds: input.productTypeIds }
     const project = await this.json<Project>(
-      await this.ctx.post('/api/projects', { data: { name: input.name ?? unique('Project'), tenantId: input.tenantId, customer: input.customer } }),
+      await this.ctx.post('/api/projects', { data: { name: input.name ?? unique('Project'), tenantId: input.tenantId, customer: input.customer, ...settings } }),
     )
     if (!input.status || input.status === 'active') return project
     return this.json<Project>(
-      await this.ctx.put(`/api/projects/${project.id}`, { data: { name: project.name, status: input.status, expectedUpdatedAt: project.updatedAt } }),
+      await this.ctx.put(`/api/projects/${project.id}`, { data: { name: project.name, status: input.status, expectedUpdatedAt: project.updatedAt, ...settings } }),
     )
   }
 
@@ -352,6 +366,24 @@ export class Api {
     return this.json<Variant>(
       await this.ctx.put(`/api/products/${productId}/variants/${variant.id}`, {
         data: { name, sku, imageFileId, attributes, isActive, price, expectedUpdatedAt: updatedAt },
+      }),
+    )
+  }
+
+  /** Adds a manual BOM line: a catalog variant, or free text with a USD unit price. */
+  async addManualLine(versionId: string, line: { variantId?: string; name?: string; unitPrice?: string; quantity: number; note?: string }): Promise<{ id: string }> {
+    return this.json(await this.ctx.post(`/api/versions/${versionId}/manual-lines`, { data: line }))
+  }
+
+  /** Saves a version's pricing (discount, services, label) over whatever it has. */
+  async savePricing(
+    versionId: string,
+    pricing: { discountKind: string; discountValue?: string; servicesKind: string; servicesValue?: string; servicesLabel?: Localized },
+  ): Promise<void> {
+    const current = await this.json<{ updatedAt: string | null }>(await this.ctx.get(`/api/versions/${versionId}/pricing`))
+    await this.json(
+      await this.ctx.put(`/api/versions/${versionId}/pricing`, {
+        data: { discountValue: '0', servicesValue: '0', ...pricing, expectedUpdatedAt: current.updatedAt },
       }),
     )
   }

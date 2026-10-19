@@ -112,3 +112,38 @@ test('bom: quantities per plan and zone, manual lines, pricing, update from cata
   await expect(sensorRow).toContainText('$60.00')
   await expect(grandTotal(page)).toHaveText(/\$194\.50/)
 })
+
+test('bom: a project in another currency shows converted amounts', async ({ page, api }) => {
+  const kind = await api.createKind({}, { abbreviation: 'KX' })
+  const name = unique('Dimmer')
+  const product = await api.createProduct({ ...kind.ids, name: { en: name } })
+  const variant = await api.createVariant(product.id, { name: { en: '2-gang' }, price: '10.00' })
+  const projects = {
+    EUR: await api.createProject({ name: unique('EUR project'), currency: 'EUR', exchangeRate: '0.92' }),
+    JPY: await api.createProject({ name: unique('JPY project'), currency: 'JPY', exchangeRate: '151.37' }),
+  }
+  for (const project of Object.values(projects)) {
+    const versionId = project.versions[0].id
+    const plan = await api.createPlan(versionId, 'Ground floor', planImage())
+    await api.savePlanContent(plan.id, { placements: [100, 300, 500].map((x) => ({ variantId: variant.id, x, y: 100 })) })
+    await api.addManualLine(versionId, { name: 'Cabling', unitPrice: '12.34', quantity: 1 })
+    await api.savePricing(versionId, { discountKind: 'percent', discountValue: '10', servicesKind: 'amount', servicesValue: '100' })
+  }
+  await page.setViewportSize({ width: 1400, height: 900 })
+
+  // EUR: every amount converted on its own from its USD value (D228).
+  await page.goto(`/projects/${projects.EUR.id}?tab=bom`)
+  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '0', '3', '$10.00€9.20', '$30.00€27.60'])
+  await expect(bomRow(page, 'Cabling')).toContainText('$12.34€11.35')
+  const totals = page.getByRole('region', { name: 'Totals', exact: true })
+  // Subtotal 42.34, discount 4.23, services 100, grand total 138.11.
+  await expect(totals.getByTestId('total-subtotal')).toHaveText(/\$42\.34\s*€38\.95/)
+  await expect(totals.getByTestId('total-discount')).toHaveText(/-\$4\.23\s*-€3\.89/)
+  await expect(grandTotal(page)).toHaveText(/\$138\.11\s*€127\.06/)
+  await expect(totals).toContainText('1 USD = 0.92 EUR')
+
+  // JPY has no minor unit.
+  await page.goto(`/projects/${projects.JPY.id}?tab=bom`)
+  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '0', '3', '$10.00¥1,514', '$30.00¥4,541'])
+  await expect(grandTotal(page)).toHaveText(/\$138\.11\s*¥20,906/)
+})
