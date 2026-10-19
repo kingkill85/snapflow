@@ -7,7 +7,7 @@ import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib'
 
 type Entry = { name: string; data: Buffer }
 
-function readZip(zip: Buffer): Entry[] {
+export function readZip(zip: Buffer): Entry[] {
   let end = zip.length - 22
   while (end >= 0 && zip.readUInt32LE(end) !== 0x06054b50) end--
   if (end < 0) throw new Error('not a ZIP file')

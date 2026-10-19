@@ -40,6 +40,9 @@ const labels = {
     cabling: 'Cabling and small material',
     travel: 'Travel costs',
     unitPrice: 'Unit price (USD)',
+    createProposal: 'Create proposal',
+    documents: 'Documents',
+    split: 'One document per product type',
   },
   de: {
     bom: 'Stückliste',
@@ -59,6 +62,9 @@ const labels = {
     cabling: 'Verkabelung und Kleinmaterial',
     travel: 'Anfahrtskosten',
     unitPrice: 'Einzelpreis (USD)',
+    createProposal: 'Angebot erstellen',
+    documents: 'Dokumente',
+    split: 'Ein Dokument je Produkttyp',
   },
 }
 type Lang = keyof typeof labels
@@ -168,6 +174,15 @@ async function seed(api: Api, lang: Lang) {
   await api.updateProduct(dimmer.product.id, { isActive: false })
   await api.ctx.delete(`/api/products/${relay.product.id}/variants/${relay.variant.id}`)
 
+  // Proposals (2d): a combined one and one per product type, on the main and the completed project.
+  for (const project of [main, done]) {
+    const versionId = project.versions[0].id
+    const combined = await api.ctx.post(`/api/versions/${versionId}/proposals`, { data: { exporter: 'docx' } })
+    expect(combined.ok(), await combined.text()).toBe(true)
+    const split = await api.ctx.post(`/api/versions/${versionId}/proposals`, { data: { exporter: 'docx', split: true, productTypeIds: types } })
+    expect(split.ok(), await split.text()).toBe(true)
+  }
+
   return { main, eur, empty, done, plans }
 }
 
@@ -185,7 +200,7 @@ for (const lang of ['en', 'de'] as const) {
       const l = labels[lang]
       const s = await seed(api, lang)
       await complete(api, s.done.id)
-      const path = (projectId: string, tab: 'bom' | 'pricing') => `/projects/${projectId}?tab=${tab}`
+      const path = (projectId: string, tab: 'bom' | 'pricing' | 'proposals') => `/projects/${projectId}?tab=${tab}`
       const choose = async (p: Page, label: string, option: string) => {
         await p.getByRole('combobox', { name: label, exact: true }).click()
         await p.getByRole('option', { name: option, exact: true }).click()
@@ -271,6 +286,26 @@ for (const lang of ['en', 'de'] as const) {
           },
         },
         { name: 'pricing-read-only', path: path(s.done.id, 'pricing'), fullPage: true },
+        { name: 'proposals', path: path(s.main.id, 'proposals'), fullPage: true },
+        { name: 'proposals-empty', path: path(s.empty.id, 'proposals'), fullPage: true },
+        { name: 'proposals-read-only', path: path(s.done.id, 'proposals'), fullPage: true },
+        {
+          name: 'proposal-dialog',
+          path: path(s.eur.id, 'proposals'),
+          act: async (p) => {
+            await p.getByRole('button', { name: l.createProposal }).click()
+            await expect(dialog(p).getByTestId('preview-total')).toHaveCount(1)
+          },
+        },
+        {
+          name: 'proposal-dialog-split',
+          path: path(s.main.id, 'proposals'),
+          act: async (p) => {
+            await p.getByRole('button', { name: l.createProposal }).click()
+            await choose(p, l.documents, l.split)
+            await expect(dialog(p).getByTestId('preview-total')).toHaveCount(2)
+          },
+        },
       ]
 
       await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
@@ -292,7 +327,7 @@ for (const lang of ['en', 'de'] as const) {
           if (step.act) await step.act(page)
           await page.waitForTimeout(200)
           await expectNoHorizontalOverflow(page)
-          await page.screenshot({ path: `e2e/screenshots/bom2c-${step.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: step.fullPage ?? false })
+          await page.screenshot({ path: `e2e/screenshots/${step.name.startsWith('proposal') ? 'proposals2d' : 'bom2c'}-${step.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: step.fullPage ?? false })
           await page.keyboard.press('Escape')
           if (step.warning) await page.unroute('**/api/versions/*/bom')
         }
