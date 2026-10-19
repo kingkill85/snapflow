@@ -161,11 +161,6 @@ FROM (VALUES
 JOIN function_types f ON f.key = s.function
 JOIN load_types l ON l.key = s.load;
 
--- The SnapFlow 1 workbook's "Dimensions (mm)" column (starter profile, D121)
--- is just information.
-INSERT INTO catalog_fields (key, label, value_type, unit, sort_order)
-VALUES ('dimensions', '{"en": "Dimensions", "de": "Abmessungen"}', 'text', 'mm', 1);
-
 -- +goose Down
 ALTER TABLE product_types DROP COLUMN default_bus_current_ma, DROP COLUMN reserve_percent, DROP COLUMN bus_devices_max;
 ALTER TABLE products DROP COLUMN mounting;

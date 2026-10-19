@@ -53,7 +53,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	c.tenants.UseFiles(fileSvc)
 	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc, capSvc)
 	products.Register(api, productSvc)
-	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users)
+	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users, capSvc)
 	imports.Register(api, importSvc)
 	projectSvc := projects.NewService(deps.DB, productTypes, c.tenants)
 	if deps.ExchangeRates != nil {
