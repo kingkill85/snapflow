@@ -30,6 +30,7 @@ import {
 import { useLocalized } from '@/i18n/localized'
 
 import { Counters } from './Counters'
+import { LinkedColumns } from './NewColumnsStep'
 import { compactRows } from './diff'
 import { changesSection, issuesSection, itemAnchor, offsetOf, useClampOffset, useFilters, useScrollToHash } from './filters'
 import { IssuesSection } from './IssuesSection'
@@ -127,6 +128,8 @@ export function PreviewStep({ run, onEditMapping, onApplied }: Props) {
       </Section>
 
       <IssuesSection run={run} counts={counts} linkItems />
+
+      <LinkedColumns mapping={run.mapping} />
 
       <Section title={t('preview.applyTitle')} description={t('preview.applyDescription')}>
         <SwitchField
@@ -368,7 +371,7 @@ function ItemCard({ item, labels, highlighted }: { item: ImportItem; labels: Ret
           showBefore={showBefore}
           rows={changes.map((c) => {
             // A new category's attribute: its type (the attribute an import creates for a mapped column, D133).
-            const typed = item.entity === 'category' && c.field.startsWith('attributes.') && typeof c.after === 'string'
+            const typed = item.entity === 'category' && c.field.startsWith('attributes.') && !c.field.endsWith('.fieldKey') && typeof c.after === 'string'
             const after = typed ? t(`attributeType.${c.after}` as 'attributeType.text', { defaultValue: c.after }) : c.after
             return { key: c.field, label: fieldLabel(c.field), before: { field: c.field, value: c.before }, after: { field: c.field, value: after } }
           })}

@@ -16,7 +16,10 @@ export const customAttribute = '@attribute'
 
 export type ConstantRow = { target: string; value: string }
 /** A mapping that is not one column's target: a column this file lacks, or a second target of a column. */
-export type ExtraRow = { target: string; column: string; columnLetter: string; order?: number }
+export type ExtraRow = { target: string; column: string; columnLetter: string; order?: number } & Link
+
+/** An attribute column's link to a catalog field, or its answer "just information" (D188), kept as loaded. */
+export type Link = { fieldKey?: string; information?: boolean }
 
 /**
  * Targets that repeat (the add-ons): their order in the field list is the
@@ -47,6 +50,12 @@ export type MappingForm = {
    * chosen since after them in column order.
    */
   order: Record<string, number>
+  /**
+   * The catalog field link (or "just information") of a column's attribute
+   * target, per column letter, as loaded; sent while the column keeps that
+   * target, so a profile keeps the answers.
+   */
+  links: Record<string, Link & { target: string }>
   constants: ConstantRow[]
   extras: ExtraRow[]
   /** Errors of the whole field list (e.g. "map the model number"). */
@@ -67,6 +76,7 @@ export const emptyForm = (): MappingForm => ({
   targets: {},
   customKeys: {},
   order: {},
+  links: {},
   constants: [],
   extras: [],
 })
@@ -121,12 +131,22 @@ export function formFromMapping(mapping: ImportMapping, columns: ImportSourceCol
     if (column && !form.targets[column.letter]) {
       form.targets[column.letter] = field.target
       if (repeatable) form.order[column.letter] = index
+      if (field.fieldKey || field.information) form.links[column.letter] = { target: field.target, ...linkOf(field) }
     } else {
-      form.extras.push({ target: field.target, column: field.column ?? '', columnLetter: field.columnLetter ?? '', ...(repeatable ? { order: index } : {}) })
+      form.extras.push({
+        target: field.target,
+        column: field.column ?? '',
+        columnLetter: field.columnLetter ?? '',
+        ...(repeatable ? { order: index } : {}),
+        ...linkOf(field),
+      })
     }
   })
   return form
 }
+
+/** A field's catalog field link or "just information", without empty parts. */
+export const linkOf = (f: Link): Link => ({ ...(f.fieldKey ? { fieldKey: f.fieldKey } : {}), ...(f.information ? { information: true } : {}) })
 
 /** What the form sends, and where the server's errors about each part are shown. */
 export type Built = { mapping: ImportMapping; fields: ApiFieldMap }
@@ -161,7 +181,8 @@ export function mappingFromForm(form: MappingForm, columns: ImportSourceColumn[]
     if (target === '') return
     if (target === customAttribute) target = `attribute.${(form.customKeys[c.letter] ?? '').trim()}`
     const unique = c.header !== '' && counts.get(headerKey(c.header)) === 1 && form.headerRow > 0
-    const field = { target, ...(unique ? { column: c.header } : {}), columnLetter: c.letter }
+    const link = form.links[c.letter]
+    const field = { target, ...(unique ? { column: c.header } : {}), columnLetter: c.letter, ...(link && link.target === target ? linkOf(link) : {}) }
     if (isRepeatable(target)) repeated.push({ field, at: `targets.${c.letter}`, order: form.order[c.letter] ?? unordered, position })
     else add(field, `targets.${c.letter}`)
   })
@@ -169,6 +190,7 @@ export function mappingFromForm(form: MappingForm, columns: ImportSourceColumn[]
     target: row.target,
     ...(row.column ? { column: row.column } : {}),
     ...(row.columnLetter ? { columnLetter: row.columnLetter } : {}),
+    ...linkOf(row),
   })
   form.extras.forEach((row, i) => {
     if (isRepeatable(row.target)) repeated.push({ field: extra(row), at: `extras.${i}.target`, order: row.order ?? unordered, position: columns.length + i })
@@ -257,7 +279,7 @@ function normalise(m: ImportMapping) {
     allOrNothing: m.allOrNothing ?? true,
     // By target, stable: repeated targets (add-ons) keep their order, which matters.
     fields: m.fields
-      .map((f) => [f.target, headerKey(f.column ?? ''), (f.columnLetter ?? '').toUpperCase(), f.value ?? null] as const)
+      .map((f) => [f.target, headerKey(f.column ?? ''), (f.columnLetter ?? '').toUpperCase(), f.value ?? null, f.fieldKey ?? '', f.information ?? false] as const)
       .sort((x, y) => x[0].localeCompare(y[0])),
   }
 }

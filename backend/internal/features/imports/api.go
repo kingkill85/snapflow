@@ -184,6 +184,37 @@ func Register(api huma.API, svc *Service) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "checkImportColumns", Method: http.MethodPost, Path: "/api/import-columns",
+		Summary: "Check a mapping's attribute columns against the catalog fields",
+		Description: "D188: every attribute.<key> column is matched with the catalog fields (a link kept in fieldKey, else the key " +
+			"and the header text against field keys and labels, ignoring case, spacing and punctuation). Returns the mapping with " +
+			"the matches linked and each column's status; unknown columns block the preview (import.columns_unknown) until " +
+			"answered (POST /api/import-columns/answers).",
+		Tags: []string{tag},
+	}, func(ctx context.Context, in *struct{ Body ImportColumnsInput }) (*struct{ Body ImportColumns }, error) {
+		out, err := svc.Columns(ctx, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &struct{ Body ImportColumns }{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "answerImportColumns", Method: http.MethodPost, Path: "/api/import-columns/answers",
+		Summary: "Answer what unknown columns mean",
+		Description: "Each answer creates a catalog field (all in one transaction; errors at body.answers[i].field.*) and links the " +
+			"column to it, or marks the column as just information. Returns the column check of the answered mapping: " +
+			"preview with that mapping, and save it in the profile to keep the answers.",
+		Tags: []string{tag},
+	}, func(ctx context.Context, in *struct{ Body ImportColumnAnswers }) (*struct{ Body ImportColumns }, error) {
+		out, err := svc.AnswerColumns(ctx, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &struct{ Body ImportColumns }{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "listImports", Method: http.MethodGet, Path: "/api/imports",
 		Summary: "List import runs", Description: "Newest first.", Tags: []string{tag},
 	}, func(ctx context.Context, in *runsInput) (*runsOutput, error) {

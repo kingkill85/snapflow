@@ -17,7 +17,14 @@ export interface ImportField {
      */
   columnLetter?: string;
   /**
-     * product.modelNumber, product.name.<locale>, product.description.<locale>, product.productType, product.category, variant.name.<locale>, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.<key> (see GET /api/import-targets)
+     * attribute.<key> targets: the catalog field the column is (filled in by the column check; kept by profiles)
+     * @maxLength 64
+     */
+  fieldKey?: string;
+  /** attribute.<key> targets: the column was answered as just information */
+  information?: boolean;
+  /**
+     * product.modelNumber, product.name.<locale>, product.description.<locale>, product.productType, product.category, product.mounting, variant.name.<locale>, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.<key> (see GET /api/import-targets)
      * @maxLength 100
      */
   target: string;

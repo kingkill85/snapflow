@@ -13,17 +13,18 @@ import (
 )
 
 const createFunctionType = `-- name: CreateFunctionType :one
-INSERT INTO function_types (key, name) VALUES ($1, $2)
-RETURNING id, key, name, created_at, updated_at
+INSERT INTO function_types (key, name, allows_circuit) VALUES ($1, $2, $3)
+RETURNING id, key, name, created_at, updated_at, allows_circuit
 `
 
 type CreateFunctionTypeParams struct {
-	Key  string
-	Name i18n.Text
+	Key           string
+	Name          i18n.Text
+	AllowsCircuit bool
 }
 
 func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionTypeParams) (FunctionType, error) {
-	row := q.db.QueryRow(ctx, createFunctionType, arg.Key, arg.Name)
+	row := q.db.QueryRow(ctx, createFunctionType, arg.Key, arg.Name, arg.AllowsCircuit)
 	var i FunctionType
 	err := row.Scan(
 		&i.ID,
@@ -31,6 +32,7 @@ func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionType
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AllowsCircuit,
 	)
 	return i, err
 }
@@ -47,8 +49,17 @@ func (q *Queries) DeleteFunctionType(ctx context.Context, id uuid.UUID) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const deleteFunctionTypeLoadTypes = `-- name: DeleteFunctionTypeLoadTypes :exec
+DELETE FROM function_type_load_types WHERE function_type_id = $1
+`
+
+func (q *Queries) DeleteFunctionTypeLoadTypes(ctx context.Context, functionTypeID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteFunctionTypeLoadTypes, functionTypeID)
+	return err
+}
+
 const getFunctionType = `-- name: GetFunctionType :one
-SELECT id, key, name, created_at, updated_at FROM function_types WHERE id = $1
+SELECT id, key, name, created_at, updated_at, allows_circuit FROM function_types WHERE id = $1
 `
 
 func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionType, error) {
@@ -60,12 +71,52 @@ func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionTy
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AllowsCircuit,
 	)
 	return i, err
 }
 
+const insertFunctionTypeLoadTypes = `-- name: InsertFunctionTypeLoadTypes :exec
+INSERT INTO function_type_load_types (function_type_id, load_type_id)
+SELECT $1::uuid, unnest($2::uuid[])
+`
+
+type InsertFunctionTypeLoadTypesParams struct {
+	FunctionTypeID uuid.UUID
+	LoadTypeIds    []uuid.UUID
+}
+
+func (q *Queries) InsertFunctionTypeLoadTypes(ctx context.Context, arg InsertFunctionTypeLoadTypesParams) error {
+	_, err := q.db.Exec(ctx, insertFunctionTypeLoadTypes, arg.FunctionTypeID, arg.LoadTypeIds)
+	return err
+}
+
+const listFunctionTypeLoadTypes = `-- name: ListFunctionTypeLoadTypes :many
+SELECT function_type_id, load_type_id FROM function_type_load_types ORDER BY function_type_id, load_type_id
+`
+
+func (q *Queries) ListFunctionTypeLoadTypes(ctx context.Context) ([]FunctionTypeLoadType, error) {
+	rows, err := q.db.Query(ctx, listFunctionTypeLoadTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FunctionTypeLoadType{}
+	for rows.Next() {
+		var i FunctionTypeLoadType
+		if err := rows.Scan(&i.FunctionTypeID, &i.LoadTypeID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFunctionTypes = `-- name: ListFunctionTypes :many
-SELECT id, key, name, created_at, updated_at FROM function_types ORDER BY key
+SELECT id, key, name, created_at, updated_at, allows_circuit FROM function_types ORDER BY key
 `
 
 func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error) {
@@ -83,6 +134,7 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AllowsCircuit,
 		); err != nil {
 			return nil, err
 		}
@@ -95,19 +147,25 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 }
 
 const updateFunctionType = `-- name: UpdateFunctionType :one
-UPDATE function_types SET key = $2, name = $3, updated_at = now()
+UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, updated_at = now()
 WHERE id = $1
-RETURNING id, key, name, created_at, updated_at
+RETURNING id, key, name, created_at, updated_at, allows_circuit
 `
 
 type UpdateFunctionTypeParams struct {
-	ID   uuid.UUID
-	Key  string
-	Name i18n.Text
+	ID            uuid.UUID
+	Key           string
+	Name          i18n.Text
+	AllowsCircuit bool
 }
 
 func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionTypeParams) (FunctionType, error) {
-	row := q.db.QueryRow(ctx, updateFunctionType, arg.ID, arg.Key, arg.Name)
+	row := q.db.QueryRow(ctx, updateFunctionType,
+		arg.ID,
+		arg.Key,
+		arg.Name,
+		arg.AllowsCircuit,
+	)
 	var i FunctionType
 	err := row.Scan(
 		&i.ID,
@@ -115,6 +173,7 @@ func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionType
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AllowsCircuit,
 	)
 	return i, err
 }

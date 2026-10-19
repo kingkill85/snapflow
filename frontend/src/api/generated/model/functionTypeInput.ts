@@ -9,11 +9,18 @@ import type { FunctionTypeInputName } from './functionTypeInputName';
 export interface FunctionTypeInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Several needs may share one channel (default false); on update, left out keeps the stored value (D294) */
+  allowsCircuit?: boolean;
   /**
      * @minLength 1
      * @maxLength 64
      */
   key: string;
+  /**
+     * Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)
+     * @maxItems 200
+     */
+  loadTypeIds?: string[];
   /** Display name per locale; "en" is required */
   name: FunctionTypeInputName;
 }

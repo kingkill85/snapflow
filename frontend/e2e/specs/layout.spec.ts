@@ -16,6 +16,9 @@ const pages = [
   { name: 'projects', path: '/projects', heading: 'Projects' },
   { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
   { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
+  { name: 'catalog-fields', path: '/catalog/fields', heading: 'Fields' },
+  { name: 'output-kinds', path: '/catalog/output-kinds', heading: 'Output kinds' },
+  { name: 'load-types', path: '/catalog/load-types', heading: 'Load types' },
   { name: 'categories', path: '/catalog/categories', heading: 'Categories' },
   { name: 'category-new', path: '/catalog/categories/new', heading: 'New category' },
   { name: 'users', path: '/admin/users', heading: 'Users' },
@@ -51,6 +54,9 @@ const listPages = [
   { name: 'categories', path: '/catalog/categories', heading: { en: 'Categories', de: 'Kategorien' } },
   { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Product types', de: 'Produkttypen' } },
   { name: 'function-types', path: '/catalog/function-types', heading: { en: 'Function types', de: 'Funktionstypen' } },
+  { name: 'catalog-fields', path: '/catalog/fields', heading: { en: 'Fields', de: 'Felder' } },
+  { name: 'output-kinds', path: '/catalog/output-kinds', heading: { en: 'Output kinds', de: 'Ausgangsarten' } },
+  { name: 'load-types', path: '/catalog/load-types', heading: { en: 'Load types', de: 'Lastarten' } },
   { name: 'users', path: '/admin/users', heading: { en: 'Users', de: 'Benutzer' } },
   { name: 'tenants', path: '/admin/tenants', heading: { en: 'Tenants', de: 'Mandanten' } },
   { name: 'roles', path: '/admin/roles', heading: { en: 'Roles', de: 'Rollen' } },
@@ -114,6 +120,22 @@ for (const width of [1280, 1440, 1920]) {
           tenantId: (await api.createTenant(unique('Elektrotechnik Mustermann-Schmidt GmbH & Co. KG'))).id,
           customer: { name: 'Maximilian Alexander Mustermann-Schmidt', company: 'Mustermann-Schmidt Immobilienverwaltung GmbH' },
         })
+        // A catalog field with a meaning and both parameters: the widest Fields row (output kinds and load types are seeded).
+        const [kinds, loads] = await Promise.all(
+          ['/api/output-kinds', '/api/load-types'].map(async (path) => ((await (await api.ctx.get(path)).json()) as { items: { id: string }[] }).items),
+        )
+        const field = await api.ctx.post('/api/catalog-fields', {
+          data: {
+            key: uniqueKey('dimmer_led_w'),
+            label: { en: unique('Max. LED load per dimmer channel'), de: unique('Max. LED-Last je Dimmkanal') },
+            type: 'number',
+            unit: 'W',
+            meaning: 'channel_limit_w',
+            outputKindId: kinds[0].id,
+            loadTypeId: loads[0].id,
+          },
+        })
+        expect(field.status()).toBe(201)
         // Required afterwards: the product misses the value, a problem badge in the status cell.
         await api.updateCategory(category.id, { attributes: [{ ...attribute, required: true }] })
         await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)

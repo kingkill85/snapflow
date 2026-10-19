@@ -13,6 +13,11 @@ import type { InstanceAttributeDefinitionType } from './instanceAttributeDefinit
 export interface InstanceAttributeDefinition {
   /** Help text per locale; if set, "en" is required */
   description?: InstanceAttributeDefinitionDescription;
+  /**
+     * Key of the catalog field the attribute is linked to (type, unit, options and meaning come from it); empty for none
+     * @maxLength 64
+     */
+  fieldKey?: string;
   /** Type of a list's items */
   itemType?: InstanceAttributeDefinitionItemType;
   /** Stable identifier, lower snake case, unique within the schema */

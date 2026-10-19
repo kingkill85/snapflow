@@ -22,6 +22,7 @@ const product = (overrides: Partial<ProductFormValues> = {}): ProductFormValues 
   name: { en: 'Dimmer', de: '  ' },
   description: { en: ' ', de: '' },
   isActive: true,
+  mounting: '',
   values: {},
   keep: {},
   ...overrides,
@@ -41,7 +42,7 @@ describe('product and variant forms', () => {
   })
 
   it('leaves out a blank description and blank German texts', () => {
-    expect(toProductInput(product(), {})).toEqual({ productTypeId: 'type', categoryId: 'category', modelNumber: 'M1', name: { en: 'Dimmer' }, attributes: {}, isActive: true })
+    expect(toProductInput(product(), {})).toEqual({ productTypeId: 'type', categoryId: 'category', modelNumber: 'M1', name: { en: 'Dimmer' }, attributes: {}, isActive: true, mounting: '' })
     expect(toProductInput(product({ description: { en: 'Four channels', de: ' ' } }), {}).description).toEqual({ en: 'Four channels' })
     expect(toProductInput(product({ description: { en: 'Four', de: 'Vier' } }), {}).description).toEqual({ en: 'Four', de: 'Vier' })
   })

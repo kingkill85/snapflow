@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
@@ -37,6 +38,9 @@ const StandardVariantName = "Standard"
 type planEntry struct {
 	// A category to create.
 	Category *categories.CategoryInput `json:"category,omitempty"`
+	// Links of an existing category (ID) to link: attribute key -> catalog
+	// field key (its unlinked attributes the columns' fields match).
+	Links map[string]string `json:"links,omitempty"`
 	// The product's state after the import; CategorySeq is set when its
 	// category is one this run creates.
 	Product     *products.ProductInput `json:"product,omitempty"`
@@ -92,6 +96,8 @@ type planInput struct {
 	types      []producttypes.ProductType
 	categories []categories.Category
 	catalog    []products.CatalogProduct
+	// fields are the catalog fields by key (attribute columns link them).
+	fields map[string]capabilities.CatalogField
 	// storeImage stores a picture (reading its bytes) and returns its
 	// file; an *apperr.Error means the picture is not usable
 	// (import.image_invalid). It is called once per picture part, from
@@ -143,8 +149,13 @@ type planner struct {
 	attrKeys []string
 	// new categories by key
 	newCategories map[string]*entry
-	typeByID      map[uuid.UUID]producttypes.ProductType
-	categoryByID  map[uuid.UUID]categories.Category
+	// linkEntries are the existing categories whose unlinked attributes
+	// the run links to the columns' catalog fields (by category id);
+	// linkWarned the category/key pairs warned about (type mismatch).
+	linkEntries  map[uuid.UUID]*entry
+	linkWarned   map[string]bool
+	typeByID     map[uuid.UUID]producttypes.ProductType
+	categoryByID map[uuid.UUID]categories.Category
 	// constType and constCategory are the product type and category of a
 	// constant (resolved once).
 	constType     *producttypes.ProductType
@@ -163,10 +174,10 @@ type storedImage struct {
 
 // fieldIndex is where each target is mapped (-1: not mapped).
 type fieldIndex struct {
-	model, ptype, category, sku, price, image int
-	pname, pdesc, vname                       map[string]int
-	attrs                                     map[string]int
-	addons                                    []int
+	model, ptype, category, sku, price, image, mounting int
+	pname, pdesc, vname                                 map[string]int
+	attrs                                               map[string]int
+	addons                                              []int
 }
 
 func buildPlan(in planInput, loc string) (*plan, error) {
@@ -186,8 +197,15 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 			}
 		}
 	}
+	p.linkEntries = map[uuid.UUID]*entry{}
+	p.linkWarned = map[string]bool{}
+	for _, f := range in.mapping.Fields {
+		if t, ok := parseTarget(f.Target); ok && t.kind == tAttribute && f.FieldKey != "" && !f.Information {
+			p.scope.FieldKeys = append(p.scope.FieldKeys, f.FieldKey)
+		}
+	}
 	p.targets = make([]target, len(in.mapping.Fields))
-	p.idx = fieldIndex{model: -1, ptype: -1, category: -1, sku: -1, price: -1, image: -1,
+	p.idx = fieldIndex{model: -1, ptype: -1, category: -1, sku: -1, price: -1, image: -1, mounting: -1,
 		pname: map[string]int{}, pdesc: map[string]int{}, vname: map[string]int{}, attrs: map[string]int{}}
 	for i, f := range in.mapping.Fields {
 		t, _ := parseTarget(f.Target)
@@ -199,6 +217,8 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 			p.idx.ptype = i
 		case tCategory:
 			p.idx.category = i
+		case tMounting:
+			p.idx.mounting = i
 		case tVariantSKU:
 			p.idx.sku = i
 		case tVariantPrice:
@@ -630,14 +650,19 @@ func (p *planner) resolveCategory(rd *rowData) (categories.Category, int, bool) 
 }
 
 // newCategoryEntry plans a category the file names but the catalog lacks:
-// active, with a text attribute (product scope) per mapped attribute key, so
-// the mapped columns have somewhere to go; an admin tightens the schema
-// afterwards.
+// active, with an attribute (product scope) per mapped attribute key, so
+// the mapped columns have somewhere to go: linked to the column's catalog
+// field (its type, unit, options and meaning; D188 amending D133), else a
+// text attribute an admin tightens afterwards.
 func (p *planner) newCategoryEntry(key, name string) *entry {
 	schema := attrschema.Schema{}
 	for i, f := range p.mapping.Fields {
 		t := p.targets[i]
 		if t.kind != tAttribute {
+			continue
+		}
+		if field, ok := p.fields[f.FieldKey]; ok && !f.Information {
+			schema = append(schema, attrschema.AttributeDefinition{Definition: field.Definition(t.key), Scope: attrschema.ScopeProduct})
 			continue
 		}
 		label := products.CollapseSpace(f.Column)
@@ -664,6 +689,58 @@ func (p *planner) newCategoryEntry(key, name string) *entry {
 	return e
 }
 
+// planLinks plans linking the attributes of an existing category that
+// the mapped columns feed to the columns' catalog fields: an attribute
+// with the column's key and no field link of its own gets the column's
+// field when the types match (a "changed" category item, applied through
+// the categories service in the apply's transaction); another type is a
+// warning (import.attribute_not_linked) and the attribute stays unlinked.
+// Undoing the run leaves the links (they only add a meaning).
+func (p *planner) planLinks(cat categories.Category, g *group) {
+	for i, f := range p.mapping.Fields {
+		t := p.targets[i]
+		if t.kind != tAttribute || f.Information || f.FieldKey == "" {
+			continue
+		}
+		field, ok := p.fields[f.FieldKey]
+		if !ok {
+			continue
+		}
+		for _, a := range cat.Attributes {
+			if a.Key != t.key || a.FieldKey != "" {
+				continue
+			}
+			if a.Type != field.Type {
+				if w := cat.ID.String() + "/" + a.Key; !p.linkWarned[w] {
+					p.linkWarned[w] = true
+					p.issue("warning", nil, i, "import.attribute_not_linked",
+						map[string]any{"key": a.Key, "field": field.Key, "category": cat.Key, "type": string(a.Type), "expected": string(field.Type)})
+				}
+				continue
+			}
+			e := p.linkEntries[cat.ID]
+			if e == nil {
+				id := cat.ID
+				e = &entry{item: ImportItem{Seq: len(p.entries) + 1, Entity: "category", Status: "changed", ID: &id, Key: cat.Key, Name: cat.Name,
+					Changes: []ImportFieldChange{}}}
+				e.plan.ID, e.plan.ExpectedUpdatedAt, e.plan.Links = &id, cat.UpdatedAt, map[string]string{}
+				p.entries = append(p.entries, e)
+				p.linkEntries[cat.ID] = e
+				p.counts.Categories.Changed++
+			}
+			if _, done := e.plan.Links[a.Key]; !done {
+				e.plan.Links[a.Key] = field.Key
+				e.item.Changes = append(e.item.Changes, ImportFieldChange{Field: "attributes." + a.Key + ".fieldKey", After: field.Key})
+			}
+		}
+	}
+	if e := p.linkEntries[cat.ID]; e != nil {
+		for _, r := range g.rows {
+			e.item.Rows = append(e.item.Rows, r.row.Number)
+		}
+	}
+}
+
 func humanize(key string) string {
 	s := strings.ReplaceAll(key, "_", " ")
 	return strings.ToUpper(s[:1]) + s[1:]
@@ -684,6 +761,9 @@ func (p *planner) planProduct(g *group) {
 	cat, catSeq, catOK := p.resolveCategory(first)
 	ok := typeOK && catOK
 	g.pt, g.cat, g.catSeq = pt, cat, catSeq
+	if catOK && catSeq == 0 && cat.ID != uuid.Nil {
+		p.planLinks(cat, g)
+	}
 	if ce := p.newCategories[cat.Key]; catSeq != 0 && ce != nil {
 		for _, r := range g.rows {
 			ce.item.Rows = append(ce.item.Rows, r.row.Number)
@@ -710,7 +790,7 @@ func (p *planner) planProduct(g *group) {
 
 	// Later rows only add variants; conflicting product fields are
 	// warnings (the first row wins).
-	productFields := []int{p.idx.ptype, p.idx.category}
+	productFields := []int{p.idx.ptype, p.idx.category, p.idx.mounting}
 	for _, i := range p.idx.pname {
 		productFields = append(productFields, i)
 	}
@@ -741,6 +821,7 @@ func (p *planner) planProduct(g *group) {
 	if g.existing != nil {
 		after.Name, after.Description = cloneText(g.existing.Name), cloneText(g.existing.Description)
 		after.Attributes = cloneValues(g.existing.Attributes)
+		after.Mounting = &g.existing.Mounting
 		existing = &products.Existing{ProductTypeID: g.existing.ProductTypeID, CategoryID: g.existing.CategoryID, Attributes: g.existing.Attributes}
 	}
 	for locale, i := range p.idx.pname {
@@ -748,6 +829,14 @@ func (p *planner) planProduct(g *group) {
 	}
 	for locale, i := range p.idx.pdesc {
 		setText(after.Description, locale, p.cell(first.row, i))
+	}
+	if i := p.idx.mounting; i >= 0 {
+		value := p.cell(first.row, i)
+		if m, ok := mountingValue(value); ok {
+			after.Mounting = &m
+		} else {
+			p.issue("error", first, i, "import.mounting_unknown", map[string]any{"value": products.CollapseSpace(value)})
+		}
 	}
 	p.applyAttributes(first, cat, attrschema.ScopeProduct, after.Attributes)
 	normalized, errs := products.NormalizeProduct(pt, cat, after, existing, "")
@@ -1418,6 +1507,7 @@ func (p *planner) productChanges(before *products.CatalogProduct, after products
 	textChanges(add, "name", b.Name, after.Name)
 	textChanges(add, "description", b.Description, after.Description)
 	valueChanges(add, b.Attributes, after.Attributes)
+	add("mounting", nilIfEmpty(b.Mounting), nilIfEmpty(deref(after.Mounting)))
 	if before == nil || !before.IsActive {
 		add("isActive", activeBefore(before != nil, b.IsActive), true)
 	}
@@ -1514,4 +1604,11 @@ func cloneValues(v attrschema.Values) attrschema.Values {
 		out[k] = x
 	}
 	return out
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

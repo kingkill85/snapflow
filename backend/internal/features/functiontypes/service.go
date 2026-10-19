@@ -6,6 +6,7 @@ package functiontypes
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -16,30 +17,61 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 type FunctionType struct {
-	ID        uuid.UUID `json:"id"`
-	Key       string    `json:"key" doc:"Stable identifier, lower snake case" example:"dimmer"`
-	Name      i18n.Text `json:"name" doc:"Display name per locale"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID   uuid.UUID `json:"id"`
+	Key  string    `json:"key" doc:"Stable identifier, lower snake case" example:"dimmer"`
+	Name i18n.Text `json:"name" doc:"Display name per locale"`
+	// AllowsCircuit: several needs of this function may share one channel
+	// (lights, sockets: yes; blinds, inputs: no).
+	AllowsCircuit bool        `json:"allowsCircuit" doc:"Several needs of this function may share one channel (a circuit)"`
+	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds" doc:"The load types a need of this function may have; empty = any"`
+	CreatedAt     time.Time   `json:"createdAt"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
 }
 
 type FunctionTypeInput struct {
-	Key  string    `json:"key" minLength:"1" maxLength:"64" example:"dimmer"`
-	Name i18n.Text `json:"name" doc:"Display name per locale; \"en\" is required"`
+	Key           string      `json:"key" minLength:"1" maxLength:"64" example:"dimmer"`
+	Name          i18n.Text   `json:"name" doc:"Display name per locale; \"en\" is required"`
+	AllowsCircuit *bool       `json:"allowsCircuit,omitempty" doc:"Several needs may share one channel (default false); on update, left out keeps the stored value (D294)"`
+	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)"`
 }
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-type Service struct {
-	q store.Querier
+// DB is the database the service runs on; *pgxpool.Pool implements it.
+type DB interface {
+	store.DBTX
+	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
 }
 
-func NewService(q store.Querier) *Service {
-	return &Service{q: q}
+type Service struct {
+	db DB
+	q  *store.Queries
+}
+
+func NewService(db DB) *Service {
+	return &Service{db: db, q: store.New(db)}
+}
+
+func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) error {
+	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
+}
+
+// loadTypes returns the allowed load types of every function type.
+func (s *Service) loadTypes(ctx context.Context) (map[uuid.UUID][]uuid.UUID, error) {
+	links, err := s.q.ListFunctionTypeLoadTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[uuid.UUID][]uuid.UUID{}
+	for _, l := range links {
+		out[l.FunctionTypeID] = append(out[l.FunctionTypeID], l.LoadTypeID)
+	}
+	return out, nil
 }
 
 func (s *Service) List(ctx context.Context) ([]FunctionType, error) {
@@ -50,9 +82,13 @@ func (s *Service) List(ctx context.Context) ([]FunctionType, error) {
 	if err != nil {
 		return nil, err
 	}
+	loads, err := s.loadTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]FunctionType, len(rows))
 	for i, r := range rows {
-		out[i] = fromRow(r)
+		out[i] = fromRow(r, loads[r.ID])
 	}
 	return out, nil
 }
@@ -65,7 +101,11 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (FunctionType, error) {
 	if err != nil {
 		return FunctionType{}, mapErr(err)
 	}
-	return fromRow(row), nil
+	loads, err := s.loadTypes(ctx)
+	if err != nil {
+		return FunctionType{}, err
+	}
+	return fromRow(row, loads[row.ID]), nil
 }
 
 func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionType, error) {
@@ -77,11 +117,19 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
-	row, err := s.q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name})
+	var row store.FunctionType
+	err := s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name, AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit})
+		if err != nil {
+			return err
+		}
+		return setLoadTypes(ctx, q, row.ID, in.LoadTypeIDs)
+	})
 	if err != nil {
 		return FunctionType{}, mapErr(err, in.Key)
 	}
-	return fromRow(row), nil
+	return fromRow(row, in.LoadTypeIDs), nil
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput) (FunctionType, error) {
@@ -93,11 +141,38 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	if err := validate(in); err != nil {
 		return FunctionType{}, err
 	}
-	row, err := s.q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name})
+	var row store.FunctionType
+	err := s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		// Left-out flags keep the stored values (D294).
+		allowsCircuit := in.AllowsCircuit
+		if allowsCircuit == nil {
+			current, err := q.GetFunctionType(ctx, id)
+			if err != nil {
+				return err
+			}
+			allowsCircuit = &current.AllowsCircuit
+		}
+		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name, AllowsCircuit: *allowsCircuit})
+		if err != nil || in.LoadTypeIDs == nil {
+			return err
+		}
+		if err := q.DeleteFunctionTypeLoadTypes(ctx, id); err != nil {
+			return err
+		}
+		return setLoadTypes(ctx, q, id, in.LoadTypeIDs)
+	})
 	if err != nil {
 		return FunctionType{}, mapErr(err, in.Key)
 	}
-	return fromRow(row), nil
+	if in.LoadTypeIDs == nil {
+		loads, err := s.loadTypes(ctx)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		return fromRow(row, loads[id]), nil
+	}
+	return fromRow(row, in.LoadTypeIDs), nil
 }
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
@@ -106,7 +181,7 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	n, err := s.q.DeleteFunctionType(ctx, id)
 	if err != nil {
-		return err
+		return mapErr(err)
 	}
 	if n == 0 {
 		return apperr.NotFound("function_type.not_found")
@@ -123,6 +198,13 @@ func validate(in FunctionTypeInput) error {
 	if !in.Name.Valid() {
 		errs = append(errs, apperr.Field("body.name.en", "validation.required", "English name is required"))
 	}
+	seen := map[uuid.UUID]bool{}
+	for i, id := range in.LoadTypeIDs {
+		if seen[id] {
+			errs = append(errs, apperr.Field(fmt.Sprintf("body.loadTypeIds[%d]", i), "function_type.load_type_duplicate", "listed twice"))
+		}
+		seen[id] = true
+	}
 	if len(errs) > 0 {
 		return apperr.Validation(errs...)
 	}
@@ -137,9 +219,32 @@ func mapErr(err error, key ...string) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && len(key) > 0 {
 		return apperr.Conflict("function_type.key_taken", "key already exists").With("key", key[0])
 	}
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		// Output kinds serve the function type (function_type_load_types
+		// cascades; an unknown load type is caught in setLoadTypes).
+		return apperr.Conflict("function_type.in_use", "output kinds still serve this function type")
+	}
 	return err
 }
 
-func fromRow(r store.FunctionType) FunctionType {
-	return FunctionType{ID: r.ID, Key: r.Key, Name: r.Name, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+// setLoadTypes stores the allowed load types; an unknown one is
+// load_type.not_found (from the foreign key).
+func setLoadTypes(ctx context.Context, q *store.Queries, id uuid.UUID, loadTypeIDs []uuid.UUID) error {
+	if len(loadTypeIDs) == 0 {
+		return nil
+	}
+	err := q.InsertFunctionTypeLoadTypes(ctx, store.InsertFunctionTypeLoadTypesParams{FunctionTypeID: id, LoadTypeIds: loadTypeIDs})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return apperr.Validation(apperr.Field("body.loadTypeIds", "load_type.not_found", "a load type does not exist"))
+	}
+	return err
+}
+
+func fromRow(r store.FunctionType, loadTypes []uuid.UUID) FunctionType {
+	if loadTypes == nil {
+		loadTypes = []uuid.UUID{}
+	}
+	return FunctionType{ID: r.ID, Key: r.Key, Name: r.Name, AllowsCircuit: r.AllowsCircuit, LoadTypeIDs: loadTypes,
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }

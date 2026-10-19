@@ -43,7 +43,10 @@
       "text": "Text"
     },
     "unknown": "Dieses Attribut gibt es in dieser Kategorie nicht.",
-    "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt."
+    "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt.",
+    "field_not_found": "Es gibt kein Katalogfeld „{{key}}“.",
+    "field_type": "Das verknüpfte Feld „{{key}}“ ist vom Typ $t(attribute.type_name.{{expected}}); verwenden Sie diesen Typ.",
+    "type_or": "oder"
   },
   "auth": {
     "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
@@ -66,6 +69,19 @@
     "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
     "variant_unavailable": "Dieses Produkt ist nicht verfügbar (inaktiv) und kann nicht hinzugefügt werden."
   },
+  "catalog_field": {
+    "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_referenced": "Importprofile verwenden den Schlüssel „{{key}}“: Er kann sich nicht ändern.",
+    "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
+    "meaning_options": "Für diese Bedeutung müssen die Auswahlwerte genau diese sein: {{expected}}.",
+    "meaning_type": "Diese Bedeutung braucht einen anderen Werttyp ({{expected}}).",
+    "not_found": "Dieses Feld existiert nicht mehr.",
+    "order_mismatch": "Die Felder wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "param_not_allowed": "Diese Bedeutung hat keine solche Einstellung.",
+    "product_type_duplicate": "Dieser Produkttyp ist doppelt aufgeführt.",
+    "stale": "Jemand anderes hat dieses Feld inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
   "category": {
     "in_use": "Diese Kategorie wird noch von Produkten verwendet. Deaktivieren Sie sie stattdessen.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
@@ -87,16 +103,24 @@
     "type": "Nur JPEG-, PNG- und WebP-Bilder werden akzeptiert."
   },
   "function_type": {
+    "in_use": "Ausgangsarten bedienen diesen Funktionstyp noch.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
+    "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
     "not_found": "Dieser Funktionstyp existiert nicht mehr."
   },
   "import": {
     "addon_ambiguous": "Das Zubehör \"{{ref}}\" passt zu mehr als einer Variante; die erste wird verwendet.",
     "addon_not_found": "Das Zubehör \"{{ref}}\" wurde weder in der Datei noch im Katalog gefunden.",
     "addon_skipped": "Das Zubehör \"{{ref}}\" steht in einer Zeile mit Fehlern und wird ausgelassen.",
+    "answer_field_not_found": "Es gibt kein Katalogfeld \"{{key}}\".",
+    "answer_required": "Wählen Sie ein neues Feld, ein vorhandenes Feld oder „Nur Information“.",
+    "answer_target": "Keine zugeordnete Spalte hat dieses Ziel.",
+    "attribute_not_linked": "Das Attribut \"{{key}}\" der Kategorie \"{{category}}\" bleibt unverknüpft: Das Feld \"{{field}}\" hat den Typ {{expected}}, das Attribut {{type}}.",
     "category_unknown": "Es gibt keine Kategorie \"{{value}}\". Legen Sie sie an oder schalten Sie „Fehlende Kategorien anlegen“ ein.",
     "column_missing": "Die Datei hat keine Spalte \"{{column}}\".",
+    "columns_unknown_one": "{{count}} neue Spalte braucht zuerst eine Antwort: Was bedeutet sie? ({{columns}})",
+    "columns_unknown_other": "{{count}} neue Spalten brauchen zuerst eine Antwort: Was bedeuten sie? ({{columns}})",
     "duplicate_sku": "Die SKU \"{{sku}}\" kommt in der Datei mehrfach vor.",
     "duplicate_variant": "Die Variante \"{{name}}\" kommt bei diesem Produkt mehrfach vor.",
     "file_type": "Importiert werden können nur .xlsx-Arbeitsmappen und .csv-Dateien in UTF-8.",
@@ -104,6 +128,7 @@
     "image_invalid": "Dieses Bild kann nicht verwendet werden (nur JPEG, PNG und WebP bis 10 MB und 25 Megapixel).",
     "images_too_large": "Die Bilder des Blatts sind zusammen zu groß (höchstens {{maxMb}} MB).",
     "mapping_required": "Wählen Sie ein Profil oder eine Zuordnung.",
+    "mounting_unknown": "„{{value}}“ ist keine Montageart (Grundriss, Verteiler oder beides).",
     "no_rows": "Die Datei hat unter der Kopfzeile keine Datenzeilen.",
     "not_found": "Dieser Import existiert nicht mehr.",
     "price_rounded": "Der Preis {{value}} hat mehr als zwei Nachkommastellen und wird auf {{rounded}} gerundet.",
@@ -136,8 +161,28 @@
     "target_duplicate": "Dieses Ziel ist doppelt zugeordnet.",
     "target_unknown": "Dieses Ziel gibt es nicht."
   },
+  "load_type": {
+    "in_use": "Diese Lastart wird noch von Funktionstypen oder Katalogfeldern verwendet.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
+    "not_found": "Diese Lastart existiert nicht mehr.",
+    "order_mismatch": "Die Lastarten wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diese Lastart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
   "network": {
     "unavailable": "Keine Verbindung zum Server."
+  },
+  "output_kind": {
+    "alternative_cycle": "Diese Ausgangsart hat diese bereits als Alternative.",
+    "alternative_duplicate": "Diese Ausgangsart ist doppelt als Alternative aufgeführt.",
+    "alternative_self": "Eine Ausgangsart kann nicht ihre eigene Alternative sein.",
+    "function_type_duplicate": "Dieser Funktionstyp ist doppelt aufgeführt.",
+    "in_use": "Diese Ausgangsart wird noch von Katalogfeldern oder als Alternative einer anderen Ausgangsart verwendet.",
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
+    "not_found": "Diese Ausgangsart existiert nicht mehr.",
+    "order_mismatch": "Die Ausgangsarten wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diese Ausgangsart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "plan": {
     "not_found": "Dieser Plan existiert nicht mehr.",
@@ -257,6 +302,7 @@
     "min_above_max": "Das Maximum darf nicht unter dem Minimum liegen.",
     "number": "Bitte eine Zahl eingeben, z. B. 27,50 oder 27.50.",
     "password_mismatch": "Die Passwörter stimmen nicht überein.",
+    "range": "Geben Sie einen Wert zwischen {{min}} und {{max}} ein.",
     "required": "Dieses Feld ist erforderlich.",
     "too_long": "Dieser Wert ist zu lang (höchstens {{max}} Zeichen).",
     "too_many": "Es sind zu viele Einträge (höchstens {{max}})."

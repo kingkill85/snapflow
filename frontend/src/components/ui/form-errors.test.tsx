@@ -15,7 +15,8 @@ const invalid = (...fields: FieldErrorBody[]) => new ApiError({ status: 422, cod
 function placeholders(value: unknown, prefix = ''): Record<string, string[]> {
   if (typeof value === 'string') {
     const names = [...value.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1])
-    return names.length > 0 ? { [prefix]: [...new Set(names)].sort() } : {}
+    // Plural forms (key_one, key_other) are one key.
+    return names.length > 0 ? { [prefix.replace(/_(one|other)$/, '')]: [...new Set(names)].sort() } : {}
   }
   return Object.assign({}, ...Object.entries(value as object).map(([k, v]) => placeholders(v, prefix ? `${prefix}.${k}` : k)))
 }
@@ -145,5 +146,19 @@ describe('API field errors', () => {
     ).toBe('This value is invalid. Please check the highlighted fields.')
     // A validation error without any field details.
     expect(message(invalid(), fields)).toBe('The request was invalid.')
+  })
+
+  it('names value types in type lists and uses plural texts', () => {
+    const { result } = renderHook(() => useErrorMessage())
+    const message = result.current
+    expect(message(invalid({ location: 'body.other', code: 'catalog_field.meaning_type', params: { expected: 'number, integer' } }))).toBe(
+      'This meaning needs another value type (a number or a whole number).',
+    )
+    expect(message(new ApiError({ status: 422, code: 'import.columns_unknown', params: { count: 1, columns: 'attribute.a' } }))).toBe(
+      '1 new column needs an answer first: what does it mean? (attribute.a)',
+    )
+    expect(message(new ApiError({ status: 422, code: 'import.columns_unknown', params: { count: 2, columns: 'attribute.a, attribute.b' } }))).toBe(
+      '2 new columns need an answer first: what do they mean? (attribute.a, attribute.b)',
+    )
   })
 })

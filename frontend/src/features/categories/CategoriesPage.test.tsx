@@ -18,6 +18,7 @@ const problem = (status: number, body: object) =>
 const category = (over: Partial<Category>): Category => ({
   id: '6f1c2b8e-0000-4000-8000-000000000001',
   key: 'dimmer_actuator',
+  mounting: 'floorplan',
   name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
   sortOrder: 1,
   isActive: true,

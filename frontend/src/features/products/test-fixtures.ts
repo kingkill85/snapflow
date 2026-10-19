@@ -16,6 +16,8 @@ export const zigbeeType: ProductType = {
   key: 'zigbee',
   name: { en: 'Zigbee', de: 'Zigbee' },
   abbreviation: 'ZB',
+  reservePercent: 20,
+  topology: 'wireless',
   color: '#1f6feb',
   sortOrder: 1,
   isActive: true,
@@ -35,6 +37,7 @@ export const types = [zigbeeType, knxType, legacyType]
 export const dimmerCategory: Category = {
   id: id(101),
   key: 'dimmer_actuators',
+  mounting: 'floorplan',
   name: { en: 'Dimmer actuators', de: 'Dimmaktoren' },
   sortOrder: 1,
   isActive: true,
@@ -108,6 +111,7 @@ export const ivory: Variant = {
   productId: id(201),
   name: { en: 'Ivory White', de: 'Elfenbein' },
   sku: 'M485-IW',
+  capabilities: { mounting: 'floorplan', channels: [], moduleTotalsW: [], busCurrentUsedMaDefault: false, wirelessPlacesUsedDefault: false },
   price: '27.00',
   imageFileId: id(901),
   attributes: { colour: 'white' },
@@ -162,6 +166,30 @@ export const dimmer: Product = {
   categoryId: dimmerCategory.id,
   category: { id: dimmerCategory.id, key: dimmerCategory.key, name: dimmerCategory.name, isActive: true },
   modelNumber: 'M485/DIM.4',
+  mounting: 'board',
+  capabilities: {
+    mounting: 'board',
+    channels: [
+      {
+        outputKindId: id(401),
+        outputKindKey: 'dimmer_output',
+        count: 6,
+        limitsW: [
+          { loadTypeId: id(501), loadTypeKey: 'led', value: 200 },
+          { loadTypeId: id(502), loadTypeKey: 'halogen', value: 220 },
+        ],
+        limitsA: [{ value: 2.5 }],
+        minLoadsW: [{ loadTypeId: id(501), loadTypeKey: 'led', value: 3 }],
+        alternatives: [],
+      },
+    ],
+    moduleTotalA: 6,
+    moduleTotalsW: [{ value: 1200.5 }],
+    busCurrentUsedMa: 20,
+    busCurrentUsedMaDefault: true,
+    railWidthTe: 6,
+    wirelessPlacesUsedDefault: false,
+  },
   name: { en: 'Dimmer 4ch', de: 'Dimmer 4-fach' },
   description: { en: 'Four channels' },
   attributes: { series: 'Pro', power: 300, width_te: 4, dali: true, bus_system: 'zigbee', loads: ['led', 'motor'], protocols: ['DALI'], currents: [1.5, 2] },
@@ -197,3 +225,12 @@ export const listItem = (overrides: Partial<ProductListItem> = {}): ProductListI
 })
 
 export const ids = { id }
+
+/** Output kinds and load types the capabilities name. */
+export const outputKinds = [
+  { id: id(401), key: 'dimmer_output', name: { en: 'dimmer output', de: 'Dimmerausgang' }, isActive: true, sortOrder: 1, functionTypeIds: [], createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+]
+export const loadTypes = [
+  { id: id(501), key: 'led', name: { en: 'LED' }, isActive: true, sortOrder: 1, createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+  { id: id(502), key: 'halogen', name: { en: 'halogen' }, isActive: true, sortOrder: 2, createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+]

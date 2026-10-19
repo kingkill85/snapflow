@@ -5,10 +5,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
+import type { Capabilities } from './capabilities';
 import type { CategoryRef } from './categoryRef';
 import type { FieldError } from './fieldError';
 import type { ProductAttributes } from './productAttributes';
 import type { ProductDescription } from './productDescription';
+import type { ProductMounting } from './productMounting';
 import type { ProductName } from './productName';
 import type { ProductStaleAttributes } from './productStaleAttributes';
 import type { ProductTypeRef } from './productTypeRef';
@@ -24,6 +26,8 @@ export interface Product {
   /** Product, product type and category are active */
   available: boolean;
   can: Actions;
+  /** What SnapFlow knows about the product for the board checks, from its values and the linked fields' meanings */
+  capabilities: Capabilities;
   category: CategoryRef;
   categoryId: string;
   createdAt: string;
@@ -32,6 +36,8 @@ export interface Product {
   /** The product's own flag */
   isActive: boolean;
   modelNumber: string;
+  /** The product's own mounting; empty = the category's (capabilities.mounting is the effective one) */
+  mounting?: ProductMounting;
   name: ProductName;
   productType: ProductTypeRef;
   productTypeId: string;

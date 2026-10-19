@@ -686,7 +686,7 @@ func TestCSVFixedTypeAndConstants(t *testing.T) {
 		t.Errorf("fields %v", p.Fields)
 	}
 	// An unknown attribute (not in the category's schema).
-	m["fields"] = append(m["fields"].([]any)[:9], map[string]any{"target": "attribute.colour", "value": "red"})
+	m["fields"] = append(m["fields"].([]any)[:9], map[string]any{"target": "attribute.colour", "value": "red", "information": true})
 	run = preview(t, api, run.ID.String(), map[string]any{"mapping": m})
 	got := issues(t, api, run.ID.String())
 	if len(got) != 1 || got[0].Code != "attribute.unknown" || got[0].Target != "attribute.colour" || got[0].Row != 2 {

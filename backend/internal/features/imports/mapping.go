@@ -36,7 +36,7 @@ const StarterProductType = "zigbee"
 // workbook-sample): header row 3, data from row 4, Category as category
 // (missing ones created), the product type with key "zigbee" as a constant
 // (it must exist: the import never creates product types), Dimensions as a
-// text attribute, "Model Number + Style" as SKU, price in USD, add-ons
+// text attribute (answered as just information, D188), "Model Number + Style" as SKU, price in USD, add-ons
 // 01-03 required and 04-08 optional, the pictures floating over each row.
 func StarterMapping() ImportMapping {
 	col := func(target, header, letter string) ImportField {
@@ -51,7 +51,8 @@ func StarterMapping() ImportMapping {
 			col("product.name.en", "Item Name", "E"),
 			col("product.description.en", "Item Description", "F"),
 			col("product.modelNumber", "Model Number", "G"),
-			col("attribute.dimensions", "Dimensions (mm)", "H"),
+			// Just information (D188): a text attribute of created categories.
+			{Target: "attribute.dimensions", Column: "Dimensions (mm)", ColumnLetter: "H", Information: true},
 			{Target: "variant.image"},
 			col("variant.name.en", "Style", "I"),
 			col("variant.sku", "Model Number + Style", "J"),
@@ -83,6 +84,7 @@ const (
 	tAddonRequired
 	tAddonOptional
 	tAttribute
+	tMounting
 )
 
 type target struct {
@@ -97,7 +99,7 @@ func parseTarget(s string) (target, bool) {
 	fixed := map[string]targetKind{
 		"product.modelNumber": tModelNumber, "product.productType": tProductType, "product.category": tCategory,
 		"variant.sku": tVariantSKU, "variant.price": tVariantPrice, "variant.image": tVariantImage,
-		"addon.required": tAddonRequired, "addon.optional": tAddonOptional,
+		"addon.required": tAddonRequired, "addon.optional": tAddonOptional, "product.mounting": tMounting,
 	}
 	if k, ok := fixed[s]; ok {
 		return target{kind: k}, true
@@ -117,7 +119,7 @@ func (t target) repeatable() bool { return t.kind == tAddonRequired || t.kind ==
 
 func (t target) constantAllowed() bool {
 	switch t.kind {
-	case tProductType, tCategory, tProductName, tProductDescription, tVariantName, tVariantPrice, tAttribute:
+	case tProductType, tCategory, tProductName, tProductDescription, tVariantName, tVariantPrice, tAttribute, tMounting:
 		return true
 	}
 	return false
@@ -162,8 +164,13 @@ func validateMapping(m ImportMapping, types map[uuid.UUID]producttypes.ProductTy
 		f.Target = strings.TrimSpace(f.Target)
 		f.Column = strings.TrimSpace(f.Column)
 		f.ColumnLetter = strings.ToUpper(strings.TrimSpace(f.ColumnLetter))
-		fields[i] = f
+		f.FieldKey = strings.TrimSpace(f.FieldKey)
 		t, ok := parseTarget(f.Target)
+		if ok && t.kind != tAttribute {
+			// Links and answers belong to attribute columns only.
+			f.FieldKey, f.Information = "", false
+		}
+		fields[i] = f
 		if !ok {
 			errs = append(errs, apperr.Field(floc+".target", "import_profile.target_unknown", "unknown target"))
 			continue
@@ -268,6 +275,7 @@ func targets(cats []categories.Category, only map[uuid.UUID]bool) []ImportTarget
 	out = append(out,
 		ImportTarget{Target: "product.productType", Group: "product", Constant: true, Required: true},
 		ImportTarget{Target: "product.category", Group: "product", Constant: true, Required: true},
+		ImportTarget{Target: "product.mounting", Group: "product", Constant: true},
 	)
 	for _, l := range i18n.Locales {
 		out = append(out, ImportTarget{Target: "variant.name." + l, Group: "variant", Constant: true})

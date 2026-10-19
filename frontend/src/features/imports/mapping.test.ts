@@ -154,3 +154,30 @@ describe('add-on order and profile errors', () => {
     expect(fields['mapping.fields[5]']).toBeUndefined()
   })
 })
+
+describe('catalog field links (D188)', () => {
+  const linked = {
+    sourceKind: 'xlsx' as const,
+    headerRow: 1,
+    dataStartRow: 2,
+    fields: [
+      { target: 'product.modelNumber', column: 'Model number', columnLetter: 'A' },
+      { target: 'attribute.width', columnLetter: 'B', fieldKey: 'width_te' },
+      { target: 'attribute.notes', columnLetter: 'D', information: true },
+      { target: 'attribute.gone', column: 'Gone', columnLetter: 'X', fieldKey: 'gone_field' },
+    ],
+  }
+
+  it('keeps a column’s link while it keeps its target, also in further mappings', () => {
+    const form = formFromMapping(linked, columns)
+    const built = mappingFromForm(form, columns, 'xlsx').mapping
+    expect(built.fields).toContainEqual({ target: 'attribute.width', columnLetter: 'B', fieldKey: 'width_te' })
+    expect(built.fields).toContainEqual({ target: 'attribute.notes', columnLetter: 'D', information: true })
+    expect(built.fields).toContainEqual({ target: 'attribute.gone', column: 'Gone', columnLetter: 'X', fieldKey: 'gone_field' })
+    expect(sameMapping(built, linked)).toBe(true)
+    // Another target drops the link; a mapping without the links differs.
+    const changed = mappingFromForm({ ...form, targets: { ...form.targets, B: 'attribute.other' } }, columns, 'xlsx').mapping
+    expect(changed.fields).toContainEqual({ target: 'attribute.other', columnLetter: 'B' })
+    expect(sameMapping(built, { ...linked, fields: linked.fields.map(({ target, column, columnLetter }) => ({ target, column, columnLetter })) })).toBe(false)
+  })
+})

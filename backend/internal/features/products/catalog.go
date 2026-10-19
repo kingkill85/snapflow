@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/products/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
@@ -41,6 +42,7 @@ type CatalogProduct struct {
 	Description   i18n.Text         `json:"description,omitempty"`
 	Attributes    attrschema.Values `json:"attributes"`
 	IsActive      bool              `json:"isActive"`
+	Mounting      string            `json:"mounting,omitempty" doc:"Mounting override; empty = the category's"`
 	UpdatedAt     time.Time         `json:"updatedAt"`
 	Variants      []CatalogVariant  `json:"variants,omitempty"`
 }
@@ -127,6 +129,9 @@ func normalizeProduct(pt *producttypes.ProductType, c *categories.Category, in P
 	case !pt.IsActive && (existing == nil || existing.ProductTypeID != pt.ID):
 		// An inactive type takes no new products; a product keeps its own.
 		errs = append(errs, apperr.Field(at(prefix, "productTypeId"), "product.type_inactive", "the product type is inactive"))
+	}
+	if in.Mounting != nil && *in.Mounting != "" && !capabilities.ValidMounting(*in.Mounting) {
+		errs = append(errs, apperr.Field(at(prefix, "mounting"), "validation.invalid", "mounting must be floorplan, board or both"))
 	}
 	if c == nil {
 		return in, append(errs, apperr.Field(at(prefix, "categoryId"), "product.category_not_found", "no such category"))
@@ -325,7 +330,7 @@ func (s *Service) RestoreProduct(ctx context.Context, p CatalogProduct, expected
 	row, err := s.updateProduct(ctx, p.ID, ProductUpdate{
 		ProductInput: ProductInput{
 			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, ModelNumber: p.ModelNumber, Name: p.Name, Description: p.Description,
-			Attributes: p.Attributes, IsActive: p.IsActive,
+			Attributes: p.Attributes, IsActive: p.IsActive, Mounting: &p.Mounting,
 		},
 		ExpectedUpdatedAt: expectedUpdatedAt,
 	}, true, Known{})
@@ -588,7 +593,7 @@ func (s *Service) SetAddonLists(ctx context.Context, lists []VariantAddons) (fai
 func catalogProduct(r store.Product) CatalogProduct {
 	p := CatalogProduct{
 		ID: r.ID, ProductTypeID: r.ProductTypeID, CategoryID: r.CategoryID, ModelNumber: r.ModelNumber, Name: r.Name,
-		Attributes: r.Attributes, IsActive: r.IsActive, UpdatedAt: r.UpdatedAt,
+		Attributes: r.Attributes, IsActive: r.IsActive, Mounting: deref(r.Mounting), UpdatedAt: r.UpdatedAt,
 	}
 	if r.Description != nil {
 		p.Description = *r.Description

@@ -51,7 +51,8 @@ INSERT INTO products (product_type_id, model_number, name, attributes) VALUES
   ($1, 'DIM-2', '{"en":"Dimmer 2"}', '{"width_te":6,"stale":true}'),
   ($2, 'GW-1', '{"en":"Gateway 1"}', '{}')`, dimmer, gateway)
 
-	if err := database.Migrate(ctx, url); err != nil {
+	// The shape 00007 left (later migrations add columns).
+	if err := database.MigrateTo(ctx, url, 7); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,4 +272,79 @@ func sameJSONRow(a, b any) bool {
 func dump(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
+}
+
+// 00017_capabilities seeds served function types, circuit flags and load
+// types for the function types that exist, the relay pair alternative of the
+// blind output, and rolls back with rows in its tables.
+func TestCapabilitiesSeeds(t *testing.T) {
+	ctx := context.Background()
+	url := testdb.NewDatabase(t)
+	if err := database.MigrateTo(ctx, url, 16); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mustExec(t, db, `INSERT INTO function_types (key, name) VALUES
+  ('dimmer', '{"en":"Dimmer"}'), ('blind', '{"en":"Blind"}'), ('input', '{"en":"Input"}'), ('custom', '{"en":"Custom"}')`)
+	if err := database.MigrateTo(ctx, url, 17); err != nil {
+		t.Fatal(err)
+	}
+	query := func(sql string) []string {
+		t.Helper()
+		rows, err := db.Query(ctx, sql)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var s string
+			if err := rows.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	served := query(`SELECT o.key || ':' || f.key FROM output_kind_function_types x
+JOIN output_kinds o ON o.id = x.output_kind_id JOIN function_types f ON f.id = x.function_type_id ORDER BY 1`)
+	want := []string{"analog_0_10v_output:dimmer", "blind_output:blind", "dali_output:dimmer", "dimmer_output:dimmer", "input:input"}
+	if !reflect.DeepEqual(served, want) {
+		t.Errorf("served %v, want %v", served, want)
+	}
+	circuits := query(`SELECT key FROM function_types WHERE allows_circuit ORDER BY key`)
+	if !reflect.DeepEqual(circuits, []string{"dimmer"}) {
+		t.Errorf("circuits %v", circuits)
+	}
+	loads := query(`SELECT f.key || ':' || l.key FROM function_type_load_types x
+JOIN function_types f ON f.id = x.function_type_id JOIN load_types l ON l.id = x.load_type_id ORDER BY 1`)
+	if len(loads) != 8 || loads[0] != "blind:ac_motor" || loads[2] != "dimmer:capacitive" {
+		t.Errorf("load types %v", loads)
+	}
+	alts := query(`SELECT o.key || '<-' || f.key || ':' || a.count FROM output_kind_alternatives a
+JOIN output_kinds o ON o.id = a.output_kind_id JOIN output_kinds f ON f.id = a.from_kind_id`)
+	if !reflect.DeepEqual(alts, []string{"blind_output<-relay_output:2"}) {
+		t.Errorf("alternatives %v", alts)
+	}
+	// Rows in the new tables do not block the rollback; up again works.
+	mustExec(t, db, `INSERT INTO catalog_fields (key, label, value_type, sort_order) VALUES ('width', '{"en":"Width"}', 'number', 1)`)
+	mustExec(t, db, `INSERT INTO categories (key, name, attributes, instance_attributes, sort_order)
+VALUES ('c', '{"en":"C"}', '[{"key":"w","label":{"en":"W"},"type":"number","fieldKey":"width"}]', '[]', 1)`)
+	mustExec(t, db, `INSERT INTO category_field_links (category_id, field_key) SELECT id, 'width' FROM categories WHERE key = 'c'`)
+	assertPgError(t, db, "23503", `DELETE FROM catalog_fields WHERE key = 'width'`)
+	assertPgError(t, db, "23503", `UPDATE catalog_fields SET key = 'width2' WHERE key = 'width'`)
+	mustExec(t, db, `UPDATE product_types SET topology = 'bus'`)
+	if err := database.MigrateDownTo(ctx, url, 16); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.MigrateTo(ctx, url, 17); err != nil {
+		t.Fatal(err)
+	}
+	if got := query(`SELECT key FROM output_kinds ORDER BY sort_order LIMIT 1`); !reflect.DeepEqual(got, []string{"dimmer_output"}) {
+		t.Errorf("after down/up %v", got)
+	}
 }

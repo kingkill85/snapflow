@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
@@ -41,12 +42,16 @@ type catalogScope struct {
 	// preview used (fixed, constant or resolved per row).
 	TypeIDs     []uuid.UUID `json:"typeIds"`
 	CategoryIDs []uuid.UUID `json:"categoryIds"`
+	// FieldKeys are the catalog fields the mapping's attribute columns
+	// link: their key, type and version are part of the token (a field
+	// changed between preview and apply makes the preview stale).
+	FieldKeys []string `json:"fieldKeys,omitempty"`
 }
 
 // normalize sorts and deduplicates every list, so equal scopes are equal
 // JSON.
 func (s *catalogScope) normalize() {
-	for _, list := range []*[]string{&s.ModelKeys, &s.SKUKeys, &s.RefKeys, &s.CategoryValues, &s.TypeValues} {
+	for _, list := range []*[]string{&s.ModelKeys, &s.SKUKeys, &s.RefKeys, &s.CategoryValues, &s.TypeValues, &s.FieldKeys} {
 		if *list == nil {
 			*list = []string{}
 		}
@@ -92,11 +97,14 @@ func (s *catalogScope) normalize() {
 //   - the variants owning one of the file's SKUs, with their product;
 //   - the variants an add-on reference finds (by SKU, model number and name,
 //     or the model number of a "Standard" variant) and their products
-//     (their model number labels the link).
+//     (their model number labels the link);
+//   - the catalog fields the attribute columns link (key, type, version;
+//     a missing one counts as missing).
 //
 // Other systems and categories and the add-on lists of unrelated variants
 // are not covered.
-func scopeToken(types []producttypes.ProductType, cats []categories.Category, catalog []products.CatalogProduct, sc catalogScope) (string, error) {
+func scopeToken(types []producttypes.ProductType, cats []categories.Category, catalog []products.CatalogProduct,
+	fields map[string]capabilities.CatalogField, sc catalogScope) (string, error) {
 	type version struct {
 		ID        uuid.UUID `json:"i"`
 		UpdatedAt time.Time `json:"u"`
@@ -106,6 +114,11 @@ func scopeToken(types []producttypes.ProductType, cats []categories.Category, ca
 		ProductID       uuid.UUID             `json:"p"`
 		AddonsUpdatedAt *time.Time            `json:"au,omitempty"`
 		Addons          []products.AddonInput `json:"a,omitempty"`
+	}
+	type field struct {
+		Key       string    `json:"k"`
+		Type      string    `json:"t,omitempty"`
+		UpdatedAt time.Time `json:"u"`
 	}
 	in := func(list []string) map[string]bool {
 		m := make(map[string]bool, len(list))
@@ -132,7 +145,16 @@ func scopeToken(types []producttypes.ProductType, cats []categories.Category, ca
 		Categories []version `json:"c"`
 		Products   []version `json:"p"`
 		Variants   []variant `json:"v"`
+		Fields     []field   `json:"f,omitempty"`
 	}{Types: []version{}, Categories: []version{}, Products: []version{}, Variants: []variant{}}
+	for _, k := range sc.FieldKeys { // sorted by normalize
+		f, ok := fields[k]
+		if !ok {
+			state.Fields = append(state.Fields, field{Key: k})
+			continue
+		}
+		state.Fields = append(state.Fields, field{Key: k, Type: string(f.Type), UpdatedAt: f.UpdatedAt})
+	}
 
 	productSeen := map[uuid.UUID]bool{}
 	addProduct := func(p *products.CatalogProduct) {

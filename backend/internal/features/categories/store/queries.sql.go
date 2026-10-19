@@ -26,9 +26,9 @@ func (q *Queries) CategoryExists(ctx context.Context, id uuid.UUID) (bool, error
 }
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories (key, name, description, is_active, attributes, instance_attributes, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(sort_order), 0) + 1 FROM categories))
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+INSERT INTO categories (key, name, description, is_active, attributes, instance_attributes, mounting, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(sort_order), 0) + 1 FROM categories))
+RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting
 `
 
 type CreateCategoryParams struct {
@@ -38,6 +38,7 @@ type CreateCategoryParams struct {
 	IsActive           bool
 	Attributes         attrschema.Schema
 	InstanceAttributes attrschema.InstanceSchema
+	Mounting           string
 }
 
 // New categories go to the end of the order (under LockCategoryOrder, so two
@@ -50,6 +51,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
+		arg.Mounting,
 	)
 	var i Category
 	err := row.Scan(
@@ -63,6 +65,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -79,8 +82,56 @@ func (q *Queries) DeleteCategory(ctx context.Context, id uuid.UUID) (int64, erro
 	return result.RowsAffected(), nil
 }
 
+const deleteFieldLinks = `-- name: DeleteFieldLinks :exec
+DELETE FROM category_field_links WHERE category_id = $1
+`
+
+func (q *Queries) DeleteFieldLinks(ctx context.Context, categoryID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteFieldLinks, categoryID)
+	return err
+}
+
+const fieldUsers = `-- name: FieldUsers :many
+SELECT l.field_key, c.id, c.key, c.name
+FROM category_field_links l JOIN categories c ON c.id = l.category_id
+ORDER BY l.field_key, c.sort_order, c.key
+`
+
+type FieldUsersRow struct {
+	FieldKey string
+	ID       uuid.UUID
+	Key      string
+	Name     i18n.Text
+}
+
+// FieldUsers lists the categories linking each catalog field key.
+func (q *Queries) FieldUsers(ctx context.Context) ([]FieldUsersRow, error) {
+	rows, err := q.db.Query(ctx, fieldUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FieldUsersRow{}
+	for rows.Next() {
+		var i FieldUsersRow
+		if err := rows.Scan(
+			&i.FieldKey,
+			&i.ID,
+			&i.Key,
+			&i.Name,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCategory = `-- name: GetCategory :one
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM categories WHERE id = $1
+SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting FROM categories WHERE id = $1
 `
 
 func (q *Queries) GetCategory(ctx context.Context, id uuid.UUID) (Category, error) {
@@ -97,12 +148,30 @@ func (q *Queries) GetCategory(ctx context.Context, id uuid.UUID) (Category, erro
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }
 
+const insertFieldLinks = `-- name: InsertFieldLinks :exec
+INSERT INTO category_field_links (category_id, field_key)
+SELECT $1::uuid, unnest($2::text[])
+`
+
+type InsertFieldLinksParams struct {
+	CategoryID uuid.UUID
+	FieldKeys  []string
+}
+
+// InsertFieldLinks stores the fields a category links (its save keeps them
+// in step with attributes[].fieldKey, D305).
+func (q *Queries) InsertFieldLinks(ctx context.Context, arg InsertFieldLinksParams) error {
+	_, err := q.db.Exec(ctx, insertFieldLinks, arg.CategoryID, arg.FieldKeys)
+	return err
+}
+
 const listCategories = `-- name: ListCategories :many
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM categories
+SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting FROM categories
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -127,6 +196,7 @@ func (q *Queries) ListCategories(ctx context.Context, includeInactive bool) ([]C
 			&i.InstanceAttributes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Mounting,
 		); err != nil {
 			return nil, err
 		}
@@ -136,6 +206,29 @@ func (q *Queries) ListCategories(ctx context.Context, includeInactive bool) ([]C
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCategory = `-- name: LockCategory :one
+SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting FROM categories WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockCategory(ctx context.Context, id uuid.UUID) (Category, error) {
+	row := q.db.QueryRow(ctx, lockCategory, id)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.Attributes,
+		&i.InstanceAttributes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Mounting,
+	)
+	return i, err
 }
 
 const lockCategoryIDs = `-- name: LockCategoryIDs :many
@@ -176,6 +269,38 @@ func (q *Queries) LockCategoryOrder(ctx context.Context, lockKey int64) error {
 	return err
 }
 
+const setCategoryAttributes = `-- name: SetCategoryAttributes :one
+UPDATE categories
+SET attributes = $2, instance_attributes = $3, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1
+RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting
+`
+
+type SetCategoryAttributesParams struct {
+	ID                 uuid.UUID
+	Attributes         attrschema.Schema
+	InstanceAttributes attrschema.InstanceSchema
+}
+
+func (q *Queries) SetCategoryAttributes(ctx context.Context, arg SetCategoryAttributesParams) (Category, error) {
+	row := q.db.QueryRow(ctx, setCategoryAttributes, arg.ID, arg.Attributes, arg.InstanceAttributes)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.Attributes,
+		&i.InstanceAttributes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Mounting,
+	)
+	return i, err
+}
+
 const setCategoryOrder = `-- name: SetCategoryOrder :exec
 UPDATE categories p SET sort_order = o.ord
 FROM unnest($1::uuid[]) WITH ORDINALITY AS o (id, ord)
@@ -190,10 +315,10 @@ func (q *Queries) SetCategoryOrder(ctx context.Context, ids []uuid.UUID) error {
 
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE categories
-SET key = $2, name = $3, description = $4, is_active = $5, attributes = $6, instance_attributes = $7,
+SET key = $2, name = $3, description = $4, is_active = $5, attributes = $6, instance_attributes = $7, mounting = $8,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $8
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+WHERE id = $1 AND updated_at = $9
+RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting
 `
 
 type UpdateCategoryParams struct {
@@ -204,6 +329,7 @@ type UpdateCategoryParams struct {
 	IsActive           bool
 	Attributes         attrschema.Schema
 	InstanceAttributes attrschema.InstanceSchema
+	Mounting           string
 	ExpectedUpdatedAt  time.Time
 }
 
@@ -219,6 +345,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
+		arg.Mounting,
 		arg.ExpectedUpdatedAt,
 	)
 	var i Category
@@ -233,6 +360,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }

@@ -13,6 +13,27 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+type CatalogField struct {
+	ID           uuid.UUID
+	Key          string
+	Label        i18n.Text
+	ValueType    string
+	Unit         *string
+	Options      []byte
+	EtimFeature  *string
+	Meaning      *string
+	OutputKindID *uuid.UUID
+	LoadTypeID   *uuid.UUID
+	SortOrder    int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type CatalogFieldProductType struct {
+	CatalogFieldID uuid.UUID
+	ProductTypeID  uuid.UUID
+}
+
 type Category struct {
 	ID                 uuid.UUID
 	Key                string
@@ -24,6 +45,12 @@ type Category struct {
 	InstanceAttributes attrschema.InstanceSchema
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	Mounting           string
+}
+
+type CategoryFieldLink struct {
+	CategoryID uuid.UUID
+	FieldKey   string
 }
 
 type File struct {
@@ -44,11 +71,17 @@ type FileSource struct {
 }
 
 type FunctionType struct {
-	ID        uuid.UUID
-	Key       string
-	Name      i18n.Text
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            uuid.UUID
+	Key           string
+	Name          i18n.Text
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	AllowsCircuit bool
+}
+
+type FunctionTypeLoadType struct {
+	FunctionTypeID uuid.UUID
+	LoadTypeID     uuid.UUID
 }
 
 type ImportChange struct {
@@ -117,6 +150,37 @@ type ImportRun struct {
 	Images       []byte
 }
 
+type LoadType struct {
+	ID        uuid.UUID
+	Key       string
+	Name      i18n.Text
+	SortOrder int32
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type OutputKind struct {
+	ID        uuid.UUID
+	Key       string
+	Name      i18n.Text
+	SortOrder int32
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type OutputKindAlternative struct {
+	OutputKindID uuid.UUID
+	FromKindID   uuid.UUID
+	Count        int32
+}
+
+type OutputKindFunctionType struct {
+	OutputKindID   uuid.UUID
+	FunctionTypeID uuid.UUID
+}
+
 type Plan struct {
 	ID               uuid.UUID
 	TenantID         uuid.UUID
@@ -176,18 +240,24 @@ type Product struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	CategoryID    uuid.UUID
+	Mounting      *string
 }
 
 type ProductType struct {
-	ID           uuid.UUID
-	Key          string
-	Name         i18n.Text
-	Color        *string
-	SortOrder    int32
-	IsActive     bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Abbreviation *string
+	ID                        uuid.UUID
+	Key                       string
+	Name                      i18n.Text
+	Color                     *string
+	SortOrder                 int32
+	IsActive                  bool
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	Abbreviation              *string
+	DefaultBusCurrentMa       *int32
+	ReservePercent            int32
+	BusDevicesMax             *int32
+	Topology                  string
+	DefaultWirelessPlacesUsed *int32
 }
 
 type ProductVariant struct {

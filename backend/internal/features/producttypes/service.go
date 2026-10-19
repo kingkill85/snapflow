@@ -29,24 +29,36 @@ import (
 )
 
 type ProductType struct {
-	ID           uuid.UUID    `json:"id"`
-	Key          string       `json:"key" doc:"Stable identifier, lower snake case" example:"zigbee"`
-	Name         i18n.Text    `json:"name" doc:"Display name per locale"`
-	Abbreviation string       `json:"abbreviation,omitempty" doc:"Badge text, upper case, at most 6 characters" example:"ZB"`
-	Color        string       `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
-	SortOrder    int32        `json:"sortOrder" doc:"Position in the catalog, 1 first"`
-	IsActive     bool         `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
-	CreatedAt    time.Time    `json:"createdAt"`
-	UpdatedAt    time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can          auth.Actions `json:"can"`
+	ID           uuid.UUID `json:"id"`
+	Key          string    `json:"key" doc:"Stable identifier, lower snake case" example:"zigbee"`
+	Name         i18n.Text `json:"name" doc:"Display name per locale"`
+	Abbreviation string    `json:"abbreviation,omitempty" doc:"Badge text, upper case, at most 6 characters" example:"ZB"`
+	Color        string    `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
+	SortOrder    int32     `json:"sortOrder" doc:"Position in the catalog, 1 first"`
+	IsActive     bool      `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
+	// System settings for the board checks (step 3a).
+	DefaultBusCurrentMa *int32 `json:"defaultBusCurrentMa,omitempty" doc:"Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown"`
+	ReservePercent      int32  `json:"reservePercent" doc:"Capacity kept in reserve: amber above 100 − reserve %, red when exceeded"`
+	BusDevicesMax       *int32 `json:"busDevicesMax,omitempty" doc:"Default maximum devices per bus line; empty = not checked"`
+	// Topology selects the defaults capabilities fall back to (D304).
+	Topology                  string       `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
+	DefaultWirelessPlacesUsed *int32       `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
+	CreatedAt                 time.Time    `json:"createdAt"`
+	UpdatedAt                 time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can                       auth.Actions `json:"can"`
 }
 
 type ProductTypeInput struct {
-	Key          string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
-	Name         i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
-	Abbreviation string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
-	Color        string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
-	IsActive     bool      `json:"isActive"`
+	Key                       string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
+	Name                      i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
+	Abbreviation              string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
+	Color                     string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
+	IsActive                  bool      `json:"isActive"`
+	DefaultBusCurrentMa       *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	ReservePercent            *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20; on update, left out keeps the stored value (D294)"`
+	BusDevicesMax             *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	Topology                  string    `json:"topology,omitempty" enum:"bus,wireless,none" doc:"Default none; on update, left out keeps the stored value (D294)"`
+	DefaultWirelessPlacesUsed *int32    `json:"defaultWirelessPlacesUsed,omitempty" doc:"1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -145,7 +157,8 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 		}
 		row, err = q.CreateProductType(ctx, store.CreateProductTypeParams{
 			Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
-			IsActive: in.IsActive,
+			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
+			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
 		})
 		return err
 	})
@@ -163,6 +176,31 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 	if err != nil {
 		return ProductType{}, err
 	}
+	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil || in.Topology == "" || in.DefaultWirelessPlacesUsed == nil {
+		// Left-out settings keep the stored values (D294).
+		current, err := s.q.GetProductType(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ProductType{}, apperr.NotFound("product_type.not_found")
+		}
+		if err != nil {
+			return ProductType{}, err
+		}
+		if in.DefaultBusCurrentMa == nil {
+			in.DefaultBusCurrentMa = orZero(current.DefaultBusCurrentMa)
+		}
+		if in.ReservePercent == nil {
+			in.ReservePercent = &current.ReservePercent
+		}
+		if in.BusDevicesMax == nil {
+			in.BusDevicesMax = orZero(current.BusDevicesMax)
+		}
+		if in.Topology == "" {
+			in.Topology = current.Topology
+		}
+		if in.DefaultWirelessPlacesUsed == nil {
+			in.DefaultWirelessPlacesUsed = orZero(current.DefaultWirelessPlacesUsed)
+		}
+	}
 	in.ProductTypeInput, err = validate(in.ProductTypeInput)
 	if err != nil {
 		return ProductType{}, err
@@ -172,7 +210,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 		var err error
 		row, err = q.UpdateProductType(ctx, store.UpdateProductTypeParams{
 			ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
-			IsActive:          in.IsActive,
+			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
+			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
 			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
@@ -288,11 +327,38 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	if in.Color != "" && !colorPattern.MatchString(in.Color) {
 		errs = append(errs, apperr.Field("body.color", "product_type.color_format", "colour must be #rrggbb"))
 	}
+	if in.ReservePercent == nil {
+		in.ReservePercent = ptr(int32(DefaultReservePercent))
+	}
+	rangeErr := func(loc string, v *int32, lo, hi int32) {
+		if v != nil && (*v < lo || *v > hi) {
+			errs = append(errs, apperr.Field(loc, "validation.range", "out of range").With("min", lo).With("max", hi))
+		}
+	}
+	// 0 means none (stored as NULL).
+	in.DefaultBusCurrentMa, in.BusDevicesMax = noneIfZero(in.DefaultBusCurrentMa), noneIfZero(in.BusDevicesMax)
+	rangeErr("body.defaultBusCurrentMa", in.DefaultBusCurrentMa, 1, 100000)
+	rangeErr("body.reservePercent", in.ReservePercent, 0, 90)
+	rangeErr("body.busDevicesMax", in.BusDevicesMax, 1, 100000)
+	in.DefaultWirelessPlacesUsed = noneIfZero(in.DefaultWirelessPlacesUsed)
+	rangeErr("body.defaultWirelessPlacesUsed", in.DefaultWirelessPlacesUsed, 1, 1000)
+	switch in.Topology {
+	case "":
+		in.Topology = "none"
+	case "bus", "wireless", "none":
+	default:
+		errs = append(errs, apperr.Field("body.topology", "validation.invalid", "topology must be bus, wireless or none"))
+	}
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
 }
+
+// DefaultReservePercent is the reserve of a product type unless set (spec 3a, Q9).
+const DefaultReservePercent = 20
+
+func ptr[T any](v T) *T { return &v }
 
 func strPtr(s string) *string {
 	if s == "" {
@@ -330,6 +396,8 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 	pt := ProductType{
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		DefaultBusCurrentMa: r.DefaultBusCurrentMa, ReservePercent: r.ReservePercent, BusDevicesMax: r.BusDevicesMax,
+		Topology: r.Topology, DefaultWirelessPlacesUsed: r.DefaultWirelessPlacesUsed,
 		Can: auth.Actions{Update: write, Delete: write},
 	}
 	if r.Abbreviation != nil {
@@ -339,4 +407,20 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 		pt.Color = *r.Color
 	}
 	return pt
+}
+
+// orZero is v, or 0 (none) when nil.
+func orZero(v *int32) *int32 {
+	if v == nil {
+		return ptr(int32(0))
+	}
+	return v
+}
+
+// noneIfZero is nil for 0 (none), else v.
+func noneIfZero(v *int32) *int32 {
+	if v != nil && *v == 0 {
+		return nil
+	}
+	return v
 }

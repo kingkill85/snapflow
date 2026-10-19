@@ -5,17 +5,28 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductTypeInputName } from './productTypeInputName';
+import type { ProductTypeInputTopology } from './productTypeInputTopology';
 
 export interface ProductTypeInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none */
   abbreviation?: string;
+  /** 1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
+  busDevicesMax?: number;
   /** Badge colour, #rrggbb (stored lower case); empty for none */
   color?: string;
+  /** 1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
+  defaultBusCurrentMa?: number;
+  /** 1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
+  defaultWirelessPlacesUsed?: number;
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: ProductTypeInputName;
+  /** 0-90; default 20; on update, left out keeps the stored value (D294) */
+  reservePercent?: number;
+  /** Default none; on update, left out keeps the stored value (D294) */
+  topology?: ProductTypeInputTopology;
 }

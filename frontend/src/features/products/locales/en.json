@@ -49,7 +49,9 @@
     "active": "Active",
     "activeHint": "Inactive products are hidden from the catalog; their variants keep their own setting.",
     "name": "Name",
-    "description": "Description"
+    "description": "Description",
+    "mounting": "Mounting",
+    "mountingHint": "Where this product is placed; by default as its category."
   },
   "categoryChange": "You changed the category. When you save, this product's values are checked against the new category's attributes; values the new category does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new category are flagged on the variants.",
   "chooseCategoryFirst": "Choose a category to fill in its attributes.",
@@ -130,5 +132,46 @@
     "shown_one": "{{count}} variant shown",
     "shown_other": "{{count}} variants shown",
     "showMore": "Show more"
+  },
+  "mounting": {
+    "asCategory": "As category",
+    "asCategoryNamed": "As category ({{mounting}})",
+    "floorplan": "Floorplan",
+    "board": "Distribution board",
+    "both": "Floorplan and board"
+  },
+  "capabilities": {
+    "title": "What SnapFlow knows about this product",
+    "hint": "Computed from the attribute values of catalog fields with a meaning. Empty values do not count.",
+    "product": "Product",
+    "channels": "{{n}} × {{kind}}",
+    "max": "max {{limits}}",
+    "alternative_one": "each also usable as {{kind}}",
+    "alternative_other": "or up to {{max}} × {{kind}} (from {{per}} channels each)",
+    "moduleTotalA": "max {{a}} A for the whole module",
+    "busUsed": "uses {{ma}} mA bus current",
+    "busSupplied": "supplies {{ma}} mA bus current",
+    "busDevicesMax_one": "up to {{n}} device per line",
+    "busDevicesMax_other": "up to {{n}} devices per line",
+    "railWidth": "{{te}} TE wide",
+    "enclosure": "enclosure with {{rows}} rows of {{te}} TE",
+    "wirelessSupplied_one": "{{n}} wireless place",
+    "wirelessSupplied_other": "{{n}} wireless places",
+    "wirelessUsed_one": "uses {{n}} wireless place",
+    "wirelessUsed_other": "uses {{n}} wireless places",
+    "router": "Zigbee router",
+    "noRouter": "no Zigbee router",
+    "motor": {
+      "ac": "for AC motors",
+      "dc": "for DC motors"
+    },
+    "mounting": "mounting: {{mounting}}",
+    "valueW": "{{v}} W",
+    "valueA": "{{v}} A",
+    "withLoad": "{{value}} {{load}}",
+    "limitsA": "max {{limits}} per channel",
+    "minLoads": "min {{limits}} per channel",
+    "moduleTotalsW": "max {{limits}} for the whole module",
+    "systemDefault": "{{text}} (system default)"
   }
 }

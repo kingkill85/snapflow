@@ -36,7 +36,10 @@
     "position": "Position",
     "description": "Description",
     "label": "Label",
-    "descriptionHint": "Shown as help under the input."
+    "descriptionHint": "Shown as help under the input.",
+    "mounting": "Mounting",
+    "mountingHint": "Where products of this category are placed. A product can override it.",
+    "catalogField": "Catalog field"
   },
   "schema": {
     "item": "Attribute {{n}}",
@@ -82,5 +85,17 @@
   "notFound": {
     "title": "Category not found",
     "message": "This category does not exist (anymore)."
+  },
+  "mounting": {
+    "floorplan": "Floorplan",
+    "board": "Distribution board",
+    "both": "Floorplan and board"
+  },
+  "link": {
+    "none": "No link",
+    "hint": "Linking takes the field's type, unit and options, and its meaning.",
+    "meaning": "Meaning",
+    "locked": "Set by the linked catalog field.",
+    "summary": "field {{key}}"
   }
 }

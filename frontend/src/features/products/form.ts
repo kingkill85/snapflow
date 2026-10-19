@@ -47,6 +47,8 @@ export const productSchema = z.object({
   name: requiredText(limits.name),
   description: translatableSchema({ max: limits.description }),
   isActive: z.boolean(),
+  /** The mounting override; '' = as the category (D294). */
+  mounting: z.string(),
   values: attributeValues,
   keep,
 })
@@ -87,6 +89,7 @@ export function toProductFormValues(item: Product | null, defs: Definition[], se
     name: toTranslatable(item?.name),
     description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
+    mounting: item?.mounting ?? '',
     values: toFormValues(defs, item?.attributes, separator),
     keep: keepAll(storedValues(item)),
   }
@@ -126,6 +129,8 @@ export function toProductInput(v: ProductFormValues, attributes: Record<string, 
     ...(description ? { description } : {}),
     attributes,
     isActive: v.isActive,
+    // Always sent: '' clears the override (D294).
+    mounting: v.mounting,
   }
 }
 
@@ -143,7 +148,7 @@ export function toVariantInput(v: VariantFormValues, attributes: Record<string, 
   }
 }
 
-const productFields = ['productTypeId', 'categoryId', 'modelNumber']
+const productFields = ['productTypeId', 'categoryId', 'modelNumber', 'mounting']
 const variantFields = ['sku', 'price', 'imageFileId']
 
 /** API error locations shown at the form's fields, for the definitions shown and the stored values outside them. */

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 import type { ImportMapping, ImportTarget } from '@/api/generated/model'
-import type { ErrorKey } from '@/components/ui'
+import { errorExists, type ErrorKey, formatParams } from '@/components/ui'
 import { type LocalizedText, useLocalized } from '@/i18n/localized'
 
 // Names in the import, in the UI language: targets, diff fields and error codes.
@@ -57,6 +57,12 @@ export function useFieldLabel(attributes: AttributeLabels) {
   const localized = useLocalized()
   const language = useLanguageName()
   return (field: string): string => {
+    if (field.startsWith('attributes.') && field.endsWith('.fieldKey')) {
+      // An existing category's attribute linked to a catalog field (D-import link).
+      const key = field.slice('attributes.'.length, -'.fieldKey'.length)
+      const label = attributes.get(key)
+      return t('field.attributeLink', { attribute: label ? localized(label) : key })
+    }
     if (field.startsWith('attributes.')) {
       const key = field.slice('attributes.'.length)
       const label = attributes.get(key)
@@ -72,6 +78,10 @@ export function useFieldLabel(attributes: AttributeLabels) {
 export function useCodeMessage() {
   const { t, i18n } = useTranslation('errors')
   return (code: string, params?: Record<string, unknown>) =>
-    String(i18n.exists(code, { ns: 'errors' }) ? t(code as ErrorKey, (params ?? {}) as never) : t('validation.invalid'))
+    String(
+      errorExists(code, params)
+        ? t(code as ErrorKey, (formatParams(params, i18n.resolvedLanguage ?? 'en', undefined, code) ?? {}) as never)
+        : t('validation.invalid'),
+    )
 }
 

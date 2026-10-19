@@ -67,6 +67,7 @@ import {
   useSaveNotice,
   useFreshProductTypes,
 } from './paths'
+import { CapabilitiesSection } from './CapabilitiesSection'
 import { VariantsSection } from './VariantsSection'
 
 /** catalog/products/new and catalog/products/:id */
@@ -192,6 +193,7 @@ function ExistingProduct({ id }: { id: string }) {
         onLeave={unsaved.allow}
       />
       <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
+      <CapabilitiesSection product={product} />
       {unsaved.dialog}
     </Page>
   )
@@ -349,6 +351,13 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
       .map((c) => ({ value: c.id, label: c.isActive ? localized(c.name) : t('field.inactiveType', { name: localized(c.name) }) })),
   ]
   const categoryChanged = loaded !== null && categoryId !== loaded.categoryId
+  const mountingOptions = [
+    {
+      value: '',
+      label: category ? t('mounting.asCategoryNamed', { mounting: t(`mounting.${category.mounting}`) }) : t('mounting.asCategory'),
+    },
+    ...(['floorplan', 'board', 'both'] as const).map((v) => ({ value: v, label: t(`mounting.${v}`) })),
+  ]
 
   return (
     <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
@@ -383,6 +392,16 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
             />
           </div>
           {categoryChanged && <Notice tone="warning">{t('categoryChange')}</Notice>}
+          <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <FormSelectField
+              control={form.control}
+              name="mounting"
+              label={t('field.mounting')}
+              hint={t('field.mountingHint')}
+              options={mountingOptions}
+              error={fieldError(errors.mounting?.message)}
+            />
+          </div>
           <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
           <FormTranslatableField control={form.control} name="description" label={t('field.description')} multiline />
           <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />

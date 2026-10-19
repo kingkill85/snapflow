@@ -6,6 +6,7 @@
  */
 import type { Actions } from './actions';
 import type { Addon } from './addon';
+import type { Capabilities } from './capabilities';
 import type { FieldError } from './fieldError';
 import type { VariantAttributes } from './variantAttributes';
 import type { VariantName } from './variantName';
@@ -23,6 +24,8 @@ export interface Variant {
   /** Variant, product, product type and category are active */
   available: boolean;
   can: Actions;
+  /** As on the product, with the variant's own values */
+  capabilities: Capabilities;
   createdAt: string;
   id: string;
   /** Image, served at /api/files/{id} */

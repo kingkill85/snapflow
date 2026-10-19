@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
+
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
@@ -50,12 +52,18 @@ func (m *ImportMapping) UnmarshalJSON(data []byte) error {
 // ImportField feeds one target from a column (by header text, else by
 // column letter) or from a constant.
 type ImportField struct {
-	Target string `json:"target" maxLength:"100" doc:"product.modelNumber, product.name.<locale>, product.description.<locale>, product.productType, product.category, variant.name.<locale>, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.<key> (see GET /api/import-targets)"`
+	Target string `json:"target" maxLength:"100" doc:"product.modelNumber, product.name.<locale>, product.description.<locale>, product.productType, product.category, product.mounting, variant.name.<locale>, variant.sku, variant.price, variant.image, addon.required, addon.optional or attribute.<key> (see GET /api/import-targets)"`
 	// Column is matched against the header row ignoring case and repeated
 	// white space.
 	Column       string  `json:"column,omitempty" maxLength:"200" doc:"Header text, matched ignoring case and repeated white space"`
 	ColumnLetter string  `json:"columnLetter,omitempty" maxLength:"3" doc:"Column letter (A, B, ..., AA), used when no header matches or no column is given"`
 	Value        *string `json:"value,omitempty" maxLength:"1000" doc:"A constant for every row instead of a column (product type, category, names, descriptions, price and attributes); matched like a cell"`
+	// FieldKey links an attribute column to a catalog field (D188): set by
+	// the column check when the column matches a field, or by answering it.
+	FieldKey string `json:"fieldKey,omitempty" maxLength:"64" doc:"attribute.<key> targets: the catalog field the column is (filled in by the column check; kept by profiles)"`
+	// Information marks an attribute column answered as "just information"
+	// (no catalog field).
+	Information bool `json:"information,omitempty" doc:"attribute.<key> targets: the column was answered as just information"`
 }
 
 // ImportProfile is a saved mapping, reused per supplier.
@@ -197,7 +205,7 @@ type ImportCounts struct {
 	RowsSkipped int                `json:"rowsSkipped" doc:"Rows with errors (skipped, or blocking with all or nothing)"`
 	Errors      int                `json:"errors"`
 	Warnings    int                `json:"warnings"`
-	Categories  ImportCounter      `json:"categories" doc:"Only new: categories to create"`
+	Categories  ImportCounter      `json:"categories" doc:"new: categories to create; changed: existing categories whose attributes get linked to catalog fields"`
 	Products    ImportCounter      `json:"products"`
 	Variants    ImportCounter      `json:"variants"`
 	Addons      ImportAddonCounter `json:"addons"`
@@ -252,7 +260,7 @@ type ImportCategoryRef struct {
 
 // ImportFieldChange is one field's value before and after the import.
 type ImportFieldChange struct {
-	Field  string `json:"field" doc:"modelNumber, productType, category, name.<locale>, description.<locale>, attributes.<key>, isActive, sku, price, image, addons"`
+	Field  string `json:"field" doc:"modelNumber, productType, category, name.<locale>, description.<locale>, attributes.<key>, mounting, isActive, sku, price, image, addons"`
 	Before any    `json:"before,omitempty"`
 	After  any    `json:"after,omitempty"`
 }
@@ -320,4 +328,83 @@ type ImportSourceRow struct {
 	Number int      `json:"number"`
 	Cells  []string `json:"cells" doc:"Aligned with columns"`
 	Images int      `json:"images"`
+}
+
+// Column statuses of the column check (D188).
+const (
+	ColumnField       = "field"
+	ColumnInformation = "information"
+	ColumnCategory    = "category"
+	ColumnUnknown     = "unknown"
+)
+
+// ImportColumnsInput asks which attribute columns of a mapping are known.
+type ImportColumnsInput struct {
+	Mapping ImportMapping `json:"mapping"`
+}
+
+// ImportColumns is the column check's answer: the mapping with the matched
+// fields linked (fieldKey) and the status of every attribute column.
+type ImportColumns struct {
+	Mapping ImportMapping  `json:"mapping" doc:"The mapping with fieldKey set on the columns that match a catalog field; save it in the profile to keep the links"`
+	Columns []ImportColumn `json:"columns" doc:"Every attribute column, in mapping order"`
+	Unknown int            `json:"unknown" doc:"Columns that must be answered before the preview"`
+}
+
+// ImportColumn is one attribute column of a mapping.
+type ImportColumn struct {
+	FieldIndex   int    `json:"fieldIndex" doc:"Index in mapping.fields"`
+	Target       string `json:"target" example:"attribute.dimmer_outputs"`
+	Key          string `json:"key" doc:"The attribute key" example:"dimmer_outputs"`
+	Column       string `json:"column,omitempty" doc:"Header text"`
+	ColumnLetter string `json:"columnLetter,omitempty"`
+	// Status: field (a catalog field; type, unit and meaning from it),
+	// information (answered as just information), category (an existing
+	// category defines the attribute) or unknown (must be answered).
+	Status string                     `json:"status" enum:"field,information,category,unknown"`
+	Field  *capabilities.CatalogField `json:"field,omitempty" doc:"The catalog field (status field)"`
+	// Categories are the existing categories considered (the fixed
+	// mapping.categoryId only, else all) that define the attribute key.
+	Categories []ImportColumnCategory `json:"categories" doc:"Existing categories (the fixed categoryId only, else all) that define the attribute key, with the link status"`
+}
+
+// Link statuses of a category attribute against its column.
+const (
+	ColumnCategoryLinked       = "linked"
+	ColumnCategoryWillLink     = "will_link"
+	ColumnCategoryTypeMismatch = "type_mismatch"
+	ColumnCategoryOtherField   = "other_field"
+	ColumnCategoryUnlinked     = "unlinked"
+)
+
+// ImportColumnCategory is an existing category that defines a column's
+// attribute key.
+type ImportColumnCategory struct {
+	CategoryID    uuid.UUID `json:"categoryId"`
+	Key           string    `json:"key"`
+	Name          i18n.Text `json:"name"`
+	AttributeType string    `json:"attributeType" doc:"The attribute's value type"`
+	FieldKey      string    `json:"fieldKey,omitempty" doc:"The catalog field the attribute links, if any"`
+	// Status: linked (to the column's field), will_link (unlinked, same
+	// type: the import links it when the category's rows are applied),
+	// type_mismatch (unlinked, other type: stays unlinked, warning
+	// import.attribute_not_linked), other_field (linked to another field),
+	// unlinked (the column has no field: known, no meaning).
+	Status string `json:"status" enum:"linked,will_link,type_mismatch,other_field,unlinked"`
+}
+
+// ImportColumnAnswer answers a column (unknown, or matched automatically
+// to override the match): a new catalog field, an existing one, or just
+// information; exactly one.
+type ImportColumnAnswer struct {
+	Target      string                          `json:"target" maxLength:"100" doc:"The attribute target of the column, e.g. attribute.dimmer_outputs"`
+	Information bool                            `json:"information,omitempty" doc:"Just information: no catalog field"`
+	Field       *capabilities.CatalogFieldInput `json:"field,omitempty" doc:"Create this catalog field and link the column to it"`
+	FieldKey    string                          `json:"fieldKey,omitempty" maxLength:"64" doc:"Link the column to this existing catalog field (import.answer_field_not_found if there is none)"`
+}
+
+// ImportColumnAnswers is the body of the answers.
+type ImportColumnAnswers struct {
+	Mapping ImportMapping        `json:"mapping"`
+	Answers []ImportColumnAnswer `json:"answers" maxItems:"200"`
 }

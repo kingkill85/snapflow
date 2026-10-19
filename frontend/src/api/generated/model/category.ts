@@ -7,6 +7,7 @@
 import type { Actions } from './actions';
 import type { AttributeDefinition } from './attributeDefinition';
 import type { CategoryDescription } from './categoryDescription';
+import type { CategoryMounting } from './categoryMounting';
 import type { CategoryName } from './categoryName';
 import type { InstanceAttributeDefinition } from './instanceAttributeDefinition';
 
@@ -26,6 +27,8 @@ export interface Category {
   isActive: boolean;
   /** Stable identifier, lower snake case */
   key: string;
+  /** Where products are placed: the floorplan, the distribution board, or both */
+  mounting: CategoryMounting;
   /** Display name per locale */
   name: CategoryName;
   /** Position in the catalog, 1 first */

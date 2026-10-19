@@ -14,6 +14,9 @@ type Querier interface {
 	// BOMVariants returns what a BOM snapshot keeps of the given variants (bom
 	// feature, through BOMVariants).
 	BOMVariants(ctx context.Context, ids []uuid.UUID) ([]BOMVariantsRow, error)
+	// CapabilityVariants returns what the capabilities of variants are computed
+	// from: their values and their product's.
+	CapabilityVariants(ctx context.Context, ids []uuid.UUID) ([]CapabilityVariantsRow, error)
 	CatalogAddons(ctx context.Context) ([]VariantAddon, error)
 	// Bulk reads and business-key lookups for other features (the import):
 	// the whole catalog in a few queries, no page cap, no active filter.

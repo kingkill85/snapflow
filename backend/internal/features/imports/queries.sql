@@ -27,6 +27,15 @@ RETURNING *;
 -- name: ProfileExists :one
 SELECT EXISTS (SELECT 1 FROM import_profiles WHERE id = $1);
 
+-- ProfilesLinkingField counts the profiles whose mapping links an
+-- attribute column to the catalog field key.
+-- name: ProfilesLinkingField :one
+SELECT count(*) FROM import_profiles p
+WHERE EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p.mapping -> 'fields') f
+    WHERE f ->> 'fieldKey' = sqlc.arg(field_key)::text
+);
+
 -- name: DeleteProfile :execrows
 DELETE FROM import_profiles WHERE id = $1;
 

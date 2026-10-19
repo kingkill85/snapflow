@@ -189,7 +189,8 @@
       "name": "Produktname",
       "description": "Beschreibung",
       "productType": "Produkttyp",
-      "category": "Kategorie"
+      "category": "Kategorie",
+      "mounting": "Montage"
     },
     "variant": {
       "name": "Variantenname",
@@ -217,7 +218,9 @@
     "price": "Preis",
     "image": "Bild",
     "addons": "Zubehör",
-    "localized": "{{name}} ({{language}})"
+    "localized": "{{name}} ({{language}})",
+    "mounting": "Montage",
+    "attributeLink": "Attribut „{{attribute}}“: Katalogfeld"
   },
   "value": {
     "none": "–",
@@ -265,7 +268,8 @@
     "warnings": "Warnungen",
     "rowsSkipped": "Zeilen mit Fehlern",
     "unmapped_one": "{{count}} Spalte wird nicht importiert:",
-    "unmapped_other": "{{count}} Spalten werden nicht importiert:"
+    "unmapped_other": "{{count}} Spalten werden nicht importiert:",
+    "changedCategories": "Kategorien mit Feldverknüpfung"
   },
   "preview": {
     "title": "Vorschau",
@@ -364,5 +368,62 @@
     "title": "Import löschen",
     "message": "Den Import von „{{name}}“ löschen? Seine Vorschau, Fehler und sein Änderungsprotokoll werden gelöscht; der Katalog ändert sich nicht.",
     "applied": "Dieser Import ist übernommen: Machen Sie ihn zuerst rückgängig und löschen Sie ihn dann."
+  },
+  "columns": {
+    "title": "Neue Spalten – was bedeuten sie?",
+    "description_one": "{{count}} Spalte passt noch zu keinem Katalogfeld. Gib an, was sie bedeutet: nur Information, ein vorhandenes Katalogfeld oder ein neues, das SnapFlow für seine Prüfungen nutzen kann.",
+    "description_other": "{{count}} Spalten passen noch zu keinem Katalogfeld. Gib für jede an, was sie bedeutet: nur Information, ein vorhandenes Katalogfeld oder ein neues, das SnapFlow für seine Prüfungen nutzen kann.",
+    "columnNamed": "Spalte „{{column}}“ ({{letter}})",
+    "columnLetter": "Spalte {{letter}}",
+    "attributeKey": "Attribut {{key}}",
+    "mode": "Diese Spalte ist",
+    "modeField": "Ein neues Katalogfeld",
+    "modeInformation": "Nur Information",
+    "key": "Feldschlüssel",
+    "label": "Bezeichnung",
+    "typeLabel": "Werttyp",
+    "type": {
+      "text": "Text",
+      "number": "Zahl",
+      "integer": "Ganze Zahl",
+      "boolean": "Ja/Nein",
+      "enum": "Auswahl"
+    },
+    "unit": "Einheit",
+    "options": "Auswahlwerte",
+    "optionsHint": "Wert eingeben und Enter drücken.",
+    "optionsFixed": "Diese Bedeutung braucht genau diese Auswahlwerte.",
+    "meaning": "Bedeutung für die Prüfungen",
+    "meaningHint": "Was SnapFlow mit dem Wert macht; „Nur Information“ behält ihn am Produkt, ohne ihn zu prüfen.",
+    "outputKind": "Ausgangsart",
+    "loadType": "Lastart",
+    "productTypes": "Nur für diese Produkttypen",
+    "productTypesHint": "Keiner angehakt: Die Bedeutung gilt für alle Produkttypen.",
+    "back": "Zurück zur Zuordnung",
+    "save": "Antworten speichern und Vorschau",
+    "knownTitle": "Bekannte Spalten",
+    "knownDescription": "Diese Attributspalten sind bereits bekannt.",
+    "knownField": "Katalogfeld „{{field}}“ · {{meaning}}",
+    "status": {
+      "information": "Nur Information",
+      "category": "Bekannt, ohne Bedeutung",
+      "field": "Katalogfeld"
+    },
+    "knownFieldKey": "Katalogfeld „{{key}}“",
+    "modeExisting": "Ein vorhandenes Katalogfeld",
+    "existingField": "Katalogfeld",
+    "change": "Ändern",
+    "linkField": "Feld verknüpfen",
+    "changeColumn": "Ändern, was Spalte {{column}} bedeutet",
+    "link": {
+      "linked": "verknüpft in {{category}}",
+      "will_link": "wird mit Feld {{field}} verknüpft in {{category}}",
+      "type_mismatch": "bleibt unverknüpft in {{category}}: anderer Werttyp",
+      "other_field": "mit Feld {{field}} verknüpft in {{category}}",
+      "unlinked": "Attribut von {{category}}, kein Feld"
+    },
+    "anyLoadType": "Jede Lastart",
+    "keep": "Wie erkannt lassen",
+    "keepColumn": "Spalte {{column}} wie erkannt lassen"
   }
 }

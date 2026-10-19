@@ -26,8 +26,9 @@ func TestUnknownAttribute(t *testing.T) {
 	api := apptest.New(t)
 	pt := newProductType(t, api, "knx", "KNX")
 	cat := newCategory(t, api, "dimmer", "", nil)
-	dims := map[string]any{"target": "attribute.dimensions", "column": "Dimensions"}
-	weight := map[string]any{"target": "attribute.weight", "column": "Weight"}
+	// Answered as just information, so the preview runs (D188).
+	dims := map[string]any{"target": "attribute.dimensions", "column": "Dimensions", "information": true}
+	weight := map[string]any{"target": "attribute.weight", "column": "Weight", "information": true}
 	run := upload(t, api, "d.csv", csvFile("Model;Name;Variant;Price;Weight;Dimensions", "D-1;Dimmer;;5;;", "D-2;Dimmer 2;;5;3;4*4"), "")
 	run = preview(t, api, run.ID.String(), map[string]any{"mapping": csvMapping(pt.ID, cat.ID, weight, dims)})
 	// Sorted by key: dimensions before weight, on every preview.
@@ -38,7 +39,7 @@ func TestUnknownAttribute(t *testing.T) {
 	if want := []string{"3 attribute.dimensions attribute.unknown", "3 attribute.weight attribute.unknown"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("issues %v", got)
 	}
-	constant := map[string]any{"target": "attribute.dimensions", "value": ""}
+	constant := map[string]any{"target": "attribute.dimensions", "value": "", "information": true}
 	run = upload(t, api, "e.csv", csvFile("Model;Name;Variant;Price", "E-1;E;;5"), "")
 	if run = preview(t, api, run.ID.String(), map[string]any{"mapping": csvMapping(pt.ID, cat.ID, constant)}); run.Counts.Errors != 1 {
 		t.Errorf("constant: %d errors", run.Counts.Errors)

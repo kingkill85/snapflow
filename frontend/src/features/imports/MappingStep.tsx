@@ -9,6 +9,7 @@ import { useListCategories } from '@/api/generated/categories/categories'
 import {
   getGetImportQueryKey,
   getListImportProfilesQueryKey,
+  useCheckImportColumns,
   useCreateImportProfile,
   useDeleteImportProfile,
   useGetImportProfile,
@@ -18,7 +19,7 @@ import {
   usePreviewImport,
   useUpdateImportProfile,
 } from '@/api/generated/imports/imports'
-import type { ImportMapping, ImportProfile, ImportRun, ImportSourceColumn, ImportTarget } from '@/api/generated/model'
+import type { ImportColumns, ImportMapping, ImportProfile, ImportRun, ImportSourceColumn, ImportTarget } from '@/api/generated/model'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
 import {
   Badge,
@@ -67,6 +68,7 @@ import {
   profileFieldMap,
   sameMapping,
 } from './mapping'
+import { NewColumnsStep } from './NewColumnsStep'
 import { invalidateRunDetails, listPath } from './paths'
 import { useRunReload } from './run-reload'
 
@@ -240,6 +242,9 @@ export function MappingStep({ run, autoProfileId, onAutoSettled, allOrNothing, o
   // ---------------------------------------------------------------- preview
 
   const preview = usePreviewImport()
+  const checkColumns = useCheckImportColumns()
+  /** The column check of a mapping whose preview found unknown columns: they are answered first (D188). */
+  const [columnsCheck, setColumnsCheck] = useState<{ mapping: ImportMapping; check: ImportColumns } | null>(null)
   const [previewError, setPreviewError] = useState<{ error: unknown; fields: Built['fields'] } | null>(null)
   const submitPreview = async () => {
     const built = build()
@@ -254,8 +259,22 @@ export function MappingStep({ run, autoProfileId, onAutoSettled, allOrNothing, o
       queryClient.setQueryData(getGetImportQueryKey(run.id), result)
       await invalidateRunDetails(queryClient, run.id)
       onPreviewed()
-    } catch (e) {
+    } catch (previewFailed) {
+      let e = previewFailed
       runReload.check(e)
+      if (e instanceof ApiError && e.code === 'import.columns_unknown') {
+        // Some columns need an answer: ask, then preview the answered mapping.
+        try {
+          const check = await checkColumns.mutateAsync({ data: { mapping: built.mapping } })
+          if (check.unknown > 0) {
+            setColumnsCheck({ mapping: check.mapping, check })
+            if (autoProfileId) onAutoSettled?.()
+            return
+          }
+        } catch (checkError) {
+          e = checkError
+        }
+      }
       setPreviewError({ error: showErrors(e, shown), fields: shown.fields })
       if (autoProfileId) onAutoSettled?.()
     }
@@ -563,8 +582,23 @@ export function MappingStep({ run, autoProfileId, onAutoSettled, allOrNothing, o
     ? fieldError(nameField.params && Object.keys(nameField.params).length > 0 ? `${nameField.code} ${JSON.stringify(nameField.params)}` : nameField.code)
     : undefined
   const imageColumn = Object.values(values.targets).includes('variant.image')
-  const busy = preview.isPending || loading !== null
+  const busy = preview.isPending || checkColumns.isPending || loading !== null
   const dataRows = source.data?.dataRows
+
+  if (columnsCheck) {
+    return (
+      <NewColumnsStep
+        mapping={columnsCheck.mapping}
+        check={columnsCheck.check}
+        onBack={() => setColumnsCheck(null)}
+        onAnswered={(answered) => {
+          setColumnsCheck(null)
+          // The answers become part of the form (a profile saved from it keeps them); then the preview runs.
+          load(answered, { preview: true })
+        }}
+      />
+    )
+  }
 
   return (
     <form

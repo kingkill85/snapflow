@@ -36,7 +36,10 @@
     "position": "Position",
     "description": "Beschreibung",
     "label": "Bezeichnung",
-    "descriptionHint": "Wird als Hilfe unter der Eingabe angezeigt."
+    "descriptionHint": "Wird als Hilfe unter der Eingabe angezeigt.",
+    "mounting": "Montage",
+    "mountingHint": "Wo Produkte dieser Kategorie platziert werden. Ein Produkt kann es überschreiben.",
+    "catalogField": "Katalogfeld"
   },
   "schema": {
     "item": "Attribut {{n}}",
@@ -82,5 +85,17 @@
   "notFound": {
     "title": "Kategorie nicht gefunden",
     "message": "Diese Kategorie gibt es nicht (mehr)."
+  },
+  "mounting": {
+    "floorplan": "Grundriss",
+    "board": "Verteiler",
+    "both": "Grundriss und Verteiler"
+  },
+  "link": {
+    "none": "Keine Verknüpfung",
+    "hint": "Die Verknüpfung übernimmt Typ, Einheit und Optionen des Felds sowie seine Bedeutung.",
+    "meaning": "Bedeutung",
+    "locked": "Vom verknüpften Katalogfeld vorgegeben.",
+    "summary": "Feld {{key}}"
   }
 }

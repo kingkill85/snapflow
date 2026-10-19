@@ -29,6 +29,9 @@ import type {
   GetImportSourceParams,
   ImportApplyInput,
   ImportChangePage,
+  ImportColumnAnswers,
+  ImportColumns,
+  ImportColumnsInput,
   ImportIssuePage,
   ImportItemPage,
   ImportPreviewInput,
@@ -95,6 +98,142 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
+ * D188: every attribute.<key> column is matched with the catalog fields (a link kept in fieldKey, else the key and the header text against field keys and labels, ignoring case, spacing and punctuation). Returns the mapping with the matches linked and each column's status; unknown columns block the preview (import.columns_unknown) until answered (POST /api/import-columns/answers).
+ * @summary Check a mapping's attribute columns against the catalog fields
+ */
+export const checkImportColumns = (
+    importColumnsInput: BodyType<NonReadonly<ImportColumnsInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<ImportColumns>(
+      {url: `/api/import-columns`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: importColumnsInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getCheckImportColumnsMutationKey = () => ['checkImportColumns'] as const;
+
+export const getCheckImportColumnsMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkImportColumns>>, TError,CheckImportColumnsMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof checkImportColumns>>, TError,CheckImportColumnsMutationVariables, TContext> => {
+
+const mutationKey = getCheckImportColumnsMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkImportColumns>>, CheckImportColumnsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkImportColumns(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckImportColumnsMutationResult = NonNullable<Awaited<ReturnType<typeof checkImportColumns>>>
+    export type CheckImportColumnsMutationBody = BodyType<NonReadonly<ImportColumnsInput>>
+    export type CheckImportColumnsMutationError = ErrorType<Error>
+    export type CheckImportColumnsMutationVariables = {data: BodyType<NonReadonly<ImportColumnsInput>>}
+
+    /**
+ * @summary Check a mapping's attribute columns against the catalog fields
+ */
+export const useCheckImportColumns = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkImportColumns>>, TError,CheckImportColumnsMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof checkImportColumns>>,
+        TError,
+        CheckImportColumnsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCheckImportColumnsMutationOptions(options), queryClient);
+    }
+    /**
+ * Each answer creates a catalog field (all in one transaction; errors at body.answers[i].field.*) and links the column to it, or marks the column as just information. Returns the column check of the answered mapping: preview with that mapping, and save it in the profile to keep the answers.
+ * @summary Answer what unknown columns mean
+ */
+export const answerImportColumns = (
+    importColumnAnswers: BodyType<NonReadonly<ImportColumnAnswers>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<ImportColumns>(
+      {url: `/api/import-columns/answers`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: importColumnAnswers, signal
+    },
+      );
+    }
+
+
+
+
+export const getAnswerImportColumnsMutationKey = () => ['answerImportColumns'] as const;
+
+export const getAnswerImportColumnsMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof answerImportColumns>>, TError,AnswerImportColumnsMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof answerImportColumns>>, TError,AnswerImportColumnsMutationVariables, TContext> => {
+
+const mutationKey = getAnswerImportColumnsMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof answerImportColumns>>, AnswerImportColumnsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  answerImportColumns(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnswerImportColumnsMutationResult = NonNullable<Awaited<ReturnType<typeof answerImportColumns>>>
+    export type AnswerImportColumnsMutationBody = BodyType<NonReadonly<ImportColumnAnswers>>
+    export type AnswerImportColumnsMutationError = ErrorType<Error>
+    export type AnswerImportColumnsMutationVariables = {data: BodyType<NonReadonly<ImportColumnAnswers>>}
+
+    /**
+ * @summary Answer what unknown columns mean
+ */
+export const useAnswerImportColumns = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof answerImportColumns>>, TError,AnswerImportColumnsMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof answerImportColumns>>,
+        TError,
+        AnswerImportColumnsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAnswerImportColumnsMutationOptions(options), queryClient);
+    }
+    /**
  * By name. With no profile at all, the starter profile "SnapFlow 1 workbook" is created first.
  * @summary List import profiles
  */

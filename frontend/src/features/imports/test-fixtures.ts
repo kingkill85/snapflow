@@ -28,6 +28,8 @@ export const zigbee: ProductType = {
   key: 'zigbee',
   name: { en: 'Zigbee' },
   abbreviation: 'ZB',
+  reservePercent: 20,
+  topology: 'wireless',
   color: '#1f6feb',
   sortOrder: 1,
   isActive: true,
@@ -39,6 +41,7 @@ export const zigbee: ProductType = {
 export const gateways: Category = {
   id: id(121),
   key: 'gateways',
+  mounting: 'floorplan',
   name: { en: 'Gateways', de: 'Gateways' },
   sortOrder: 1,
   isActive: true,

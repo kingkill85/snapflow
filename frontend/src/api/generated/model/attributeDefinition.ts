@@ -14,6 +14,11 @@ import type { AttributeOption } from './attributeOption';
 export interface AttributeDefinition {
   /** Help text per locale; if set, "en" is required */
   description?: AttributeDefinitionDescription;
+  /**
+     * Key of the catalog field the attribute is linked to (type, unit, options and meaning come from it); empty for none
+     * @maxLength 64
+     */
+  fieldKey?: string;
   /** Type of a list's items */
   itemType?: AttributeDefinitionItemType;
   /** Stable identifier, lower snake case, unique within the schema */

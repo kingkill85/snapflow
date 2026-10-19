@@ -105,7 +105,7 @@ export function CategoriesPage() {
   const rows = list.data?.items ?? []
   const columns: Column<Category>[] = [
     // The position among the rows shown (sortOrder counts hidden inactive categories too).
-    { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px text-right tabular-nums' },
+    { header: t('field.position'), cell: (p) => rows.indexOf(p) + 1, className: 'w-px whitespace-nowrap text-right tabular-nums' },
     {
       header: t('field.name'),
       mobile: 'title',

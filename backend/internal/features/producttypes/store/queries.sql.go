@@ -14,17 +14,23 @@ import (
 )
 
 const createProductType = `-- name: CreateProductType :one
-INSERT INTO product_types (key, name, abbreviation, color, is_active, sort_order)
-VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
-RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation
+INSERT INTO product_types (key, name, abbreviation, color, is_active, default_bus_current_ma, reserve_percent, bus_devices_max,
+    topology, default_wireless_places_used, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used
 `
 
 type CreateProductTypeParams struct {
-	Key          string
-	Name         i18n.Text
-	Abbreviation *string
-	Color        *string
-	IsActive     bool
+	Key                       string
+	Name                      i18n.Text
+	Abbreviation              *string
+	Color                     *string
+	IsActive                  bool
+	DefaultBusCurrentMa       *int32
+	ReservePercent            int32
+	BusDevicesMax             *int32
+	Topology                  string
+	DefaultWirelessPlacesUsed *int32
 }
 
 // New types go to the end of the order (under LockProductTypeOrder, so two
@@ -36,6 +42,11 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 		arg.Abbreviation,
 		arg.Color,
 		arg.IsActive,
+		arg.DefaultBusCurrentMa,
+		arg.ReservePercent,
+		arg.BusDevicesMax,
+		arg.Topology,
+		arg.DefaultWirelessPlacesUsed,
 	)
 	var i ProductType
 	err := row.Scan(
@@ -48,6 +59,11 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Abbreviation,
+		&i.DefaultBusCurrentMa,
+		&i.ReservePercent,
+		&i.BusDevicesMax,
+		&i.Topology,
+		&i.DefaultWirelessPlacesUsed,
 	)
 	return i, err
 }
@@ -65,7 +81,7 @@ func (q *Queries) DeleteProductType(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const getProductType = `-- name: GetProductType :one
-SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation FROM product_types WHERE id = $1
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used FROM product_types WHERE id = $1
 `
 
 func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType, error) {
@@ -81,12 +97,17 @@ func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Abbreviation,
+		&i.DefaultBusCurrentMa,
+		&i.ReservePercent,
+		&i.BusDevicesMax,
+		&i.Topology,
+		&i.DefaultWirelessPlacesUsed,
 	)
 	return i, err
 }
 
 const listProductTypes = `-- name: ListProductTypes :many
-SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation FROM product_types
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used FROM product_types
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -110,6 +131,11 @@ func (q *Queries) ListProductTypes(ctx context.Context, includeInactive bool) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Abbreviation,
+			&i.DefaultBusCurrentMa,
+			&i.ReservePercent,
+			&i.BusDevicesMax,
+			&i.Topology,
+			&i.DefaultWirelessPlacesUsed,
 		); err != nil {
 			return nil, err
 		}
@@ -185,19 +211,26 @@ func (q *Queries) SetProductTypeOrder(ctx context.Context, ids []uuid.UUID) erro
 const updateProductType = `-- name: UpdateProductType :one
 UPDATE product_types
 SET key = $2, name = $3, abbreviation = $4, color = $5, is_active = $6,
+    default_bus_current_ma = $7, reserve_percent = $8, bus_devices_max = $9,
+    topology = $10, default_wireless_places_used = $11,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $7
-RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation
+WHERE id = $1 AND updated_at = $12
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used
 `
 
 type UpdateProductTypeParams struct {
-	ID                uuid.UUID
-	Key               string
-	Name              i18n.Text
-	Abbreviation      *string
-	Color             *string
-	IsActive          bool
-	ExpectedUpdatedAt time.Time
+	ID                        uuid.UUID
+	Key                       string
+	Name                      i18n.Text
+	Abbreviation              *string
+	Color                     *string
+	IsActive                  bool
+	DefaultBusCurrentMa       *int32
+	ReservePercent            int32
+	BusDevicesMax             *int32
+	Topology                  string
+	DefaultWirelessPlacesUsed *int32
+	ExpectedUpdatedAt         time.Time
 }
 
 // UpdateProductType changes the type only if nobody else has since it was
@@ -211,6 +244,11 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		arg.Abbreviation,
 		arg.Color,
 		arg.IsActive,
+		arg.DefaultBusCurrentMa,
+		arg.ReservePercent,
+		arg.BusDevicesMax,
+		arg.Topology,
+		arg.DefaultWirelessPlacesUsed,
 		arg.ExpectedUpdatedAt,
 	)
 	var i ProductType
@@ -224,6 +262,11 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Abbreviation,
+		&i.DefaultBusCurrentMa,
+		&i.ReservePercent,
+		&i.BusDevicesMax,
+		&i.Topology,
+		&i.DefaultWirelessPlacesUsed,
 	)
 	return i, err
 }

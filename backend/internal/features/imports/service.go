@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports/store"
@@ -69,10 +70,12 @@ type Service struct {
 	products *products.Service
 	files    *files.Service
 	users    *users.Service
+	caps     *capabilities.Service
 }
 
-func NewService(db DB, types *producttypes.Service, cats *categories.Service, products *products.Service, files *files.Service, users *users.Service) *Service {
-	return &Service{db: db, q: store.New(db), types: types, cats: cats, products: products, files: files, users: users}
+func NewService(db DB, types *producttypes.Service, cats *categories.Service, products *products.Service, files *files.Service,
+	users *users.Service, caps *capabilities.Service) *Service {
+	return &Service{db: db, q: store.New(db), types: types, cats: cats, products: products, files: files, users: users, caps: caps}
 }
 
 func (s *Service) inTx(ctx context.Context, opts pgx.TxOptions, fn func(tx pgx.Tx, q *store.Queries) error) error {
@@ -492,10 +495,14 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 		types   []producttypes.ProductType
 		cats    []categories.Category
 		catalog []products.CatalogProduct
+		fields  map[string]capabilities.CatalogField
 	)
 	err = database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
 		var err error
 		if types, err = s.types.WithTx(tx).List(ctx, true); err != nil {
+			return err
+		}
+		if fields, err = s.caps.WithTx(tx).FieldsByKey(ctx); err != nil {
 			return err
 		}
 		if cats, err = s.cats.WithTx(tx).List(ctx, true); err != nil {
@@ -528,6 +535,11 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 	if len(errs) > 0 {
 		return ImportRun{}, apperr.Validation(errs...)
 	}
+	// Every attribute column must be known before the preview (D188).
+	mapping, columns := checkColumns(mapping, fields, cats)
+	if n, targets := countUnknown(columns); n > 0 {
+		return ImportRun{}, errColumnsUnknown(targets)
+	}
 	src, table, err := s.open(ctx, row, mapping.Sheet, mapping.HeaderRow)
 	if err != nil {
 		return ImportRun{}, err
@@ -542,7 +554,7 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 		}
 	}
 	pl, err := buildPlan(planInput{
-		mapping: mapping, table: table, types: types, categories: cats, catalog: catalog,
+		mapping: mapping, table: table, types: types, categories: cats, catalog: catalog, fields: fields,
 		storeImage: func(img importsrc.Image) (uuid.UUID, error) {
 			if id, ok := known[img.Name]; ok {
 				return id, nil
@@ -563,7 +575,7 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 			pl.images[name] = id
 		}
 	}
-	token, err := scopeToken(types, cats, catalog, pl.scope)
+	token, err := scopeToken(types, cats, catalog, fields, pl.scope)
 	if err != nil {
 		return ImportRun{}, err
 	}
