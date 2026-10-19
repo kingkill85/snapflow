@@ -200,3 +200,32 @@ func TestBusy(t *testing.T) {
 		t.Errorf("after release: %v", err)
 	}
 }
+
+func TestManualLineNotesAndModelNumbers(t *testing.T) {
+	b := testBOM(1, 1)
+	variant := uuid.New()
+	b.Lines[0].Key = variant.String()
+	b.Groups[0].Categories[0].Lines[0] = variant.String()
+	b.Lines[0].Snapshot.ModelNumber, b.Lines[0].Snapshot.SKU = "ZB-DIM-200", "A-1"
+	free := uuid.New()
+	b.Lines = append(b.Lines, bom.BOMLine{Key: free.String(), Kind: bom.KindFreeText, Name: "Cable", Quantity: 1, UnitPrice: "1.00", Total: "1.00"})
+	b.Groups = append(b.Groups, bom.BOMGroup{Kind: "freeText", Subtotal: "1.00", Lines: []string{free.String()}})
+	b.ManualLines = []bom.ManualLine{{ID: uuid.New(), VariantID: &variant, Note: "behind the TV"}, {ID: free, Note: "10 m"}}
+	rows := content{lang: "en", bom: b}.bomTable().Rows
+	var device, cable string
+	var detail document.Run
+	for _, r := range rows {
+		switch txt := cellText(r.Cells[1]); {
+		case strings.HasPrefix(txt, "Device"):
+			device, detail = txt, r.Cells[1].Runs[1]
+		case strings.HasPrefix(txt, "Cable"):
+			cable = txt
+		}
+	}
+	if !strings.HasSuffix(device, "\nbehind the TV") || !strings.HasSuffix(cable, "\n10 m") {
+		t.Errorf("notes: %q, %q", device, cable)
+	}
+	if !detail.NoBreakHyphens || !strings.Contains(detail.Text, "ZB-DIM-200") {
+		t.Errorf("model number run: %+v", detail)
+	}
+}

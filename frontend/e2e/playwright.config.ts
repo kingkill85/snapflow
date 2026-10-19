@@ -3,7 +3,7 @@ import { availableParallelism } from 'node:os'
 
 import { defineConfig, devices } from '@playwright/test'
 
-import { admin, adminStorageState, backendBinary, backendPort, backendURL, databaseURL, distributorName, frontendPort, frontendURL, storageDir } from './env'
+import { admin, adminStorageState, backendBinary, backendPort, backendURL, databaseURL, distributorName, frontendPort, frontendURL, ratesPort, ratesURL, storageDir } from './env'
 
 // Run with `make e2e`, which recreates the database first. Servers are always
 // started fresh (against the e2e database) unless E2E_REUSE_SERVERS=1 is set,
@@ -57,6 +57,15 @@ export default defineConfig({
   ],
   webServer: [
     {
+      // The online exchange rate provider, stubbed (fixed rates, dated yesterday).
+      name: 'rates',
+      command: `node e2e/rates-stub.ts ${ratesPort}`,
+      cwd: '..',
+      url: ratesURL,
+      reuseExistingServer: reuse,
+      timeout: 30_000,
+    },
+    {
       name: 'backend',
       // Built once and started directly (no `go run` per start; `go build` is
       // incremental). Starts with an empty file store, like the database.
@@ -76,6 +85,7 @@ export default defineConfig({
         TRUSTED_PROXIES: '',
         STATIC_DIR: '',
         STORAGE_DIR: storageDir,
+        EXCHANGE_RATE_URL: ratesURL,
       },
     },
     {

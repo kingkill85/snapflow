@@ -288,3 +288,14 @@ func TestMediaHaveSizesInLocalHeaders(t *testing.T) {
 		t.Fatal("no media")
 	}
 }
+
+func TestNoBreakHyphens(t *testing.T) {
+	parts := unzip(t, render(t, document.Document{Sections: []document.Section{{Blocks: []document.Block{
+		document.Paragraph{Runs: []document.Run{{Text: "ZB-DIM-200", NoBreakHyphens: true}, {Text: " a-b"}}},
+	}}}}))
+	doc := string(parts["word/document.xml"])
+	wellFormed(t, "word/document.xml", parts["word/document.xml"])
+	if !strings.Contains(doc, `<w:t xml:space="preserve">ZB</w:t><w:noBreakHyphen/><w:t xml:space="preserve">DIM</w:t><w:noBreakHyphen/>`) || !strings.Contains(doc, " a-b<") {
+		t.Errorf("hyphens: %s", doc)
+	}
+}

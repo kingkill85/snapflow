@@ -32,6 +32,9 @@ export const slot = parseSlot(process.env.E2E_SLOT)
 
 export const backendPort = slot === 0 ? 8001 : 20000 + 10 * slot
 export const frontendPort = slot === 0 ? 5174 : 20001 + 10 * slot
+/** The stub exchange rate provider (e2e/rates-stub.ts), the backend's EXCHANGE_RATE_URL. */
+export const ratesPort = slot === 0 ? 8002 : 20002 + 10 * slot
+export const ratesURL = `http://localhost:${ratesPort}/v6/latest/USD`
 export const backendURL = `http://localhost:${backendPort}`
 export const frontendURL = `http://localhost:${frontendPort}`
 

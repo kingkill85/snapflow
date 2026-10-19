@@ -275,7 +275,20 @@ func runs(rs []document.Run) string {
 			if i > 0 {
 				b.WriteString(`<w:br/>`)
 			}
-			if line != "" {
+			switch {
+			case line == "":
+			case r.NoBreakHyphens:
+				// w:noBreakHyphen: Word and LibreOffice draw a hyphen that
+				// never breaks the line (U+2011 lacks a glyph in some fonts).
+				for j, part := range strings.Split(line, "-") {
+					if j > 0 {
+						b.WriteString(`<w:noBreakHyphen/>`)
+					}
+					if part != "" {
+						b.WriteString(`<w:t xml:space="preserve">` + esc(part) + `</w:t>`)
+					}
+				}
+			default:
 				b.WriteString(`<w:t xml:space="preserve">` + esc(line) + `</w:t>`)
 			}
 			b.WriteString(`</w:r>`)

@@ -260,6 +260,19 @@ func (c content) bomTable() document.Table {
 			names[*ln.VariantID] = text(ln.Snapshot.ProductName, l)
 		}
 	}
+	// Notes of manual lines print under their line: a free-text line's own,
+	// a catalog line's under the variant's line it merged into.
+	notes := map[string][]string{}
+	for _, m := range c.bom.ManualLines {
+		if m.Note == "" {
+			continue
+		}
+		key := m.ID.String()
+		if m.VariantID != nil {
+			key = m.VariantID.String()
+		}
+		notes[key] = append(notes[key], m.Note)
+	}
 	pos := 0
 	row := func(ln bom.BOMLine) document.Row {
 		pos++
@@ -275,7 +288,7 @@ func (c content) bomTable() document.Table {
 			if ln.Snapshot.SKU != "" {
 				detail += " · " + l.t("sku", ln.Snapshot.SKU)
 			}
-			desc = append(desc, document.Run{Text: "\n" + detail, Italic: true})
+			desc = append(desc, document.Run{Text: "\n" + detail, Italic: true, NoBreakHyphens: true})
 			if ln.Kind == bom.KindAddOn && len(ln.AddOnOf) > 0 {
 				var of []string
 				for _, id := range ln.AddOnOf {
@@ -288,6 +301,9 @@ func (c content) bomTable() document.Table {
 			}
 		} else {
 			desc = append(desc, document.Run{Text: ln.Name})
+		}
+		if n := notes[ln.Key]; len(n) > 0 {
+			desc = append(desc, document.Run{Text: "\n" + strings.Join(n, "\n")})
 		}
 		cells := []document.Cell{document.TextCell(itoa(pos)), {Runs: desc, Indent: indent}}
 		if c.planColumns() {
