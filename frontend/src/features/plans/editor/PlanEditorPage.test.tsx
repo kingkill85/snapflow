@@ -267,11 +267,13 @@ describe('PlanEditorPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Place need' }))
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-tool', 'placeNeed')
+    expect(screen.getByRole('button', { name: 'Place need' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText('Click on the plan to place the need symbol; Esc cancels.')).toBeInTheDocument()
     // Without a function nothing is placed.
     await user.click(screen.getByRole('button', { name: 'place here' }))
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '0')
-    await chooseOption(user, screen.getByRole('combobox', { name: 'Function of the next symbol' }), 'Blind')
+    await chooseOption(user, screen.getByRole('combobox', { name: 'Function type of the next symbol' }), 'Blind')
     await user.click(screen.getByRole('button', { name: 'place here' }))
 
     // Placed, selected (inspector) and back to Select.

@@ -173,11 +173,11 @@
     "bar": "Maßstab: der Balken entspricht {{label}}"
   },
   "needs": {
-    "title": "Bedarfe",
-    "empty": "Noch keine Bedarfe.",
+    "title": "Bedarf",
+    "empty": "Noch kein Bedarf.",
     "add": "Bedarf hinzufügen",
-    "addHint": "Wählen Sie eine Funktion, um dieser Zone einen Bedarf hinzuzufügen.",
-    "functionType": "Funktion",
+    "addHint": "Wählen Sie einen Funktionstyp, um dieser Zone einen Bedarf hinzuzufügen.",
+    "functionType": "Funktionstyp",
     "quantity": "Anzahl",
     "power": "Leistung je Stück",
     "powerHint": "In W, z. B. 7,5; leer, wenn unbekannt",
@@ -195,25 +195,24 @@
     "noTemplates": "Keine aktiven Raumvorlagen.",
     "applied_one": "{{count}} Bedarf aus „{{name}}“ hinzugefügt.",
     "applied_other": "{{count}} Bedarfe aus „{{name}}“ hinzugefügt.",
-    "skipped_one": "{{count}} Zeile wurde übersprungen: Funktion oder Lastart ist inaktiv.",
-    "skipped_other": "{{count}} Zeilen wurden übersprungen: Funktion oder Lastart ist inaktiv.",
+    "skipped_one": "{{count}} Zeile wurde übersprungen: Funktionstyp oder Lastart ist inaktiv.",
+    "skipped_other": "{{count}} Zeilen wurden übersprungen: Funktionstyp oder Lastart ist inaktiv.",
     "symbol": "Bedarfssymbol",
-    "symbolBadge": "Symbol",
     "symbolsHint_one": "Dazu {{count}} Bedarfssymbol in dieser Zone (auf dem Plan bearbeiten).",
     "symbolsHint_other": "Dazu {{count}} Bedarfssymbole in dieser Zone (auf dem Plan bearbeiten).",
-    "count_one": "{{count}} Bedarf",
-    "count_other": "{{count}} Bedarfe",
+    "count_one": "Bedarf: {{count}} Stück",
+    "count_other": "Bedarf: {{count}} Stück",
     "inactive": "{{name}} (inaktiv)",
-    "unknown": "Unbekannte Funktion",
+    "unknown": "Unbekannter Funktionstyp",
     "invalidPower": "Geben Sie eine Leistung von 0 bis 100000 W ein.",
-    "placeFunction": "Funktion des nächsten Symbols",
-    "noFunctionTypes": "Im Katalog gibt es keine aktiven Funktionen.",
+    "placeFunction": "Funktionstyp des nächsten Symbols",
+    "noFunctionTypes": "Im Katalog gibt es keine aktiven Funktionstypen.",
     "zoneOfSymbol": "Zone",
     "noZone": "Außerhalb aller Zonen"
   },
   "needWarning": {
-    "need_function_type_inactive": "Die Funktion ist im Katalog inaktiv.",
+    "need_function_type_inactive": "Der Funktionstyp ist im Katalog inaktiv.",
     "need_outside_zones": "Das Symbol liegt außerhalb aller Zonen.",
-    "need_load_type_not_allowed": "Die Funktion erlaubt diese Lastart nicht mehr."
+    "need_load_type_not_allowed": "Der Funktionstyp erlaubt diese Lastart nicht mehr."
   }
 }

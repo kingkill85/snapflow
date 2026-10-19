@@ -176,8 +176,8 @@
     "title": "Needs",
     "empty": "No needs yet.",
     "add": "Add need",
-    "addHint": "Choose a function to add a need to this zone.",
-    "functionType": "Function",
+    "addHint": "Choose a function type to add a need to this zone.",
+    "functionType": "Function type",
     "quantity": "Quantity",
     "power": "Power per unit",
     "powerHint": "In W, e.g. 7.5; empty if unknown",
@@ -195,25 +195,24 @@
     "noTemplates": "No active room templates.",
     "applied_one": "{{count}} need added from “{{name}}”.",
     "applied_other": "{{count}} needs added from “{{name}}”.",
-    "skipped_one": "{{count}} line was skipped: its function or load type is inactive.",
-    "skipped_other": "{{count}} lines were skipped: their function or load type is inactive.",
+    "skipped_one": "{{count}} line was skipped: its function type or load type is inactive.",
+    "skipped_other": "{{count}} lines were skipped: their function type or load type is inactive.",
     "symbol": "Need symbol",
-    "symbolBadge": "Symbol",
     "symbolsHint_one": "Plus {{count}} need symbol in this zone (edit it on the plan).",
     "symbolsHint_other": "Plus {{count}} need symbols in this zone (edit them on the plan).",
     "count_one": "{{count}} need",
     "count_other": "{{count}} needs",
     "inactive": "{{name}} (inactive)",
-    "unknown": "Unknown function",
+    "unknown": "Unknown function type",
     "invalidPower": "Enter a power from 0 to 100000 W.",
-    "placeFunction": "Function of the next symbol",
+    "placeFunction": "Function type of the next symbol",
     "noFunctionTypes": "There are no active function types in the catalog.",
     "zoneOfSymbol": "Zone",
     "noZone": "Outside every zone"
   },
   "needWarning": {
-    "need_function_type_inactive": "The function is inactive in the catalog.",
+    "need_function_type_inactive": "The function type is inactive in the catalog.",
     "need_outside_zones": "The symbol lies outside every zone.",
-    "need_load_type_not_allowed": "The function no longer allows this load type."
+    "need_load_type_not_allowed": "The function type no longer allows this load type."
   }
 }

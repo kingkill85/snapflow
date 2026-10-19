@@ -813,7 +813,7 @@ function NeedNode({ need: n, look, selected, warning, error, k, theme }: { need:
   return (
     <Group name="need" id={n.id} x={n.x ?? 0} y={n.y ?? 0}>
       <Circle radius={r} fill={theme.surface} stroke={ink} strokeWidth={(selected || error ? 2.5 : 1.5) * k} />
-      {look?.icon === 'dimmer' && <Wedge radius={r - 1.5 * k} angle={180} fill={theme.muted} opacity={0.35} listening={false} />}
+      {look?.icon === 'dimmer' && <Wedge radius={r - 1.5 * k} angle={180} fill={ink} opacity={0.3} listening={false} />}
       {(look?.icon === 'lamp' || look?.icon === 'dimmer') && (
         <>
           <Line points={[-d, -d, d, d]} stroke={ink} strokeWidth={1.5 * k} listening={false} />

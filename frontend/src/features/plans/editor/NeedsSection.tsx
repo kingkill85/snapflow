@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { LoadType, NeedWarning, PlanNeed, PlanZone, RoomTemplate } from '@/api/generated/model'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
-import { Badge, Button, Field, IconButton, Notice, SelectField, TextareaField } from '@/components/ui'
+import { Button, Field, IconButton, Notice, SelectField, TextareaField } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { isSymbol, type NeedPatch } from './document'
@@ -287,9 +287,7 @@ export function NeedInspector({
   return (
     <div className="space-y-4">
       <div className="space-y-0.5">
-        <p className="flex items-center gap-2 text-xs font-medium text-muted">
-          {t('needs.symbol')} <Badge>{t('needs.symbolBadge')}</Badge>
-        </p>
+        <p className="text-xs font-medium text-muted">{t('needs.symbol')}</p>
         <p className="font-medium break-words">{text(need)}</p>
         <p className="text-sm text-muted">
           {t('needs.zoneOfSymbol')}: {zoneName ?? t('needs.noZone')}

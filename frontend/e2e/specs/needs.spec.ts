@@ -79,7 +79,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
 
   // A load symbol in the kitchen.
   await page.getByRole('button', { name: 'Place need' }).click()
-  await page.getByRole('combobox', { name: 'Function of the next symbol' }).click()
+  await page.getByRole('combobox', { name: 'Function type of the next symbol' }).click()
   await page.getByRole('option', { name: light }).click()
   const at = await imageToPage(page)
   const spot = at(850, 300)

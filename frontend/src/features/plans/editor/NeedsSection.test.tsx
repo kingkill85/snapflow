@@ -86,7 +86,7 @@ describe('zone needs section', () => {
     const first = within(section).getByRole('listitem', { name: '3 × Dimmable light · 60 W · LED · Ceiling' })
     expect(within(first).getByText('Over the table')).toBeInTheDocument()
     expect(within(first).getByRole('alert')).toHaveTextContent('Must be between 1 and 100.')
-    expect(within(section).getByText('The function is inactive in the catalog.')).toBeInTheDocument()
+    expect(within(section).getByText('The function type is inactive in the catalog.')).toBeInTheDocument()
 
     await user.click(within(section).getByRole('button', { name: 'Move Blind · Window up' }))
     expect(needsOf()).toEqual([
@@ -145,7 +145,7 @@ describe('zone needs section', () => {
     ])
     expect(spy).toHaveBeenCalledTimes(1)
     expect(within(section).getByText('2 needs added from “Living room”.')).toBeInTheDocument()
-    expect(within(section).getByText('1 line was skipped: its function or load type is inactive.')).toBeInTheDocument()
+    expect(within(section).getByText('1 line was skipped: its function type or load type is inactive.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'undo' }))
     expect(needsOf()).toEqual([])
   })
