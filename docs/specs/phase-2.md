@@ -115,12 +115,56 @@ Not in phase 2: loads in zones and channel assignment, distribution boards, bus 
 - Frontend: Vitest for the plans list, dialogs, palette, inspector, undo/redo reducer, autosave state machine, lock banner; canvas interactions via the editor's state functions (geometry helpers unit-tested).
 - E2E: create a plan with an image, place products, draw a zone, see the zone count, undo/redo, reload shows the saved content, second user sees the lock; layout matrix for the plans list and editor shell.
 
-## 2c – BOM and pricing (outline)
+## 2c – BOM and pricing
 
-- BOM computed by a backend service from the version's plans (plan kind `BOMLines`): one line per variant + per add-on variant, grouped by product + variant + snapshot price, quantities per plan and per zone; plus manual lines (catalog variant or free text, quantity, price). Placements marked `existing` produce no BOM lines (and no required add-on lines).
-- **Price snapshots per version** (`version_items`: variant id → frozen name, model number, product type, category, unit price, image file): taken when a variant first appears in the version; "Update from catalog" previews the diff (price/name/availability changes) and applies selected or all. Catalog deletions keep snapshots with a null reference (D59).
-- **Pricing per version** (accepted recommendation "invoice settings per version"): discount and services each as percent or absolute, computed once in the backend; project currency and rate (2a) convert; totals and rounding rules (money as integer cents or numeric, round half up per line in USD, converted total rounded to the currency's minor unit) defined once and tested.
-- UI: BOM panel/page per version (grouped by product type/category, per-plan columns, zone filter), manual lines editor, pricing settings, update-from-catalog dialog with diff. Totals only from the API.
+All money rules live in one backend package; the frontend only displays what the API returns (CLAUDE.md rule 1). SnapFlow 1 had the invoice maths five times and they disagreed — here it exists once, with table tests.
+
+### Model (tenant-owned, RLS like 2a/2b, all queries through `database.InScope`)
+- **version_items** – the price snapshot of one catalog variant in one version: `version_id`, `variant_id` (nullable after a catalog deletion, D59; unique per version while set), `product_id`, frozen copies of: product name (i18n), variant name (i18n), model number, SKU, product type (id, key, name, abbreviation, colour), category (id, name, position), product type and category catalog positions (for sorting), unit price (numeric, USD, D19), image file id, required add-on variant ids (the variant's required add-on links at snapshot time); `captured_at`, `updated_at`.
+  - A snapshot is taken the first time a variant appears in the version: on plan content save (placement variants, their required add-ons, chosen optional add-ons) and on manual-line save. The BOM feature registers a hook with plans (like the copy hook, D197) — plans does not read BOM tables, BOM does not read plan tables; BOM reads placements through a plans service method.
+  - Snapshots are never changed implicitly; only "Update from catalog" changes them. Snapshots no longer used by any placement or manual line are kept (harmless) but not shown.
+- **version_manual_lines**: `id`, `version_id`, `position`, either `variant_id` (catalog line: snapshot as above, unit price from the snapshot) or free text (`name` 1–200, `unit_price` numeric ≥ 0 USD), `quantity` (whole number 1–100000), `note` (≤500).
+- **version_pricing** (one row per version, defaults when absent): `discount_kind` (`none|percent|amount`), `discount_value` (percent 0–100 with 2 decimals, or amount ≥ 0 USD), `services_kind` (`none|percent|amount`), `services_value`, `services_label` (i18n, default "System design, programming & commissioning" / "Systemplanung, Programmierung & Inbetriebnahme"), `updated_at` (D37 stale check).
+- Version copy (`copyVersion` hook) copies snapshots, manual lines and pricing.
+
+### BOM computation (backend service, plan-kind interface `BOMLines` for floorplans)
+- Every placement that is not `existing` (D185) contributes 1 × its variant, 1 × each required add-on of its snapshot, 1 × each chosen optional add-on. Placements without a variant (catalog deletion) contribute their snapshot if one exists, else are reported as a warning.
+- Lines are grouped by variant (one snapshot per variant per version, so one price): quantity total, quantity per plan, quantity per zone (zone ids per plan, "no zone" bucket). Add-on lines are separate lines (an add-on is its own product), marked `addOn` with the ids of the main variants they came from for display.
+- Manual catalog lines add to the same variant's line (quantity column "manual"); free-text lines are their own lines.
+- Order: product type catalog order → category catalog order → model number → variant name (snapshot values; D82 order); free-text lines last in their own group.
+- Availability: each line carries the live catalog status (`available`, `deleted`, `inactive`) and whether the snapshot differs from the catalog (`outdated`: price/name/model/image/required add-ons changed) — computed from the products service.
+
+### Money rules (one package, table-tested)
+- Amounts are decimals (no floats; `numeric` in Postgres, a decimal type in Go, strings in the API). USD amounts have 2 decimals.
+- Line total = unit price × quantity (exact, then rounded half-up to 0.01 USD).
+- Goods subtotal = Σ line totals.
+- Discount: percent → subtotal × p / 100 rounded to 0.01; amount → the value, capped at the subtotal (never negative totals — SnapFlow 1 disagreed on this).
+- Services: percent → (subtotal − discount) × p / 100 rounded; amount → the value.
+- Grand total (USD) = subtotal − discount + services.
+- Project currency (2a: currency + rate): every displayed amount converted as USD × rate, rounded half-up to the currency's ISO 4217 minor unit (table in code: most currencies 2, e.g. JPY/KRW 0, BHD/KWD/OMR 3), converting each line total, the subtotal, discount, services and grand total individually from their USD values (so the converted grand total may differ from the sum of converted lines by rounding — documented; the proposal shows converted values only when the currency is not USD).
+- No VAT/sales tax in phase 2 (SnapFlow 1 had none; record as a decision; can become a tenant/project setting later).
+
+### API (`features/bom`)
+- `GET /api/versions/{versionId}/bom` → `{lines[{key, kind: catalog|addOn|freeText, variantId|null, productId|null, snapshot{productName, variantName, modelNumber, sku, productType{…}, category{…}, imageUrl}, unitPrice, quantity, quantities{plans{planId: n}, zones{zoneId: n}, unzoned{planId: n}, manual}, total, converted{unitPrice,total}|null, status{available, deleted, inactive, outdated}, addOnOf[]}], groups (product type → category with subtotals), totals{subtotal, discount, services, grandTotal, currency, rate, converted{…}|null}, pricing{…}, warnings[]}`.
+- `PUT /api/versions/{versionId}/pricing` (expectedUpdatedAt).
+- Manual lines: `POST/PUT/DELETE /api/versions/{versionId}/manual-lines[/{id}]`, `PUT …/manual-lines/order`.
+- Update from catalog: `GET /api/versions/{versionId}/catalog-changes` → per used snapshot the field-level before/after (price, names, model number, image, required add-ons, availability/deletion) and the effect on the grand total; `POST /api/versions/{versionId}/catalog-changes/apply {variantIds[] | all: true}` → re-snapshots those (deleted variants cannot be updated; they stay frozen).
+- Read-only projects (D169) refuse changes; permissions `projects.read` / `projects.write`.
+- Error codes `bom.*`, `pricing.*` with en + de texts.
+
+### Frontend
+- Project page, per version: tabs **Plans** (2b) / **Bill of materials** / **Pricing** (URL-addressable).
+- BOM tab: table grouped by product type then category (group header rows with subtotals), columns: image, product + variant + model number (+ add-on marker "for …"), one quantity column per plan (scrolls horizontally on narrow screens; phone: cards), manual, total quantity, unit price, line total (USD and, if the project currency is not USD, the converted amounts in a second line or toggle); filter by plan and by zone (zone filter changes the quantity shown); status badges (unavailable, deleted, outdated) with a link to "Update from catalog"; totals block (subtotal, discount, services, grand total, converted grand total). Export CSV of the BOM is not in 2c (2d exports).
+- Manual lines: add catalog product (picker like the palette) or free-text line, quantity, note, reorder, delete.
+- Pricing tab: discount (none / percent / amount), services (none / percent / amount) with editable label, preview of totals from the API (debounced GET with the unsaved values? → no: save then show; or a `POST …/pricing/preview` returning totals for given values — add it so the form shows live totals without client maths).
+- Update from catalog dialog: list of changed items with before/after per field, total effect, select some or all, apply; afterwards the BOM refreshes.
+- Plans editor: no BOM panel in the editor in 2c (the version page is the place); the editor's inspector may show the snapshot price of the selected placement (from the BOM API) — optional.
+- All numbers formatted with the UI language (D71/D144), currency codes from the project.
+
+### Tests
+- Backend: money rules table tests (rounding, caps, percent/amount, currencies with 0/2/3 minor units), BOM grouping (existing placements excluded, required/optional add-ons, manual lines merge, free text, per plan/zone quantities, deleted variants), snapshot creation via the plans hook (first appearance only, never implicit updates), catalog changes preview/apply, pricing stale, RLS for the new tables, version copy, read-only.
+- Frontend: Vitest + MSW for BOM table (grouping, filters, statuses), manual lines, pricing form with preview, update-from-catalog dialog.
+- E2E: place products in a plan → BOM shows them with quantities per plan and zone; add a manual line; set discount/services; change a catalog price → outdated badge → update from catalog → totals change; existing placement not in the BOM.
 
 ## 2d – Proposals (outline)
 
