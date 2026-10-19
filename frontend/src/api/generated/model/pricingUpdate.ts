@@ -4,13 +4,17 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { PricingUpdateClosingText } from './pricingUpdateClosingText';
 import type { PricingUpdateDiscountKind } from './pricingUpdateDiscountKind';
+import type { PricingUpdateIntroText } from './pricingUpdateIntroText';
 import type { PricingUpdateServicesKind } from './pricingUpdateServicesKind';
 import type { PricingUpdateServicesLabel } from './pricingUpdateServicesLabel';
 
 export interface PricingUpdate {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Per locale, at most 5000 characters; empty for none (en required otherwise) */
+  closingText?: PricingUpdateClosingText;
   discountKind: PricingUpdateDiscountKind;
   /** Percent 0-100 or USD amount, at most 2 decimals; ignored for none */
   discountValue?: string;
@@ -19,6 +23,8 @@ export interface PricingUpdate {
      * @nullable
      */
   expectedUpdatedAt: string | null;
+  /** Per locale, at most 5000 characters; empty for none (en required otherwise) */
+  introText?: PricingUpdateIntroText;
   servicesKind: PricingUpdateServicesKind;
   /** Per locale, at most 200 characters; empty for the default label */
   servicesLabel?: PricingUpdateServicesLabel;

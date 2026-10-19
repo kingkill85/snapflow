@@ -25,10 +25,14 @@ import type {
 
 import type {
   Error,
+  File,
+  Letterhead,
+  LetterheadInput,
   ListTenantsParams,
   Tenant,
   TenantInput,
-  TenantList
+  TenantList,
+  UploadTenantLogoBody
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -464,6 +468,241 @@ export const useUpdateTenant = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getUpdateTenantMutationOptions(options), queryClient);
+    }
+    /**
+ * Admins for every tenant, a tenant admin for their own (tenants.profile).
+ * @summary Get a tenant's letterhead
+ */
+export const getTenantLetterhead = (
+    id: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Letterhead>(
+      {url: `/api/tenants/${id}/letterhead`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetTenantLetterheadQueryKey = (id: string,) => {
+    return [
+    `/api/tenants/${id}/letterhead`
+    ] as const;
+    }
+
+
+export const getGetTenantLetterheadQueryOptions = <TData = Awaited<ReturnType<typeof getTenantLetterhead>>, TError = ErrorType<Error>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTenantLetterheadQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenantLetterhead>>> = ({ signal }) => getTenantLetterhead(id, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTenantLetterheadQueryResult = NonNullable<Awaited<ReturnType<typeof getTenantLetterhead>>>
+export type GetTenantLetterheadQueryError = ErrorType<Error>
+
+
+export function useGetTenantLetterhead<TData = Awaited<ReturnType<typeof getTenantLetterhead>>, TError = ErrorType<Error>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTenantLetterhead>>,
+          TError,
+          Awaited<ReturnType<typeof getTenantLetterhead>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTenantLetterhead<TData = Awaited<ReturnType<typeof getTenantLetterhead>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTenantLetterhead>>,
+          TError,
+          Awaited<ReturnType<typeof getTenantLetterhead>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTenantLetterhead<TData = Awaited<ReturnType<typeof getTenantLetterhead>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a tenant's letterhead
+ */
+
+export function useGetTenantLetterhead<TData = Awaited<ReturnType<typeof getTenantLetterhead>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTenantLetterhead>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTenantLetterheadQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Replaces every field (empty clears). Admins for every tenant, a tenant admin for their own (tenants.profile).
+ * @summary Change a tenant's letterhead
+ */
+export const updateTenantLetterhead = (
+    id: string,
+    letterheadInput: BodyType<NonReadonly<LetterheadInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Letterhead>(
+      {url: `/api/tenants/${id}/letterhead`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: letterheadInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getUpdateTenantLetterheadMutationKey = () => ['updateTenantLetterhead'] as const;
+
+export const getUpdateTenantLetterheadMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTenantLetterhead>>, TError,UpdateTenantLetterheadMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateTenantLetterhead>>, TError,UpdateTenantLetterheadMutationVariables, TContext> => {
+
+const mutationKey = getUpdateTenantLetterheadMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTenantLetterhead>>, UpdateTenantLetterheadMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTenantLetterhead(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTenantLetterheadMutationResult = NonNullable<Awaited<ReturnType<typeof updateTenantLetterhead>>>
+    export type UpdateTenantLetterheadMutationBody = BodyType<NonReadonly<LetterheadInput>>
+    export type UpdateTenantLetterheadMutationError = ErrorType<Error>
+    export type UpdateTenantLetterheadMutationVariables = {id: string;data: BodyType<NonReadonly<LetterheadInput>>}
+
+    /**
+ * @summary Change a tenant's letterhead
+ */
+export const useUpdateTenantLetterhead = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTenantLetterhead>>, TError,UpdateTenantLetterheadMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateTenantLetterhead>>,
+        TError,
+        UpdateTenantLetterheadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateTenantLetterheadMutationOptions(options), queryClient);
+    }
+    /**
+ * Multipart field `image` (JPEG, PNG or WebP, at most 5 MB); stored in the tenant's scope. Set it as the letterhead's logoFileId to use it.
+ * @summary Upload a logo for a tenant's letterhead
+ */
+export const uploadTenantLogo = (
+    id: string,
+    uploadTenantLogoBody?: BodyType<UploadTenantLogoBody>,
+ signal?: AbortSignal
+) => {
+
+      const formData = new FormData();
+if(uploadTenantLogoBody?.image !== undefined) {
+ formData.append(`image`, uploadTenantLogoBody.image);
+ }
+
+      return apiClient<File>(
+      {url: `/api/tenants/${id}/logo`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData, signal
+    },
+      );
+    }
+
+
+
+
+export const getUploadTenantLogoMutationKey = () => ['uploadTenantLogo'] as const;
+
+export const getUploadTenantLogoMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadTenantLogo>>, TError,UploadTenantLogoMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof uploadTenantLogo>>, TError,UploadTenantLogoMutationVariables, TContext> => {
+
+const mutationKey = getUploadTenantLogoMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadTenantLogo>>, UploadTenantLogoMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  uploadTenantLogo(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadTenantLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadTenantLogo>>>
+    export type UploadTenantLogoMutationBody = BodyType<UploadTenantLogoBody> | undefined
+    export type UploadTenantLogoMutationError = ErrorType<Error>
+    export type UploadTenantLogoMutationVariables = {id: string;data?: BodyType<UploadTenantLogoBody>}
+
+    /**
+ * @summary Upload a logo for a tenant's letterhead
+ */
+export const useUploadTenantLogo = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadTenantLogo>>, TError,UploadTenantLogoMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof uploadTenantLogo>>,
+        TError,
+        UploadTenantLogoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadTenantLogoMutationOptions(options), queryClient);
     }
     /**
  * The tenant leaves the archive and stays inactive until it is activated.

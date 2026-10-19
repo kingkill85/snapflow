@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
+import type { Letterhead } from './letterhead';
 
 export interface Tenant {
   /** A URL to the JSON Schema for this object. */
@@ -18,6 +19,8 @@ export interface Tenant {
   isActive: boolean;
   /** The one tenant that runs SnapFlow; home of the admins */
   isDistributor: boolean;
+  /** Printed on the tenant's proposals; change it with PUT /api/tenants/{id}/letterhead */
+  letterhead: Letterhead;
   name: string;
   /** Projects of the tenant: deleting a tenant with projects archives it */
   projectCount: number;
