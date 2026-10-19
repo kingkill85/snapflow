@@ -34,10 +34,20 @@
     "network_assignment_dangling": "{{item}} is assigned to {{target}}",
     "unknown": "Check {{code}}"
   },
+  "candidate": {
+    "channel_overload_w": "would draw {{loadW}} W (at most {{limitW}} W)",
+    "channel_overload_w_mixed": "would draw {{loadW}} W of mixed loads ({{utilisationPercent}} % of what the channel takes for this mix)",
+    "channel_overload_a": "would draw {{currentA}} A at {{voltage}} V (at most {{limitA}} A)",
+    "channel_overload_a_mixed": "would draw {{currentA}} A of mixed loads at {{voltage}} V ({{utilisationPercent}} % of what the channel takes for this mix)",
+    "module_overload_w": "{{item}} would draw {{loadW}} W in total, {{loadType}} (at most {{limitW}} W)",
+    "module_overload_a": "{{item}} would draw {{currentA}} A in total at {{voltage}} V (at most {{limitA}} A)",
+    "groupChannels": "{{count}} channels: {{text}}",
+    "groupNeeds": "{{count}} needs: {{text}}"
+  },
   "reason": {
     "no_channel_serves": "No channel serves {{functionType}}",
     "no_free_channel": "No free channel for {{functionType}}",
-    "limits_exceeded": "No free channel fits (power, current or motor type)"
+    "limits_exceeded": "Too large for every available channel (power, current or motor type)"
   },
   "fallback": {
     "need": "A need",

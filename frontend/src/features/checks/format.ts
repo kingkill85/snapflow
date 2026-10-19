@@ -93,6 +93,10 @@ export type FindingCode = (typeof findingCodes)[number]
 export const unconnectableReasons = ['no_channel_serves', 'no_free_channel', 'limits_exceeded'] as const
 export type UnconnectableReason = (typeof unconnectableReasons)[number]
 
+/** Codes with their own wording as a refused candidate (`candidate.*`). */
+const candidateCodes = ['channel_overload_w', 'channel_overload_a', 'module_overload_w', 'module_overload_a'] as const
+const isCandidateCode = (code: string): code is (typeof candidateCodes)[number] => (candidateCodes as readonly string[]).includes(code)
+
 const isCode = (code: string): code is FindingCode => (findingCodes as readonly string[]).includes(code)
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
@@ -105,7 +109,12 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim(
 export function useFindingText() {
   const { t } = useTranslation('checks')
   const separator = useDecimalSeparator()
-  return (finding: Pick<Finding, 'code' | 'params'>, names: FindingNames = {}): string => {
+  /**
+   * `candidate`: the rule a candidate in the connect picker breaks, worded as what the connection would do
+   * ("would draw 17.39 A at 230 V (at most 16 A)") and without the channel's name for the limits, so equal
+   * refusals read alike and can be grouped; other codes read as findings.
+   */
+  return (finding: Pick<Finding, 'code' | 'params'>, names: FindingNames = {}, candidate = false): string => {
     const values: Record<string, string> = {}
     for (const [key, value] of Object.entries(finding.params ?? {})) {
       if (typeof value === 'number') values[key] = formatDecimal(value, separator)
@@ -129,6 +138,12 @@ export function useFindingText() {
       motor: motor(finding.params?.motorType),
       needMotor: motor(finding.params?.needMotorType),
       code: finding.code,
+    }
+    const mixed = finding.params?.mixedLoads === true
+    if (candidate && isCandidateCode(finding.code)) {
+      if (mixed && finding.code === 'channel_overload_w') return t('candidate.channel_overload_w_mixed', all)
+      if (mixed && finding.code === 'channel_overload_a') return t('candidate.channel_overload_a_mixed', all)
+      return t(`candidate.${finding.code}`, all)
     }
     // Several load types on a channel: the share of the mix's limit, not an effective limit in W or A (D417).
     if (finding.params?.mixedLoads === true && finding.code === 'channel_overload_w') return t('finding.channel_overload_w_mixed', all)

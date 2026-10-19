@@ -2,7 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BoardWarning, Capabilities, VariantSearchItem } from '@/api/generated/model'
+import type { BoardWarning, Capabilities, Finding, VariantSearchItem } from '@/api/generated/model'
 import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, Field, IconButton, Notice, SelectField, SwitchField } from '@/components/ui'
@@ -165,6 +165,8 @@ type InspectorProps = {
   planId: string
   /** The version's wiring view (channels and connections); undefined in tests that do not need it. */
   wiring?: WiringModel
+  /** The version's checks findings (channel errors in the channel list). */
+  findings?: Finding[]
 }
 
 /** The Inspector tab of the board editor: one module (product, variant, row, add-ons, values, capabilities), or a count. */
@@ -186,7 +188,7 @@ export function ModuleInspector(props: InspectorProps) {
   return <OneModule key={modules[0].id} {...props} module={modules[0]} />
 }
 
-function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice, versionId, planId, wiring }: InspectorProps & { module: BoardModuleDoc }) {
+function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice, versionId, planId, wiring, findings }: InspectorProps & { module: BoardModuleDoc }) {
   const { t } = useTranslation('plans')
   const { t: tc } = useTranslation()
   const localize = useLocalized()
@@ -272,7 +274,7 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
           )}
         </section>
       )}
-      {wiring && <ModuleChannels versionId={versionId} planId={planId} moduleId={m.id} hasChannels={(capabilities?.channels.length ?? 0) > 0} wiring={wiring} />}
+      {wiring && <ModuleChannels versionId={versionId} planId={planId} moduleId={m.id} hasChannels={(capabilities?.channels.length ?? 0) > 0} wiring={wiring} findings={findings} />}
       <SwitchField label={t('inspector.existing')} hint={t('inspector.existingHint')} checked={m.existing} disabled={!editable} onChange={(e) => update({ existing: e.target.checked })} />
       <Button variant="danger-quiet" size="sm" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'remove', ids: [m.id] } })}>
         <Trash2 /> {tc('action.delete')}

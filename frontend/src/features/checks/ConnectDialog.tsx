@@ -89,6 +89,26 @@ export function ConnectDialog({ versionId, wiring, target, onOpenChange, onConne
       setPending(null)
     }
   }
+  // Refused candidates: limits worded as what the connection would draw (no channel name), so identical
+  // refusals are grouped ("12 channels: would draw 17.39 A at 230 V (at most 16 A)"); others name the candidate.
+  const refusals: { key: string; text: string; names: string[] }[] = []
+  for (const c of broken) {
+    const names = {
+      channel: wiring.channelText(c),
+      need: wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId))),
+      item: wiring.itemName(wiring.items.get(`${c.targetPlanId}/${c.targetItemId}`)),
+    }
+    const words = findingText({ code: c.problem!.code, params: c.problem!.params }, names, true)
+    const name = describe(c)
+    const short = target?.kind === 'need' ? name : names.need
+    const prev = refusals.find((g) => g.key === words)
+    if (prev) prev.names.push(name)
+    // The rule's sentence mostly names the candidate already (D417).
+    else refusals.push({ key: words, text: words.includes(short) ? words : `${name}: ${words}`, names: [name] })
+  }
+  for (const g of refusals) {
+    if (g.names.length > 1) g.text = t(target?.kind === 'need' ? 'candidate.groupChannels' : 'candidate.groupNeeds', { count: g.names.length, text: g.key })
+  }
   const functionType = need ? wiring.functionTypeName(need.functionTypeId) : undefined
   const reason = candidates.data?.reason
   return (
@@ -149,17 +169,12 @@ export function ConnectDialog({ versionId, wiring, target, onOpenChange, onConne
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted">{t('connect.notPossible', { count: broken.length })}</p>
                 <ul className="space-y-1 text-sm text-muted">
-                  {broken.slice(0, shownProblems).map((c) => {
-                    const words = findingText(
-                      { code: c.problem!.code, params: c.problem!.params },
-                      { channel: wiring.channelText(c), need: wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId))), item: wiring.itemName(wiring.items.get(`${c.targetPlanId}/${c.targetItemId}`)) },
-                    )
-                    const name = describe(c)
-                    const short = target?.kind === 'need' ? name : wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId)))
-                    // The rule's sentence mostly names the candidate already (D417).
-                    return <li key={`${c.needId}/${c.targetItemId}/${c.outputKindId}/${c.channelNo}`}>{words.includes(short) ? words : `${name}: ${words}`}</li>
-                  })}
-                  {broken.length > shownProblems && <li>{t('connect.more', { count: broken.length - shownProblems })}</li>}
+                  {refusals.slice(0, shownProblems).map((g) => (
+                    <li key={g.key} title={g.names.length > 1 ? g.names.join('\n') : undefined}>
+                      {g.text}
+                    </li>
+                  ))}
+                  {refusals.length > shownProblems && <li>{t('connect.more', { count: refusals.length - shownProblems })}</li>}
                 </ul>
               </div>
             )}

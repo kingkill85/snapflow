@@ -197,6 +197,14 @@ describe('BoardEditorPage', () => {
           status: 'amber',
         },
       ],
+      findings: [
+        {
+          severity: 'error',
+          code: 'channel_overload_a',
+          refs: { targetPlanId: board.id, itemId: m, outputKindId: relayKind, channelNo: 1, connectionIds: [conn] },
+          params: { currentA: 17.39, voltage: 230, limitA: 16, utilisationPercent: 109 },
+        },
+      ],
     }
     serve(content({ modules: [{ id: m, rowId: row, offsetTe: 0, variantId: catalog[0].id, label: 'D1', existing: false, addonVariantIds: [], instanceValues: {}, widthTe: 2 }] }), project, wiring, checks)
     server.use(
@@ -226,14 +234,18 @@ describe('BoardEditorPage', () => {
     const user = userEvent.setup()
     const { router } = open(`?select=${m}`)
 
-    // Module badge (used = connected or taken by an alternative) and the header check.
-    expect(await screen.findByRole('button', { name: /D1, 2 TE, 3 of 4 channels used/ })).toBeInTheDocument()
+    // Module badge: physical channels only (the blind output is made of relays 1–2), used = connected or taken by an alternative.
+    expect(await screen.findByRole('button', { name: /D1, 2 TE, 2 of 3 channels used/ })).toBeInTheDocument()
     expect(await screen.findByTestId('board-check')).toHaveTextContent('Near limit')
 
     // The inspector shows the module's channels: native first, then alternatives.
     const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
     const channels = await within(inspector).findByRole('region', { name: 'Channels' })
     expect(within(channels).getByText('Relay output: 0 of 2 free')).toBeInTheDocument()
+    // A channel with an error from the checks is marked, with the finding's text.
+    const relay1 = within(channels).getByTestId(`channel-${relayKind}-1`)
+    expect(within(relay1).getByText('1 error')).toBeInTheDocument()
+    expect(within(relay1).getByText(/17\.39 A at 230 V connected, at most 16 A/)).toBeInTheDocument()
     // The deep link selected the module once and is removed from the URL (replace, D404).
     await waitFor(() => expect(router.state.location.search).toBe(''))
     expect(router.state.historyAction).toBe('REPLACE')

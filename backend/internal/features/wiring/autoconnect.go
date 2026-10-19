@@ -466,7 +466,7 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 		switch {
 		case !l.sawServing:
 			reason = ReasonNoChannelServes
-		case !l.sawFree:
+		case !l.sawFree && p.fitsSomewhereEmpty(l.n, roomFor, boardFor):
 			reason = ReasonNoFreeChannel
 		}
 		n := l.n
@@ -484,6 +484,19 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 	}
 	out.Checksum = checksum(sn.conns, out)
 	return out, p.made
+}
+
+// fitsSomewhereEmpty reports whether one unit of n would fit on some
+// serving channel if that channel's item were empty: without one, the need
+// is too large for every channel (limits_exceeded, D418), not short of
+// free channels.
+func (p *planner) fitsSomewhereEmpty(n *Need, roomFor func(*Need) *prefList, boardFor func(uuid.UUID) *prefList) bool {
+	for _, ch := range slices.Concat(roomFor(n).chans, boardFor(n.FunctionTypeID).chans) {
+		if p.st.fitsEmpty(n, ch) {
+			return true
+		}
+	}
+	return false
 }
 
 // lastChannel is the channel the last pick used: a new connection or a

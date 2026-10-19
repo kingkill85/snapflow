@@ -34,10 +34,20 @@
     "network_assignment_dangling": "{{item}} ist {{target}} zugeordnet",
     "unknown": "Prüfung {{code}}"
   },
+  "candidate": {
+    "channel_overload_w": "würde {{loadW}} W aufnehmen (höchstens {{limitW}} W)",
+    "channel_overload_w_mixed": "würde {{loadW}} W gemischter Lasten aufnehmen ({{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt)",
+    "channel_overload_a": "würde {{currentA}} A bei {{voltage}} V aufnehmen (höchstens {{limitA}} A)",
+    "channel_overload_a_mixed": "würde {{currentA}} A gemischter Lasten bei {{voltage}} V aufnehmen ({{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt)",
+    "module_overload_w": "{{item}} würde gesamt {{loadW}} W aufnehmen, {{loadType}} (höchstens {{limitW}} W)",
+    "module_overload_a": "{{item}} würde gesamt {{currentA}} A bei {{voltage}} V aufnehmen (höchstens {{limitA}} A)",
+    "groupChannels": "{{count}} Kanäle: {{text}}",
+    "groupNeeds": "{{count}} Bedarfe: {{text}}"
+  },
   "reason": {
     "no_channel_serves": "Kein Kanal bedient „{{functionType}}“",
     "no_free_channel": "Kein freier Kanal für „{{functionType}}“",
-    "limits_exceeded": "Kein freier Kanal passt (Leistung, Strom oder Motortyp)"
+    "limits_exceeded": "Zu groß für jeden verfügbaren Kanal (Leistung, Strom oder Motortyp)"
   },
   "fallback": {
     "need": "Ein Bedarf",

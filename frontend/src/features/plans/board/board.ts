@@ -334,7 +334,12 @@ export function boardPaletteProducts(variants: VariantSearchItem[], productTypeI
   return paletteProducts(variants.filter((v) => onBoard(v.capabilities) && enclosureSize(v.capabilities) === null), productTypeIds)
 }
 
-/** Used (holds a connection or a base channel taken by another channel) and total channels of an item. */
-export function channelUse(channels: Pick<ChannelInfo, 'connectionIds' | 'blocked'>[]) {
-  return { used: channels.filter((c) => c.connectionIds.length > 0 || c.blocked).length, total: channels.length }
+/**
+ * Used and total physical channels of an item: native channels only, since an alternative channel (e.g. a
+ * blind output of a relay pair) consumes base channels; a native channel is used when it holds a connection
+ * or an alternative made of it does (blocked).
+ */
+export function channelUse(channels: Pick<ChannelInfo, 'connectionIds' | 'blocked' | 'alternative'>[]) {
+  const physical = channels.filter((c) => !c.alternative)
+  return { used: physical.filter((c) => c.connectionIds.length > 0 || c.blocked).length, total: physical.length }
 }
