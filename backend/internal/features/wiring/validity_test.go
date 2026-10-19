@@ -13,12 +13,12 @@ import (
 // relays), function types light (circuit), socket (circuit), blind, and
 // load types led, halogen, ac_motor, dc_motor.
 type fixture struct {
-	cat                                  Catalog
-	dimmer, relay, blind                 uuid.UUID
-	light, socket, blindFn               uuid.UUID
-	led, halogen, acMotor, dcMotor       uuid.UUID
-	board                                uuid.UUID
-	floor                                uuid.UUID
+	cat                            Catalog
+	dimmer, relay, blind           uuid.UUID
+	light, socket, blindFn         uuid.UUID
+	led, halogen, acMotor, dcMotor uuid.UUID
+	board                          uuid.UUID
+	floor                          uuid.UUID
 }
 
 func newFixture() fixture {
@@ -41,7 +41,9 @@ func newFixture() fixture {
 
 func ptr[T any](v T) *T { return &v }
 
-func lim(lt *uuid.UUID, v float64) capabilities.Limit { return capabilities.Limit{LoadTypeID: lt, Value: v} }
+func lim(lt *uuid.UUID, v float64) capabilities.Limit {
+	return capabilities.Limit{LoadTypeID: lt, Value: v}
+}
 
 // dimmerCaps: 4 dimmer channels, 200 W LED / 300 W halogen, min 5 W.
 func (f fixture) dimmerCaps() capabilities.Capabilities {
@@ -60,8 +62,6 @@ func (f fixture) relayCaps() capabilities.Capabilities {
 
 type tcase struct {
 	name  string
-	needs []*Need
-	items []*Item
 	conns []*Conn
 	// want: codes expected (in any order); none = valid.
 	want []string
@@ -189,8 +189,13 @@ func TestValidity(t *testing.T) {
 			for _, c := range tc.conns {
 				st.remove(c)
 			}
-			if len(st.evaluate()) != 0 || len(st.phys) != len(st.phys) {
+			if len(st.evaluate()) != 0 {
 				t.Fatalf("problems left after removing")
+			}
+			for _, users := range st.phys {
+				if len(users) != 0 {
+					t.Fatalf("base channels still used: %v", st.phys)
+				}
 			}
 		})
 	}

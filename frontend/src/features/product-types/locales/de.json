@@ -26,6 +26,8 @@
     "systemSettings": "Systemeinstellungen",
     "defaultBusCurrentMa": "Standard-Busstrom",
     "defaultBusCurrentMaHint": "Angenommen für ein Busgerät ohne eigenen Wert (z. B. KNX 10 mA). Leer = unbekannt.",
+    "nominalVoltage": "Nennspannung",
+    "nominalVoltageHint": "Rechnet die Leistung von Bedarfen (W) in Strom (A) um, für Grenzen in A.",
     "reservePercent": "Reserve",
     "reservePercentHint": "Freizuhaltende Kapazität: gelb über 100 % − Reserve, rot bei Überschreitung.",
     "busDevicesMax": "Geräte pro Linie",

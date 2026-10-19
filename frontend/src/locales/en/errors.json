@@ -87,6 +87,26 @@
     "product_type_not_in_project": "The project does not use this system. Add it to the project first.",
     "devices_max_invalid": "Enter a number from 1 to {{max}} or leave it empty."
   },
+  "connection": {
+    "not_found": "This connection no longer exists.",
+    "changed": "The version was changed meanwhile. Reload and try again.",
+    "disconnect_target": "Choose a need or a channel to disconnect.",
+    "need_not_found": "This need no longer exists.",
+    "target_not_found": "This device is no longer on a plan of this version.",
+    "channel_not_found": "This device has no such channel.",
+    "function_not_served": "This channel cannot serve the need's function.",
+    "motor_mismatch": "The output drives {{motorType}} motors; the need has a {{needMotorType}} motor.",
+    "units_exceeded": "More units connected ({{units}}) than the need has ({{quantity}}).",
+    "channel_conflict": "This channel shares its outputs with another channel that is already in use.",
+    "circuit_not_allowed": "This channel can take only one unit: circuits are only allowed for needs of the same function that allows circuits.",
+    "channel_overload_w": "The channel is overloaded: {{loadW}} W of {{limitW}} W.",
+    "channel_overload_a": "The channel is overloaded: {{currentA}} A of {{limitA}} A.",
+    "module_overload_w": "The device is overloaded: {{loadW}} W of {{limitW}} W in total.",
+    "module_overload_a": "The device is overloaded: {{currentA}} A of {{limitA}} A in total."
+  },
+  "auto_connect": {
+    "changed": "The version changed since the preview. Preview again."
+  },
   "catalog_field": {
     "in_use": "Categories link the field \"{{key}}\": its key and type cannot change and it cannot be deleted.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",

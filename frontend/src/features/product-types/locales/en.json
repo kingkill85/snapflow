@@ -26,6 +26,8 @@
     "systemSettings": "System settings",
     "defaultBusCurrentMa": "Default bus current",
     "defaultBusCurrentMaHint": "Assumed for a bus device without its own value (e.g. KNX 10 mA). Empty = unknown.",
+    "nominalVoltage": "Nominal voltage",
+    "nominalVoltageHint": "Converts the power of needs (W) into current (A) for limits given in A.",
     "reservePercent": "Reserve",
     "reservePercentHint": "Capacity kept free: amber above 100 % − reserve, red when exceeded.",
     "busDevicesMax": "Devices per line",

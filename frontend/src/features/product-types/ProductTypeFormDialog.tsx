@@ -83,6 +83,10 @@ const schema = z.object({
     .regex(/^\d+$/, errorKey('validation.range', { min: 0, max: 90 }))
     .refine((v) => Number(v) <= 90, errorKey('validation.range', { min: 0, max: 90 })),
   busDevicesMax: optionalWhole(1, 100000),
+  nominalVoltage: z
+    .string()
+    .trim()
+    .refine((v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 1000, errorKey('validation.range', { min: 1, max: 1000 })),
   topology: z.enum(['bus', 'wireless', 'none']),
   defaultWirelessPlacesUsed: optionalWhole(1, 1000),
   isActive: z.boolean(),
@@ -90,7 +94,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 const fields = {
-  ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'defaultBusCurrentMa', 'reservePercent', 'busDevicesMax', 'topology', 'defaultWirelessPlacesUsed', 'isActive']),
+  ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'defaultBusCurrentMa', 'reservePercent', 'busDevicesMax', 'nominalVoltage', 'topology', 'defaultWirelessPlacesUsed', 'isActive']),
   ...translatableApiFields('name'),
 }
 
@@ -102,6 +106,7 @@ const toFormValues = (item: ProductType | null): FormValues => ({
   defaultBusCurrentMa: item?.defaultBusCurrentMa?.toString() ?? '',
   reservePercent: (item?.reservePercent ?? 20).toString(),
   busDevicesMax: item?.busDevicesMax?.toString() ?? '',
+  nominalVoltage: (item?.nominalVoltage ?? 230).toString(),
   topology: item?.topology ?? 'none',
   defaultWirelessPlacesUsed: item?.defaultWirelessPlacesUsed?.toString() ?? '',
   isActive: item?.isActive ?? true,
@@ -119,6 +124,7 @@ const toInput = (v: FormValues): ProductTypeInput => {
     defaultBusCurrentMa: Number(v.defaultBusCurrentMa.trim() || 0),
     reservePercent: Number(v.reservePercent.trim()),
     busDevicesMax: Number(v.busDevicesMax.trim() || 0),
+    nominalVoltage: Number(v.nominalVoltage.trim()),
     topology: v.topology,
     defaultWirelessPlacesUsed: Number(v.defaultWirelessPlacesUsed.trim() || 0),
     isActive: v.isActive,
@@ -312,6 +318,15 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
             required
             error={fieldError(errors.reservePercent?.message)}
             {...form.register('reservePercent')}
+          />
+          <Field
+            label={t('field.nominalVoltage')}
+            hint={t('field.nominalVoltageHint')}
+            suffix="V"
+            inputMode="numeric"
+            required
+            error={fieldError(errors.nominalVoltage?.message)}
+            {...form.register('nominalVoltage')}
           />
           {topology === 'bus' && (
             <Field

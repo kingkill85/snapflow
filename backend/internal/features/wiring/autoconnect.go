@@ -297,7 +297,7 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 func checksum(conns []store.Connection, p AutoConnectPreview) string {
 	h := sha256.New()
 	for _, c := range conns {
-		fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%s|%d;", c.ID, c.NeedPlanID, c.NeedID, c.Units, c.TargetPlanID, c.TargetItemID, c.OutputKindID, c.ChannelNo)
+		_, _ = fmt.Fprintf(h, "%s|%s|%s|%d|%s|%s|%s|%d;", c.ID, c.NeedPlanID, c.NeedID, c.Units, c.TargetPlanID, c.TargetItemID, c.OutputKindID, c.ChannelNo)
 	}
 	data, _ := json.Marshal(struct {
 		C []PlannedConnection

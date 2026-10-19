@@ -22,6 +22,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   name: { en: 'Zigbee', de: 'Zigbee' },
   sortOrder: 1,
   reservePercent: 20,
+  nominalVoltage: 230,
   topology: 'none',
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
@@ -30,7 +31,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   ...over,
 })
 
-const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb', topology: 'bus', defaultBusCurrentMa: 10, reservePercent: 25, busDevicesMax: 64 })
+const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb', topology: 'bus', defaultBusCurrentMa: 10, reservePercent: 25, busDevicesMax: 64, nominalVoltage: 110 })
 const beta = productType({
   id: '6f1c2b8e-0000-4000-8000-000000000002',
   key: 'knx',
@@ -156,6 +157,7 @@ describe('ProductTypesPage', () => {
       defaultBusCurrentMa: 0,
       reservePercent: 20,
       busDevicesMax: 0,
+      nominalVoltage: 230,
       topology: 'wireless',
       defaultWirelessPlacesUsed: 1,
       isActive: true,
@@ -286,6 +288,7 @@ describe('ProductTypesPage', () => {
       defaultBusCurrentMa: 10,
       reservePercent: 25,
       busDevicesMax: 64,
+      nominalVoltage: 110,
       topology: 'bus',
       defaultWirelessPlacesUsed: 0,
       isActive: true,

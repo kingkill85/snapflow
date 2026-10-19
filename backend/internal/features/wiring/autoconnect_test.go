@@ -70,11 +70,11 @@ func TestAutoConnect(t *testing.T) {
 	f := newFixture()
 	v := newVersion(f)
 	kitchen, living := v.zone("Kitchen"), v.zone("Living")
-	n1 := v.need(kitchen, f.light, 3, "50", &f.led)  // circuit on one dimmer channel (150 W)
-	n2 := v.need(kitchen, f.light, 2, "40", &f.led)  // joins the kitchen circuit until 200 W: 1 unit, then a new channel
+	n1 := v.need(kitchen, f.light, 3, "50", &f.led)    // circuit on one dimmer channel (150 W)
+	n2 := v.need(kitchen, f.light, 2, "40", &f.led)    // joins the kitchen circuit until 200 W: 1 unit, then a new channel
 	n3 := v.need(living, f.blindFn, 2, "", &f.acMotor) // two blind outputs from relay pairs
-	n4 := v.need(living, f.socket, 1, "100", nil)    // a relay (pair 1+2 and 3+4 are taken by blinds → none left)
-	v.need(living, uuid.New(), 1, "", nil)            // nothing serves it
+	n4 := v.need(living, f.socket, 1, "100", nil)      // a relay (pair 1+2 and 3+4 are taken by blinds → none left)
+	v.need(living, uuid.New(), 1, "", nil)             // nothing serves it
 	dim := v.module(f.dimmerCaps())
 	rel := v.module(f.relayCaps())
 

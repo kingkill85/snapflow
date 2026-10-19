@@ -25,6 +25,8 @@ export interface ProductTypeInput {
   key: string;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: ProductTypeInputName;
+  /** 1-1000 V; default 230; on update, left out keeps the stored value (D294) */
+  nominalVoltage?: number;
   /** 0-90; default 20; on update, left out keeps the stored value (D294) */
   reservePercent?: number;
   /** Default none; on update, left out keeps the stored value (D294) */
