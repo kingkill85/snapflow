@@ -19,6 +19,7 @@ const acme: Tenant = {
   createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-18T10:00:00Z',
   projectCount: 0,
+  letterhead: { companyName: '', address: '', phone: '', email: '', website: '', logoFileId: null, logoUrl: null },
   can: { update: true, delete: true },
 }
 

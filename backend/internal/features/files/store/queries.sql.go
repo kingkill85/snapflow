@@ -27,6 +27,18 @@ func (q *Queries) AddFileSource(ctx context.Context, arg AddFileSourceParams) er
 	return err
 }
 
+const contentInUse = `-- name: ContentInUse :one
+SELECT EXISTS (SELECT 1 FROM files WHERE sha256 = $1)
+`
+
+// ContentInUse reports whether any file (of any scope) has these contents.
+func (q *Queries) ContentInUse(ctx context.Context, sha256 string) (bool, error) {
+	row := q.db.QueryRow(ctx, contentInUse, sha256)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createFile = `-- name: CreateFile :one
 INSERT INTO files (tenant_id, sha256, content_type, size, width, height)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -67,6 +79,15 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, e
 		&i.TenantID,
 	)
 	return i, err
+}
+
+const deleteFiles = `-- name: DeleteFiles :exec
+DELETE FROM files WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteFiles(ctx context.Context, ids []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteFiles, ids)
+	return err
 }
 
 const fileBySource = `-- name: FileBySource :one
@@ -133,4 +154,36 @@ func (q *Queries) GetFile(ctx context.Context, id uuid.UUID) (File, error) {
 		&i.TenantID,
 	)
 	return i, err
+}
+
+const lockFiles = `-- name: LockFiles :many
+SELECT id, tenant_id, sha256 FROM files WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE
+`
+
+type LockFilesRow struct {
+	ID       uuid.UUID
+	TenantID *uuid.UUID
+	Sha256   string
+}
+
+// LockFiles locks files for a delete, so no row can start referencing them
+// (a foreign key check waits for the lock) until the delete commits.
+func (q *Queries) LockFiles(ctx context.Context, ids []uuid.UUID) ([]LockFilesRow, error) {
+	rows, err := q.db.Query(ctx, lockFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockFilesRow{}
+	for rows.Next() {
+		var i LockFilesRow
+		if err := rows.Scan(&i.ID, &i.TenantID, &i.Sha256); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

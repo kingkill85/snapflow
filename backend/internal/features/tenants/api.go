@@ -6,7 +6,32 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
+
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
+	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
+
+type letterheadOutput struct {
+	Body Letterhead
+}
+
+type letterheadInput struct {
+	ID   uuid.UUID `path:"id" format:"uuid"`
+	Body LetterheadInput
+}
+
+type logoForm struct {
+	Image huma.FormFile `form:"image" required:"true" doc:"JPEG, PNG or WebP image, at most 5 MB"`
+}
+
+type logoInput struct {
+	ID      uuid.UUID `path:"id" format:"uuid"`
+	RawBody huma.MultipartFormFiles[logoForm]
+}
+
+type fileOutput struct {
+	Body files.File
+}
 
 const tag = "tenants"
 
@@ -109,6 +134,56 @@ func Register(api huma.API, svc *Service) {
 		DefaultStatus: http.StatusNoContent,
 	}, func(ctx context.Context, in *idParam) (*struct{}, error) {
 		return nil, svc.Delete(ctx, in.ID)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getTenantLetterhead",
+		Method:      http.MethodGet,
+		Path:        "/api/tenants/{id}/letterhead",
+		Summary:     "Get a tenant's letterhead",
+		Description: "Admins for every tenant, a tenant admin for their own (tenants.profile).",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *idParam) (*letterheadOutput, error) {
+		l, err := svc.GetLetterhead(ctx, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return &letterheadOutput{Body: l}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "updateTenantLetterhead",
+		Method:      http.MethodPut,
+		Path:        "/api/tenants/{id}/letterhead",
+		Summary:     "Change a tenant's letterhead",
+		Description: "Replaces every field (empty clears). Admins for every tenant, a tenant admin for their own (tenants.profile).",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *letterheadInput) (*letterheadOutput, error) {
+		l, err := svc.UpdateLetterhead(ctx, in.ID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &letterheadOutput{Body: l}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "uploadTenantLogo",
+		Method:      http.MethodPost,
+		Path:        "/api/tenants/{id}/logo",
+		Summary:     "Upload a logo for a tenant's letterhead",
+		Description: "Multipart field `image` (JPEG, PNG or WebP, at most 5 MB); stored in the tenant's scope. Set it as " +
+			"the letterhead's logoFileId to use it.",
+		Tags:          []string{tag},
+		DefaultStatus: http.StatusCreated,
+		Middlewares:   huma.Middlewares{files.LimitUpload(auth.PermTenantsProfile, LogoMaxSize)},
+	}, func(ctx context.Context, in *logoInput) (*fileOutput, error) {
+		form := in.RawBody.Data()
+		defer func() { _ = form.Image.Close() }()
+		f, err := svc.UploadLogo(ctx, in.ID, form.Image)
+		if err != nil {
+			return nil, err
+		}
+		return &fileOutput{Body: f}, nil
 	})
 
 	huma.Register(api, huma.Operation{

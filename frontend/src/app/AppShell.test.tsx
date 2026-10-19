@@ -96,14 +96,14 @@ describe('AppShell', () => {
       'Administration',
     ])
     expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories', 'Product types', 'Function types', 'Import'])
-    expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Tenants', 'Roles'])
+    expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Tenants', 'Roles', 'Company profile'])
   })
 
   it('shows only what the role may open; a section with one page is a plain link', async () => {
     const user = userEvent.setup()
     renderWithProviders(routes, { me: tenantAdminMe })
     await screen.findByRole('navigation', { name: 'Main navigation' })
-    expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Roles'])
+    expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Roles', 'Company profile'])
   })
 
   it('links a single page of a section directly', async () => {
@@ -150,6 +150,7 @@ describe('AppShell', () => {
       'Users',
       'Tenants',
       'Roles',
+      'Company profile',
     ])
     await user.click(within(sheet).getByRole('link', { name: 'Products' }))
     expect(await screen.findByText('some page')).toBeInTheDocument()

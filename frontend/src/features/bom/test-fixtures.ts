@@ -114,6 +114,8 @@ const pricing = {
   servicesValue: '50',
   servicesLabel: { en: 'Programming', de: 'Programmierung' },
   servicesLabelDefault: { en: 'System design', de: 'Systemplanung' },
+  introText: {},
+  closingText: {},
   updatedAt: '2026-10-19T09:00:00Z',
 }
 

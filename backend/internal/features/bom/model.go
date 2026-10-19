@@ -160,6 +160,8 @@ type Pricing struct {
 	// ServicesLabelDefault is the label a version without a label of its own
 	// shows; a form sends {} for it, so the version keeps following the default.
 	ServicesLabelDefault i18n.Text `json:"servicesLabelDefault" doc:"The default services label; send servicesLabel {} to use it"`
+	IntroText            i18n.Text `json:"introText" doc:"Printed before the bill of materials of a proposal; {} for none"`
+	ClosingText          i18n.Text `json:"closingText" doc:"Printed after the totals of a proposal (closing terms); {} for none"`
 	// UpdatedAt is null while the version has the defaults.
 	UpdatedAt *time.Time `json:"updatedAt" nullable:"true" doc:"Send it back as expectedUpdatedAt"`
 }
@@ -171,6 +173,8 @@ type PricingInput struct {
 	ServicesKind  string    `json:"servicesKind" enum:"none,percent,amount"`
 	ServicesValue string    `json:"servicesValue,omitempty" doc:"Percent 0-100 or USD amount, at most 2 decimals; ignored for none"`
 	ServicesLabel i18n.Text `json:"servicesLabel,omitempty" doc:"Per locale, at most 200 characters; empty for the default label"`
+	IntroText     i18n.Text `json:"introText,omitempty" doc:"Per locale, at most 5000 characters; empty for none (en required otherwise)"`
+	ClosingText   i18n.Text `json:"closingText,omitempty" doc:"Per locale, at most 5000 characters; empty for none (en required otherwise)"`
 }
 
 // PricingUpdate is a pricing save.

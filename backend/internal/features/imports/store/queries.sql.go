@@ -701,6 +701,32 @@ func (q *Queries) ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
 	return exists, err
 }
 
+const referencedFiles = `-- name: ReferencedFiles :many
+SELECT DISTINCT file_id::uuid AS file_id FROM import_runs WHERE file_id = ANY($1::uuid[])
+`
+
+// ReferencedFiles returns those of the files that rows reference (the
+// files feature's reference check, D269).
+func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, referencedFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setRunPreview = `-- name: SetRunPreview :one
 UPDATE import_runs
 SET state = 'previewed', profile_id = $2, profile_name = $3, mapping = $4, all_or_nothing = $5,

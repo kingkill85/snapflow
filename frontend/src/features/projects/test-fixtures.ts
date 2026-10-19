@@ -37,6 +37,7 @@ export const tenant = (over: Partial<Tenant>): Tenant => ({
   createdAt: at,
   updatedAt: at,
   projectCount: 0,
+  letterhead: { companyName: '', address: '', phone: '', email: '', website: '', logoFileId: null, logoUrl: null },
   can: { update: true, delete: true },
   ...over,
 })

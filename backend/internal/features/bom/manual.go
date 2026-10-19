@@ -54,7 +54,8 @@ func manualLineOf(m store.VersionManualLine, items map[uuid.UUID]store.VersionIt
 		unit = money.MustParse(deref(m.UnitPrice))
 	}
 	total := money.LineTotal(unit, int64(m.Quantity))
-	l.UnitPrice, l.Total, l.Converted = money.USD(unit), money.USD(total), cur.convertLine(unit, total)
+	l.UnitPrice, l.Total = money.USD(unit), money.USD(total)
+	l.Converted, _ = cur.line(unit, int64(m.Quantity))
 	return l
 }
 

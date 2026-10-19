@@ -119,3 +119,8 @@ SELECT pp.plan_id, pp.id, pp.catalog_variant_id, (pp.variant_id IS NULL)::boolea
 FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
 WHERE p.version_id = $1
 ORDER BY pp.plan_id, pp.position;
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM plans WHERE image_file_id = ANY(sqlc.arg(ids)::uuid[]);

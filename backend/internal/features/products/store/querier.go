@@ -74,6 +74,9 @@ type Querier interface {
 	// that add-on replaces and add-on inserts take on them.
 	LockVariantIDs(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ProductExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	// SearchVariants is the add-on picker's list across the catalog, in catalog
 	// order (product type order, category order, model number, variant order):
 	// all variants without a search, else those whose product (as in

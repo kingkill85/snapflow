@@ -86,7 +86,7 @@ func serve(ctx context.Context) error {
 	}
 	router, _ := app.New(app.Deps{
 		DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}, TrustedProxies: cfg.TrustedProxies,
-		Storage: storage,
+		Storage: storage, ProposalGenerations: cfg.ProposalGenerations,
 	})
 	if cfg.StaticDir != "" {
 		httpserver.MountSPA(router, cfg.StaticDir)

@@ -44,6 +44,9 @@ type Querier interface {
 	PlanIDsForCopy(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanIDsOfVersion(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanVersion(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	SetLock(ctx context.Context, arg SetLockParams) error
 	// SetPlanOrder sets the positions to the order of ids (1..n).
 	SetPlanOrder(ctx context.Context, ids []uuid.UUID) error

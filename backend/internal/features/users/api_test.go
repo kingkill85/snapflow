@@ -354,7 +354,7 @@ func TestMe(t *testing.T) {
 	}
 	assertContains(t, resp.Body.String(),
 		`"tenantName":"Acme"`, `"role":"tenant_admin"`,
-		`"permissions":["catalog.read","projects.read","projects.write","projects.delete","users.manage"]`,
+		`"permissions":["catalog.read","projects.read","projects.write","projects.delete","users.manage","tenants.profile"]`,
 		`"assignableRoles":["tenant_admin","user"]`)
 
 	user := api.NewUser(api.NewTenant("Other"), auth.RoleUser)

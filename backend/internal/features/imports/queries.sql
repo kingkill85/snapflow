@@ -159,3 +159,8 @@ SELECT * FROM import_changes WHERE run_id = $1 ORDER BY seq;
 INSERT INTO import_lock (id, generation) VALUES (true, 1)
 ON CONFLICT (id) DO UPDATE SET generation = import_lock.generation + 1
 RETURNING generation;
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT file_id::uuid AS file_id FROM import_runs WHERE file_id = ANY(sqlc.arg(ids)::uuid[]);

@@ -61,6 +61,7 @@ export const errorParamNames = {
   'plan.placement_size': ['max'],
   'pricing.amount_range': ['max'],
   'pricing.percent_range': ['max'],
+  'proposal.exporter_unknown': ['exporters'],
   'plan.zone_points': ['min', 'max'],
   'product.model_number_taken': ['modelNumber'],
   'product_type.key_taken': ['key'],

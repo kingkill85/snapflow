@@ -4,16 +4,22 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { PricingInputClosingText } from './pricingInputClosingText';
 import type { PricingInputDiscountKind } from './pricingInputDiscountKind';
+import type { PricingInputIntroText } from './pricingInputIntroText';
 import type { PricingInputServicesKind } from './pricingInputServicesKind';
 import type { PricingInputServicesLabel } from './pricingInputServicesLabel';
 
 export interface PricingInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Per locale, at most 5000 characters; empty for none (en required otherwise) */
+  closingText?: PricingInputClosingText;
   discountKind: PricingInputDiscountKind;
   /** Percent 0-100 or USD amount, at most 2 decimals; ignored for none */
   discountValue?: string;
+  /** Per locale, at most 5000 characters; empty for none (en required otherwise) */
+  introText?: PricingInputIntroText;
   servicesKind: PricingInputServicesKind;
   /** Per locale, at most 200 characters; empty for the default label */
   servicesLabel?: PricingInputServicesLabel;

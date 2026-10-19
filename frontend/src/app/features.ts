@@ -1,7 +1,7 @@
 import { profileFeature } from '@/features/auth'
 import { functionTypesFeature } from '@/features/function-types'
 import { rolesFeature } from '@/features/roles'
-import { tenantsFeature } from '@/features/tenants'
+import { companyProfileFeature, tenantsFeature } from '@/features/tenants'
 import { usersFeature } from '@/features/users'
 import { categoriesFeature } from '@/features/categories'
 import { productTypesFeature } from '@/features/product-types'
@@ -21,6 +21,7 @@ export const features: FeatureModule[] = [
   functionTypesFeature,
   usersFeature,
   tenantsFeature,
+  companyProfileFeature,
   rolesFeature,
   profileFeature,
   productTypesFeature,

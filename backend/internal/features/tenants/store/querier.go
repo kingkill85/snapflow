@@ -19,8 +19,12 @@ type Querier interface {
 	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
 	GetTenants(ctx context.Context, ids []uuid.UUID) ([]Tenant, error)
 	ListTenants(ctx context.Context, includeArchived bool) ([]Tenant, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	// RestoreTenant takes a tenant out of the archive; it stays inactive.
 	RestoreTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	UpdateLetterhead(ctx context.Context, arg UpdateLetterheadParams) (Tenant, error)
 	// UpdateTenant changes a tenant; an archived one cannot be activated, also
 	// when it was archived after the caller read it (no row then).
 	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)

@@ -56,6 +56,9 @@ type Querier interface {
 	LockRun(ctx context.Context, id uuid.UUID) (ImportRun, error)
 	MaxIssueSeq(ctx context.Context, runID uuid.UUID) (int32, error)
 	ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	SetRunPreview(ctx context.Context, arg SetRunPreviewParams) (ImportRun, error)
 	SetRunState(ctx context.Context, arg SetRunStateParams) (ImportRun, error)
 	UpdateProfile(ctx context.Context, arg UpdateProfileParams) (ImportProfile, error)

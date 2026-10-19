@@ -195,6 +195,13 @@
     "not_found": "This version no longer exists.",
     "stale": "Someone else changed this version in the meantime. Reload it and make your changes again."
   },
+  "proposal": {
+    "empty": "The bill of materials of this version is empty; there is nothing to offer yet.",
+    "exporter_unknown": "This document format is not available ({{exporters}}).",
+    "not_found": "This proposal no longer exists.",
+    "product_type_not_in_bom": "This version has no items of this product type.",
+    "product_types_required": "Choose at least one product type."
+  },
   "request": {
     "bad": "The request was invalid.",
     "canceled": "The request was cancelled.",
@@ -212,6 +219,7 @@
     "archived": "This tenant is archived. Restore it before activating it.",
     "distributor_protected": "The distributor tenant cannot be deactivated or deleted.",
     "has_projects": "This archived tenant still has projects ({{count}}) and cannot be deleted.",
+    "logo_not_found": "This logo no longer exists. Upload it again.",
     "name_taken": "A tenant named \"{{name}}\" already exists.",
     "not_found": "This tenant no longer exists."
   },

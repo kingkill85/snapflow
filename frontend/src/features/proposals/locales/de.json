@@ -1,0 +1,37 @@
+{
+  "title": "Angebote",
+  "description": "Aus dieser Version erzeugte Dokumente für den Kunden. Jedes behält die Summen, mit denen es erstellt wurde.",
+  "create": "Angebot erstellen",
+  "empty": "Noch keine Angebote.",
+  "emptyHint": "Noch keine Angebote. Erstellen Sie eines aus der Stückliste dieser Version.",
+  "combined": "Gesamt",
+  "deletedUser": "Gelöschter Benutzer",
+  "download": "Herunterladen",
+  "created_one": "Angebot {{numbers}} erstellt; der Download wurde gestartet.",
+  "created_other": "{{count}} Angebote erstellt ({{numbers}}); sie werden nacheinander heruntergeladen.",
+  "downloadFallback_one": "Falls der Download nicht startet:",
+  "downloadFallback_other": "Falls ein Download nicht startet:",
+  "deleteTitle": "Angebot löschen",
+  "deleteMessage": "Angebot „{{number}}“ und seine Datei löschen? Die Nummer wird nicht erneut vergeben.",
+  "column": {
+    "number": "Nummer",
+    "createdAt": "Erstellt",
+    "type": "Dokument",
+    "language": "Sprache",
+    "grandTotal": "Gesamtsumme",
+    "createdBy": "Erstellt von"
+  },
+  "dialog": {
+    "title": "Angebot erstellen",
+    "format": "Format",
+    "documents": "Dokumente",
+    "combined": "Ein Gesamtangebot",
+    "split": "Ein Dokument je Produkttyp",
+    "splitHint": "Jedes Dokument enthält nur seinen Produkttyp. Freitextpositionen stehen nur im Gesamtangebot.",
+    "productTypes": "Produkttypen",
+    "noProductTypes": "Die Stückliste enthält keine Produkttypen.",
+    "preview": "Summen je Dokument",
+    "previewNone": "Die Summen erscheinen, sobald ein Produkttyp gewählt ist.",
+    "freeText": "Freitextpositionen (nur im Gesamtangebot): {{total}}"
+  }
+}

@@ -248,6 +248,38 @@ type ProjectVersion struct {
 	UpdatedAt time.Time
 }
 
+type Proposal struct {
+	ID                  uuid.UUID
+	TenantID            uuid.UUID
+	VersionID           uuid.UUID
+	Seq                 int32
+	Number              string
+	Exporter            string
+	Language            string
+	ProductTypeID       *uuid.UUID
+	ProductTypeName     *i18n.Text
+	FileID              uuid.UUID
+	FileName            string
+	Currency            string
+	ExchangeRate        string
+	Subtotal            string
+	Discount            string
+	Services            string
+	GrandTotal          string
+	ConvertedSubtotal   *string
+	ConvertedDiscount   *string
+	ConvertedServices   *string
+	ConvertedGrandTotal *string
+	CreatedBy           *uuid.UUID
+	CreatedAt           time.Time
+}
+
+type ProposalCounter struct {
+	VersionID uuid.UUID
+	TenantID  uuid.UUID
+	LastSeq   int32
+}
+
 type Session struct {
 	ID         uuid.UUID
 	TokenHash  []byte
@@ -265,6 +297,12 @@ type Tenant struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	ArchivedAt    *time.Time
+	CompanyName   string
+	Address       string
+	Phone         string
+	Email         string
+	Website       string
+	LogoFileID    *uuid.UUID
 }
 
 type User struct {
@@ -335,4 +373,6 @@ type VersionPricing struct {
 	ServicesValue string
 	ServicesLabel *i18n.Text
 	UpdatedAt     time.Time
+	IntroText     *i18n.Text
+	ClosingText   *i18n.Text
 }

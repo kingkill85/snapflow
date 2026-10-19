@@ -3,7 +3,8 @@
     "label": "Version contents",
     "plans": "Plans",
     "bom": "Bill of materials",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "proposals": "Proposals"
   },
   "bom": {
     "title": "Bill of materials",
@@ -98,7 +99,11 @@
     "previewPending": "Updating…",
     "previewInvalid": "The totals update once the values are valid.",
     "saved": "Pricing saved.",
-    "save": "Save"
+    "save": "Save",
+    "introText": "Introduction",
+    "introTextHint": "Printed on the proposal before the bill of materials.",
+    "closingText": "Closing text",
+    "closingTextHint": "Printed on the proposal after the totals, e.g. terms and validity."
   },
   "changes": {
     "title": "Update from catalog",

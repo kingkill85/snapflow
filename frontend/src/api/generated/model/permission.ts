@@ -19,5 +19,6 @@ export const Permission = {
   projectsdelete: 'projects.delete',
   usersmanage: 'users.manage',
   tenantsmanage: 'tenants.manage',
+  tenantsprofile: 'tenants.profile',
   tenantsaccess_all: 'tenants.access_all',
 } as const;

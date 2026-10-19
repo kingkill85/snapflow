@@ -4,7 +4,9 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { PricingClosingText } from './pricingClosingText';
 import type { PricingDiscountKind } from './pricingDiscountKind';
+import type { PricingIntroText } from './pricingIntroText';
 import type { PricingServicesKind } from './pricingServicesKind';
 import type { PricingServicesLabel } from './pricingServicesLabel';
 import type { PricingServicesLabelDefault } from './pricingServicesLabelDefault';
@@ -12,9 +14,13 @@ import type { PricingServicesLabelDefault } from './pricingServicesLabelDefault'
 export interface Pricing {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Printed after the totals of a proposal (closing terms); {} for none */
+  closingText: PricingClosingText;
   discountKind: PricingDiscountKind;
   /** Percent (0-100, 2 decimals) or USD amount */
   discountValue: string;
+  /** Printed before the bill of materials of a proposal; {} for none */
+  introText: PricingIntroText;
   servicesKind: PricingServicesKind;
   servicesLabel: PricingServicesLabel;
   /** The default services label; send servicesLabel {} to use it */

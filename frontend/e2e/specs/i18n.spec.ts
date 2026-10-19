@@ -9,7 +9,7 @@ test('switching to Deutsch translates the UI and survives a reload', async ({ pa
   expect(await navEntries(page)).toEqual({
     Projekte: ['Projekte'],
     Katalog: ['Produkte', 'Kategorien', 'Produkttypen', 'Funktionstypen', 'Import'],
-    Verwaltung: ['Benutzer', 'Mandanten', 'Rollen'],
+    Verwaltung: ['Benutzer', 'Mandanten', 'Rollen', 'Firmenprofil'],
   })
   await expect(page.getByRole('button', { name: 'Neuer Mandant' })).toBeVisible()
   await expect(accountButton(page)).toHaveAccessibleName(/^Konto: /)

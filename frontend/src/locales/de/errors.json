@@ -195,6 +195,13 @@
     "not_found": "Diese Version existiert nicht mehr.",
     "stale": "Jemand anderes hat diese Version inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
+  "proposal": {
+    "empty": "Die Stückliste dieser Version ist leer; es gibt noch nichts anzubieten.",
+    "exporter_unknown": "Dieses Dokumentformat ist nicht verfügbar ({{exporters}}).",
+    "not_found": "Dieses Angebot existiert nicht mehr.",
+    "product_type_not_in_bom": "Diese Version hat keine Positionen dieses Produkttyps.",
+    "product_types_required": "Wählen Sie mindestens einen Produkttyp."
+  },
   "request": {
     "bad": "Die Anfrage war ungültig.",
     "canceled": "Die Anfrage wurde abgebrochen.",
@@ -212,6 +219,7 @@
     "archived": "Dieser Mandant ist archiviert. Stellen Sie ihn wieder her, bevor Sie ihn aktivieren.",
     "distributor_protected": "Der Distributor-Mandant kann nicht deaktiviert oder gelöscht werden.",
     "has_projects": "Dieser archivierte Mandant hat noch Projekte ({{count}}) und kann nicht gelöscht werden.",
+    "logo_not_found": "Dieses Logo existiert nicht mehr. Bitte laden Sie es erneut hoch.",
     "name_taken": "Ein Mandant namens „{{name}}“ existiert bereits.",
     "not_found": "Dieser Mandant existiert nicht mehr."
   },

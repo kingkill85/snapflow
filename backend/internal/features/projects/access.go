@@ -44,6 +44,34 @@ type VersionCopier func(ctx context.Context, tx pgx.Tx, source, target VersionRe
 // requests.
 func (s *Service) OnCopyVersion(c VersionCopier) { s.copiers = append(s.copiers, c) }
 
+// VersionsDeleter runs in tx, the transaction that deletes versions (one
+// version or a whole project), before their rows and everything that
+// cascades with them go. It returns what to run once that transaction has
+// committed (nil: nothing), e.g. deleting files only the deleted rows
+// referenced (D269). A failure fails the delete.
+type VersionsDeleter func(ctx context.Context, tx pgx.Tx, versionIDs []uuid.UUID) (after func(context.Context), err error)
+
+// OnDeleteVersions registers a deleter; Delete and DeleteVersion run every
+// deleter. Call it while wiring the features, not concurrently with
+// requests.
+func (s *Service) OnDeleteVersions(d VersionsDeleter) { s.deleters = append(s.deleters, d) }
+
+// deleteVersions runs the deleters for versions in tx and returns what to
+// run after the commit.
+func (s *Service) deleteVersions(ctx context.Context, tx pgx.Tx, versionIDs []uuid.UUID) ([]func(context.Context), error) {
+	var after []func(context.Context)
+	for _, d := range s.deleters {
+		a, err := d(ctx, tx, versionIDs)
+		if err != nil {
+			return nil, err
+		}
+		if a != nil {
+			after = append(after, a)
+		}
+	}
+	return after, nil
+}
+
 // ReadVersion returns a version the caller may read (projects.read), in tx,
 // a transaction scoped to the caller (database.InScope). Versions of
 // projects the caller does not see are project_version.not_found.

@@ -56,9 +56,9 @@ func (q *Queries) CopyManualLines(ctx context.Context, arg CopyManualLinesParams
 
 const copyPricing = `-- name: CopyPricing :exec
 INSERT INTO version_pricing (version_id, tenant_id, discount_kind, discount_value, services_kind, services_value,
-    services_label, updated_at)
+    services_label, intro_text, closing_text, updated_at)
 SELECT $1::uuid, $2::uuid, discount_kind, discount_value, services_kind,
-    services_value, services_label, updated_at
+    services_value, services_label, intro_text, closing_text, updated_at
 FROM version_pricing WHERE version_id = $3::uuid
 `
 
@@ -110,7 +110,7 @@ func (q *Queries) GetManualLine(ctx context.Context, id uuid.UUID) (VersionManua
 
 const getPricing = `-- name: GetPricing :one
 
-SELECT version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at FROM version_pricing WHERE version_id = $1
+SELECT version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at, intro_text, closing_text FROM version_pricing WHERE version_id = $1
 `
 
 // Pricing ------------------------------------------------------------------
@@ -126,6 +126,8 @@ func (q *Queries) GetPricing(ctx context.Context, versionID uuid.UUID) (VersionP
 		&i.ServicesValue,
 		&i.ServicesLabel,
 		&i.UpdatedAt,
+		&i.IntroText,
+		&i.ClosingText,
 	)
 	return i, err
 }
@@ -374,7 +376,7 @@ func (q *Queries) LockManualLine(ctx context.Context, id uuid.UUID) (VersionManu
 }
 
 const lockPricing = `-- name: LockPricing :one
-SELECT version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at FROM version_pricing WHERE version_id = $1 FOR UPDATE
+SELECT version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at, intro_text, closing_text FROM version_pricing WHERE version_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockPricing(ctx context.Context, versionID uuid.UUID) (VersionPricing, error) {
@@ -389,8 +391,36 @@ func (q *Queries) LockPricing(ctx context.Context, versionID uuid.UUID) (Version
 		&i.ServicesValue,
 		&i.ServicesLabel,
 		&i.UpdatedAt,
+		&i.IntroText,
+		&i.ClosingText,
 	)
 	return i, err
+}
+
+const referencedFiles = `-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM version_items WHERE image_file_id = ANY($1::uuid[])
+`
+
+// ReferencedFiles returns those of the files that rows reference (the
+// files feature's reference check, D269).
+func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, referencedFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setManualLinePosition = `-- name: SetManualLinePosition :exec
@@ -514,13 +544,15 @@ func (q *Queries) UpdateManualLine(ctx context.Context, arg UpdateManualLinePara
 
 const upsertPricing = `-- name: UpsertPricing :one
 INSERT INTO version_pricing (version_id, tenant_id, discount_kind, discount_value, services_kind, services_value,
-    services_label)
+    services_label, intro_text, closing_text)
 VALUES ($1, $2, $3, $4,
-    $5, $6, $7)
+    $5, $6, $7, $8,
+    $9)
 ON CONFLICT (version_id) DO UPDATE SET discount_kind = excluded.discount_kind,
     discount_value = excluded.discount_value, services_kind = excluded.services_kind,
-    services_value = excluded.services_value, services_label = excluded.services_label, updated_at = now()
-RETURNING version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at
+    services_value = excluded.services_value, services_label = excluded.services_label,
+    intro_text = excluded.intro_text, closing_text = excluded.closing_text, updated_at = now()
+RETURNING version_id, tenant_id, discount_kind, discount_value, services_kind, services_value, services_label, updated_at, intro_text, closing_text
 `
 
 type UpsertPricingParams struct {
@@ -531,6 +563,8 @@ type UpsertPricingParams struct {
 	ServicesKind  string
 	ServicesValue string
 	ServicesLabel *i18n.Text
+	IntroText     *i18n.Text
+	ClosingText   *i18n.Text
 }
 
 func (q *Queries) UpsertPricing(ctx context.Context, arg UpsertPricingParams) (VersionPricing, error) {
@@ -542,6 +576,8 @@ func (q *Queries) UpsertPricing(ctx context.Context, arg UpsertPricingParams) (V
 		arg.ServicesKind,
 		arg.ServicesValue,
 		arg.ServicesLabel,
+		arg.IntroText,
+		arg.ClosingText,
 	)
 	var i VersionPricing
 	err := row.Scan(
@@ -553,6 +589,8 @@ func (q *Queries) UpsertPricing(ctx context.Context, arg UpsertPricingParams) (V
 		&i.ServicesValue,
 		&i.ServicesLabel,
 		&i.UpdatedAt,
+		&i.IntroText,
+		&i.ClosingText,
 	)
 	return i, err
 }

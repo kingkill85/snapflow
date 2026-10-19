@@ -218,10 +218,10 @@ func (o order) less(a, b store.VersionItem) int {
 	)
 }
 
-// currency is the conversion of a version's amounts (nil for USD).
+// currency is the conversion of a version's amounts (nil for USD): the
+// customer-facing amounts in the project currency (D267).
 type currency struct {
-	code string
-	rate money.Amount
+	money.Converter
 }
 
 func (st *state) currency() *currency { return currencyOf(st.ref) }
@@ -231,22 +231,25 @@ func currencyOf(ref projects.VersionRef) *currency {
 	if ref.Currency == "" || ref.Currency == "USD" {
 		return nil
 	}
-	return &currency{code: ref.Currency, rate: money.MustParse(ref.ExchangeRate)}
+	return &currency{money.Converter{Currency: ref.Currency, Rate: money.MustParse(ref.ExchangeRate)}}
 }
 
-// convertLine is a line's unit price and total in the project currency (nil for USD).
-func (c *currency) convertLine(unit, total money.Amount) *NullableConvertedLine {
+// line is a line's unit price and total in the project currency (nil for
+// USD) and the converted total (zero for USD).
+func (c *currency) line(unitUSD money.Amount, quantity int64) (*NullableConvertedLine, money.Amount) {
+	if c == nil {
+		return nil, money.Zero
+	}
+	total := c.LineTotal(unitUSD, quantity)
+	return &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: c.Format(c.Amount(unitUSD)), Total: c.Format(total)}}, total
+}
+
+// format formats an amount of the currency (nil for USD).
+func (c *currency) format(a money.Amount) *string {
 	if c == nil {
 		return nil
 	}
-	return &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *c.convert(unit), Total: *c.convert(total)}}
-}
-
-func (c *currency) convert(usd money.Amount) *string {
-	if c == nil {
-		return nil
-	}
-	s := money.Format(money.Convert(usd, c.rate, c.code), c.code)
+	s := c.Format(a)
 	return &s
 }
 
@@ -269,19 +272,20 @@ func (st *state) bom() BOM {
 		}
 		out.Plans = append(out.Plans, ref)
 	}
-	subtotal := money.Zero
+	// USD sums, and the same sums of the converted line totals.
+	subtotal, convSubtotal := money.Zero, money.Zero
 	var group *BOMGroup
-	var groupSum, catSum money.Amount
+	var groupSum, catSum, convGroupSum, convCatSum money.Amount
 	closeCat := func() {
 		if group != nil && len(group.Categories) > 0 {
 			c := &group.Categories[len(group.Categories)-1]
-			c.Subtotal, c.Converted = money.USD(catSum), cur.convert(catSum)
+			c.Subtotal, c.Converted = money.USD(catSum), cur.format(convCatSum)
 		}
 	}
 	closeGroup := func() {
 		closeCat()
 		if group != nil {
-			group.Subtotal, group.Converted = money.USD(groupSum), cur.convert(groupSum)
+			group.Subtotal, group.Converted = money.USD(groupSum), cur.format(convGroupSum)
 			out.Groups = append(out.Groups, *group)
 		}
 	}
@@ -302,29 +306,32 @@ func (st *state) bom() BOM {
 			UnitPrice: money.USD(unit), Quantity: a.total, Quantities: a.qty, Total: money.USD(total),
 			Status: &NullableLineStatus{LineStatus: status}, AddOnOf: a.addOnOf,
 		}
-		line.Converted = cur.convertLine(unit, total)
+		var conv money.Amount
+		line.Converted, conv = cur.line(unit, a.total)
+		convSubtotal = convSubtotal.Add(conv)
 		out.Lines = append(out.Lines, line)
 
 		if group == nil || group.ProductType.ID != it.ProductTypeID {
 			closeGroup()
 			pt := snapshotOf(ord.typeItem[it.ProductTypeID]).ProductType
 			group = &BOMGroup{Kind: "productType", ProductType: &NullableSnapshotProductType{SnapshotProductType: pt}, Categories: []BOMCategoryGroup{}, Lines: []string{}}
-			groupSum = money.Zero
+			groupSum, convGroupSum = money.Zero, money.Zero
 		}
 		if n := len(group.Categories); n == 0 || group.Categories[n-1].Category.ID != it.CategoryID {
 			closeCat()
 			group.Categories = append(group.Categories, BOMCategoryGroup{Category: snapshotOf(ord.catItem[it.CategoryID]).Category, Lines: []string{}})
-			catSum = money.Zero
+			catSum, convCatSum = money.Zero, money.Zero
 		}
 		c := &group.Categories[len(group.Categories)-1]
 		c.Lines = append(c.Lines, line.Key)
 		groupSum, catSum = groupSum.Add(total), catSum.Add(total)
+		convGroupSum, convCatSum = convGroupSum.Add(conv), convCatSum.Add(conv)
 	}
 	closeGroup()
 
 	// Free-text lines last, in their own group, in manual-line order.
 	var free *BOMGroup
-	freeSum := money.Zero
+	freeSum, convFreeSum := money.Zero, money.Zero
 	for _, m := range st.manual {
 		if m.VariantID != nil {
 			continue
@@ -338,7 +345,9 @@ func (st *state) bom() BOM {
 			Quantity: int64(m.Quantity), Total: money.USD(total), AddOnOf: []uuid.UUID{},
 			Quantities: LineQuantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}, Manual: int64(m.Quantity)},
 		}
-		line.Converted = cur.convertLine(unit, total)
+		var conv money.Amount
+		line.Converted, conv = cur.line(unit, int64(m.Quantity))
+		convSubtotal, convFreeSum = convSubtotal.Add(conv), convFreeSum.Add(conv)
 		out.Lines = append(out.Lines, line)
 		if free == nil {
 			free = &BOMGroup{Kind: "freeText", Categories: []BOMCategoryGroup{}, Lines: []string{}}
@@ -346,12 +355,12 @@ func (st *state) bom() BOM {
 		free.Lines = append(free.Lines, line.Key)
 	}
 	if free != nil {
-		free.Subtotal, free.Converted = money.USD(freeSum), cur.convert(freeSum)
+		free.Subtotal, free.Converted = money.USD(freeSum), cur.format(convFreeSum)
 		out.Groups = append(out.Groups, *free)
 	}
 
 	out.Pricing = st.pricingOut()
-	out.Totals = st.totals(subtotal, out.Pricing)
+	out.Totals = st.totals(subtotal, convSubtotal, out.Pricing)
 	return out
 }
 
@@ -372,28 +381,36 @@ func (st *state) grandTotal() money.Amount {
 }
 
 func computeTotals(subtotal money.Amount, p Pricing) money.Totals {
-	return money.Compute(subtotal,
-		money.Adjustment{Kind: money.Kind(p.DiscountKind), Value: money.MustParse(p.DiscountValue)},
-		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: money.MustParse(p.ServicesValue)})
+	return computeIn(money.USDConverter, subtotal, p)
 }
 
-func (st *state) totals(subtotal money.Amount, p Pricing) BOMTotals {
+func computeIn(c money.Converter, subtotal money.Amount, p Pricing) money.Totals {
+	discount, services := adjustments(p)
+	return c.Compute(subtotal, discount, services)
+}
+
+func adjustments(p Pricing) (discount, services money.Adjustment) {
+	return money.Adjustment{Kind: money.Kind(p.DiscountKind), Value: money.MustParse(p.DiscountValue)},
+		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: money.MustParse(p.ServicesValue)}
+}
+
+// totals are the version's totals: USD from the USD subtotal, and in the
+// project currency from the sum of the converted line totals (D267).
+func (st *state) totals(subtotal, convSubtotal money.Amount, p Pricing) BOMTotals {
 	t := computeTotals(subtotal, p)
 	out := BOMTotals{
-		BOMAmounts: BOMAmounts{
-			Subtotal: money.USD(t.Subtotal), Discount: money.USD(t.Discount),
-			Services: money.USD(t.Services), GrandTotal: money.USD(t.GrandTotal),
-		},
-		Currency: "USD", Rate: "1",
+		BOMAmounts: amountsOf(money.USDConverter, t),
+		Currency:   "USD", Rate: "1",
 	}
 	if st.ref.Currency != "" {
 		out.Currency, out.Rate = st.ref.Currency, money.MustParse(st.ref.ExchangeRate).String()
 	}
 	if cur := st.currency(); cur != nil {
-		out.Converted = &NullableBOMAmounts{BOMAmounts: BOMAmounts{
-			Subtotal: *cur.convert(t.Subtotal), Discount: *cur.convert(t.Discount),
-			Services: *cur.convert(t.Services), GrandTotal: *cur.convert(t.GrandTotal),
-		}}
+		out.Converted = &NullableBOMAmounts{BOMAmounts: amountsOf(cur.Converter, computeIn(cur.Converter, convSubtotal, p))}
 	}
 	return out
+}
+
+func amountsOf(c money.Converter, t money.Totals) BOMAmounts {
+	return BOMAmounts{Subtotal: c.Format(t.Subtotal), Discount: c.Format(t.Discount), Services: c.Format(t.Services), GrandTotal: c.Format(t.GrandTotal)}
 }

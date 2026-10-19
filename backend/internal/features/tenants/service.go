@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
@@ -30,6 +31,7 @@ type Tenant struct {
 	IsActive      bool         `json:"isActive" doc:"Users of an inactive tenant cannot log in"`
 	ArchivedAt    *time.Time   `json:"archivedAt,omitempty" doc:"Set while the tenant is archived: deleted, but kept for its projects"`
 	ProjectCount  int64        `json:"projectCount" doc:"Projects of the tenant: deleting a tenant with projects archives it"`
+	Letterhead    Letterhead   `json:"letterhead" doc:"Printed on the tenant's proposals; change it with PUT /api/tenants/{id}/letterhead"`
 	CreatedAt     time.Time    `json:"createdAt"`
 	UpdatedAt     time.Time    `json:"updatedAt"`
 	Can           auth.Actions `json:"can"`
@@ -50,6 +52,7 @@ type ProjectCounter interface {
 type Service struct {
 	q        store.Querier
 	projects ProjectCounter
+	files    *files.Service
 }
 
 func NewService(q store.Querier) *Service {
@@ -291,7 +294,7 @@ func mapErr(err error, name string) error {
 func fromRow(r store.Tenant) Tenant {
 	return Tenant{
 		ID: r.ID, Name: r.Name, IsDistributor: r.IsDistributor, IsActive: r.IsActive, ArchivedAt: r.ArchivedAt,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Letterhead: letterheadOf(r),
 		Can: auth.Actions{Update: true, Delete: !r.IsDistributor},
 	}
 }

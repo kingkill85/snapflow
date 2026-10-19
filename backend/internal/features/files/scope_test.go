@@ -8,7 +8,6 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
-	filesstore "github.com/kingkill85/snapflow/backend/internal/features/files/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
@@ -21,7 +20,7 @@ func TestScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := files.NewService(filesstore.New(api.DB), storage)
+	svc := files.NewService(api.DB, storage)
 	acme := api.NewTenant("Acme")
 	other := api.NewTenant("Other")
 	acmeUser := api.NewUser(acme, auth.RoleUser)

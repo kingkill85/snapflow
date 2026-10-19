@@ -63,3 +63,20 @@ func onOff(b bool) string {
 	}
 	return "off"
 }
+
+// InAllTenants runs fn in one transaction (InTx) that sees the rows of every
+// tenant: app.access_all is on, the role stays the connection's own. It is
+// for system work that must not miss another tenant's rows, such as the
+// files feature asking every feature whether a file is still referenced
+// (D269). Never use it for data a caller asked for: that is InScope.
+func InAllTenants(ctx context.Context, db Beginner, opts pgx.TxOptions, fn func(pgx.Tx) error) error {
+	if _, nested := db.(*Nested); nested {
+		return ErrScopeNested
+	}
+	return InTx(ctx, db, opts, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.access_all', 'on', true)`); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
+}

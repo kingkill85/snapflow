@@ -5,7 +5,7 @@ test('a demoted tenant admin loses user management on their next action', async 
   const tenantAdmin = await api.createUser({ role: 'tenant_admin' })
   const theirPage = await sessionFor(tenantAdmin)
   await theirPage.goto('/admin/users')
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles', 'Company profile'] })
   // They start creating a user...
   await theirPage.getByRole('button', { name: 'New user' }).click()
   const theirDialog = theirPage.getByRole('dialog', { name: 'New user' })
@@ -41,5 +41,5 @@ test('a promoted user gets user management after a reload', async ({ page, api, 
   await expect(dialog).toBeHidden()
 
   await theirPage.reload()
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles', 'Company profile'] })
 })

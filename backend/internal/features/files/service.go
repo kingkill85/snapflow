@@ -4,8 +4,9 @@
 // scope (D79): the catalog, readable by every logged-in user, or one tenant,
 // readable only by that tenant and callers with tenants.access_all (others
 // get 404). The same bytes give one file per scope. Other features reference
-// files by id and check them with Exists in their scope; unreferenced files
-// are kept (a cleanup job comes later).
+// files by id and check them with Exists in their scope and register a
+// Referencer, so DeleteIfUnreferenced can delete a tenant file nothing
+// references any more (D269); other unreferenced files are kept (D58).
 package files
 
 import (
@@ -116,9 +117,20 @@ type File struct {
 	CreatedAt   time.Time  `json:"createdAt"`
 }
 
+// DB is the database the service runs on; *pgxpool.Pool implements it.
+type DB interface {
+	store.DBTX
+	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
+}
+
 type Service struct {
+	// db starts the transactions of DeleteIfUnreferenced; q may be bound to
+	// a caller's transaction (WithTx).
+	db      DB
 	q       store.Querier
 	storage *Storage
+	// referencers are asked whether files are referenced (OnReferences).
+	referencers *[]Referencer
 	// decoding holds DecodeBudget bytes; every image decode acquires its
 	// decodeCost first.
 	decoding *semaphore.Weighted
@@ -126,8 +138,9 @@ type Service struct {
 
 // NewService returns the service; storage may be nil when the API is only
 // built to export the OpenAPI document.
-func NewService(q store.Querier, storage *Storage) *Service {
-	return &Service{q: q, storage: storage, decoding: semaphore.NewWeighted(DecodeBudget)}
+func NewService(db DB, storage *Storage) *Service {
+	return &Service{db: db, q: store.New(db), storage: storage, referencers: &[]Referencer{},
+		decoding: semaphore.NewWeighted(DecodeBudget)}
 }
 
 // WithTx returns the service working inside tx, so Exists and foreign keys
@@ -135,7 +148,7 @@ func NewService(q store.Querier, storage *Storage) *Service {
 // and the decode budget. Contents written before a rollback stay on disk,
 // unreferenced, like any unreferenced file.
 func (s *Service) WithTx(tx pgx.Tx) *Service {
-	return &Service{q: store.New(tx), storage: s.storage, decoding: s.decoding}
+	return &Service{db: s.db, q: store.New(tx), storage: s.storage, referencers: s.referencers, decoding: s.decoding}
 }
 
 // Upload stores an image (JPEG, PNG or WebP, by magic bytes, at most
@@ -248,6 +261,12 @@ func (s *Service) put(ctx context.Context, scope Scope, data []byte, contentType
 	})
 	if err != nil {
 		return File{}, err
+	}
+	// DeleteIfUnreferenced may have removed the same contents of a deleted
+	// file between the first Put and the row; with the row in place they
+	// stay, so storing them again (a no-op when present) closes that gap.
+	if err := s.storage.Put(hexSum, data); err != nil {
+		return File{}, fmt.Errorf("files: store: %w", err)
 	}
 	return fromRow(row), nil
 }

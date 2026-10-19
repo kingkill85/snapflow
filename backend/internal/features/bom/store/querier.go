@@ -29,6 +29,9 @@ type Querier interface {
 	ListManualLines(ctx context.Context, versionID uuid.UUID) ([]VersionManualLine, error)
 	LockManualLine(ctx context.Context, id uuid.UUID) (VersionManualLine, error)
 	LockPricing(ctx context.Context, versionID uuid.UUID) (VersionPricing, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	SetManualLinePosition(ctx context.Context, arg SetManualLinePositionParams) error
 	// UpdateItem re-snapshots a variant ("Update from catalog").
 	UpdateItem(ctx context.Context, arg UpdateItemParams) (int64, error)

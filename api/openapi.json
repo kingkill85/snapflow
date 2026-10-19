@@ -1099,6 +1099,40 @@
         ],
         "type": "object"
       },
+      "ExporterInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "fileExtension": {
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Display name per content language",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "fileExtension",
+          "contentType"
+        ],
+        "type": "object"
+      },
       "FieldError": {
         "additionalProperties": false,
         "properties": {
@@ -1293,6 +1327,43 @@
         },
         "required": [
           "items"
+        ],
+        "type": "object"
+      },
+      "GenerateInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/GenerateInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "exporter": {
+            "description": "An exporter key (GET /api/exporters)",
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "productTypeIds": {
+            "description": "Split: the product types (each must have lines in the BOM); ignored otherwise",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "split": {
+            "description": "One document per product type in productTypeIds instead of one combined proposal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "exporter"
         ],
         "type": "object"
       },
@@ -2567,6 +2638,103 @@
         ],
         "type": "object"
       },
+      "Letterhead": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Letterhead.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "description": "May have several lines",
+            "type": "string"
+          },
+          "companyName": {
+            "description": "Empty: the tenant name is printed",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "logoFileId": {
+            "description": "An image of the tenant's scope (POST /api/tenants/{id}/logo); null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "logoUrl": {
+            "description": "Download path of the logo; null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "companyName",
+          "address",
+          "phone",
+          "email",
+          "website",
+          "logoFileId",
+          "logoUrl"
+        ],
+        "type": "object"
+      },
+      "LetterheadInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/LetterheadInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "description": "At most 500 characters, may have several lines",
+            "type": "string"
+          },
+          "companyName": {
+            "description": "At most 200 characters",
+            "type": "string"
+          },
+          "email": {
+            "description": "A valid email address or empty",
+            "type": "string"
+          },
+          "logoFileId": {
+            "description": "An uploaded logo of this tenant, null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "description": "At most 50 characters",
+            "type": "string"
+          },
+          "website": {
+            "description": "At most 200 characters",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "LineQuantities": {
         "additionalProperties": false,
         "properties": {
@@ -2953,6 +3121,30 @@
           "null"
         ]
       },
+      "NullableFreeTextShare": {
+        "additionalProperties": false,
+        "properties": {
+          "converted": {
+            "description": "In the project currency; null for USD projects",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grandTotal": {
+            "description": "USD",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grandTotal",
+          "converted"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "NullableItemSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -3064,6 +3256,28 @@
           "null"
         ]
       },
+      "NullableProposalProductType": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "NullableSnapshotProductType": {
         "additionalProperties": false,
         "properties": {
@@ -3160,6 +3374,7 @@
           "projects.delete",
           "users.manage",
           "tenants.manage",
+          "tenants.profile",
           "tenants.access_all"
         ],
         "type": "string"
@@ -3703,6 +3918,48 @@
         ],
         "type": "object"
       },
+      "PreviewDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "productType": {
+            "$ref": "#/components/schemas/NullableProposalProductType",
+            "description": "Null for the combined proposal"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/BOMTotals"
+          }
+        },
+        "required": [
+          "productType",
+          "totals"
+        ],
+        "type": "object"
+      },
+      "PreviewInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PreviewInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "productTypeIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "split": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "Pricing": {
         "additionalProperties": false,
         "properties": {
@@ -3715,6 +3972,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "closingText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Printed after the totals of a proposal (closing terms); {} for none",
+            "type": "object"
+          },
           "discountKind": {
             "enum": [
               "none",
@@ -3726,6 +3990,13 @@
           "discountValue": {
             "description": "Percent (0-100, 2 decimals) or USD amount",
             "type": "string"
+          },
+          "introText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Printed before the bill of materials of a proposal; {} for none",
+            "type": "object"
           },
           "servicesKind": {
             "enum": [
@@ -3768,6 +4039,8 @@
           "servicesValue",
           "servicesLabel",
           "servicesLabelDefault",
+          "introText",
+          "closingText",
           "updatedAt"
         ],
         "type": "object"
@@ -3784,6 +4057,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "closingText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 5000 characters; empty for none (en required otherwise)",
+            "type": "object"
+          },
           "discountKind": {
             "enum": [
               "none",
@@ -3795,6 +4075,13 @@
           "discountValue": {
             "description": "Percent 0-100 or USD amount, at most 2 decimals; ignored for none",
             "type": "string"
+          },
+          "introText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 5000 characters; empty for none (en required otherwise)",
+            "type": "object"
           },
           "servicesKind": {
             "enum": [
@@ -3834,6 +4121,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "closingText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 5000 characters; empty for none (en required otherwise)",
+            "type": "object"
+          },
           "discountKind": {
             "enum": [
               "none",
@@ -3853,6 +4147,13 @@
               "string",
               "null"
             ]
+          },
+          "introText": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 5000 characters; empty for none (en required otherwise)",
+            "type": "object"
           },
           "servicesKind": {
             "enum": [
@@ -5108,6 +5409,136 @@
         ],
         "type": "object"
       },
+      "Proposal": {
+        "additionalProperties": false,
+        "properties": {
+          "can": {
+            "$ref": "#/components/schemas/ProposalActions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdByName": {
+            "description": "Full name or email; empty when the user was deleted",
+            "type": "string"
+          },
+          "downloadUrl": {
+            "description": "GET it to download the file",
+            "type": "string"
+          },
+          "exporter": {
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "fileName": {
+            "examples": [
+              "2026-0007-V2-03 Villa Sommer.docx"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "language": {
+            "description": "The project's language when it was generated",
+            "examples": [
+              "de"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "description": "\u003cproject number\u003e-\u003cversion name\u003e-\u003csequence\u003e; split documents add the product type abbreviation",
+            "examples": [
+              "2026-0007-V2-03"
+            ],
+            "type": "string"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/NullableProposalProductType",
+            "description": "The product type of a split document; null for the combined proposal"
+          },
+          "sequence": {
+            "description": "Per version; the documents of one split run share it",
+            "format": "int32",
+            "type": "integer"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/BOMTotals",
+            "description": "The totals printed in the document (USD and converted)"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "number",
+          "sequence",
+          "exporter",
+          "language",
+          "productType",
+          "fileName",
+          "downloadUrl",
+          "totals",
+          "createdBy",
+          "createdByName",
+          "createdAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ProposalActions": {
+        "additionalProperties": false,
+        "properties": {
+          "delete": {
+            "description": "projects.delete",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "delete"
+        ],
+        "type": "object"
+      },
+      "ProposalPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProposalPreview.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewDocument"
+            },
+            "type": "array"
+          },
+          "freeText": {
+            "$ref": "#/components/schemas/NullableFreeTextShare",
+            "description": "Split runs of a version with free-text lines: their share (combined proposal only); null otherwise"
+          }
+        },
+        "required": [
+          "documents",
+          "freeText"
+        ],
+        "type": "object"
+      },
       "RequiredAddon": {
         "additionalProperties": false,
         "properties": {
@@ -5287,6 +5718,10 @@
             "description": "The one tenant that runs SnapFlow; home of the admins",
             "type": "boolean"
           },
+          "letterhead": {
+            "$ref": "#/components/schemas/Letterhead",
+            "description": "Printed on the tenant's proposals; change it with PUT /api/tenants/{id}/letterhead"
+          },
           "name": {
             "type": "string"
           },
@@ -5306,6 +5741,7 @@
           "isDistributor",
           "isActive",
           "projectCount",
+          "letterhead",
           "createdAt",
           "updatedAt",
           "can"
@@ -6313,6 +6749,40 @@
         "summary": "Update a category",
         "tags": [
           "categories"
+        ]
+      }
+    },
+    "/api/exporters": {
+      "get": {
+        "operationId": "listExporters",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExporterInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the document formats",
+        "tags": [
+          "proposals"
         ]
       }
     },
@@ -9248,6 +9718,87 @@
         ]
       }
     },
+    "/api/proposals/{id}": {
+      "delete": {
+        "description": "Needs projects.delete; also on completed or cancelled projects.",
+        "operationId": "deleteProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{id}/file": {
+      "get": {
+        "description": "As an attachment named `\u003cnumber\u003e \u003cproject name\u003e.\u003cextension\u003e`.",
+        "operationId": "downloadProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Download a proposal's file",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
     "/api/roles": {
       "get": {
         "operationId": "getRoleMatrix",
@@ -9482,6 +10033,169 @@
           }
         },
         "summary": "Update a tenant",
+        "tags": [
+          "tenants"
+        ]
+      }
+    },
+    "/api/tenants/{id}/letterhead": {
+      "get": {
+        "description": "Admins for every tenant, a tenant admin for their own (tenants.profile).",
+        "operationId": "getTenantLetterhead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letterhead"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a tenant's letterhead",
+        "tags": [
+          "tenants"
+        ]
+      },
+      "put": {
+        "description": "Replaces every field (empty clears). Admins for every tenant, a tenant admin for their own (tenants.profile).",
+        "operationId": "updateTenantLetterhead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LetterheadInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letterhead"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change a tenant's letterhead",
+        "tags": [
+          "tenants"
+        ]
+      }
+    },
+    "/api/tenants/{id}/logo": {
+      "post": {
+        "description": "Multipart field `image` (JPEG, PNG or WebP, at most 5 MB); stored in the tenant's scope. Set it as the letterhead's logoFileId to use it.",
+        "operationId": "uploadTenantLogo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "image": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "image": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": "JPEG, PNG or WebP image, at most 5 MB",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "image"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Upload a logo for a tenant's letterhead",
         "tags": [
           "tenants"
         ]
@@ -10547,6 +11261,158 @@
         "summary": "Totals for unsaved pricing values",
         "tags": [
           "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/proposals": {
+      "get": {
+        "description": "Newest first.",
+        "operationId": "listProposals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the proposals of a version",
+        "tags": [
+          "proposals"
+        ]
+      },
+      "post": {
+        "description": "One combined proposal, or with split one per product type in productTypeIds (free-text lines only in the combined one). Also on completed or cancelled projects. Needs projects.write. Errors: 422 proposal.exporter_unknown, proposal.empty, proposal.product_types_required, proposal.product_type_not_in_bom.",
+        "operationId": "generateProposals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Generate proposals of a version",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/proposals/preview": {
+      "post": {
+        "operationId": "previewProposals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalPreview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Preview the totals of the documents a generation would write",
+        "tags": [
+          "proposals"
         ]
       }
     }

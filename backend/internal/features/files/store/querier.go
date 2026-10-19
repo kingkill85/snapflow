@@ -12,10 +12,13 @@ import (
 
 type Querier interface {
 	AddFileSource(ctx context.Context, arg AddFileSourceParams) error
+	// ContentInUse reports whether any file (of any scope) has these contents.
+	ContentInUse(ctx context.Context, sha256 string) (bool, error)
 	// CreateFile stores a file's metadata in its scope (tenant_id NULL: the
 	// catalog), or returns the existing row when the same bytes were stored in
 	// that scope before (the no-op update makes RETURNING see it).
 	CreateFile(ctx context.Context, arg CreateFileParams) (File, error)
+	DeleteFiles(ctx context.Context, ids []uuid.UUID) error
 	// FileBySource returns the file an uploaded image became (file_sources) in
 	// a scope, by the SHA-256 of the uploaded bytes.
 	FileBySource(ctx context.Context, arg FileBySourceParams) (File, error)
@@ -23,6 +26,9 @@ type Querier interface {
 	// catalog).
 	FileExists(ctx context.Context, arg FileExistsParams) (bool, error)
 	GetFile(ctx context.Context, id uuid.UUID) (File, error)
+	// LockFiles locks files for a delete, so no row can start referencing them
+	// (a foreign key check waits for the lock) until the delete commits.
+	LockFiles(ctx context.Context, ids []uuid.UUID) ([]LockFilesRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

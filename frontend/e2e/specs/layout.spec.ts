@@ -22,6 +22,7 @@ const pages = [
   { name: 'tenants', path: '/admin/tenants', heading: 'Tenants' },
   { name: 'roles', path: '/admin/roles', heading: 'Roles' },
   { name: 'profile', path: '/profile', heading: 'Profile' },
+  { name: 'company-profile', path: '/admin/company', heading: 'Company profile' },
 ]
 
 const viewports = [

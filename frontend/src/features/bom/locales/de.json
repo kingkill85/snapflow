@@ -3,7 +3,8 @@
     "label": "Inhalt der Version",
     "plans": "Pläne",
     "bom": "Stückliste",
-    "pricing": "Preise"
+    "pricing": "Preise",
+    "proposals": "Angebote"
   },
   "bom": {
     "title": "Stückliste",
@@ -98,7 +99,11 @@
     "previewPending": "Wird aktualisiert …",
     "previewInvalid": "Die Summen werden aktualisiert, sobald die Werte gültig sind.",
     "saved": "Preise gespeichert.",
-    "save": "Speichern"
+    "save": "Speichern",
+    "introText": "Einleitung",
+    "introTextHint": "Steht im Angebot vor der Stückliste.",
+    "closingText": "Schlusstext",
+    "closingTextHint": "Steht im Angebot nach den Summen, z. B. Bedingungen und Gültigkeit."
   },
   "changes": {
     "title": "Aus dem Katalog aktualisieren",

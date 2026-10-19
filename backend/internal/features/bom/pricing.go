@@ -26,9 +26,24 @@ var maxAmount = money.MustParse("9999999999.99")
 
 const maxLabelLength = 200
 
+// maxTextLength bounds the introduction and closing texts.
+const maxTextLength = 5000
+
+// textOrEmpty is a stored optional text, {} for none.
+func textOrEmpty(t *i18n.Text) i18n.Text {
+	if t == nil {
+		return i18n.Text{}
+	}
+	return *t
+}
+
 func (st *state) pricingOut() Pricing {
 	if st.pricing == nil {
-		return Pricing{DiscountKind: "none", DiscountValue: "0.00", ServicesKind: "none", ServicesValue: "0.00", ServicesLabel: DefaultServicesLabel, ServicesLabelDefault: DefaultServicesLabel}
+		return Pricing{
+			DiscountKind: "none", DiscountValue: "0.00", ServicesKind: "none", ServicesValue: "0.00",
+			ServicesLabel: DefaultServicesLabel, ServicesLabelDefault: DefaultServicesLabel,
+			IntroText: i18n.Text{}, ClosingText: i18n.Text{},
+		}
 	}
 	p := st.pricing
 	label := DefaultServicesLabel
@@ -40,6 +55,7 @@ func (st *state) pricingOut() Pricing {
 		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
 		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)),
 		ServicesLabel: label, ServicesLabelDefault: DefaultServicesLabel, UpdatedAt: &at,
+		IntroText: textOrEmpty(p.IntroText), ClosingText: textOrEmpty(p.ClosingText),
 	}
 }
 
@@ -83,6 +99,19 @@ func validPricing(in PricingInput) (store.UpsertPricingParams, error) {
 		}
 		out.ServicesLabel = &label
 	}
+	text := func(loc string, t i18n.Text) *i18n.Text {
+		t = t.Trimmed()
+		if len(t) == 0 {
+			return nil
+		}
+		errs = append(errs, t.Check(loc, maxTextLength)...)
+		if !t.Valid() {
+			errs = append(errs, apperr.Field(loc+".en", "validation.required", "the English text is required"))
+		}
+		return &t
+	}
+	out.IntroText = text("body.introText", in.IntroText)
+	out.ClosingText = text("body.closingText", in.ClosingText)
 	if len(errs) > 0 {
 		return out, apperr.Validation(errs...)
 	}
@@ -99,6 +128,7 @@ func pricingOf(p store.UpsertPricingParams) Pricing {
 		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
 		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)), ServicesLabel: label,
 		ServicesLabelDefault: DefaultServicesLabel,
+		IntroText:            textOrEmpty(p.IntroText), ClosingText: textOrEmpty(p.ClosingText),
 	}
 }
 
@@ -162,7 +192,11 @@ func (s *Service) PreviewPricing(ctx context.Context, versionID uuid.UUID, in Pr
 		return BOMTotals{}, err
 	}
 	b := st.bom()
-	return st.totals(money.MustParse(b.Totals.Subtotal), pricingOf(params)), nil
+	conv := money.Zero
+	if c := b.Totals.Converted; c != nil {
+		conv = money.MustParse(c.Subtotal)
+	}
+	return st.totals(money.MustParse(b.Totals.Subtotal), conv, pricingOf(params)), nil
 }
 
 func errPricingStale() *apperr.Error {
