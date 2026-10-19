@@ -61,6 +61,8 @@
     "newName": "Zone",
     "zone": "Zone",
     "name": "Name",
+    "shortName": "Short name",
+    "shortNameHint": "Up to 12 characters, used on channel labels. Empty: derived from the name.",
     "palette": "Colour",
     "useColor": "Use colour {{color}}",
     "color": "Custom colour",

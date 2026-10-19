@@ -343,14 +343,15 @@ type PlanPlacement struct {
 }
 
 type PlanZone struct {
-	PlanID   uuid.UUID
-	ID       uuid.UUID
-	TenantID uuid.UUID
-	Name     string
-	Color    string
-	Opacity  float64
-	Points   []byte
-	Position int32
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Name      string
+	Color     string
+	Opacity   float64
+	Points    []byte
+	Position  int32
+	ShortName string
 }
 
 type Product struct {

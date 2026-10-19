@@ -115,6 +115,11 @@ describe('Inspector', () => {
       expect(name).toHaveValue('Kitchen')
       expect(lastChange(spy)).toEqual({ type: 'change', action: { type: 'updateZones', changes: [{ id: z.id, patch: { name: 'Kitchen' } }] }, key: `${z.id}:name` })
 
+      const short = screen.getByLabelText(/^Short name/)
+      expect(short).toHaveAttribute('maxlength', '12')
+      await user.type(short, 'Kit')
+      expect(lastChange(spy)).toEqual({ type: 'change', action: { type: 'updateZones', changes: [{ id: z.id, patch: { shortName: 'Kit' } }] }, key: `${z.id}:shortName` })
+
       await user.click(screen.getByRole('button', { name: 'Use colour #22c55e' }))
       expect(lastChange(spy).action).toEqual({ type: 'updateZones', changes: [{ id: z.id, patch: { color: '#22c55e' } }] })
       expect(screen.getByRole('button', { name: 'Use colour #22c55e' })).toHaveAttribute('aria-pressed', 'true')

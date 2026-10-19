@@ -357,7 +357,7 @@ func TestDocuments(t *testing.T) {
 	body := plain(parts["word/document.xml"])
 	for _, s := range []string{"Installation manual", "Overview", "Bus lines", "KNX 1", "Main board", "D2", "Lights", "Dimmer 1",
 		"Ceiling spots", "3 × 40 W LED", "1.1.1", "existing", "Living room", "Free channels", "Kunde GmbH", "Cables and terminals",
-		"Gateways", "Hub", "00124B001CA1B2C3", "Reading lamp"} {
+		"Gateways", "Hub", "00124B001CA1B2C3", "Reading lamp", "1.1 (default)"} {
 		if !strings.Contains(body, s) {
 			t.Errorf("manual lacks %q", s)
 		}
@@ -382,7 +382,7 @@ func TestDocuments(t *testing.T) {
 		t.Errorf("labels %+v", lb)
 	}
 	body = plain(unzip(t, data)["word/document.xml"])
-	for _, s := range []string{"Channel labels", "Row 1", "D2 Lights", "1 Living Ceiling spots", "D3"} {
+	for _, s := range []string{"Channel labels", "Row 1", "D2 Lights", "1LivCeiling spots", "D3", "TE 1–12"} {
 		if !strings.Contains(body, s) {
 			t.Errorf("labels lack %q", s)
 		}

@@ -69,6 +69,16 @@ func (d *data) kindName(id uuid.UUID) string {
 	return ""
 }
 
+// kindNameByKey is an output kind's name by its key.
+func (d *data) kindNameByKey(key string) string {
+	for _, k := range d.kinds {
+		if k.Key == key {
+			return text(k.Name, d.lang)
+		}
+	}
+	return key
+}
+
 // channelText: "<kind> <no>".
 func (d *data) channelText(kindID uuid.UUID, no int32) string {
 	return strings.TrimSpace(d.kindName(kindID) + " " + strconv.Itoa(int(no)))
@@ -97,18 +107,25 @@ func (d *data) needWithFunction(n *wiring.NeedInfo) string {
 	return n.Label + " (" + d.functionName(n.FunctionTypeID) + ")"
 }
 
-// loadText: "3 × 60 W LED" (power and load type when known).
+// loadText: "3 × 60 W LED" with power and load type, "3 × LED" with only
+// the load type, "3" with neither (no "× 0 W").
 func (d *data) loadText(n *wiring.NeedInfo, units int32) string {
-	s := strconv.Itoa(int(units))
+	var what []string
 	if n.PowerW != nil {
-		s += " × " + d.lang.watts(*n.PowerW)
-	} else {
-		s += " ×"
+		if w, err := strconv.ParseFloat(*n.PowerW, 64); err == nil && w > 0 {
+			what = append(what, d.lang.watts(*n.PowerW))
+		}
 	}
 	if n.LoadTypeID != nil {
 		if lt, ok := d.loadTypes[*n.LoadTypeID]; ok {
-			s += " " + text(lt.Name, d.lang)
+			if name := text(lt.Name, d.lang); name != "" {
+				what = append(what, name)
+			}
 		}
+	}
+	s := strconv.Itoa(int(units))
+	if len(what) > 0 {
+		s += " × " + strings.Join(what, " ")
 	}
 	return s
 }

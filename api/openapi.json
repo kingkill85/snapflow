@@ -8506,6 +8506,10 @@
               "type": "array"
             },
             "type": "array"
+          },
+          "shortName": {
+            "description": "0-12 characters; the zone's name on channel labels (empty: derived from the name)",
+            "type": "string"
           }
         },
         "required": [
