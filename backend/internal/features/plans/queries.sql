@@ -80,9 +80,9 @@ DELETE FROM plan_placements WHERE plan_id = $1;
 -- 200 zones).
 -- name: InsertZones :exec
 INSERT INTO plan_zones (tenant_id, plan_id, id, name, short_name, color, opacity, points, position)
-SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.name, coalesce(r.short_name, ''), r.color, r.opacity, r.points, r.position
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.name, coalesce(r."shortName", ''), r.color, r.opacity, r.points, r.position
 FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
-    AS r (id uuid, name text, short_name text, color text, opacity double precision, points jsonb, position integer);
+    AS r (id uuid, name text, "shortName" text, color text, opacity double precision, points jsonb, position integer);
 
 -- InsertPlacements inserts the placements of a JSON array (one statement for
 -- up to 2000 placements).

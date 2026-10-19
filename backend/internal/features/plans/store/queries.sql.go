@@ -578,9 +578,9 @@ func (q *Queries) InsertPlacements(ctx context.Context, arg InsertPlacementsPara
 
 const insertZones = `-- name: InsertZones :exec
 INSERT INTO plan_zones (tenant_id, plan_id, id, name, short_name, color, opacity, points, position)
-SELECT $1::uuid, $2::uuid, r.id, r.name, coalesce(r.short_name, ''), r.color, r.opacity, r.points, r.position
+SELECT $1::uuid, $2::uuid, r.id, r.name, coalesce(r."shortName", ''), r.color, r.opacity, r.points, r.position
 FROM jsonb_to_recordset($3::jsonb)
-    AS r (id uuid, name text, short_name text, color text, opacity double precision, points jsonb, position integer)
+    AS r (id uuid, name text, "shortName" text, color text, opacity double precision, points jsonb, position integer)
 `
 
 type InsertZonesParams struct {
