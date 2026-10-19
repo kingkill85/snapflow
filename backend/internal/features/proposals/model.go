@@ -63,6 +63,26 @@ type PreviewDocument struct {
 	Totals      bom.BOMTotals                `json:"totals"`
 }
 
+// FreeTextShare is what the free-text lines add to the combined proposal of
+// a split run: the combined grand total minus the documents' grand totals,
+// so the documents visibly reconcile to the combined total (D258).
+type FreeTextShare struct {
+	GrandTotal string  `json:"grandTotal" doc:"USD"`
+	Converted  *string `json:"converted" nullable:"true" doc:"In the project currency; null for USD projects"`
+}
+
+// NullableFreeTextShare may be null.
+type NullableFreeTextShare struct {
+	_ struct{} `nullable:"true"`
+	FreeTextShare
+}
+
+// ProposalPreview are the totals of the documents a run would write.
+type ProposalPreview struct {
+	Documents []PreviewDocument      `json:"documents"`
+	FreeText  *NullableFreeTextShare `json:"freeText" doc:"Split runs of a version with free-text lines: their share (combined proposal only); null otherwise"`
+}
+
 // ExporterInfo describes an output format.
 type ExporterInfo struct {
 	Key           string    `json:"key" example:"docx"`

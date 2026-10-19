@@ -37,6 +37,9 @@ type Document struct {
 	// Header and Footer repeat on every page of every section; nil for none.
 	Header *Block
 	Footer *Footer
+	// CompactHeader: the header is a single line (e.g. only a company name),
+	// so pages start 2 cm from the top instead of 4 cm.
+	CompactHeader bool
 	// Sections in order; each starts on a new page.
 	Sections []Section
 }

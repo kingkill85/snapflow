@@ -101,3 +101,54 @@ func TestParse(t *testing.T) {
 		t.Errorf("Parse(12.50) = %v, %v", d, err)
 	}
 }
+
+// TestConverter: customer-facing amounts in the project currency add up
+// (D267): converted unit price × quantity, sums of converted line totals,
+// percent on the converted subtotal, absolute USD values converted once.
+func TestConverter(t *testing.T) {
+	m := money.MustParse
+	eur := money.Converter{Currency: "EUR", Rate: m("0.9237")}
+	// 19.99 USD → 18.46 EUR (18.464763); × 3 = 55.38, not round(59.97 × 0.9237) = 55.39.
+	if got := eur.Format(eur.LineTotal(m("19.99"), 3)); got != "55.38" {
+		t.Errorf("EUR line total %s", got)
+	}
+	jpy := money.Converter{Currency: "JPY", Rate: m("151.37")}
+	if got := jpy.Format(jpy.LineTotal(m("19.99"), 3)); got != "9078" { // 3026 × 3
+		t.Errorf("JPY line total %s", got)
+	}
+	cases := []struct {
+		name                 string
+		c                    money.Converter
+		sub                  string
+		discount, services   money.Adjustment
+		wantD, wantS, wantGT string
+	}{
+		{"percent EUR", eur, "55.41", money.Adjustment{Kind: money.KindPercent, Value: m("10")}, money.Adjustment{Kind: money.KindPercent, Value: m("5")}, "5.54", "2.49", "52.36"},
+		{"amount EUR (USD converted once)", eur, "55.41", money.Adjustment{Kind: money.KindAmount, Value: m("10.01")}, money.Adjustment{Kind: money.KindAmount, Value: m("100")}, "9.25", "92.37", "138.53"},
+		{"capped", eur, "5.00", money.Adjustment{Kind: money.KindAmount, Value: m("100")}, money.Adjustment{Kind: money.KindNone}, "5.00", "0.00", "0.00"},
+		{"JPY", jpy, "9078", money.Adjustment{Kind: money.KindPercent, Value: m("12.5")}, money.Adjustment{Kind: money.KindAmount, Value: m("10")}, "1135", "1514", "9457"},
+	}
+	for _, tc := range cases {
+		got := tc.c.Compute(m(tc.sub), tc.discount, tc.services)
+		if f := tc.c.Format; f(got.Discount) != tc.wantD || f(got.Services) != tc.wantS || f(got.GrandTotal) != tc.wantGT {
+			t.Errorf("%s: %s %s %s", tc.name, f(got.Discount), f(got.Services), f(got.GrandTotal))
+		}
+		if !got.Subtotal.Sub(got.Discount).Add(got.Services).Equal(got.GrandTotal) {
+			t.Errorf("%s: does not add up", tc.name)
+		}
+	}
+	// Split in JPY: documents add up to the combined amounts in yen.
+	parts := jpy.Split([]money.Amount{m("9078"), m("3027"), m("1")},
+		money.Adjustment{Kind: money.KindAmount, Value: m("33.33")}, money.Adjustment{Kind: money.KindAmount, Value: m("7")})
+	combined := jpy.Compute(m("12106"), money.Adjustment{Kind: money.KindAmount, Value: m("33.33")}, money.Adjustment{Kind: money.KindAmount, Value: m("7")})
+	gt := money.Zero
+	for _, p := range parts {
+		gt = gt.Add(p.GrandTotal)
+		if !p.Discount.Equal(p.Discount.Round(0)) {
+			t.Errorf("JPY part with decimals: %s", p.Discount)
+		}
+	}
+	if !gt.Equal(combined.GrandTotal) {
+		t.Errorf("JPY split %s, combined %s", gt, combined.GrandTotal)
+	}
+}

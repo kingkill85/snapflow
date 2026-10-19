@@ -29,6 +29,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
+	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
 
@@ -276,9 +277,33 @@ func TestGenerate(t *testing.T) {
 	// Preview gives the same totals.
 	resp = api.Post("/api/versions/"+f.version.String()+"/proposals/preview", user.Cookie, map[string]any{"split": true, "productTypeIds": []string{f.typeA, f.typeB}})
 	wantCode(t, resp, http.StatusOK, "")
-	preview := decode[[]proposals.PreviewDocument](t, resp)
+	pv := decode[proposals.ProposalPreview](t, resp)
+	preview := pv.Documents
 	if len(preview) != 2 || preview[0].Totals.GrandTotal != split[0].Totals.GrandTotal {
 		t.Errorf("preview %+v", preview)
+	}
+	// With an absolute discount the split documents and the free-text share
+	// add up to the combined total, in USD and in the project currency.
+	if pv.FreeText == nil || pv.FreeText.Converted == nil {
+		t.Fatalf("no free-text share: %+v", pv)
+	}
+	sumUSD, sumConv := money.MustParse(pv.FreeText.GrandTotal), money.MustParse(*pv.FreeText.Converted)
+	for _, d := range preview {
+		sumUSD = sumUSD.Add(money.MustParse(d.Totals.GrandTotal))
+		sumConv = sumConv.Add(money.MustParse(d.Totals.Converted.GrandTotal))
+	}
+	if money.USD(sumUSD) != b.Totals.GrandTotal || money.Format(sumConv, "EUR") != b.Totals.Converted.GrandTotal {
+		t.Errorf("split + free text = %s / %s, combined %s / %s", sumUSD, sumConv, b.Totals.GrandTotal, b.Totals.Converted.GrandTotal)
+	}
+	// The free-text share is about the Kabelpauschale (30 USD = 15 EUR, less
+	// its share of the discount, plus services).
+	if pv.FreeText.GrandTotal == "0.00" {
+		t.Errorf("free-text share %+v", pv.FreeText)
+	}
+	// Combined preview: no share.
+	resp = api.Post("/api/versions/"+f.version.String()+"/proposals/preview", user.Cookie, map[string]any{})
+	if pv := decode[proposals.ProposalPreview](t, resp); pv.FreeText != nil || len(pv.Documents) != 1 {
+		t.Errorf("combined preview %+v", pv)
 	}
 
 	resp = api.Get("/api/versions/"+f.version.String()+"/proposals", user.Cookie)

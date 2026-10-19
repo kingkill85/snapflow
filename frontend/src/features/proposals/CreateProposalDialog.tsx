@@ -2,13 +2,13 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { NullableSnapshotProductType, PreviewDocument, PreviewInput, Proposal } from '@/api/generated/model'
+import type { NullableFreeTextShare, NullableSnapshotProductType, PreviewDocument, PreviewInput, Proposal } from '@/api/generated/model'
 import { previewProposals, useGenerateProposals, useListExporters } from '@/api/generated/proposals/proposals'
 import { CheckboxGroupField, DataTable, errorKey, ErrorMessage, FormDialog, Loading, SelectField, TypeBadge, useFieldError } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
-import { startDownload, useFormatGrandTotal } from './format'
+import { startDownloads, useFormatAmount, useFormatGrandTotal } from './format'
 
 type ProductType = NonNullable<NullableSnapshotProductType>
 type Mode = 'combined' | 'split'
@@ -26,7 +26,8 @@ type Props = {
  * Create proposal: the format (only the API's exporters), one combined
  * document or one per chosen product type, and the totals of each document
  * from the preview endpoint (debounced; the frontend computes nothing, rule 1).
- * Created files download right away.
+ * Created files download right away, several one after another (the
+ * notice in the tab links each of them too).
  */
 export function CreateProposalDialog({ open, onOpenChange, versionId, productTypes, onCreated }: Props) {
   const { t } = useTranslation('proposals')
@@ -41,13 +42,15 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
   const [typeIds, setTypeIds] = useState<string[]>(() => productTypes.map((p) => p.id))
   const [typesError, setTypesError] = useState(false)
   const exporterOptions = (exporters.data ?? []).map((e) => ({ value: e.key, label: localize(e.name) }))
-  const chosenExporter = exporterOptions.some((o) => o.value === exporter) ? exporter : (exporterOptions[0]?.value ?? '')
+  // Undefined until the exporters have loaded: creating waits for them and never sends an empty format.
+  const chosenExporter: string | undefined = exporterOptions.some((o) => o.value === exporter) ? exporter : exporterOptions[0]?.value
 
   const split = mode === 'split'
   const input: PreviewInput | undefined = split ? (typeIds.length > 0 ? { split: true, productTypeIds: typeIds } : undefined) : { split: false }
   const preview = usePreview(versionId, input, open)
 
   const submit = async () => {
+    if (!chosenExporter) return
     if (split && typeIds.length === 0) {
       setTypesError(true)
       return
@@ -60,7 +63,7 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
     }
     onOpenChange(false)
     onCreated(created)
-    for (const p of created) startDownload(p.downloadUrl)
+    startDownloads(created.map((p) => p.downloadUrl))
   }
 
   const documentName = (d: PreviewDocument) => {
@@ -80,6 +83,7 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
       title={t('dialog.title')}
       submitLabel={tCommon('action.create')}
       submitting={generate.isPending}
+      submitDisabled={!chosenExporter}
       onSubmit={() => void submit()}
       error={<ErrorMessage error={generate.error} />}
     >
@@ -88,7 +92,7 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
       ) : exporters.isPending ? (
         <Loading />
       ) : (
-        <SelectField label={t('dialog.format')} required value={chosenExporter} options={exporterOptions} onValueChange={setExporter} />
+        <SelectField label={t('dialog.format')} required value={chosenExporter ?? ''} options={exporterOptions} onValueChange={setExporter} />
       )}
       <SelectField
         label={t('dialog.documents')}
@@ -132,7 +136,8 @@ export function CreateProposalDialog({ open, onOpenChange, versionId, productTyp
           <Loading />
         ) : (
           <div className={cn(preview.pending && 'opacity-60')}>
-            <PreviewTable documents={preview.data} documentName={documentName} />
+            <PreviewTable documents={preview.data.documents} documentName={documentName} />
+            {preview.data.freeText && <FreeTextRow share={preview.data.freeText} currency={preview.data.documents[0]?.totals.currency ?? 'USD'} />}
           </div>
         )}
       </div>
@@ -155,6 +160,17 @@ function PreviewTable({ documents, documentName }: { documents: PreviewDocument[
       ]}
       empty={null}
     />
+  )
+}
+
+/** A split leaves the free-text lines out of every document: their share, which only the combined proposal has. */
+function FreeTextRow({ share, currency }: { share: NonNullable<NullableFreeTextShare>; currency: string }) {
+  const { t } = useTranslation('proposals')
+  const amount = useFormatAmount()
+  return (
+    <p className="mt-2 text-sm text-muted" data-testid="preview-free-text">
+      {t('dialog.freeText', { total: amount(share.grandTotal, share.converted, currency) })}
+    </p>
   )
 }
 

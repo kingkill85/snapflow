@@ -10,7 +10,6 @@ import (
 // language, D253). English is the fallback.
 var messages = map[string]map[string]string{
 	"en": {
-		"exporter":       "Word document (DOCX)",
 		"title":          "Proposal",
 		"number":         "Proposal no.",
 		"date":           "Date",
@@ -35,13 +34,16 @@ var messages = map[string]map[string]string{
 		"plans":          "Plans",
 		"legend":         "Legend",
 		"existing":       "hatched: existing devices (not part of this proposal)",
+		"existingCount":  "%d + %d existing",
+		"planColumn":     "P%d",
+		"planColumns":    "Quantities per plan",
+		"category":       "Category",
 		"page":           "Page {page} of {pages}",
 		"model":          "Model %s",
 		"sku":            "SKU %s",
 		"amountCurrency": "%s (%s)",
 	},
 	"de": {
-		"exporter":       "Word-Dokument (DOCX)",
 		"title":          "Angebot",
 		"number":         "Angebotsnr.",
 		"date":           "Datum",
@@ -66,6 +68,10 @@ var messages = map[string]map[string]string{
 		"plans":          "Pläne",
 		"legend":         "Legende",
 		"existing":       "schraffiert: vorhandene Geräte (nicht Teil dieses Angebots)",
+		"existingCount":  "%d + %d vorhanden",
+		"planColumn":     "P%d",
+		"planColumns":    "Mengen je Plan",
+		"category":       "Kategorie",
 		"page":           "Seite {page} von {pages}",
 		"model":          "Modell %s",
 		"sku":            "Art.-Nr. %s",

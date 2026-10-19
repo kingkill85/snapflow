@@ -28,3 +28,11 @@ SELECT * FROM proposals WHERE id = $1;
 
 -- name: DeleteProposal :execrows
 DELETE FROM proposals WHERE id = $1;
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT file_id::uuid AS file_id FROM proposals WHERE file_id = ANY(sqlc.arg(ids)::uuid[]);
+
+-- name: FilesOfVersions :many
+SELECT DISTINCT file_id FROM proposals WHERE version_id = ANY(sqlc.arg(version_ids)::uuid[]);

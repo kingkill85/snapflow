@@ -10,14 +10,13 @@ import (
 	"image/color"
 	"image/png"
 	"io"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx"
+	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx/docxtest"
 )
 
 func pngBytes(t *testing.T, w, h int) []byte {
@@ -248,23 +247,44 @@ func TestRejectsNonPNG(t *testing.T) {
 	}
 }
 
-// TestLibreOffice converts a generated file to PDF when LibreOffice is
-// installed (not in the dev shell; the click-through does it by hand).
+// TestLibreOffice converts a generated file (letterhead with a logo, images,
+// portrait and landscape sections) to PDF when LibreOffice is installed: not
+// in the default dev shell, but in the "documents" one CI runs it in with
+// REQUIRE_SOFFICE=1 (then a missing soffice fails the test).
 func TestLibreOffice(t *testing.T) {
-	soffice, err := exec.LookPath("soffice")
+	soffice := docxtest.Soffice(t)
+	docxtest.ConvertToPDF(t, soffice, map[string][]byte{"sample.docx": render(t, sample(t))})
+}
+
+// TestMediaHaveSizesInLocalHeaders: a stored entry whose sizes only follow
+// its data (data descriptor, flag 0x8) cannot be read by LibreOffice.
+func TestMediaHaveSizesInLocalHeaders(t *testing.T) {
+	data := render(t, sample(t))
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		t.Skip("soffice not installed")
-	}
-	dir := t.TempDir()
-	in := filepath.Join(dir, "sample.docx")
-	if err := os.WriteFile(in, render(t, sample(t)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(soffice, "--headless", "-env:UserInstallation=file://"+dir+"/profile", "--convert-to", "pdf", "--outdir", dir, in)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("soffice: %v: %s", err, out)
+	media := 0
+	for _, f := range zr.File {
+		if f.Method == zip.Store && f.Flags&0x8 != 0 {
+			t.Errorf("%s: stored with a data descriptor", f.Name)
+		}
+		if strings.HasPrefix(f.Name, "word/media/") {
+			media++
+			off, err := f.DataOffset()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The local header's sizes (offset 18 and 22 from its start;
+			// the header ends 30 + name length bytes in).
+			start := off - 30 - int64(len(f.Name))
+			size := uint32(data[start+22]) | uint32(data[start+23])<<8 | uint32(data[start+24])<<16 | uint32(data[start+25])<<24
+			if size == 0 || uint64(size) != f.UncompressedSize64 {
+				t.Errorf("%s: local header size %d, want %d", f.Name, size, f.UncompressedSize64)
+			}
+		}
 	}
-	if st, err := os.Stat(filepath.Join(dir, "sample.pdf")); err != nil || st.Size() == 0 {
-		t.Fatalf("no PDF: %v", err)
+	if media == 0 {
+		t.Fatal("no media")
 	}
 }

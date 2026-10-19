@@ -38,7 +38,7 @@ type proposalsOutput struct {
 }
 
 type previewOutput struct {
-	Body []PreviewDocument
+	Body ProposalPreview
 }
 
 type exportersOutput struct {

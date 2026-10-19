@@ -535,6 +535,32 @@ func (q *Queries) PlanVersion(ctx context.Context, id uuid.UUID) (uuid.UUID, err
 	return version_id, err
 }
 
+const referencedFiles = `-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM plans WHERE image_file_id = ANY($1::uuid[])
+`
+
+// ReferencedFiles returns those of the files that rows reference (the
+// files feature's reference check, D269).
+func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, referencedFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setLock = `-- name: SetLock :exec
 UPDATE plans SET lock_user_id = $2, lock_expires_at = $3 WHERE id = $1
 `

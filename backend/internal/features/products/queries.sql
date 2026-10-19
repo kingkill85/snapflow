@@ -302,3 +302,8 @@ SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM product_variants WHERE image_file_id = ANY(sqlc.arg(ids)::uuid[]);

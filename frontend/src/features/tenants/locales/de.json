@@ -35,7 +35,8 @@
     "website": "Website",
     "logo": "Logo",
     "logoHint": "PNG, JPEG oder WebP, höchstens 5 MB. Gedruckt höchstens 45 × 18 mm.",
-    "saved": "Briefkopf gespeichert."
+    "saved": "Briefkopf gespeichert.",
+    "notLoaded": "Der Briefkopf konnte nicht geladen werden und wird deshalb nicht gespeichert. Die übrigen Änderungen werden gespeichert."
   },
   "profile": {
     "title": "Firmenprofil",

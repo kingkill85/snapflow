@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"hash/crc32"
 	"image/png"
 	"math"
 	"strconv"
@@ -70,6 +71,9 @@ type writer struct {
 	images  int // global counter for media names and drawing ids
 	parts   map[string]*part
 	current *part
+	// relative sizes tables as a share of the text width (the header,
+	// shared by portrait and landscape sections).
+	relative bool
 }
 
 func (w *writer) render(ctx context.Context) ([]byte, error) {
@@ -94,14 +98,15 @@ func (w *writer) render(ctx context.Context) ([]byte, error) {
 			body.WriteString(`<w:p/>`)
 		}
 		if i < len(sections)-1 {
-			body.WriteString(`<w:p><w:pPr>` + sectPr(s.Orientation, w.doc.Header != nil, w.doc.Footer != nil) + `</w:pPr></w:p>`)
+			body.WriteString(`<w:p><w:pPr>` + w.sectPr(s.Orientation) + `</w:pPr></w:p>`)
 		} else {
-			body.WriteString(sectPr(s.Orientation, w.doc.Header != nil, w.doc.Footer != nil))
+			body.WriteString(w.sectPr(s.Orientation))
 		}
 	}
 	var header, footer string
 	if w.doc.Header != nil {
 		w.current = w.parts["header"]
+		w.relative = true // one header for portrait and landscape pages
 		var b strings.Builder
 		if err := w.block(&b, *w.doc.Header, textWidth(document.Portrait)); err != nil {
 			return nil, err
@@ -117,8 +122,9 @@ func (w *writer) render(ctx context.Context) ([]byte, error) {
 
 	var buf bytes.Buffer
 	z := zip.NewWriter(&buf)
+	modified := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	add := func(name, content string) error {
-		fw, err := z.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Deflate, Modified: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)})
+		fw, err := z.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Deflate, Modified: modified})
 		if err != nil {
 			return err
 		}
@@ -149,7 +155,13 @@ func (w *writer) render(ctx context.Context) ([]byte, error) {
 	}
 	for _, p := range []string{"document", "header"} {
 		for _, m := range w.parts[p].media {
-			fw, err := z.CreateHeader(&zip.FileHeader{Name: "word/media/" + m.name, Method: zip.Store})
+			// PNGs are compressed already: stored, with the CRC and sizes in
+			// the local header (no data descriptor; LibreOffice cannot read
+			// a stored entry whose sizes only follow its data).
+			fw, err := z.CreateRaw(&zip.FileHeader{
+				Name: "word/media/" + m.name, Method: zip.Store, Modified: modified,
+				CRC32: crc32.ChecksumIEEE(m.data), CompressedSize64: uint64(len(m.data)), UncompressedSize64: uint64(len(m.data)),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -171,7 +183,8 @@ func textWidth(o document.Orientation) int {
 	return a4Short - 2*margin
 }
 
-func sectPr(o document.Orientation, header, footer bool) string {
+func (w *writer) sectPr(o document.Orientation) string {
+	header, footer := w.doc.Header != nil, w.doc.Footer != nil
 	var b strings.Builder
 	b.WriteString(`<w:sectPr>`)
 	if header {
@@ -186,7 +199,7 @@ func sectPr(o document.Orientation, header, footer bool) string {
 		fmt.Fprintf(&b, `<w:pgSz w:w="%d" w:h="%d"/>`, a4Short, a4Long)
 	}
 	top := margin
-	if header {
+	if header && !w.doc.CompactHeader {
 		top = 2268 // 4 cm: room for the letterhead
 	}
 	fmt.Fprintf(&b, `<w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d" w:header="%d" w:footer="%d" w:gutter="0"/>`,
@@ -256,7 +269,8 @@ func runs(rs []document.Run) string {
 		if props != "" {
 			props = `<w:rPr>` + props + `</w:rPr>`
 		}
-		for i, line := range strings.Split(r.Text, "\n") {
+		text := strings.ReplaceAll(strings.ReplaceAll(r.Text, "\r\n", "\n"), "\r", "\n")
+		for i, line := range strings.Split(text, "\n") {
 			b.WriteString(`<w:r>` + props)
 			if i > 0 {
 				b.WriteString(`<w:br/>`)
@@ -287,7 +301,11 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	widths[len(widths)-1] += width - used
 
 	b.WriteString(`<w:tbl><w:tblPr>`)
-	fmt.Fprintf(b, `<w:tblW w:w="%d" w:type="dxa"/>`, width)
+	if w.relative {
+		b.WriteString(`<w:tblW w:w="5000" w:type="pct"/>`)
+	} else {
+		fmt.Fprintf(b, `<w:tblW w:w="%d" w:type="dxa"/>`, width)
+	}
 	if t.Borderless {
 		b.WriteString(`<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>`)
 	} else {
@@ -300,7 +318,10 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 			`<w:insideV w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>` +
 			`</w:tblBorders>`)
 	}
-	b.WriteString(`<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="85" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>`)
+	if !w.relative {
+		b.WriteString(`<w:tblLayout w:type="fixed"/>`)
+	}
+	b.WriteString(`<w:tblCellMar><w:left w:w="85" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>`)
 	b.WriteString(`<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>`)
 	b.WriteString(`</w:tblPr><w:tblGrid>`)
 	for _, wd := range widths {
@@ -331,7 +352,11 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 				align = *c.Align
 			}
 			b.WriteString(`<w:tc><w:tcPr>`)
-			fmt.Fprintf(b, `<w:tcW w:w="%d" w:type="dxa"/>`, cw)
+			if w.relative {
+				fmt.Fprintf(b, `<w:tcW w:w="%d" w:type="pct"/>`, cw*5000/width)
+			} else {
+				fmt.Fprintf(b, `<w:tcW w:w="%d" w:type="dxa"/>`, cw)
+			}
 			if span > 1 {
 				fmt.Fprintf(b, `<w:gridSpan w:val="%d"/>`, span)
 			}
@@ -415,10 +440,12 @@ func (w *writer) drawing(img document.Image) (string, error) {
 
 func footerXML(f document.Footer) string {
 	var b strings.Builder
-	b.WriteString(`<w:p><w:pPr><w:pStyle w:val="Footer"/><w:tabs><w:tab w:val="right" w:pos="` + strconv.Itoa(textWidth(document.Portrait)) + `"/></w:tabs></w:pPr>`)
+	// A right-aligned tab relative to the margin, so the page label sits at
+	// the right edge of portrait and landscape pages alike.
+	b.WriteString(`<w:p><w:pPr><w:pStyle w:val="Footer"/></w:pPr>`)
 	b.WriteString(runs([]document.Run{{Text: f.Text}}))
 	if f.PageLabel != "" {
-		b.WriteString(`<w:r><w:tab/></w:r>`)
+		b.WriteString(`<w:r><w:ptab w:relativeTo="margin" w:alignment="right" w:leader="none"/></w:r>`)
 		rest := f.PageLabel
 		for rest != "" {
 			i := strings.IndexByte(rest, '{')

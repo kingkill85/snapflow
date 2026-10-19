@@ -56,8 +56,11 @@ type Service struct {
 	q  *store.Queries
 	// copiers copy what other features own of a version (OnCopyVersion).
 	copiers []VersionCopier
-	types   *producttypes.Service
-	tenants *tenants.Service
+	// deleters clean up what other features own of deleted versions
+	// (OnDeleteVersions).
+	deleters []VersionsDeleter
+	types    *producttypes.Service
+	tenants  *tenants.Service
 	// now is the clock of project numbers (their year, in UTC).
 	now func() time.Time
 }
@@ -341,15 +344,29 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProjectUpdate) (P
 }
 
 // Delete removes a project with everything it owns (versions, product type
-// choices, later plans). Files stay (D58). Needs projects.delete, whatever
-// the project's status.
+// choices, plans, proposals); proposal files nothing else references are
+// deleted after the commit (D269), other files stay (D58). Needs
+// projects.delete, whatever the project's status.
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermProjectsDelete)
 	if err != nil {
 		return err
 	}
-	return s.inScope(ctx, actor, pgx.TxOptions{}, func(q *store.Queries) error {
+	var after []func(context.Context)
+	err = database.InScope(ctx, s.db, actor, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
 		if _, err := visible(ctx, actor, q.LockProject, id); err != nil {
+			return err
+		}
+		versions, err := q.ListVersions(ctx, id)
+		if err != nil {
+			return err
+		}
+		ids := make([]uuid.UUID, len(versions))
+		for i, v := range versions {
+			ids[i] = v.ID
+		}
+		if after, err = s.deleteVersions(ctx, tx, ids); err != nil {
 			return err
 		}
 		n, err := q.DeleteProject(ctx, id)
@@ -361,6 +378,13 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	for _, a := range after {
+		a(ctx)
+	}
+	return nil
 }
 
 // CountByTenant counts the projects of tenants (for the tenants feature:
@@ -509,14 +533,18 @@ func (s *Service) UpdateVersion(ctx context.Context, projectID, id uuid.UUID, in
 	return versionOf(row, projectActions(actor, StatusActive), int(count)), nil
 }
 
-// DeleteVersion removes a version with everything it owns. The last version
-// cannot be deleted (project_version.last): delete the project instead.
+// DeleteVersion removes a version with everything it owns; like Delete,
+// it deletes proposal files nothing else references after the commit
+// (D269). The last version cannot be deleted (project_version.last): delete
+// the project instead.
 func (s *Service) DeleteVersion(ctx context.Context, projectID, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
 		return err
 	}
-	return s.inScope(ctx, actor, pgx.TxOptions{}, func(q *store.Queries) error {
+	var after []func(context.Context)
+	err = database.InScope(ctx, s.db, actor, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
 		if _, err := s.writable(ctx, actor, q, projectID); err != nil {
 			return err
 		}
@@ -530,9 +558,19 @@ func (s *Service) DeleteVersion(ctx context.Context, projectID, id uuid.UUID) er
 		if count <= 1 {
 			return apperr.Conflict("project_version.last", "the last version cannot be deleted; delete the project instead")
 		}
+		if after, err = s.deleteVersions(ctx, tx, []uuid.UUID{id}); err != nil {
+			return err
+		}
 		_, err = q.DeleteVersion(ctx, store.DeleteVersionParams{ID: id, ProjectID: projectID})
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	for _, a := range after {
+		a(ctx)
+	}
+	return nil
 }
 
 // writable locks a project the caller sees for a change of its versions and

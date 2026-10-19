@@ -27,9 +27,9 @@ import type {
   Error,
   ExporterInfo,
   GenerateInput,
-  PreviewDocument,
   PreviewInput,
-  Proposal
+  Proposal,
+  ProposalPreview
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -504,7 +504,7 @@ export const previewProposals = (
 ) => {
 
 
-      return apiClient<PreviewDocument[]>(
+      return apiClient<ProposalPreview>(
       {url: `/api/versions/${versionId}/proposals/preview`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: previewInput, signal

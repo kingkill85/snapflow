@@ -5,7 +5,7 @@ export DATABASE_URL
 DEV_ADMIN_EMAIL ?= admin@snapflow.local
 DEV_ADMIN_PASSWORD ?= snapflow-dev
 
-.PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend test-db e2e e2e-visual e2e-db lint lint-backend lint-frontend check feature
+.PHONY: help db dev-backend dev-frontend generate api sqlc test test-backend test-frontend test-db test-documents e2e e2e-visual e2e-db lint lint-backend lint-frontend check feature
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -39,6 +39,9 @@ TEST_DATABASE_URL ?= postgres://snapflow:snapflow@localhost:$(TEST_DB_PORT)/post
 
 test-backend: test-db
 	cd backend && TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test ./...
+
+test-documents: test-db ## Convert generated documents to PDF with LibreOffice (run in `nix develop .#documents`)
+	cd backend && REQUIRE_SOFFICE=1 TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 -run 'LibreOffice' ./internal/platform/document/... ./internal/features/proposals/
 
 test-db: ## Start the Postgres of the Go tests (kept running, shared by every checkout)
 	docker compose up -d --wait --no-recreate testdb

@@ -23,6 +23,7 @@ import {
   Field,
   FormDialog,
   Loading,
+  Notice,
   setApiFieldErrors,
   SwitchField,
   useFieldError,
@@ -62,10 +63,10 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
   const can = useCan()
   // Admins edit the letterhead of an existing tenant here too (D261); it is saved after the tenant.
   const withLetterhead = !!item && can('tenants.profile')
-  // Set once the letterhead has loaded (LetterheadSection): saving waits for it; cleared on closing.
-  const [letterheadReady, setLetterheadReady] = useState(false)
+  // Set by LetterheadSection: saving waits while it loads and leaves it out if it failed to load; reset on closing.
+  const [letterhead, setLetterhead] = useState<LetterheadStatus>('loading')
   const changeOpen = (next: boolean) => {
-    if (!next) setLetterheadReady(false)
+    if (!next) setLetterhead('loading')
     onOpenChange(next)
   }
   const saveLetterhead = useMutation({ mutationFn: (v: FormValues) => updateTenantLetterhead(item!.id, toLetterheadInput(v.letterhead)) })
@@ -88,8 +89,9 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
   }, [open, item, reset, resetCreate, resetUpdate, resetLetterhead])
 
   const submit = form.handleSubmit(async (data) => {
-    // Never save a letterhead that has not loaded yet: PUT replaces every field.
-    if (withLetterhead && !letterheadReady) return
+    // Never save a letterhead that has not loaded: PUT replaces every field. One that failed to load is left out (the section says so).
+    if (withLetterhead && letterhead === 'loading') return
+    const putLetterhead = withLetterhead && letterhead === 'ready'
     const { letterhead: _letterhead, ...tenant } = data
     try {
       if (item) await update.mutateAsync({ id: item.id, data: tenant })
@@ -98,7 +100,7 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
       setApiFieldErrors(error, form.setError, fields)
       return // shown by ErrorMessage via mutation.error
     }
-    if (withLetterhead) {
+    if (putLetterhead) {
       try {
         await saveLetterhead.mutateAsync(data)
       } catch (error) {
@@ -121,6 +123,7 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
       title={item ? t('edit') : t('new')}
       submitLabel={item ? tCommon('action.update') : tCommon('action.create')}
       submitting={mutation.isPending || saveLetterhead.isPending}
+      submitDisabled={withLetterhead && letterhead === 'loading'}
       onSubmit={() => void submit()}
       error={
         <>
@@ -143,13 +146,18 @@ export function TenantFormDialog({ open, onOpenChange, item }: Props) {
           />
         </>
       )}
-      {withLetterhead && <LetterheadSection form={form} tenantId={item.id} onReady={() => setLetterheadReady(true)} />}
+      {withLetterhead && <LetterheadSection form={form} tenantId={item.id} onStatus={setLetterhead} />}
     </FormDialog>
   )
 }
 
-/** The letterhead part of the tenant dialog, loaded fresh when it opens (D44): until then a spinner, and saving waits. */
-function LetterheadSection({ form, tenantId, onReady }: { form: UseFormReturn<FormValues>; tenantId: string; onReady: () => void }) {
+type LetterheadStatus = 'loading' | 'ready' | 'failed'
+
+/**
+ * The letterhead part of the tenant dialog, loaded fresh when it opens (D44): until then a spinner, and saving waits.
+ * If it fails to load, the tenant is saved without it.
+ */
+function LetterheadSection({ form, tenantId, onStatus }: { form: UseFormReturn<FormValues>; tenantId: string; onStatus: (status: LetterheadStatus) => void }) {
   const { t } = useTranslation('tenants')
   const query = useGetTenantLetterhead(tenantId, { query: fresh })
   const applied = useRef(false)
@@ -158,8 +166,12 @@ function LetterheadSection({ form, tenantId, onReady }: { form: UseFormReturn<Fo
     if (!loaded || applied.current || !query.data) return
     applied.current = true
     form.setValue('letterhead', toLetterheadValues(query.data))
-    onReady()
-  }, [loaded, query.data, form, onReady])
+    onStatus('ready')
+  }, [loaded, query.data, form, onStatus])
+  const failed = query.isError && !loaded
+  useEffect(() => {
+    if (failed) onStatus('failed')
+  }, [failed, onStatus])
   return (
     <section aria-labelledby="letterhead-title" className="space-y-4 border-t border-line pt-4">
       <div className="space-y-1">
@@ -168,7 +180,12 @@ function LetterheadSection({ form, tenantId, onReady }: { form: UseFormReturn<Fo
         </h3>
         <p className="text-sm text-muted">{t('letterhead.description')}</p>
       </div>
-      {query.isError ? <ErrorMessage error={query.error} /> : !loaded ? <Loading /> : <LetterheadFields form={form} tenantId={tenantId} />}
+      {failed ? (
+        <>
+          <ErrorMessage error={query.error} />
+          <Notice tone="warning">{t('letterhead.notLoaded')}</Notice>
+        </>
+      ) : !loaded ? <Loading /> : <LetterheadFields form={form} tenantId={tenantId} />}
     </section>
   )
 }

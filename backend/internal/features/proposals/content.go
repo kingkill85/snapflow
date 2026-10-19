@@ -35,9 +35,12 @@ type planPage struct {
 	existing bool
 }
 
+// legendEntry counts a product type's devices on a plan: count new ones
+// (in the BOM), existing ones apart.
 type legendEntry struct {
-	name  string
-	count int
+	name     string
+	count    int
+	existing int
 }
 
 // content is everything one proposal document is built from.
@@ -78,6 +81,8 @@ func (c content) build() document.Document {
 		Title: title + " " + c.number, Language: string(l), Author: company,
 		Header: c.header(company),
 		Footer: &document.Footer{Text: company + " · " + l.t("number") + " " + c.number, PageLabel: l.t("page")},
+		// Only the company name: no 4 cm letterhead space needed.
+		CompactHeader: c.logo == nil && c.letterhead.Address == "" && c.letterhead.Phone == "" && c.letterhead.Email == "" && c.letterhead.Website == "",
 	}
 	main := document.Section{Orientation: document.Portrait}
 	add := func(b ...document.Block) { main.Blocks = append(main.Blocks, b...) }
@@ -87,6 +92,13 @@ func (c content) build() document.Document {
 		add(document.Spacer{}, document.Text(t))
 	}
 	add(document.Heading{Level: 2, Text: l.t("bom")}, c.bomTable())
+	if c.planColumns() {
+		var keys []string
+		for i, p := range c.bom.Plans {
+			keys = append(keys, l.t("planColumn", i+1)+": "+p.Name)
+		}
+		add(document.Paragraph{Runs: []document.Run{{Text: l.t("planColumns") + ": ", Bold: true}, {Text: strings.Join(keys, " · ")}}, Style: document.Small})
+	}
 	add(c.totalsTable())
 	notes := []string{l.t("net")}
 	if c.converted() {
@@ -191,15 +203,18 @@ func (c content) bomTable() document.Table {
 	l := c.lang
 	cur := c.bom.Totals.Currency
 	right := document.AlignRight
-	cols := []document.Column{{Weight: 0.6}, {Weight: 5}}
+	// Position and quantity wide enough for "Pos." and "Menge" without a
+	// break inside the word; plan columns get a short header ("P1") that
+	// the legend under the table maps to the plan's name.
+	cols := []document.Column{{Weight: 1}, {Weight: 5}}
 	head := []document.Cell{document.TextCell(l.t("pos")), document.TextCell(l.t("description"))}
 	if c.planColumns() {
-		for _, p := range c.bom.Plans {
-			cols = append(cols, document.Column{Weight: 1, Align: document.AlignRight})
-			head = append(head, document.TextCell(p.Name))
+		for i := range c.bom.Plans {
+			cols = append(cols, document.Column{Weight: 0.8, Align: document.AlignRight})
+			head = append(head, document.TextCell(l.t("planColumn", i+1)))
 		}
 	}
-	cols = append(cols, document.Column{Weight: 0.9, Align: document.AlignRight}, document.Column{Weight: 1.6, Align: document.AlignRight}, document.Column{Weight: 1.8, Align: document.AlignRight})
+	cols = append(cols, document.Column{Weight: 1.3, Align: document.AlignRight}, document.Column{Weight: 1.7, Align: document.AlignRight}, document.Column{Weight: 1.9, Align: document.AlignRight})
 	head = append(head, document.TextCell(l.t("quantity")), document.TextCell(l.t("amountCurrency", l.t("unitPrice"), cur)), document.TextCell(l.t("amountCurrency", l.t("total"), cur)))
 	for i := 2; i < len(head); i++ {
 		head[i].Align = &right
@@ -362,6 +377,10 @@ func (c content) zoneTables() []document.Block {
 		if len(cats) == 0 {
 			continue
 		}
+		if len(cats) > maxZoneColumns {
+			out = append(out, c.zoneTableByCategory(p, cats, catNames, counts))
+			continue
+		}
 		cols := []document.Column{{Weight: 2.5}}
 		head := []document.Cell{document.TextCell(p.Name)}
 		right := document.AlignRight
@@ -395,6 +414,48 @@ func (c content) zoneTables() []document.Block {
 	return out
 }
 
+// maxZoneColumns: with more categories a plan's zone summary lists the
+// categories as rows and the zones as columns.
+const maxZoneColumns = 5
+
+// zoneTableByCategory is the transposed zone summary of a plan: a row per
+// category, a column per zone with devices (and "No zone").
+func (c content) zoneTableByCategory(p bom.BOMPlanRef, cats []uuid.UUID, catNames map[uuid.UUID]string, counts map[string]map[uuid.UUID]int64) document.Table {
+	l := c.lang
+	right := document.AlignRight
+	type zone struct{ key, name string }
+	var zones []zone
+	for _, z := range p.Zones {
+		if len(counts[z.ID.String()]) > 0 {
+			zones = append(zones, zone{z.ID.String(), z.Name})
+		}
+	}
+	if len(counts[""]) > 0 {
+		zones = append(zones, zone{"", l.t("noZone")})
+	}
+	cols := []document.Column{{Weight: 2.5}}
+	head := []document.Cell{document.TextCell(p.Name + " – " + l.t("category"))}
+	for _, z := range zones {
+		cols = append(cols, document.Column{Weight: 1, Align: document.AlignRight})
+		cell := document.TextCell(z.name)
+		cell.Align = &right
+		head = append(head, cell)
+	}
+	t := document.Table{Columns: cols, Rows: []document.Row{{Kind: document.HeaderRow, Cells: head}}}
+	for _, id := range cats {
+		cells := []document.Cell{document.TextCell(catNames[id])}
+		for _, z := range zones {
+			s := ""
+			if n := counts[z.key][id]; n > 0 {
+				s = itoa64(n)
+			}
+			cells = append(cells, document.TextCell(s))
+		}
+		t.Rows = append(t.Rows, document.Row{Cells: cells})
+	}
+	return t
+}
+
 func (c content) line(key string) bom.BOMLine {
 	for _, ln := range c.bom.Lines {
 		if ln.Key == key {
@@ -425,7 +486,11 @@ func (c content) planSection(p planPage) document.Section {
 	if len(p.legend) > 0 || p.existing {
 		var parts []string
 		for _, e := range p.legend {
-			parts = append(parts, e.name+" ("+itoa(e.count)+")")
+			n := itoa(e.count)
+			if e.existing > 0 {
+				n = l.t("existingCount", e.count, e.existing)
+			}
+			parts = append(parts, e.name+" ("+n+")")
 		}
 		if p.existing {
 			parts = append(parts, l.t("existing"))

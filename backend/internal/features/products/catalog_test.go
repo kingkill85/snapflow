@@ -13,7 +13,6 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
-	filesstore "github.com/kingkill85/snapflow/backend/internal/features/files/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
@@ -27,7 +26,7 @@ func service(t *testing.T, api *apptest.API) (*products.Service, context.Context
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := products.NewService(api.DB, producttypes.NewService(api.DB), categories.NewService(api.DB), files.NewService(filesstore.New(api.DB), storage))
+	svc := products.NewService(api.DB, producttypes.NewService(api.DB), categories.NewService(api.DB), files.NewService(api.DB, storage))
 	ctx := auth.WithActor(context.Background(), auth.Actor{UserID: api.Admin.UserID, TenantID: api.Admin.TenantID, Role: auth.RoleAdmin})
 	return svc, ctx
 }

@@ -202,13 +202,15 @@ func (s *Service) File(ctx context.Context, id uuid.UUID) (Proposal, string, int
 	return Proposal{ID: row.ID, FileName: row.FileName}, f.ContentType, f.Size, contents, nil
 }
 
-// Delete removes a proposal (its file stays, content-addressed).
+// Delete removes a proposal and then its file, unless another row still
+// references it (the same document bytes, D269).
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermProjectsDelete)
 	if err != nil {
 		return err
 	}
-	return s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
+	var fileID uuid.UUID
+	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		row, err := q.GetProposal(ctx, id)
 		if err != nil {
 			return notFound(err)
@@ -216,12 +218,18 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		if _, err := s.projects.ReadVersion(ctx, tx, row.VersionID); err != nil {
 			return err
 		}
+		fileID = row.FileID
 		n, err := q.DeleteProposal(ctx, id)
 		if err == nil && n == 0 {
 			return errNotFound()
 		}
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	s.files.DeleteUnreferencedLogged(ctx, fileID)
+	return nil
 }
 
 // ---------------------------------------------------------------- generating
@@ -254,8 +262,8 @@ func documents(b bom.BOM, split bool, typeIDs []uuid.UUID) ([]document_, error) 
 	if len(typeIDs) == 0 {
 		return nil, apperr.Invalid("body.productTypeIds", "proposal.product_types_required", "choose at least one product type")
 	}
-	slices.SortFunc(typeIDs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
-	typeIDs = slices.Compact(typeIDs)
+	// Validated in the order sent (error indexes refer to it); duplicates
+	// are harmless (SplitByProductType keeps BOM order, one part per type).
 	parts, err := bom.SplitByProductType(b, typeIDs)
 	if err != nil {
 		return nil, err
@@ -269,26 +277,61 @@ func documents(b bom.BOM, split bool, typeIDs []uuid.UUID) ([]document_, error) 
 }
 
 // Preview returns the totals the documents of a generation would have.
-func (s *Service) Preview(ctx context.Context, versionID uuid.UUID, in PreviewInput) ([]PreviewDocument, error) {
+func (s *Service) Preview(ctx context.Context, versionID uuid.UUID, in PreviewInput) (ProposalPreview, error) {
 	if _, err := auth.Require(ctx, auth.PermProjectsRead); err != nil {
-		return nil, err
+		return ProposalPreview{}, err
 	}
 	b, err := s.bom.Get(ctx, versionID)
 	if err != nil {
-		return nil, err
+		return ProposalPreview{}, err
 	}
 	docs, err := documents(b, in.Split, in.ProductTypeIDs)
 	if err != nil {
-		return nil, err
+		return ProposalPreview{}, err
 	}
-	out := make([]PreviewDocument, len(docs))
+	out := ProposalPreview{Documents: make([]PreviewDocument, len(docs))}
 	for i, d := range docs {
-		out[i] = PreviewDocument{Totals: d.bom.Totals}
+		out.Documents[i] = PreviewDocument{Totals: d.bom.Totals}
 		if d.productType != nil {
-			out[i].ProductType = &NullableProposalProductType{ProposalProductType: ProposalProductType{ID: d.productType.ID, Name: d.productType.Name}}
+			out.Documents[i].ProductType = &NullableProposalProductType{ProposalProductType: ProposalProductType{ID: d.productType.ID, Name: d.productType.Name}}
 		}
 	}
+	if in.Split {
+		out.FreeText = freeTextShare(b, docs)
+	}
 	return out, nil
+}
+
+// freeTextShare is the combined grand total minus the grand totals of the
+// split run's documents, when the version has free-text lines.
+func freeTextShare(b bom.BOM, docs []document_) *NullableFreeTextShare {
+	if !slices.ContainsFunc(b.Groups, func(g bom.BOMGroup) bool { return g.Kind == "freeText" }) {
+		return nil
+	}
+	// Only a run over every product type reconciles to the combined total.
+	types := 0
+	for _, g := range b.Groups {
+		if g.ProductType != nil {
+			types++
+		}
+	}
+	if len(docs) != types {
+		return nil
+	}
+	usd := money.MustParse(b.Totals.GrandTotal)
+	for _, d := range docs {
+		usd = usd.Sub(money.MustParse(d.bom.Totals.GrandTotal))
+	}
+	out := &NullableFreeTextShare{FreeTextShare: FreeTextShare{GrandTotal: money.USD(usd)}}
+	if c := b.Totals.Converted; c != nil {
+		conv := money.MustParse(c.GrandTotal)
+		for _, d := range docs {
+			conv = conv.Sub(money.MustParse(d.bom.Totals.Converted.GrandTotal))
+		}
+		v := money.Format(conv, b.Totals.Currency)
+		out.Converted = &v
+	}
+	return out
 }
 
 // Generate writes the proposals of a version.
@@ -551,10 +594,15 @@ func renderPlan(p plans.DocumentPlan, snaps map[uuid.UUID]bom.VariantSnapshot, i
 				item.Image = images[*snap.ImageFileID]
 			}
 			name := text(snap.ProductType.Name, lang)
-			if i := slices.IndexFunc(legend, func(t legendEntry) bool { return t.name == name }); i >= 0 {
-				legend[i].count++
+			i := slices.IndexFunc(legend, func(t legendEntry) bool { return t.name == name })
+			if i < 0 {
+				legend = append(legend, legendEntry{name: name})
+				i = len(legend) - 1
+			}
+			if pl.Existing {
+				legend[i].existing++
 			} else {
-				legend = append(legend, legendEntry{name: name, count: 1})
+				legend[i].count++
 			}
 		}
 		existing = existing || pl.Existing

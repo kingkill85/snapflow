@@ -24,6 +24,30 @@ func (q *Queries) DeleteProposal(ctx context.Context, id uuid.UUID) (int64, erro
 	return result.RowsAffected(), nil
 }
 
+const filesOfVersions = `-- name: FilesOfVersions :many
+SELECT DISTINCT file_id FROM proposals WHERE version_id = ANY($1::uuid[])
+`
+
+func (q *Queries) FilesOfVersions(ctx context.Context, versionIds []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, filesOfVersions, versionIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProposal = `-- name: GetProposal :one
 SELECT id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at FROM proposals WHERE id = $1
 `
@@ -218,4 +242,30 @@ func (q *Queries) NextSeq(ctx context.Context, arg NextSeqParams) (int32, error)
 	var last_seq int32
 	err := row.Scan(&last_seq)
 	return last_seq, err
+}
+
+const referencedFiles = `-- name: ReferencedFiles :many
+SELECT DISTINCT file_id::uuid AS file_id FROM proposals WHERE file_id = ANY($1::uuid[])
+`
+
+// ReferencedFiles returns those of the files that rows reference (the
+// files feature's reference check, D269).
+func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, referencedFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

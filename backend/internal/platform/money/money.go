@@ -93,12 +93,66 @@ type Totals struct {
 //     the value;
 //   - grand total = subtotal − discount + services.
 func Compute(subtotal Amount, discount, services Adjustment) Totals {
-	t := Totals{Subtotal: RoundUSD(subtotal), Discount: Zero, Services: Zero}
+	return USDConverter.Compute(subtotal, discount, services)
+}
+
+// Convert turns a USD amount into currency at rate (units of currency per
+// 1 USD): usd × rate, rounded half up to the currency's minor unit.
+func Convert(usd, rate Amount, currency string) Amount {
+	return Round(usd.Mul(rate), MinorUnits(currency))
+}
+
+// Converter computes the customer-facing amounts of a project in its
+// currency (D267): every unit price is converted and rounded to the
+// currency's minor unit, a line total is the converted unit price ×
+// quantity, subtotals are sums of converted line totals, a percent
+// discount or services value applies to the converted subtotal, an
+// absolute one (entered in USD) is converted once; so the printed amounts
+// add up in the project currency. The USD figures are computed the same way
+// with the USD converter (rate 1) and kept as reference.
+type Converter struct {
+	Currency string
+	Rate     Amount
+}
+
+// USDConverter computes USD amounts (rate 1, cents).
+var USDConverter = Converter{Currency: "USD", Rate: decimal.NewFromInt(1)}
+
+func (c Converter) places() int32 { return MinorUnits(c.Currency) }
+
+// Round rounds a to the currency's minor unit, half up.
+func (c Converter) Round(a Amount) Amount { return Round(a, c.places()) }
+
+// Amount converts a USD amount (unit price, absolute discount or services).
+func (c Converter) Amount(usd Amount) Amount { return c.Round(usd.Mul(c.Rate)) }
+
+// LineTotal is the converted unit price × quantity (in USD the exact unit
+// price × quantity, rounded: LineTotal).
+func (c Converter) LineTotal(unitUSD Amount, quantity int64) Amount {
+	if c.Currency == "USD" {
+		return LineTotal(unitUSD, quantity)
+	}
+	return c.Round(c.Amount(unitUSD).Mul(decimal.NewFromInt(quantity)))
+}
+
+// Format formats an amount of the currency.
+func (c Converter) Format(a Amount) string { return Format(a, c.Currency) }
+
+// Compute applies the rules of spec 2c in the currency to subtotal (a sum
+// of the currency's line totals); absolute discount and services values
+// are USD and converted:
+//   - discount: percent → subtotal × p / 100 rounded; amount → the
+//     converted value; either way capped at the subtotal;
+//   - services: percent → (subtotal − discount) × p / 100 rounded; amount →
+//     the converted value;
+//   - grand total = subtotal − discount + services.
+func (c Converter) Compute(subtotal Amount, discount, services Adjustment) Totals {
+	t := Totals{Subtotal: c.Round(subtotal), Discount: Zero, Services: Zero}
 	switch discount.Kind {
 	case KindPercent:
-		t.Discount = RoundUSD(t.Subtotal.Mul(discount.Value).Div(hundred))
+		t.Discount = c.Round(t.Subtotal.Mul(discount.Value).Div(hundred))
 	case KindAmount:
-		t.Discount = RoundUSD(discount.Value)
+		t.Discount = c.Amount(discount.Value)
 	}
 	if t.Discount.GreaterThan(t.Subtotal) {
 		t.Discount = t.Subtotal
@@ -106,18 +160,10 @@ func Compute(subtotal Amount, discount, services Adjustment) Totals {
 	net := t.Subtotal.Sub(t.Discount)
 	switch services.Kind {
 	case KindPercent:
-		t.Services = RoundUSD(net.Mul(services.Value).Div(hundred))
+		t.Services = c.Round(net.Mul(services.Value).Div(hundred))
 	case KindAmount:
-		t.Services = RoundUSD(services.Value)
+		t.Services = c.Amount(services.Value)
 	}
 	t.GrandTotal = net.Add(t.Services)
 	return t
-}
-
-// Convert turns a USD amount into currency at rate (units of currency per
-// 1 USD): usd × rate, rounded half up to the currency's minor unit. Every
-// amount is converted on its own from its USD value, so a converted total
-// may differ from the sum of converted lines by rounding.
-func Convert(usd, rate Amount, currency string) Amount {
-	return Round(usd.Mul(rate), MinorUnits(currency))
 }

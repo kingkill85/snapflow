@@ -105,3 +105,8 @@ INSERT INTO version_pricing (version_id, tenant_id, discount_kind, discount_valu
 SELECT sqlc.arg(target_id)::uuid, sqlc.arg(tenant_id)::uuid, discount_kind, discount_value, services_kind,
     services_value, services_label, intro_text, closing_text, updated_at
 FROM version_pricing WHERE version_id = sqlc.arg(source_id)::uuid;
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM version_items WHERE image_file_id = ANY(sqlc.arg(ids)::uuid[]);

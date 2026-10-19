@@ -8,7 +8,16 @@
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
       forAll = f: nixpkgs.lib.genAttrs systems (s: f nixpkgs.legacyPackages.${s});
     in {
-      devShells = forAll (pkgs: {
+      devShells = forAll (pkgs: rec {
+        # The default shell plus LibreOffice, for the document tests that
+        # convert generated DOCX files to PDF (CI's documents job; locally
+        # `nix develop .#documents -c make test-documents`). Kept out of the
+        # default shell: LibreOffice is large.
+        documents = pkgs.mkShell {
+          inputsFrom = [ default ];
+          packages = [ pkgs.libreoffice ];
+          inherit (default) PLAYWRIGHT_BROWSERS_PATH PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS PLAYWRIGHT_DRIVER_VERSION;
+        };
         default = pkgs.mkShell {
           packages = with pkgs; [
             go

@@ -37,6 +37,24 @@ jobs:
       - name: Build image
         run: docker build -t snapflow:ci .
 
+  documents:
+    # Generated documents must open in a real word processor: LibreOffice
+    # (from the "documents" dev shell, not the default one) converts them
+    # to PDF; REQUIRE_SOFFICE=1 makes a missing soffice a failure, not a skip.
+    if: github.event_name != 'workflow_dispatch' && github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-documents-${{ hashFiles('backend/go.sum', 'flake.lock') }}
+      - name: Convert generated documents with LibreOffice
+        run: nix develop .#documents -c make test-documents
+
   e2e:
     needs: check
     if: github.event_name == 'pull_request'

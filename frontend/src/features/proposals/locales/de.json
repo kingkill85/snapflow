@@ -8,7 +8,9 @@
   "deletedUser": "Gelöschter Benutzer",
   "download": "Herunterladen",
   "created_one": "Angebot {{numbers}} erstellt; der Download wurde gestartet.",
-  "created_other": "{{count}} Angebote erstellt ({{numbers}}); die Downloads wurden gestartet.",
+  "created_other": "{{count}} Angebote erstellt ({{numbers}}); sie werden nacheinander heruntergeladen.",
+  "downloadFallback_one": "Falls der Download nicht startet:",
+  "downloadFallback_other": "Falls ein Download nicht startet:",
   "deleteTitle": "Angebot löschen",
   "deleteMessage": "Angebot „{{number}}“ und seine Datei löschen? Die Nummer wird nicht erneut vergeben.",
   "column": {
@@ -29,6 +31,7 @@
     "productTypes": "Produkttypen",
     "noProductTypes": "Die Stückliste enthält keine Produkttypen.",
     "preview": "Summen je Dokument",
-    "previewNone": "Wählen Sie mindestens einen Produkttyp."
+    "previewNone": "Wählen Sie mindestens einen Produkttyp.",
+    "freeText": "Freitextzeilen (nur im Gesamtangebot): {{total}}"
   }
 }

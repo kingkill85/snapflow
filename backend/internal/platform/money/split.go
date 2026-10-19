@@ -6,6 +6,11 @@ package money
 // equal ones), so the parts always add up to total. Without any weight the
 // whole total goes to the first part.
 func Allocate(total Amount, weights []Amount) []Amount {
+	return USDConverter.Allocate(total, weights)
+}
+
+// Allocate is Allocate at the currency's minor unit.
+func (c Converter) Allocate(total Amount, weights []Amount) []Amount {
 	out := make([]Amount, len(weights))
 	if len(weights) == 0 {
 		return out
@@ -21,7 +26,7 @@ func Allocate(total Amount, weights []Amount) []Amount {
 	for i, w := range weights {
 		out[i] = Zero
 		if sum.IsPositive() {
-			out[i] = RoundUSD(total.Mul(w).Div(sum))
+			out[i] = c.Round(total.Mul(w).Div(sum))
 		}
 		allocated = allocated.Add(out[i])
 	}
@@ -42,23 +47,27 @@ func Allocate(total Amount, weights []Amount) []Amount {
 // Percent amounts are rounded per document and may therefore differ from
 // the combined percent amount by a cent per document.
 func Split(subtotals []Amount, discount, services Adjustment) []Totals {
-	sum := Zero
-	for _, s := range subtotals {
-		sum = sum.Add(RoundUSD(s))
-	}
-	combined := Compute(sum, discount, services)
+	return USDConverter.Split(subtotals, discount, services)
+}
+
+// Split is Split in the currency: subtotals are the documents' subtotals in
+// the currency, absolute adjustments are USD and converted once (Compute).
+func (c Converter) Split(subtotals []Amount, discount, services Adjustment) []Totals {
 	weights := make([]Amount, len(subtotals))
+	sum := Zero
 	for i, s := range subtotals {
-		weights[i] = RoundUSD(s)
+		weights[i] = c.Round(s)
+		sum = sum.Add(weights[i])
 	}
-	discounts := Allocate(combined.Discount, weights)
-	servicesAmounts := Allocate(combined.Services, weights)
+	combined := c.Compute(sum, discount, services)
+	discounts := c.Allocate(combined.Discount, weights)
+	servicesAmounts := c.Allocate(combined.Services, weights)
 	out := make([]Totals, len(subtotals))
 	for i, sub := range weights {
 		t := Totals{Subtotal: sub, Discount: Zero, Services: Zero}
 		switch discount.Kind {
 		case KindPercent:
-			t.Discount = RoundUSD(sub.Mul(discount.Value).Div(hundred))
+			t.Discount = c.Round(sub.Mul(discount.Value).Div(hundred))
 		case KindAmount:
 			t.Discount = discounts[i]
 		}
@@ -68,7 +77,7 @@ func Split(subtotals []Amount, discount, services Adjustment) []Totals {
 		net := sub.Sub(t.Discount)
 		switch services.Kind {
 		case KindPercent:
-			t.Services = RoundUSD(net.Mul(services.Value).Div(hundred))
+			t.Services = c.Round(net.Mul(services.Value).Div(hundred))
 		case KindAmount:
 			t.Services = servicesAmounts[i]
 		}

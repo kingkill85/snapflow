@@ -43,3 +43,8 @@ UPDATE tenants SET company_name = $2, address = $3, phone = $4, email = $5, webs
     logo_file_id = sqlc.narg(logo_file_id), updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- ReferencedFiles returns those of the files that rows reference (the
+-- files feature's reference check, D269).
+-- name: ReferencedFiles :many
+SELECT DISTINCT logo_file_id::uuid AS file_id FROM tenants WHERE logo_file_id = ANY(sqlc.arg(ids)::uuid[]);

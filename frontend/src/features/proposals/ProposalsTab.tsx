@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useGetBom } from '@/api/generated/bom/bom'
 import type { Proposal } from '@/api/generated/model'
 import { getListProposalsQueryKey, useDeleteProposal, useListProposals } from '@/api/generated/proposals/proposals'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Notice, RowAction, Section, TypeBadge } from '@/components/ui'
+import { Button, ConfirmDialog, DataTable, DownloadLink, EmptyState, ErrorMessage, Loading, Notice, RowAction, Section, TypeBadge } from '@/components/ui'
 import { fresh } from '@/features/bom/format'
 import { useLocalized } from '@/i18n/localized'
 
@@ -81,7 +81,19 @@ export function ProposalsTab({ versionId, canGenerate }: Props) {
         ) : undefined
       }
     >
-      {created.length > 0 && <Notice>{t('created', { count: created.length, numbers: created.map((p) => p.number).join(', ') })}</Notice>}
+      {created.length > 0 && (
+        <Notice>
+          {t('created', { count: created.length, numbers: created.map((p) => p.number).join(', ') })}{' '}
+          {/* A fallback: browsers may block downloads that a script starts. */}
+          {t('downloadFallback', { count: created.length })}{' '}
+          {created.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ', '}
+              <DownloadLink href={p.downloadUrl}>{p.number}</DownloadLink>
+            </span>
+          ))}
+        </Notice>
+      )}
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (

@@ -258,6 +258,55 @@ describe('TenantsPage', () => {
     expect(put).toEqual({ companyName: 'Acme Ltd', address: 'Road 1', phone: '+49 2', email: '', website: '', logoFileId: null })
   })
 
+  it('saves a tenant without the letterhead when the letterhead fails to load', async () => {
+    let tenantPut: unknown
+    let letterheadPut = false
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({})] })),
+      http.get('/api/tenants/:id/letterhead', () => HttpResponse.json({ status: 500, title: 'Internal Server Error' }, { status: 500 })),
+      http.put('/api/tenants/:id', async ({ request }) => {
+        tenantPut = await request.json()
+        return HttpResponse.json(tenant({}))
+      }),
+      http.put('/api/tenants/:id/letterhead', () => {
+        letterheadPut = true
+        return HttpResponse.json(emptyLetterhead)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('The letterhead could not be loaded, so it is not saved. The other changes are saved.')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('textbox', { name: 'Company name' })).not.toBeInTheDocument()
+    await user.clear(within(dialog).getByRole('textbox', { name: 'Name' }))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Acme 2')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(tenantPut).toEqual({ name: 'Acme 2', isActive: true })
+    expect(letterheadPut).toBe(false)
+  })
+
+  it('keeps Update disabled while the letterhead loads', async () => {
+    let release!: () => void
+    const loaded = new Promise<void>((resolve) => (release = resolve))
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({})] })),
+      http.get('/api/tenants/:id/letterhead', async () => {
+        await loaded
+        return HttpResponse.json(emptyLetterhead)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Update' })).toBeDisabled()
+    release()
+    await within(dialog).findByRole('textbox', { name: 'Company name' })
+    expect(within(dialog).getByRole('button', { name: 'Update' })).toBeEnabled()
+  })
+
   it('has no letterhead when creating a tenant', async () => {
     server.use(http.get('/api/tenants', () => HttpResponse.json({ items: [] })))
     const user = userEvent.setup()

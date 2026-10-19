@@ -42,6 +42,8 @@ type FormDialogProps = {
   title: string
   submitLabel: string
   submitting: boolean
+  /** Keeps submit disabled, e.g. while data the form needs is still loading. */
+  submitDisabled?: boolean
   onSubmit: () => void
   /** Shown above the fields, e.g. a translated API error. */
   error?: ReactNode
@@ -54,10 +56,11 @@ type FormDialogProps = {
 }
 
 /** The one form-in-a-dialog pattern: scrollable fields, Cancel + submit. */
-export function FormDialog({ open, onOpenChange, title, submitLabel, submitting, onSubmit, error, children, container }: FormDialogProps) {
+export function FormDialog({ open, onOpenChange, title, submitLabel, submitting, submitDisabled, onSubmit, error, children, container }: FormDialogProps) {
   const { t } = useTranslation()
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (submitDisabled) return
     onSubmit()
   }
   const docked = !!container
@@ -84,7 +87,7 @@ export function FormDialog({ open, onOpenChange, title, submitLabel, submitting,
               <Button variant="secondary" onClick={() => onOpenChange(false)}>
                 {t('action.cancel')}
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || submitDisabled}>
                 {submitLabel}
               </Button>
             </div>

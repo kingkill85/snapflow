@@ -35,7 +35,8 @@
     "website": "Website",
     "logo": "Logo",
     "logoHint": "PNG, JPEG or WebP, at most 5 MB. Printed at most 45 × 18 mm.",
-    "saved": "Letterhead saved."
+    "saved": "Letterhead saved.",
+    "notLoaded": "The letterhead could not be loaded, so it is not saved. The other changes are saved."
   },
   "profile": {
     "title": "Company profile",

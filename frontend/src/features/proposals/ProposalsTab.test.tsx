@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Proposal } from '@/api/generated/model'
 import { bom, bomEur, versionId } from '@/features/bom/test-fixtures'
 import { problem } from '@/features/projects/test-fixtures'
+import i18n from '@/i18n'
 import { chooseOption } from '@/test/select'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
@@ -62,7 +63,10 @@ beforeEach(() => {
     clicked.push(this.getAttribute('href') ?? '')
   })
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(async () => {
+  vi.restoreAllMocks()
+  await i18n.changeLanguage('en')
+})
 
 describe('ProposalsTab', () => {
   it('lists the proposals with type, language, grand total and download links', async () => {
@@ -75,7 +79,8 @@ describe('ProposalsTab', () => {
     expect(rows[0]).toHaveTextContent('Zigbee')
     // The grand total in the project currency, as the API computed it.
     expect(rows[0]).toHaveTextContent('€251.55')
-    expect(rows[0]).toHaveTextContent('Deutsch')
+    // The document language in the UI language.
+    expect(rows[0]).toHaveTextContent('German')
     expect(rows[1]).toHaveTextContent('Combined')
     expect(rows[1]).toHaveTextContent('$279.50')
     expect(rows[1]).toHaveTextContent('Ada Admin')
@@ -118,7 +123,7 @@ describe('ProposalsTab', () => {
     serve([])
     server.use(
       http.get('/api/versions/:versionId/proposals', () => HttpResponse.json(list)),
-      http.post('/api/versions/:versionId/proposals/preview', () => HttpResponse.json([{ productType: null, totals: bom.totals }])),
+      http.post('/api/versions/:versionId/proposals/preview', () => HttpResponse.json({ documents: [{ productType: null, totals: bom.totals }], freeText: null })),
       http.post('/api/versions/:versionId/proposals', async ({ request }) => {
         generated = await request.json()
         list = [combined]
@@ -148,13 +153,14 @@ describe('ProposalsTab', () => {
       http.post('/api/versions/:versionId/proposals/preview', async ({ request }) => {
         const body = (await request.json()) as { split: boolean; productTypeIds?: string[] }
         previews.push(body)
-        if (!body.split) return HttpResponse.json([{ productType: null, totals: bom.totals }])
-        return HttpResponse.json(
-          (body.productTypeIds ?? []).map((id) => ({
+        if (!body.split) return HttpResponse.json({ documents: [{ productType: null, totals: bom.totals }], freeText: null })
+        return HttpResponse.json({
+          documents: (body.productTypeIds ?? []).map((id) => ({
             productType: id === knx.id ? { id: knx.id, name: knx.name } : { id: zigbee.id, name: zigbee.name },
             totals: { ...bom.totals, grandTotal: id === knx.id ? '100.00' : '179.50' },
           })),
-        )
+          freeText: { grandTotal: '12.00', converted: null },
+        })
       }),
       http.post('/api/versions/:versionId/proposals', async ({ request }) => {
         generated = await request.json()
@@ -172,6 +178,8 @@ describe('ProposalsTab', () => {
     expect(within(types).getByRole('checkbox', { name: /Zigbee/ })).toBeChecked()
     expect(within(types).getByRole('checkbox', { name: /KNX/ })).toBeChecked()
     await waitFor(() => expect(within(dialog).getAllByTestId('preview-total').map((e) => e.textContent)).toEqual(['$179.50', '$100.00']), { timeout: 2000 })
+    // The free-text lines are left out of every document; the preview says how much.
+    expect(within(dialog).getByTestId('preview-free-text')).toHaveTextContent('Free-text lines (combined proposal only): $12.00')
 
     // None ticked: no preview, and creating says why.
     await user.click(within(types).getByRole('checkbox', { name: /Zigbee/ }))
@@ -187,10 +195,71 @@ describe('ProposalsTab', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(generated).toEqual({ exporter: 'docx', split: true, productTypeIds: [knx.id] })
-    expect(clicked).toHaveLength(2)
-    expect(screen.getByRole('status')).toHaveTextContent('2 proposals created')
+    // One after another (startDownloads, format.test.ts).
+    expect(clicked[0]).toBe(split.downloadUrl)
+    await waitFor(() => expect(clicked).toEqual([split.downloadUrl, '/api/proposals/x/file']))
+    const notice = screen.getByRole('status')
+    expect(notice).toHaveTextContent('2 proposals created')
+    // Each file is linked too, in case the browser blocked a download.
+    expect(within(notice).getByRole('link', { name: '2026-0007-V1-02-ZB' })).toHaveAttribute('href', split.downloadUrl)
+    expect(within(notice).getByRole('link', { name: '2026-0007-V1-02-KX' })).toHaveAttribute('href', '/api/proposals/x/file')
     // Not one preview per click.
     expect(previews.length).toBeLessThan(6)
+  })
+
+  it('names the document language in the UI language', async () => {
+    await i18n.changeLanguage('de')
+    serve([split, proposal({ language: 'en' })])
+    renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />)
+    const table = await screen.findByRole('table', { name: 'Angebote' })
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Deutsch')
+    expect(rows[1]).toHaveTextContent('Englisch')
+  })
+
+  it('shows the free-text share in the project currency when converted', async () => {
+    serve([])
+    server.use(
+      http.post('/api/versions/:versionId/proposals/preview', () =>
+        HttpResponse.json({ documents: [{ productType: { id: zigbee.id, name: zigbee.name }, totals: bomEur.totals }], freeText: { grandTotal: '12.00', converted: '10.80' } }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />)
+    await user.click(await screen.findByRole('button', { name: 'Create proposal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create proposal' })
+    expect(await within(dialog).findByTestId('preview-free-text')).toHaveTextContent('Free-text lines (combined proposal only): €10.80')
+  })
+
+  it('waits for the formats before creating', async () => {
+    let release!: () => void
+    const loaded = new Promise<void>((resolve) => (release = resolve))
+    let generated: unknown
+    serve([])
+    server.use(
+      http.get('/api/exporters', async () => {
+        await loaded
+        return HttpResponse.json(exporters)
+      }),
+      http.post('/api/versions/:versionId/proposals/preview', () => HttpResponse.json({ documents: [{ productType: null, totals: bom.totals }], freeText: null })),
+      http.post('/api/versions/:versionId/proposals', async ({ request }) => {
+        generated = await request.json()
+        return HttpResponse.json([combined], { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />)
+    await user.click(await screen.findByRole('button', { name: 'Create proposal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create proposal' })
+    const create = within(dialog).getByRole('button', { name: 'Create' })
+    expect(create).toBeDisabled()
+    await user.click(create)
+    expect(generated).toBeUndefined()
+
+    release()
+    await waitFor(() => expect(create).toBeEnabled())
+    await user.click(create)
+    await waitFor(() => expect(generated).toEqual({ exporter: 'docx', split: false }))
   })
 
   it('shows API errors of generating in the dialog', async () => {

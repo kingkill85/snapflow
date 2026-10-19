@@ -105,3 +105,15 @@ func (s *Storage) Open(sum string) (*os.File, error) {
 	}
 	return f, err
 }
+
+// Remove deletes the contents stored under sum; missing contents are fine.
+func (s *Storage) Remove(sum string) error {
+	p, err := s.path(sum)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return syncDir(filepath.Dir(p))
+}

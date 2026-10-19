@@ -192,7 +192,11 @@ func (s *Service) PreviewPricing(ctx context.Context, versionID uuid.UUID, in Pr
 		return BOMTotals{}, err
 	}
 	b := st.bom()
-	return st.totals(money.MustParse(b.Totals.Subtotal), pricingOf(params)), nil
+	conv := money.Zero
+	if c := b.Totals.Converted; c != nil {
+		conv = money.MustParse(c.Subtotal)
+	}
+	return st.totals(money.MustParse(b.Totals.Subtotal), conv, pricingOf(params)), nil
 }
 
 func errPricingStale() *apperr.Error {

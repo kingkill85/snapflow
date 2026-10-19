@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 
 import type { BOMTotals } from '@/api/generated/model'
 import { useFormatMoney } from '@/features/bom/format'
-import { contentLocales } from '@/i18n/content-locales'
 
 /** A proposal's creation time for the UI language, e.g. "19 Oct 2026, 14:05". */
 export function useFormatDateTime() {
@@ -13,16 +12,27 @@ export function useFormatDateTime() {
 
 /** The grand total in the project currency as the API computed it (the converted amount, else USD). */
 export function useFormatGrandTotal() {
-  const money = useFormatMoney()
-  return (totals: BOMTotals) => (totals.converted ? money(totals.converted.grandTotal, totals.currency) : money(totals.grandTotal))
+  const amount = useFormatAmount()
+  return (totals: BOMTotals) => amount(totals.grandTotal, totals.converted?.grandTotal ?? null, totals.currency)
 }
 
-/** A content language's name ("English", "Deutsch"); an unknown code as it is. */
+/** An amount in the project currency as the API computed it: the converted amount in `currency`, else the USD amount. */
+export function useFormatAmount() {
+  const money = useFormatMoney()
+  return (usd: string, converted: string | null, currency: string) => (converted !== null ? money(converted, currency) : money(usd))
+}
+
+/** A document language's name in the UI language ("English", or "Englisch" in a German UI); an unknown code in capitals. */
 export function useLanguageName() {
-  const { t } = useTranslation()
+  const { i18n } = useTranslation()
+  const uiLanguage = i18n.resolvedLanguage ?? 'en'
   return (code: string) => {
-    const known = contentLocales.find((l) => l === code)
-    return known ? t(`language.${known}`) : code
+    try {
+      const name = new Intl.DisplayNames([uiLanguage], { type: 'language' }).of(code) ?? code
+      return name.charAt(0).toLocaleUpperCase(uiLanguage) + name.slice(1)
+    } catch {
+      return code.toUpperCase()
+    }
   }
 }
 
@@ -34,4 +44,15 @@ export function startDownload(url: string) {
   document.body.append(link)
   link.click()
   link.remove()
+}
+
+/** The gap between downloads of several files: browsers block or drop downloads started all at once. */
+export const downloadGap = 300
+
+/** Starts the downloads of several API files one after another, `downloadGap` ms apart. */
+export function startDownloads(urls: string[]) {
+  urls.forEach((url, i) => {
+    if (i === 0) startDownload(url)
+    else setTimeout(() => startDownload(url), i * downloadGap)
+  })
 }

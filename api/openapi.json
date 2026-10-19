@@ -3121,6 +3121,30 @@
           "null"
         ]
       },
+      "NullableFreeTextShare": {
+        "additionalProperties": false,
+        "properties": {
+          "converted": {
+            "description": "In the project currency; null for USD projects",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grandTotal": {
+            "description": "USD",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grandTotal",
+          "converted"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "NullableItemSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -5483,6 +5507,35 @@
         },
         "required": [
           "delete"
+        ],
+        "type": "object"
+      },
+      "ProposalPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ProposalPreview.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewDocument"
+            },
+            "type": "array"
+          },
+          "freeText": {
+            "$ref": "#/components/schemas/NullableFreeTextShare",
+            "description": "Split runs of a version with free-text lines: their share (combined proposal only); null otherwise"
+          }
+        },
+        "required": [
+          "documents",
+          "freeText"
         ],
         "type": "object"
       },
@@ -11340,10 +11393,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PreviewDocument"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/ProposalPreview"
                 }
               }
             },

@@ -8,7 +8,9 @@
   "deletedUser": "Deleted user",
   "download": "Download",
   "created_one": "Proposal {{numbers}} created; the download has started.",
-  "created_other": "{{count}} proposals created ({{numbers}}); the downloads have started.",
+  "created_other": "{{count}} proposals created ({{numbers}}); they download one after another.",
+  "downloadFallback_one": "If the download does not start:",
+  "downloadFallback_other": "If a download does not start:",
   "deleteTitle": "Delete proposal",
   "deleteMessage": "Delete proposal “{{number}}” and its file? Its number is not used again.",
   "column": {
@@ -29,6 +31,7 @@
     "productTypes": "Product types",
     "noProductTypes": "The bill of materials has no product types.",
     "preview": "Totals per document",
-    "previewNone": "Choose at least one product type."
+    "previewNone": "Choose at least one product type.",
+    "freeText": "Free-text lines (combined proposal only): {{total}}"
   }
 }

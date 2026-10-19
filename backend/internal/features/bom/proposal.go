@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom/store"
+	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
@@ -32,7 +33,9 @@ type Part struct {
 // services apply to each part's own subtotal; absolute amounts are
 // allocated by the part's share of the whole goods subtotal (every group of
 // b, free text included), so the parts of all product types add up to the
-// combined BOM when it has no free-text lines (money.Split). A type without
+// combined BOM when it has no free-text lines (money.Split). The amounts in
+// the project currency are split the same way from the groups' converted
+// subtotals (D267). A type without
 // lines in b is bom.product_type_not_in_bom.
 func SplitByProductType(b BOM, typeIDs []uuid.UUID) ([]Part, error) {
 	var errs []apperr.FieldError
@@ -46,13 +49,20 @@ func SplitByProductType(b BOM, typeIDs []uuid.UUID) ([]Part, error) {
 		return nil, apperr.Validation(errs...)
 	}
 	weights := make([]money.Amount, len(b.Groups))
+	convWeights := make([]money.Amount, len(b.Groups))
 	for i, g := range b.Groups {
 		weights[i] = money.MustParse(g.Subtotal)
+		if g.Converted != nil {
+			convWeights[i] = money.MustParse(*g.Converted)
+		}
 	}
-	p := b.Pricing
-	totals := money.Split(weights,
-		money.Adjustment{Kind: money.Kind(p.DiscountKind), Value: money.MustParse(p.DiscountValue)},
-		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: money.MustParse(p.ServicesValue)})
+	discount, services := adjustments(b.Pricing)
+	totals := money.Split(weights, discount, services)
+	cur := currencyOf(projects.VersionRef{Currency: b.Totals.Currency, ExchangeRate: b.Totals.Rate})
+	var convTotals []money.Totals
+	if cur != nil {
+		convTotals = cur.Split(convWeights, discount, services)
+	}
 	lines := make(map[string]BOMLine, len(b.Lines))
 	for _, l := range b.Lines {
 		lines[l.Key] = l
@@ -72,29 +82,13 @@ func SplitByProductType(b BOM, typeIDs []uuid.UUID) ([]Part, error) {
 		}
 		part.ManualLines = []ManualLine{}
 		part.Warnings = []BOMWarning{}
-		part.Totals = totalsOf(totals[gi], b.Totals.Currency, b.Totals.Rate)
+		part.Totals = BOMTotals{BOMAmounts: amountsOf(money.USDConverter, totals[gi]), Currency: b.Totals.Currency, Rate: b.Totals.Rate}
+		if cur != nil {
+			part.Totals.Converted = &NullableBOMAmounts{BOMAmounts: amountsOf(cur.Converter, convTotals[gi])}
+		}
 		out = append(out, Part{ProductType: g.ProductType.SnapshotProductType, BOM: part})
 	}
 	return out, nil
-}
-
-// totalsOf formats USD totals and converts them (D228) unless currency is USD.
-func totalsOf(t money.Totals, currency, rate string) BOMTotals {
-	out := BOMTotals{
-		BOMAmounts: BOMAmounts{
-			Subtotal: money.USD(t.Subtotal), Discount: money.USD(t.Discount),
-			Services: money.USD(t.Services), GrandTotal: money.USD(t.GrandTotal),
-		},
-		Currency: currency, Rate: rate,
-	}
-	if currency != "" && currency != "USD" {
-		r := money.MustParse(rate)
-		conv := func(a money.Amount) string { return money.Format(money.Convert(a, r, currency), currency) }
-		out.Converted = &NullableBOMAmounts{BOMAmounts: BOMAmounts{
-			Subtotal: conv(t.Subtotal), Discount: conv(t.Discount), Services: conv(t.Services), GrandTotal: conv(t.GrandTotal),
-		}}
-	}
-	return out
 }
 
 // VariantSnapshot are the frozen facts of a variant a version uses.

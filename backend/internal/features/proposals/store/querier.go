@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	DeleteProposal(ctx context.Context, id uuid.UUID) (int64, error)
+	FilesOfVersions(ctx context.Context, versionIds []uuid.UUID) ([]uuid.UUID, error)
 	GetProposal(ctx context.Context, id uuid.UUID) (Proposal, error)
 	InsertProposal(ctx context.Context, arg InsertProposalParams) (Proposal, error)
 	ListProposals(ctx context.Context, versionID uuid.UUID) ([]Proposal, error)
@@ -20,6 +21,9 @@ type Querier interface {
 	// NextSeq reserves the next proposal sequence of a version (atomic under
 	// concurrency: the counter row is locked by the upsert).
 	NextSeq(ctx context.Context, arg NextSeqParams) (int32, error)
+	// ReferencedFiles returns those of the files that rows reference (the
+	// files feature's reference check, D269).
+	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 }
 
 var _ Querier = (*Queries)(nil)

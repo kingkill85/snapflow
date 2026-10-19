@@ -24,3 +24,15 @@ WHERE s.source_sha256 = $1 AND s.tenant_id IS NOT DISTINCT FROM sqlc.narg(tenant
 -- name: AddFileSource :exec
 INSERT INTO file_sources (tenant_id, source_sha256, file_id) VALUES ($1, $2, $3)
 ON CONFLICT (tenant_id, source_sha256) DO NOTHING;
+
+-- LockFiles locks files for a delete, so no row can start referencing them
+-- (a foreign key check waits for the lock) until the delete commits.
+-- name: LockFiles :many
+SELECT id, tenant_id, sha256 FROM files WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id FOR UPDATE;
+
+-- name: DeleteFiles :exec
+DELETE FROM files WHERE id = ANY(sqlc.arg(ids)::uuid[]);
+
+-- ContentInUse reports whether any file (of any scope) has these contents.
+-- name: ContentInUse :one
+SELECT EXISTS (SELECT 1 FROM files WHERE sha256 = $1);

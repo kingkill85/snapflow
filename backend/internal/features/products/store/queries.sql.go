@@ -927,6 +927,32 @@ func (q *Queries) ProductExists(ctx context.Context, id uuid.UUID) (bool, error)
 	return exists, err
 }
 
+const referencedFiles = `-- name: ReferencedFiles :many
+SELECT DISTINCT image_file_id::uuid AS file_id FROM product_variants WHERE image_file_id = ANY($1::uuid[])
+`
+
+// ReferencedFiles returns those of the files that rows reference (the
+// files feature's reference check, D269).
+func (q *Queries) ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, referencedFiles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var file_id uuid.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchVariants = `-- name: SearchVariants :many
 SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
        p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id, p.category_id

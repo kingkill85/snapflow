@@ -662,9 +662,12 @@ func TestCurrencyDecimals(t *testing.T) {
 	admin := api.Admin.Cookie
 	c := newCatalog(t, api, "cur")
 	for _, tc := range []struct{ currency, rate, unit, total, grand string }{
-		// Main 20 × 3 = 60 (required add-on 5 × 3 = 15): subtotal 75.
-		{"JPY", "150.5", "3010", "9030", "11288"},
-		{"KWD", "0.3075", "6.150", "18.450", "23.063"},
+		// Main 20 × 3 = 60 (required add-on 5 × 3 = 15): subtotal 75 USD.
+		// In the currency the totals are sums of converted line totals
+		// (D267): JPY 3010 × 3 + 753 × 3 = 11289 (not 75 × 150.5 = 11288);
+		// KWD 6.150 × 3 + 1.538 × 3 = 23.064 (not 23.063).
+		{"JPY", "150.5", "3010", "9030", "11289"},
+		{"KWD", "0.3075", "6.150", "18.450", "23.064"},
 	} {
 		v := newProject(t, api, admin, map[string]any{"name": "House " + tc.currency, "productTypeIds": []string{c.TypeID}, "currency": tc.currency, "exchangeRate": tc.rate}).Versions[0].ID
 		resp := api.Post("/api/versions/"+v.String()+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 3})
