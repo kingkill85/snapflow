@@ -46,20 +46,33 @@ type FormDialogProps = {
   /** Shown above the fields, e.g. a translated API error. */
   error?: ReactNode
   children: ReactNode
+  /**
+   * Docks the dialog non-modally at the top of this element (positioned) instead of centring it over a scrim,
+   * so what it is about stays visible, e.g. the line measured in the plan editor (D225). Clicks outside keep it open; Esc and Cancel close it.
+   */
+  container?: HTMLElement | null
 }
 
 /** The one form-in-a-dialog pattern: scrollable fields, Cancel + submit. */
-export function FormDialog({ open, onOpenChange, title, submitLabel, submitting, onSubmit, error, children }: FormDialogProps) {
+export function FormDialog({ open, onOpenChange, title, submitLabel, submitting, onSubmit, error, children, container }: FormDialogProps) {
   const { t } = useTranslation()
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     onSubmit()
   }
+  const docked = !!container
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl">
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={!docked}>
+      <DialogPrimitive.Portal container={container ?? undefined}>
+        {!docked && <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />}
+        <DialogPrimitive.Content
+          onInteractOutside={docked ? (e) => e.preventDefault() : undefined}
+          className={
+            docked
+              ? 'absolute inset-x-2 top-2 z-40 flex max-h-[calc(100%-1rem)] flex-col rounded-control border border-edge bg-raised p-4 shadow-2xl'
+              : 'fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl'
+          }
+        >
           <DialogPrimitive.Title className="mb-4 text-lg font-semibold">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>

@@ -95,6 +95,8 @@ type Props = {
   onActiveVertex: (vertex: ActiveVertex | null) => void
   /** The two points of the calibration tool were picked. */
   onCalibrate: (a: Point, b: Point) => void
+  /** The two calibration points while their distance is asked for: the line stays drawn (D225). */
+  measured?: [Point, Point] | null
   stageRef?: RefObject<Konva.Stage | null>
   /** While the PNG export draws: one screen pixel is this many image pixels (strokes and labels relative to the image, not the zoom). */
   exportPixel?: number
@@ -133,6 +135,7 @@ export function PlanCanvas({
   activeVertex,
   onActiveVertex,
   onCalibrate,
+  measured,
   stageRef,
   exportPixel,
 }: Props) {
@@ -476,41 +479,56 @@ export function PlanCanvas({
             {band && <Rect x={band.x} y={band.y} width={band.width} height={band.height} stroke={theme.primary} strokeWidth={k} dash={[4 * k, 4 * k]} fill={theme.primary} opacity={0.15} />}
             {drawnRect && <Rect x={drawnRect.x} y={drawnRect.y} width={drawnRect.width} height={drawnRect.height} stroke={theme.primary} strokeWidth={2 * k} fill={theme.primary} opacity={0.2} />}
             {draft && draftLine.length >= 4 && <Line points={draftLine} stroke={theme.primary} strokeWidth={2 * k} dash={tool === 'calibrate' ? [6 * k, 4 * k] : undefined} />}
+            {measured && <Line points={measured.flatMap((p) => [p.x, p.y])} stroke={theme.primary} strokeWidth={2 * k} dash={[6 * k, 4 * k]} />}
+            {measured?.map((p, i) => (
+              <Circle key={`m${i}`} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
+            ))}
             {draft?.points.map((p, i) => (
               <Circle key={i} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
             ))}
           </Group>
+        </Layer>
+        <Layer listening={false}>
+          {zones.map((z) => (
+            <ZoneLabel key={z.id} zone={shownZone(z)} k={k} theme={theme} />
+          ))}
         </Layer>
       </CanvasStage>
     </div>
   )
 }
 
-/** A zone: its polygon filled in its colour at its opacity, outline and name. */
+/** A zone: its polygon filled in its colour at its opacity and outline (the name is drawn by `ZoneLabel`, above the placements). */
 function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; selected: boolean; error: boolean; k: number; theme: PlanColors }) {
   const flat = z.points.flat()
-  const label = labelPoint(z)
   return (
     <Group name="zone" id={z.id}>
       <Line points={flat} closed fill={z.color} opacity={z.opacity} />
       <Line points={flat} closed stroke={error ? theme.danger : z.color} strokeWidth={(error ? 3 : 2) * k} listening={false} />
       {selected && <Line name={chromeName} points={flat} closed stroke={theme.primary} strokeWidth={k} dash={[6 * k, 4 * k]} listening={false} />}
-      <Text
-        text={z.name}
-        x={label.x - 100 * k}
-        y={label.y - 8 * k}
-        width={200 * k}
-        align="center"
-        fontSize={14 * k}
-        fontStyle="bold"
-        fill={theme.ink}
-        stroke={theme.surface}
-        strokeWidth={3 * k}
-        lineJoin="round"
-        fillAfterStrokeEnabled
-        listening={false}
-      />
     </Group>
+  )
+}
+
+/** A zone's name with a halo (D221), in its own layer above the placements so a product never hides it (D224). */
+function ZoneLabel({ zone: z, k, theme }: { zone: PlanZone; k: number; theme: PlanColors }) {
+  const label = labelPoint(z)
+  return (
+    <Text
+      text={z.name}
+      x={label.x - 100 * k}
+      y={label.y - 8 * k}
+      width={200 * k}
+      align="center"
+      fontSize={14 * k}
+      fontStyle="bold"
+      fill={theme.ink}
+      stroke={theme.surface}
+      strokeWidth={3 * k}
+      lineJoin="round"
+      fillAfterStrokeEnabled
+      listening={false}
+    />
   )
 }
 

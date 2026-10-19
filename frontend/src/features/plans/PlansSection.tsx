@@ -103,8 +103,9 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
                     onClick={() => void move(plans, index, 1)}
                   />
                   <span className="flex-1" />
-                  <RowAction icon={<Pencil />} label={tCommon('action.edit')} aria-label={t('editItem', { name: plan.name })} onClick={() => setEditing(plan)} />
+                  <RowAction compact icon={<Pencil />} label={tCommon('action.edit')} aria-label={t('editItem', { name: plan.name })} onClick={() => setEditing(plan)} />
                   <RowAction
+                    compact
                     icon={<Trash2 />}
                     variant="danger-quiet"
                     label={tCommon('action.delete')}

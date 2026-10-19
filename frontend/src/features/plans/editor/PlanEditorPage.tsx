@@ -125,6 +125,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const [resizeAll, setResizeAll] = useState(false)
   const [activeVertex, setActiveVertex] = useState<ActiveVertex | null>(null)
   const [calibration, setCalibration] = useState<[Point, Point] | null>(null)
+  // The calibration form docks over the right panel, so the measured line stays visible (D225).
+  const [panel, setPanel] = useState<HTMLElement | null>(null)
   const stageRef = useRef<Konva.Stage>(null)
 
   // What the last load or save returned: the content version to send back, warnings and zone assignments.
@@ -294,6 +296,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       activeVertex={activeVertex}
       onActiveVertex={setActiveVertex}
       onCalibrate={(a, b) => setCalibration([a, b])}
+      measured={calibration}
       stageRef={stageRef}
       exportPixel={exporting ? exportPixel(plan.image) : undefined}
     />
@@ -489,11 +492,12 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       <div className="space-y-2 px-2 pt-2 empty:hidden">{banners}</div>
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : canvasArea}</div>
-        <aside aria-label={t('panel.label')} className="flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
+        <aside ref={setPanel} aria-label={t('panel.label')} className="relative flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
           <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
       <CalibrateDialog
+        container={panel}
         points={calibration}
         onClose={() => setCalibration(null)}
         onScale={(scale) => dispatch({ type: 'change', action: { type: 'setScale', scale } })}
