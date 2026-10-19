@@ -84,7 +84,7 @@ func readContent(ctx context.Context, q *store.Queries, id uuid.UUID) ([]PlanZon
 	}
 	zones := make([]PlanZone, len(zrows))
 	for i, z := range zrows {
-		zones[i] = PlanZone{ID: z.ID, Name: z.Name, Color: z.Color, Opacity: z.Opacity}
+		zones[i] = PlanZone{ID: z.ID, Name: z.Name, ShortName: z.ShortName, Color: z.Color, Opacity: z.Opacity}
 		if err := json.Unmarshal(z.Points, &zones[i].Points); err != nil {
 			return nil, nil, fmt.Errorf("plans: zone %s points: %w", z.ID, err)
 		}
@@ -294,6 +294,10 @@ func (s *Service) validateContent(ctx context.Context, st stored, cat needCatalo
 		seen[z.ID] = true
 		z.Name = strings.TrimSpace(z.Name)
 		if f := checkText(loc+".name", z.Name, MaxNameLength, true); f != nil {
+			errs = append(errs, *f)
+		}
+		z.ShortName = strings.TrimSpace(z.ShortName)
+		if f := checkText(loc+".shortName", z.ShortName, MaxShortNameLength, false); f != nil {
 			errs = append(errs, *f)
 		}
 		if !colorPattern.MatchString(z.Color) {

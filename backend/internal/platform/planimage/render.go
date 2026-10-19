@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
+	"slices"
 	"sync"
 
 	xdraw "golang.org/x/image/draw"
@@ -105,6 +106,12 @@ func RenderMax(p Plan, maxSide int) *image.RGBA {
 	for _, pl := range p.Placements {
 		r.placement(pl)
 	}
+	// Labels keep clear of the zone names (drawn later, on top).
+	for _, z := range p.Zones {
+		if box, ok := r.zoneNameBox(z); ok {
+			r.labels = append(r.labels, box)
+		}
+	}
 	for _, pl := range p.Placements {
 		if pl.Label != "" {
 			r.label(pl)
@@ -152,11 +159,13 @@ func (r *renderer) plainText(s string, x, y float64, face font.Face, c color.Col
 }
 
 type renderer struct {
-	dst   *image.RGBA
-	s     float64
-	unit  float64
-	font  float64 // unit × TextScale, for font sizes
-	faces map[faceKey]font.Face
+	// labels are the boxes of the labels drawn so far (collisions).
+	labels []rect
+	dst    *image.RGBA
+	s      float64
+	unit   float64
+	font   float64 // unit × TextScale, for font sizes
+	faces  map[faceKey]font.Face
 }
 
 func (r *renderer) polygon(pts [][2]float64, src image.Image) {
@@ -260,14 +269,62 @@ func (h hatchImage) At(x, y int) color.Color {
 	return color.RGBA{}
 }
 
+// rect is a box in output pixels.
+type rect struct{ x0, y0, x1, y1 float64 }
+
+func (a rect) overlaps(b rect) bool { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1 }
+
+// label draws a placement's label below its box, else above, right or
+// left of it where it does not overlap a label drawn before (below when
+// every side is taken).
 func (r *renderer) label(p Placement) {
 	cs := r.corners(p)
-	maxY := cs[0][1]
+	minX, minY, maxX, maxY := cs[0][0], cs[0][1], cs[0][0], cs[0][1]
 	for _, c := range cs {
-		maxY = math.Max(maxY, c[1])
+		minX, maxX = math.Min(minX, c[0]), math.Max(maxX, c[0])
+		minY, maxY = math.Min(minY, c[1]), math.Max(maxY, c[1])
 	}
 	face := r.faceOf(false, 11*r.font)
-	r.text(p.Label, p.X*r.s, maxY+2*r.unit, face, false)
+	m := face.Metrics()
+	w := float64(font.MeasureString(face, p.Label)) / 64
+	h := float64(m.Ascent+m.Descent) / 64
+	gap := 2 * r.unit
+	cx, cy := p.X*r.s, p.Y*r.s
+	// Candidate centres x and tops y.
+	cands := [][2]float64{
+		{cx, maxY + gap},
+		{cx, minY - gap - h},
+		{maxX + gap + w/2, cy - h/2},
+		{minX - gap - w/2, cy - h/2},
+	}
+	pick := cands[0]
+	for _, c := range cands {
+		box := rect{c[0] - w/2, c[1], c[0] + w/2, c[1] + h}
+		if !slices.ContainsFunc(r.labels, box.overlaps) {
+			pick = c
+			break
+		}
+	}
+	r.labels = append(r.labels, rect{pick[0] - w/2, pick[1], pick[0] + w/2, pick[1] + h})
+	r.text(p.Label, pick[0], pick[1], face, false)
+}
+
+// zoneNameBox is the box of a zone's name.
+func (r *renderer) zoneNameBox(z Zone) (rect, bool) {
+	if z.Name == "" || len(z.Points) == 0 {
+		return rect{}, false
+	}
+	minX, minY, maxX, maxY := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
+	for _, p := range z.Points {
+		minX, maxX = math.Min(minX, p[0]), math.Max(maxX, p[0])
+		minY, maxY = math.Min(minY, p[1]), math.Max(maxY, p[1])
+	}
+	face := r.faceOf(true, 13*r.font)
+	m := face.Metrics()
+	w := float64(font.MeasureString(face, z.Name)) / 64
+	h := float64(m.Ascent+m.Descent) / 64
+	cx, cy := (minX+maxX)/2*r.s, (minY+maxY)/2*r.s
+	return rect{cx - w/2, cy - h/2, cx + w/2, cy + h/2}, true
 }
 
 func (r *renderer) zoneName(z Zone) {

@@ -155,6 +155,8 @@ type data struct {
 	addrByKey  map[[2]uuid.UUID]networks.AddressedItem
 	lineByID   map[uuid.UUID]networks.BusLine
 	prefixByID map[uuid.UUID]networks.LinePrefix
+	// zoneShorts are the zones' short names on labels by plan and zone.
+	zoneShorts map[[2]uuid.UUID]string
 }
 
 // itemRef is a board module or floorplan placement with its document name.
@@ -197,6 +199,11 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 	if d.plans, err = s.plans.List(ctx, versionID); err != nil {
 		return nil, err
 	}
+	zones, err := s.plans.ZoneNames(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	d.zoneShorts = shortNames(zones)
 	for _, p := range d.plans {
 		if p.Kind == plans.KindBoard {
 			if d.boards[p.ID], err = s.plans.BoardContent(ctx, p.ID); err != nil {

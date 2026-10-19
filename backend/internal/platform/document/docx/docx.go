@@ -11,6 +11,7 @@ package docx
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -246,7 +247,11 @@ func paragraph(p document.Paragraph) string {
 	case document.Muted:
 		style = `<w:pStyle w:val="Muted"/>`
 	}
-	return `<w:p><w:pPr>` + style + jc(p.Align) + `</w:pPr>` + runs(p.Runs) + `</w:p>`
+	keep := ""
+	if p.KeepWithNext {
+		keep = `<w:keepNext/><w:spacing w:after="40"/>`
+	}
+	return `<w:p><w:pPr>` + style + keep + jc(p.Align) + `</w:pPr>` + runs(p.Runs) + `</w:p>`
 }
 
 func jc(a document.Align) string {
@@ -268,6 +273,9 @@ func runs(rs []document.Run) string {
 		}
 		if r.Italic {
 			props += `<w:i/>`
+		}
+		if r.ScalePct > 0 && r.ScalePct != 100 {
+			props += fmt.Sprintf(`<w:w w:val="%d"/>`, r.ScalePct)
 		}
 		if r.SizePt > 0 {
 			props += fmt.Sprintf(`<w:sz w:val="%d"/><w:szCs w:val="%d"/>`, int(math.Round(r.SizePt*2)), int(math.Round(r.SizePt*2)))
@@ -350,18 +358,26 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	if !w.relative {
 		b.WriteString(`<w:tblLayout w:type="fixed"/>`)
 	}
-	b.WriteString(`<w:tblCellMar><w:left w:w="85" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>`)
+	cellMar := 85
+	if t.CellMarginMM > 0 {
+		cellMar = int(math.Round(t.CellMarginMM * twipsPerMM))
+	}
+	fmt.Fprintf(b, `<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="%d" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="%d" w:type="dxa"/></w:tblCellMar>`, cellMar, cellMar)
 	b.WriteString(`<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>`)
 	b.WriteString(`</w:tblPr><w:tblGrid>`)
 	for _, wd := range widths {
 		fmt.Fprintf(b, `<w:gridCol w:w="%d"/>`, wd)
 	}
 	b.WriteString(`</w:tblGrid>`)
-	for _, r := range t.Rows {
+	for ri, r := range t.Rows {
+		keep := ""
+		if t.KeepTogether && ri < len(t.Rows)-1 {
+			keep = `<w:keepNext/>`
+		}
 		b.WriteString(`<w:tr>`)
 		height := ""
-		if t.RowHeightMM > 0 {
-			height = fmt.Sprintf(`<w:trHeight w:val="%d" w:hRule="exact"/>`, int(math.Round(t.RowHeightMM*twipsPerMM)))
+		if h := cmp.Or(r.HeightMM, t.RowHeightMM); h > 0 {
+			height = fmt.Sprintf(`<w:trHeight w:val="%d" w:hRule="exact"/>`, int(math.Round(h*twipsPerMM)))
 		}
 		switch r.Kind {
 		case document.HeaderRow:
@@ -393,6 +409,9 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 			if span > 1 {
 				fmt.Fprintf(b, `<w:gridSpan w:val="%d"/>`, span)
 			}
+			if c.Borders != nil {
+				b.WriteString(cellBorders(*c.Borders))
+			}
 			if !t.Borderless && !t.CutLines {
 				switch r.Kind {
 				case document.HeaderRow:
@@ -405,7 +424,10 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 					b.WriteString(`<w:tcBorders><w:top w:val="single" w:sz="8" w:space="0" w:color="595959"/></w:tcBorders>`)
 				}
 			}
-			b.WriteString(`</w:tcPr><w:p><w:pPr><w:spacing w:before="20" w:after="20"/>`)
+			if c.Vertical {
+				b.WriteString(`<w:textDirection w:val="btLr"/><w:vAlign w:val="center"/>`)
+			}
+			b.WriteString(`</w:tcPr><w:p><w:pPr>` + keep + `<w:spacing w:before="20" w:after="20"/>`)
 			if c.Indent > 0 {
 				fmt.Fprintf(b, `<w:ind w:left="%d"/>`, 284*c.Indent)
 			}
@@ -435,6 +457,28 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	}
 	b.WriteString(`</w:tbl><w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>`)
 	return nil
+}
+
+// cellBorders: a cell's own lines (tcBorders); LineDefault keeps the
+// table's.
+func cellBorders(bs document.Borders) string {
+	var b strings.Builder
+	b.WriteString(`<w:tcBorders>`)
+	for _, s := range []struct {
+		name string
+		line document.Line
+	}{{"top", bs.Top}, {"left", bs.Left}, {"bottom", bs.Bottom}, {"right", bs.Right}} {
+		switch s.line {
+		case document.LineNone:
+			fmt.Fprintf(&b, `<w:%s w:val="nil"/>`, s.name)
+		case document.LineThin:
+			fmt.Fprintf(&b, `<w:%s w:val="single" w:sz="2" w:space="0" w:color="999999"/>`, s.name)
+		case document.LineCut:
+			fmt.Fprintf(&b, `<w:%s w:val="dashed" w:sz="4" w:space="0" w:color="000000"/>`, s.name)
+		}
+	}
+	b.WriteString(`</w:tcBorders>`)
+	return b.String()
 }
 
 func bold(rs []document.Run) []document.Run {

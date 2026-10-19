@@ -82,6 +82,8 @@ type Paragraph struct {
 	Runs  []Run
 	Align Align
 	Style ParagraphStyle
+	// KeepWithNext keeps the paragraph on the page of the next block.
+	KeepWithNext bool
 }
 
 // Text is a paragraph of plain text.
@@ -98,6 +100,9 @@ type Run struct {
 	// SizePt sets the font size (e.g. small label texts); 0 is the
 	// paragraph's size.
 	SizePt float64
+	// ScalePct narrows (below 100) or widens the characters (e.g. 85 for
+	// a condensed look on labels); 0 is 100.
+	ScalePct int
 }
 
 // Column is a table column.
@@ -123,6 +128,23 @@ const (
 type Row struct {
 	Kind  RowKind
 	Cells []Cell
+	// HeightMM fixes this row's height; 0 is the table's RowHeightMM.
+	HeightMM float64
+}
+
+// Line is the style of a cell border.
+type Line int
+
+const (
+	LineDefault Line = iota // the table's border
+	LineNone                // no line
+	LineThin                // a thin grey line
+	LineCut                 // a dashed black line to cut along
+)
+
+// Borders overrides a cell's borders (labels).
+type Borders struct {
+	Top, Right, Bottom, Left Line
 }
 
 // Cell is a table cell.
@@ -136,6 +158,11 @@ type Cell struct {
 	Indent int
 	// Image is shown instead of the runs when set.
 	Image *Image
+	// Borders override the table's lines for this cell when set.
+	Borders *Borders
+	// Vertical turns the text by 90° (read bottom to top), for narrow
+	// cells (labels).
+	Vertical bool
 }
 
 // TextCell is a cell with plain text.
@@ -156,6 +183,11 @@ type Table struct {
 	// CutLines draws every cell border as a dashed black line to cut along
 	// (labels); it overrides Borderless.
 	CutLines bool
+	// CellMarginMM is the left and right padding inside a cell; 0 is the
+	// default (1.5 mm).
+	CellMarginMM float64
+	// KeepTogether keeps the table on one page (with the block after it).
+	KeepTogether bool
 }
 
 // Image is a PNG image shown at a size in millimetres.

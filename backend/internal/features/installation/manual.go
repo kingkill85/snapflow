@@ -75,6 +75,18 @@ type planPage struct {
 	image pngImage
 	// symbol numbers of the needs ("1", "2", …) in plan order.
 	numbers map[uuid.UUID]string
+	// marks are the devices' letters ("A", "B", …, "AA") in plan order:
+	// the plan shows them, the zone tables explain them.
+	marks map[uuid.UUID]string
+}
+
+// mark is the n-th device letter (0: "A", 25: "Z", 26: "AA").
+func mark(n int) string {
+	s := ""
+	for n++; n > 0; n = (n - 1) / 26 {
+		s = string(rune('A'+(n-1)%26)) + s
+	}
+	return s
 }
 
 // floorplans renders the floorplans with devices and need symbols; every
@@ -98,9 +110,12 @@ func (s *Service) floorplans(ctx context.Context, d *data) ([]planPage, error) {
 	}
 	var out []planPage
 	for _, p := range docPlans {
-		page := planPage{plan: p, numbers: map[uuid.UUID]string{}}
+		page := planPage{plan: p, numbers: map[uuid.UUID]string{}, marks: map[uuid.UUID]string{}}
 		for i, n := range orderedNeeds(d, p.ID) {
 			page.numbers[n.NeedID] = strconv.Itoa(i + 1)
+		}
+		for i, pl := range p.Placements {
+			page.marks[pl.ID] = mark(i)
 		}
 		bg, err := s.files.DecodeImage(ctx, p.Image, maxPlanPixels)
 		page.plan.Image = nil
@@ -117,15 +132,12 @@ func (s *Service) floorplans(ctx context.Context, d *data) ([]planPage, error) {
 			}
 			for _, pl := range p.Placements {
 				it := planimage.Placement{X: pl.X, Y: pl.Y, Width: pl.Width, Height: pl.Height, Rotation: pl.Rotation, Existing: pl.Existing}
-				it.Label = pl.Label
+				// The device's letter; label and address are in the zone
+				// tables (long labels collided on dense plans).
+				it.Label = page.marks[pl.ID]
 				if pl.VariantID != nil {
 					if v, ok := d.variants[*pl.VariantID]; ok {
 						it.Color = hexColor(v.ProductType.Color)
-					}
-				}
-				if a, ok := d.addrByKey[[2]uuid.UUID{p.ID, pl.ID}]; ok {
-					if t := addressText(a); t != "" {
-						it.Label = strings.TrimSpace(it.Label + " " + t)
 					}
 				}
 				in.Placements = append(in.Placements, it)
@@ -247,7 +259,12 @@ func overview(d *data) []document.Block {
 				if st.DevicesMax != nil {
 					devices += " / " + strconv.Itoa(int(*st.DevicesMax))
 				}
-				t.Rows = append(t.Rows, bodyRow(line.Name, text(sys.ProductType.Name, l), d.prefixByID[line.ID].Prefix, strings.Join(supplies, ", "),
+				prefix := d.prefixByID[line.ID]
+				prefixText := prefix.Prefix
+				if prefix.Default && prefixText != "" {
+					prefixText += " (" + l.t("defaultMark") + ")"
+				}
+				t.Rows = append(t.Rows, bodyRow(line.Name, text(sys.ProductType.Name, l), prefixText, strings.Join(supplies, ", "),
 					l.num(st.CurrentUsedMa)+" / "+l.num(st.CurrentSuppliedMa)+" mA", devices))
 			}
 		}
@@ -365,8 +382,8 @@ func boardBlocks(d *data, p plans.Plan) []document.Block {
 	if len(mods) == 0 {
 		return append(out, document.Text(l.t("noModules")))
 	}
-	t := document.Table{Columns: cols(0.6, 0.6, 1.6, 2.4, 0.6, 1.2), Rows: []document.Row{headerRow(l.t("colPos"), l.t("colRow"), l.t("colLabel"),
-		l.t("colProduct"), l.t("colTE"), l.t("colAddress"))}}
+	t := document.Table{Columns: cols(0.6, 0.6, 1.5, 2.3, 0.5, 1.0, 1.0), Rows: []document.Row{headerRow(l.t("colPos"), l.t("colRow"), l.t("colLabel"),
+		l.t("colProduct"), l.t("colTE"), l.t("colAddress"), l.t("colLine"))}}
 	for _, m := range mods {
 		product := d.productName(m.variantID)
 		if mn := d.model(m.variantID); mn != "" {
@@ -375,11 +392,11 @@ func boardBlocks(d *data, p plans.Plan) []document.Block {
 		if m.existing {
 			product += " – " + l.t("existingMark")
 		}
-		addr := ""
+		addr, line := "", ""
 		if a, ok := d.addrByKey[[2]uuid.UUID{m.planID, m.itemID}]; ok {
-			addr = addressText(a)
+			addr, line = addressText(a), d.networkText(a)
 		}
-		t.Rows = append(t.Rows, bodyRow(m.position, strconv.Itoa(m.rowIndex+1), m.label, product, l.num(m.widthTE), addr))
+		t.Rows = append(t.Rows, bodyRow(m.position, strconv.Itoa(m.rowIndex+1), m.label, product, l.num(m.widthTE), addr, line))
 	}
 	out = append(out, document.Heading{Level: 3, Text: l.t("modules")}, t)
 
@@ -387,14 +404,34 @@ func boardBlocks(d *data, p plans.Plan) []document.Block {
 	ct := document.Table{Columns: cols(0.6, 1.4, 1.1, 2.3, 1.4, 1.0), Rows: []document.Row{headerRow(l.t("colPos"), l.t("colChannel"),
 		l.t("colZone"), l.t("colNeed"), l.t("colLoad"), l.t("colCircuit"))}}
 	var free []string
+	var items []wiring.ItemInfo
 	for _, info := range d.wiring.Items {
-		if info.PlanID != p.ID {
-			continue
+		if info.PlanID == p.ID {
+			items = append(items, info)
 		}
+	}
+	// By module position (D1, D2, …), then channel number (native kinds
+	// before alternatives at the same number).
+	slices.SortStableFunc(items, func(a, c wiring.ItemInfo) int {
+		return posNo(d.item(a.PlanID, a.ItemID).position) - posNo(d.item(c.PlanID, c.ItemID).position)
+	})
+	for _, info := range items {
 		it := d.item(info.PlanID, info.ItemID)
 		var freeNos []string
-		for _, ch := range info.Channels {
+		channels := slices.Clone(info.Channels)
+		// An alternative channel sorts at its first base channel.
+		at := func(c wiring.ChannelInfo) int {
+			if c.Alternative {
+				return c.BaseFrom
+			}
+			return c.ChannelNo
+		}
+		slices.SortStableFunc(channels, func(a, c wiring.ChannelInfo) int { return at(a) - at(c) })
+		for _, ch := range channels {
 			chText := d.channelText(ch.OutputKindID, int32(ch.ChannelNo))
+			if ch.Alternative {
+				chText += " (" + d.kindNameByKey(ch.BaseKindKey) + " " + strconv.Itoa(ch.BaseFrom) + "+" + strconv.Itoa(ch.BaseTo) + ")"
+			}
 			if len(ch.ConnectionIDs) == 0 {
 				if !ch.Blocked && !ch.Alternative {
 					freeNos = append(freeNos, chText)
@@ -482,7 +519,7 @@ func zoneBlocks(d *data, pg planPage) []document.Block {
 		}
 		out = append(out, document.Heading{Level: 3, Text: z.name})
 		if len(devs) > 0 {
-			t := document.Table{Columns: cols(1.5, 2.3, 1.5, 1.2), Rows: []document.Row{headerRow(l.t("colDevice"), l.t("colProduct"),
+			t := document.Table{Columns: cols(0.7, 1.5, 2.3, 1.4, 1.2), Rows: []document.Row{headerRow(l.t("colMark"), l.t("colDevice"), l.t("colProduct"),
 				l.t("colAddress"), l.t("colNetwork"))}}
 			for _, pl := range devs {
 				product := d.productName(pl.VariantID)
@@ -500,7 +537,7 @@ func zoneBlocks(d *data, pg planPage) []document.Block {
 				if label == "" {
 					label = "–"
 				}
-				t.Rows = append(t.Rows, bodyRow(label, product, addr, network))
+				t.Rows = append(t.Rows, bodyRow(pg.marks[pl.ID], label, product, addr, network))
 			}
 			out = append(out, t)
 		}

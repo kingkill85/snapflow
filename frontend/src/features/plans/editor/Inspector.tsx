@@ -162,6 +162,14 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
       <p className="text-xs font-medium text-muted">{t('zones.zone')}</p>
       <ErrorList messages={errors.get(z.id) ?? []} />
       <Field label={t('zones.name')} required value={z.name} maxLength={100} disabled={!editable} onChange={(e) => update({ name: e.target.value }, 'name')} />
+      <Field
+        label={t('zones.shortName')}
+        hint={t('zones.shortNameHint')}
+        value={z.shortName ?? ''}
+        maxLength={12}
+        disabled={!editable}
+        onChange={(e) => update({ shortName: e.target.value }, 'shortName')}
+      />
       <div className="space-y-1.5">
         <p className="text-sm font-medium">{t('zones.palette')}</p>
         <div className="flex flex-wrap gap-1.5">
