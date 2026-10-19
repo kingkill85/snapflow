@@ -27,6 +27,7 @@ export function LockBanner({ lock, canTakeOver, onTakeOver, onRetry }: Props) {
   const { t } = useTranslation('plans')
   const time = useFormatTime()
   if (lock.status === 'error') return <ErrorMessage error={lock.error} action={<Button size="sm" variant="secondary" onClick={onRetry}>{t('lock.retry')}</Button>} />
+  if (lock.status === 'readOnly') return <Notice tone="warning">{t('lock.readOnly')}</Notice>
   if (lock.status !== 'held') return null
   return (
     <Notice tone="warning">

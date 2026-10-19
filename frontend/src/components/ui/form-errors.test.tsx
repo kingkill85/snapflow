@@ -6,7 +6,7 @@ import errorsDe from '@/locales/de/errors.json'
 import errorsEn from '@/locales/en/errors.json'
 
 import { apiFieldFor, apiFields, decodeMessage, errorKey, errorParamNames, setApiFieldErrors, useFieldError } from './form-errors'
-import { useErrorMessage } from './use-error-message'
+import { formatTimeParams, useErrorMessage } from './use-error-message'
 
 type FieldErrorBody = { location: string; code: string; params?: Record<string, unknown> }
 const invalid = (...fields: FieldErrorBody[]) => new ApiError({ status: 422, code: 'validation.failed', fields })
@@ -100,6 +100,19 @@ describe('API field errors', () => {
       ['email', 'user.email_taken {"email":"a@b.c"}'],
       ['nameEn', 'validation.invalid'],
     ])
+  })
+
+  it('shows times in params (the expiry of a lock) localized, not as RFC 3339', () => {
+    const { result } = renderHook(() => useErrorMessage())
+    const expiresAt = new Date(Date.now() + 60_000).toISOString()
+    const message = result.current(new ApiError({ status: 409, code: 'plan.locked', params: { name: 'Eve', expiresAt } }))
+    expect(message).toContain('Eve')
+    expect(message).not.toContain(expiresAt)
+    expect(message).not.toMatch(/\d{4}-\d{2}-\d{2}T/)
+    const now = new Date('2026-10-19T10:00:00')
+    const today = formatTimeParams({ at: new Date('2026-10-19T14:32:00').toISOString(), n: 3, s: 'x' }, 'de', now)
+    expect(today).toEqual({ at: '14:32', n: 3, s: 'x' })
+    expect(String(formatTimeParams({ at: new Date('2026-10-20T14:32:00').toISOString() }, 'en', now)?.at)).toMatch(/Oct 20, 2026/)
   })
 
   it('only says "check the highlighted fields" when every error is at a field', () => {

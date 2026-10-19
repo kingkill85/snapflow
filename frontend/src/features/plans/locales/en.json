@@ -141,6 +141,7 @@
     "heldBy": "Being edited by {{name}} until {{time}}. You can view the plan.",
     "takenOver": "{{name}} has taken over this plan. Changes not saved yet are lost; you can view it.",
     "takeOver": "Take over",
+    "readOnly": "This project has been completed or cancelled in the meantime. You can view the plan; changes not saved yet are lost.",
     "retry": "Try again"
   },
   "tools": {

@@ -3,14 +3,14 @@ import type Konva from 'konva'
 import { ArrowLeft, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router'
+import { Link, useBlocker, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
 import type { Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
 import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { type Point, useViewport, type Viewport } from '@/canvas'
-import { Button, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
+import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -35,6 +35,7 @@ import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { useShortcuts } from './use-shortcuts'
 import { ZonesPanel } from './ZonesPanel'
+import { saveOnUnload } from '../api'
 
 /** /projects/:id/versions/:versionId/plans/:planId: loads what the editor needs. */
 export function PlanEditorPage() {
@@ -98,6 +99,7 @@ type Props = { plan: Plan; content: PlanContent; project: Project; variants: Var
 
 function PlanEditor({ plan, content, project, variants }: Props) {
   const { t } = useTranslation('plans')
+  const { t: tc } = useTranslation()
   const localize = useLocalized()
   const errorMessage = useErrorMessage()
   const queryClient = useQueryClient()
@@ -108,7 +110,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const mayEdit = plan.can.update && project.status === 'active' && wide
   // Leaving saves what is pending, then releases the lock.
   const flushRef = useRef<() => Promise<void>>(async () => undefined)
-  const lock = usePlanLock(plan.id, mayEdit, () => flushRef.current())
+  const pageHideRef = useRef<() => boolean>(() => false)
+  const lock = usePlanLock(plan.id, mayEdit, { beforeRelease: () => flushRef.current(), onPageHide: () => pageHideRef.current() })
   const editable = lock.state.status === 'mine'
 
   const [state, dispatch] = useReducer(editorReducer, documentOf(content), initEditor)
@@ -169,6 +172,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   useEffect(() => {
     flushRef.current = autosave.flush
+    // Tab closed or reloaded with pending changes: one last keepalive save (D215).
+    pageHideRef.current = () => {
+      const pending = editable ? autosave.pending() : undefined
+      return pending !== undefined && saveOnUnload(plan.id, toContentInput(pending, contentVersion.current))
+    }
   })
   useEffect(() => {
     if (autosave.status === 'saved') return
@@ -176,6 +184,29 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [autosave.status])
+
+  // Leaving in the app (D28, D215): pending changes are saved first; only
+  // changes that cannot be saved (failed, stale) ask "Discard unsaved changes?".
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => editable && autosave.dirty && currentLocation.pathname !== nextLocation.pathname)
+  const [askLeave, setAskLeave] = useState(false)
+  const flushForLeave = autosave.flush
+  const pendingForLeave = autosave.pending
+  const blockerRef = useRef(blocker)
+  useEffect(() => {
+    blockerRef.current = blocker
+  })
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    let cancelled = false
+    void flushForLeave().then(() => {
+      if (cancelled) return
+      if (pendingForLeave() === undefined) blockerRef.current.proceed?.()
+      else setAskLeave(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [blocker.state, flushForLeave, pendingForLeave])
 
   /** Loads the stored content again (stale save, lock regained). */
   const reload = useCallback(async () => {
@@ -226,7 +257,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const exportPng = () => {
     const stage = stageRef.current
     if (!stage) return
-    download(stageToPng(stage, plan.image), exportFileName(project.number, plan.name))
+    const name = exportFileName(project.number, plan.name)
+    void stageToPng(stage, plan.image).then((png) => download(png, name))
   }
   const errorIds = useMemo(() => new Set(saveErrors.keys()), [saveErrors])
 
@@ -287,6 +319,23 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   const banners = (
     <>
+      <ConfirmDialog
+        open={askLeave}
+        onOpenChange={(open) => {
+          if (open) return
+          setAskLeave(false)
+          blocker.reset?.()
+        }}
+        title={tc('unsaved.title')}
+        message={tc('unsaved.message')}
+        confirmLabel={tc('action.leave')}
+        cancelLabel={tc('action.stay')}
+        pending={false}
+        onConfirm={() => {
+          setAskLeave(false)
+          blocker.proceed?.()
+        }}
+      />
       {project.status !== 'active' && <Notice tone="warning">{t('editor.readOnlyProject')}</Notice>}
       <LockBanner lock={lock.state} canTakeOver={plan.can.breakLock} onTakeOver={() => void lock.takeOver()} onRetry={() => void lock.retry()} />
       {autosave.status === 'stale' && (

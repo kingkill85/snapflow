@@ -1,5 +1,5 @@
 import { ApiError, apiClient } from '@/api/client'
-import type { Plan } from '@/api/generated/model'
+import type { Plan, PlanContentInput } from '@/api/generated/model'
 
 // Plan create and update take multipart bodies. They go through the shared
 // API client rather than the generated createPlan/updatePlan, which send the
@@ -41,5 +41,31 @@ export function releaseLockOnUnload(planId: string) {
     void fetch(`/api/plans/${planId}/lock`, { method: 'DELETE', keepalive: true, credentials: 'same-origin' }).catch(() => undefined)
   } catch {
     // nothing to do while unloading
+  }
+}
+
+/** Keepalive requests may carry at most 64 KiB (all of a page's together); larger contents cannot be sent while unloading. */
+const keepaliveLimit = 60_000
+
+/**
+ * A last save of pending content while the page unloads (tab closed or
+ * reloaded, D215): a `keepalive` PUT, which the browser completes after the
+ * page is gone. Returns false when it cannot be sent (content over the
+ * keepalive limit); the `beforeunload` prompt has warned then.
+ */
+export function saveOnUnload(planId: string, input: PlanContentInput): boolean {
+  const body = JSON.stringify(input)
+  if (new Blob([body]).size > keepaliveLimit) return false
+  try {
+    void fetch(`/api/plans/${planId}/content`, {
+      method: 'PUT',
+      keepalive: true,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).catch(() => undefined)
+    return true
+  } catch {
+    return false
   }
 }

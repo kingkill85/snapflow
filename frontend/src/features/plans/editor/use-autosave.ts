@@ -102,5 +102,8 @@ export function useAutosave<T>({ document, save, enabled, delay = autosaveDelay 
     setStale(null)
   }, [])
 
-  return { status, error: stale ?? failure?.error ?? null, dirty, flush, retry: flush, reset }
+  /** The latest document when it is not saved yet (for a last save while the page unloads), else undefined. */
+  const pending = useCallback(() => (current.current === saved.current ? undefined : current.current), [])
+
+  return { status, error: stale ?? failure?.error ?? null, dirty, flush, retry: flush, reset, pending }
 }

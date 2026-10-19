@@ -141,6 +141,7 @@
     "heldBy": "Wird bis {{time}} von {{name}} bearbeitet. Sie können den Plan ansehen.",
     "takenOver": "{{name}} hat diesen Plan übernommen. Noch nicht gespeicherte Änderungen sind verloren; Sie können ihn ansehen.",
     "takeOver": "Übernehmen",
+    "readOnly": "Dieses Projekt wurde inzwischen abgeschlossen oder storniert. Sie können den Plan ansehen; noch nicht gespeicherte Änderungen sind verloren.",
     "retry": "Erneut versuchen"
   },
   "tools": {
