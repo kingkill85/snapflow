@@ -264,3 +264,54 @@ test('plans: zone corners are dragged, added and removed', async ({ page, api })
   expect(points, JSON.stringify(points)).toHaveLength(4)
   expect(near(points, 100, 400)).toBe(false)
 })
+
+test('plans: a zone is resized as a whole by its frame', async ({ page, api }) => {
+  const { project } = await seed(api, 'Frame switch')
+  const plan = await api.createPlan(project.versions[0].id, 'Frame', planImage())
+  await page.setViewportSize({ width: 1400, height: 900 })
+  await page.goto(`/projects/${project.id}/versions/${project.versions[0].id}/plans/${plan.id}`)
+  await saved(page)
+  const map = await imageToPage(page)
+  const zonePoints = async () => (await api.planContent(plan.id)).zones[0].points
+  const near = (points: number[][], x: number, y: number) => points.some(([px, py]) => Math.abs(px - x) < 4 && Math.abs(py - y) < 4)
+  // The frame lies 10 screen px outside the zone's bounds.
+  const frame = (x: number, y: number, dx: number, dy: number) => {
+    const p = map.at(x, y)
+    return { x: p.x + dx * 10, y: p.y + dy * 10 }
+  }
+
+  await page.getByRole('button', { name: 'Draw rectangle zone' }).click()
+  await drag(page, map.at(100, 100), map.at(500, 400))
+  await saved(page)
+  const inside = map.at(300, 250)
+  await page.mouse.click(inside.x, inside.y)
+
+  // The bottom right corner of the frame scales proportionally around the top left: 400 x 300 -> 600 x 450.
+  await drag(page, frame(500, 400, 1, 1), frame(700, 500, 1, 1))
+  await saved(page)
+  let points = await zonePoints()
+  expect(points, JSON.stringify(points)).toHaveLength(4)
+  for (const [x, y] of [
+    [100, 100],
+    [700, 100],
+    [700, 550],
+    [100, 550],
+  ])
+    expect(near(points, x, y), JSON.stringify(points)).toBe(true)
+
+  // The right side stretches only the width: 600 -> 400.
+  await drag(page, frame(700, 325, 1, 0), frame(500, 300, 1, 0))
+  await saved(page)
+  points = await zonePoints()
+  for (const [x, y] of [
+    [100, 100],
+    [500, 100],
+    [500, 550],
+    [100, 550],
+  ])
+    expect(near(points, x, y), JSON.stringify(points)).toBe(true)
+
+  // One drag is one undo step.
+  await page.keyboard.press('Control+z')
+  await expect.poll(async () => near(await zonePoints(), 700, 550), { timeout: 5000 }).toBe(true)
+})

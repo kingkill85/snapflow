@@ -1,5 +1,5 @@
 import type { PlanPlacement, PlanZone } from '@/api/generated/model'
-import { boundsOf, type Point, type Rect } from '@/canvas'
+import { boundsOf, clamp, type Point, type Rect, type Size } from '@/canvas'
 
 import { newId } from './document'
 
@@ -155,3 +155,40 @@ export function labelPoint(z: PlanZone): Point {
 
 /** A polygon being drawn can close: at least 3 distinct corners with an area. */
 export const canClose = (points: Point[]) => points.length >= minZonePoints && polygonArea(points.map(toPair)) > 0
+
+/** A handle of the frame around one selected zone: corners scale, sides stretch (D252). */
+export type FrameHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+export const frameHandles: FrameHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+/** The smallest width and height a frame resize leaves a zone, in image pixels (a smaller zone keeps its size). */
+export const minZoneSize = 10
+
+/**
+ * A zone resized as a whole by dragging a handle of its bounding box by
+ * `delta` (D252): the opposite corner or side stays. A corner scales
+ * proportionally (`free`: width and height independently), a side stretches
+ * one axis. Never below `minZoneSize` per axis (no flipping) and the bounds
+ * stay inside the image (D213).
+ */
+export function scaleZone(points: number[][], handle: FrameHandle, delta: Point, free: boolean, image: Size): number[][] {
+  const b = boundsOf(points.map(toPoint))
+  // Per axis: the moving edge's direction (+1 right/bottom, -1 left/top, 0 none), the anchor and the allowed scale range.
+  const axis = (dir: number, start: number, size: number, d: number, limit: number) => {
+    if (dir === 0 || size === 0) return { anchor: start, scale: 1, min: 0, max: Infinity, active: false }
+    const anchor = dir > 0 ? start : start + size
+    const room = dir > 0 ? limit - anchor : anchor
+    const min = Math.min(minZoneSize, size) / size
+    const max = Math.max(room, size) / size
+    return { anchor, scale: (size + dir * d) / size, min, max, active: true }
+  }
+  const x = axis(handle.includes('e') ? 1 : handle.includes('w') ? -1 : 0, b.x, b.width, delta.x, image.width)
+  const y = axis(handle.includes('s') ? 1 : handle.includes('n') ? -1 : 0, b.y, b.height, delta.y, image.height)
+  let sx = clamp(x.scale, x.min, x.max)
+  let sy = clamp(y.scale, y.min, y.max)
+  if (x.active && y.active && !free) {
+    // Proportional: the axis that changed more leads, limited by both axes' ranges.
+    const s = Math.abs(x.scale - 1) >= Math.abs(y.scale - 1) ? x.scale : y.scale
+    sx = sy = clamp(s, Math.max(x.min, y.min), Math.min(x.max, y.max))
+  }
+  return points.map(([px, py]) => toPair({ x: x.anchor + (px - x.anchor) * sx, y: y.anchor + (py - y.anchor) * sy }))
+}

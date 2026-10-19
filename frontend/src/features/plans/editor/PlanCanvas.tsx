@@ -37,6 +37,8 @@ import {
   canClose,
   clampToImage,
   edgeMidpoints,
+  type FrameHandle,
+  frameHandles,
   insertVertex,
   labelPoint,
   minZonePoints,
@@ -44,6 +46,7 @@ import {
   newZone,
   rectCorners,
   removeVertex,
+  scaleZone,
   toPoint,
   zoneBounds,
 } from './zones'
@@ -64,6 +67,8 @@ type Interaction =
   | { kind: 'drawRect'; start: Point; end: Point }
   /** Dragging a zone corner; `points` already holds a corner added at an edge midpoint. */
   | { kind: 'vertex'; id: string; index: number; points: number[][]; point: Point; inserted: boolean }
+  /** Resizing a zone as a whole by a handle of its frame (D252); `points` is the preview. */
+  | { kind: 'scaleZone'; id: string; handle: FrameHandle; start: Point; points: number[][] }
 
 /** Clicks of the polygon and calibration tools, kept until the shape is done. */
 type Draft = { tool: Tool; points: Point[]; cursor: Point | null; lastClick: number }
@@ -105,6 +110,7 @@ type Props = {
 type PlanColors = typeof paperColors
 
 const handleSize = 9 // screen px
+const framePadding = 10 // screen px between a selected zone's bounds and its frame (the frame handles stay clear of the corner handles)
 const rotateOffset = 24 // screen px above the box
 const closeDistance = 8 // screen px: a click this near the first corner (or the last, as a double-click) closes a polygon
 const doubleClickMs = 400
@@ -180,6 +186,7 @@ export function PlanCanvas({
     if (interaction?.kind === 'move' && !interaction.copy && interaction.ids.includes(z.id))
       return { ...z, points: z.points.map(([x, y]) => [x + interaction.dx, y + interaction.dy]) }
     if (interaction?.kind === 'vertex' && interaction.id === z.id) return { ...z, points: moveVertex(interaction.points, interaction.index, interaction.point) }
+    if (interaction?.kind === 'scaleZone' && interaction.id === z.id) return { ...z, points: interaction.points }
     return z
   }
 
@@ -273,6 +280,10 @@ export function PlanCanvas({
       setInteraction({ kind: 'vertex', id: singleZone.id, index, points: singleZone.points, point: toPoint(singleZone.points[index]), inserted: false })
       return
     }
+    if (editable && singleZone && name.startsWith('frame-')) {
+      setInteraction({ kind: 'scaleZone', id: singleZone.id, handle: name.slice('frame-'.length) as FrameHandle, start: point, points: singleZone.points })
+      return
+    }
     if (editable && singleZone && name.startsWith('mid-')) {
       const index = Number(name.slice('mid-'.length))
       const at = edgeMidpoints(singleZone.points)[index]
@@ -337,6 +348,13 @@ export function PlanCanvas({
       case 'vertex':
         setInteraction({ ...interaction, point: clampPoint(point) })
         break
+      case 'scaleZone': {
+        const z = zoneById.get(interaction.id)
+        const delta = { x: point.x - interaction.start.x, y: point.y - interaction.start.y }
+        // Shift scales a corner freely (width and height independently).
+        if (z) setInteraction({ ...interaction, points: scaleZone(z.points, interaction.handle, delta, evt.shiftKey, plan.image) })
+        break
+      }
     }
   }
 
@@ -392,6 +410,12 @@ export function PlanCanvas({
         dispatch({ type: 'change', action: { type: 'updateZones', changes: [{ id: done.id, patch: { points } }] } })
         return
       }
+      case 'scaleZone': {
+        const before = zoneById.get(done.id)?.points
+        if (!before || JSON.stringify(before) === JSON.stringify(done.points)) return
+        dispatch({ type: 'change', action: { type: 'updateZones', changes: [{ id: done.id, patch: { points: done.points } }] } })
+        return
+      }
     }
   }
 
@@ -437,6 +461,7 @@ export function PlanCanvas({
           {zones.map((z) => (
             <ZoneNode key={z.id} zone={shownZone(z)} selected={selected.has(z.id)} error={errorIds.has(z.id)} k={k} theme={theme} />
           ))}
+          {editable && singleZoneShown && interaction?.kind !== 'move' && <ZoneFrame zone={singleZoneShown} k={k} theme={theme} />}
           {editable && singleZoneShown && interaction?.kind !== 'move' && (
             <VertexHandles zone={singleZoneShown} active={activeVertex?.zoneId === singleZoneShown.id ? activeVertex.index : -1} k={k} theme={theme} />
           )}
@@ -529,6 +554,60 @@ function ZoneLabel({ zone: z, k, theme }: { zone: PlanZone; k: number; theme: Pl
       fillAfterStrokeEnabled
       listening={false}
     />
+  )
+}
+
+const frameCursors: Record<FrameHandle, string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
+const setCursor = (node: Konva.Node, cursor: string) => {
+  const container = node.getStage()?.container()
+  if (container) container.style.cursor = cursor
+}
+
+/**
+ * The frame around one selected zone (D252): its bounds a little outside,
+ * lighter than the corner handles (drawn before them, so they win where they
+ * meet), with corner handles that scale and side handles that stretch.
+ */
+function ZoneFrame({ zone, k, theme }: { zone: PlanZone; k: number; theme: PlanColors }) {
+  const b = zoneBounds(zone)
+  const pad = framePadding * k
+  const x0 = b.x - pad
+  const y0 = b.y - pad
+  const x1 = b.x + b.width + pad
+  const y1 = b.y + b.height + pad
+  const xm = (x0 + x1) / 2
+  const ym = (y0 + y1) / 2
+  const at: Record<FrameHandle, [number, number]> = { nw: [x0, y0], n: [xm, y0], ne: [x1, y0], e: [x1, ym], se: [x1, y1], s: [xm, y1], sw: [x0, y1], w: [x0, ym] }
+  const s = handleSize * 0.8 * k
+  // A cursor set on hover is reset when the frame goes away under the pointer.
+  const group = useRef<Konva.Group>(null)
+  useEffect(() => {
+    const container = group.current?.getStage()?.container()
+    return () => {
+      if (container) container.style.cursor = ''
+    }
+  }, [])
+  return (
+    <Group ref={group} name={chromeName}>
+      <Rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} stroke={theme.primary} strokeWidth={k} opacity={0.5} listening={false} />
+      {frameHandles.map((h) => (
+        <Rect
+          key={h}
+          name={`frame-${h}`}
+          x={at[h][0] - s / 2}
+          y={at[h][1] - s / 2}
+          width={s}
+          height={s}
+          fill={theme.surface}
+          stroke={theme.primary}
+          strokeWidth={k}
+          opacity={0.75}
+          hitStrokeWidth={4 * k}
+          onMouseEnter={(e) => setCursor(e.target, frameCursors[h])}
+          onMouseLeave={(e) => setCursor(e.target, '')}
+        />
+      ))}
+    </Group>
   )
 }
 
