@@ -177,7 +177,37 @@ Backend: validity rules table-driven (output kind/function type, per-load-type W
 - **Membership (D372)**: the checks use `networks.Service.Membership` (default line / default gateway + pins → line or gateway per item), the same function the Networks view and line deletes use; members of a system without a line yet are "no line" for the view and the checks alike. A line's device limit is its `devicesMax`, else the system's `busDevicesMax`.
 - **Channel identity (D378)**: a connection's target is `(board_plan_id, module_id, output_kind_id, channel_no 1..count)` without a foreign key to `board_modules` (like D340); a variant change to fewer channels or a module delete leaves the connection dangling — reported by the checks, restored by undo. Cut/paste of a module between boards gives it a new id on the target board, so its connections are lost (documented in the editor).
 
-## 3e – Installer outputs and programming data (outline)
-- Board report per board (rails, modules, channels → zone / need label, totals) and channel labels, as DOCX via the document model (2d), downloadable from the board.
-- Programming data stored now (R18): per-unit fields for KNX individual address / HDL subnet + device id / Zigbee IEEE address (category instance attributes linked to catalog fields with meanings), bus line and gateway per device, channel ↔ needs.
-- KNX group address export (CSV/XML importable by ETS) as the first programming export; HDL and Zigbee as commissioning sheets until import formats are known.
+## 3e – Installation manual, labels and programming data
+
+What the installer gets after planning: one **installation manual** per version (DOCX via the 2d document model and exporter registry), channel **labels**, and the data for programming the systems (addresses, group addresses, commissioning lists). Built from the planned data only (plans, needs, boards, connections, networks, checks); the frontend only triggers and downloads.
+
+### Programming data (stored now, R18 / D192)
+- **Device addresses** per item (floorplan placement or board module) of a bus system: `device_addresses` (tenant-owned, RLS, per version, keyed by (plan_id, item_id) without FK to content rows like D340; ids kept on version copy): KNX individual address `area.line.device` (validated 0–15 / 0–15 / 0–255, unique per version), HDL `subnet` + `device id` (0–254 each, unique per version), Zigbee IEEE address (16 hex digits, optional, entered on site), free `note`.
+- **Bus line address defaults**: KNX `area.line` and HDL `subnet` from the bus line's address field (3c) — parsed; validation error when malformed.
+- **Auto-assign** (`POST /api/versions/{versionId}/addresses/assign {scope: all|busLineIds}`): deterministic per line (power supplies and couplers first? — record): board order → module order → floorplan order → placement order; KNX device numbers from 1 (0 reserved), HDL device ids from 1; never changes addresses set by hand (`pinned`); preview not needed (undo by clearing auto ones: `DELETE …/addresses?auto=true`).
+- `GET/PUT /api/versions/{versionId}/addresses` (bulk set/clear), findings from the checks engine: duplicate address, address outside its line, device without address (info).
+
+### Group addresses (KNX, first programming export)
+- Generated, not stored (deterministic from connections + addresses): three-level structure **main = plan (floor)**, **middle = zone (room)**, **sub = function per need**: switching → "Switch" + "Switch status"; dimming → + "Dim relative" + "Brightness value" + "Brightness status"; blind → "Up/Down" + "Stop/Step" + "Position" + "Position status"; inputs → as the connected function. Names "<zone> <need label or function> <object>", numbers main/middle/sub from plan/zone/need order (record exact rule; stable for unchanged order).
+- Export `GET /api/versions/{versionId}/exports/knx-group-addresses.csv` in the ETS group address CSV import format (3-level, `"Main","Middle","Sub","Address","Central","Unfiltered","Description","DatapointType","Security"` with DPTs DPST-1-1, DPST-3-7, DPST-5-1, DPST-1-8, DPST-1-7 …) — verify against ETS documentation and record the exact dialect; plus an XML variant only if cheap.
+- HDL and Zigbee: **commissioning lists** as XLSX (excelize is in the module graph): per line/gateway: device, model, location (plan, zone), address (HDL subnet/device id; Zigbee IEEE + gateway), channels with their loads; one sheet per system.
+
+### Installation manual (DOCX, exporter registry entry `docx-installation-manual`)
+- Cover: project, version, customer, installer (tenant letterhead D261), date, document number (like proposals D259 pattern with its own sequence, recorded as a generated document — reuse the proposals records? → own `documents` record kind or extend proposals to a general "generated documents" list; decide and record).
+- Contents per version:
+  1. **Overview**: systems, bus lines (power supplies, current used/supplied, devices/max), gateways (places), open check findings (errors/warnings) as a list — the installer sees what is still open.
+  2. **Per board**: a drawing of the board (rows/rails with modules, labels, width; rendered server-side like plan images D256), module list (position, label, product, model, address), **channel table** (module · channel · output kind · connected needs: zone, label, function, units × power, load type · circuit marker), free channels.
+  3. **Per floorplan**: the plan image with devices, need symbols and zone names (D256 renderer incl. symbols), then per zone a table of devices (label, product, address, line/gateway) and needs with where they are connected ("Ceiling lights 3 × 60 W LED → Main board D1 ch 3").
+  4. **Cable/terminal hints** are out of scope (no cable planning, R12) — one sentence says so.
+- Existing devices (D185) are included and marked "existing"; prices never appear.
+- Language = project language (D253); en + de texts in the backend catalog.
+- **Channel labels**: a separate DOCX (or a section) with label strips per board row: one label per module with label and per-channel short texts (zone abbreviation + need label), sized for common label printers? → A4 sheet with cut lines, 17.5 mm per TE width (record).
+
+### Frontend
+- Version tab **Documents** (or extend **Proposals** to "Documents": proposals + installation manuals + exports; decide and record — keep proposals' list as is): buttons "Installation manual (DOCX)", "Channel labels (DOCX)", "KNX group addresses (CSV)", "HDL commissioning list (XLSX)", "Zigbee device list (XLSX)"; list of generated manuals with download/delete.
+- Addresses: in the Networks tab per line a column "Address" with inline edit (KNX x.y.z / HDL subnet.device), "Assign addresses" (auto) and "Clear automatic"; Zigbee IEEE per device; in the board editor and floorplan inspector a read-only address line.
+- en + de, design system only.
+
+### Tests
+Backend: address validation/uniqueness/auto-assign determinism/pinned untouched/clear auto; group address generation (structure, names, DPTs, numbering stability) and CSV format golden test; XLSX commissioning lists (sheets, rows); installation manual DOCX (parts valid, LibreOffice conversion in the documents CI job, content per section, existing devices marked, no prices), labels DOCX; RLS; version copy of addresses. Frontend: documents tab, address editing, assign/clear. E2E: realistic project → assign addresses → generate manual + labels + CSV + XLSX → check files (zip/CSV content) → LibreOffice conversion in the documents job.
+
