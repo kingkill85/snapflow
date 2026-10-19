@@ -24,6 +24,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BoardContent,
+  BoardContentInput,
+  BoardCreate,
   CreatePlanBody,
   Error,
   LockPlanParams,
@@ -320,6 +323,168 @@ export const useUpdatePlan = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getUpdatePlanMutationOptions(options), queryClient);
+    }
+    /**
+ * With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.
+ * @summary Get a board's enclosure, rows and modules
+ */
+export const getBoardContent = (
+    id: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<BoardContent>(
+      {url: `/api/plans/${id}/board`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetBoardContentQueryKey = (id: string,) => {
+    return [
+    `/api/plans/${id}/board`
+    ] as const;
+    }
+
+
+export const getGetBoardContentQueryOptions = <TData = Awaited<ReturnType<typeof getBoardContent>>, TError = ErrorType<Error>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBoardContentQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBoardContent>>> = ({ signal }) => getBoardContent(id, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetBoardContentQueryResult = NonNullable<Awaited<ReturnType<typeof getBoardContent>>>
+export type GetBoardContentQueryError = ErrorType<Error>
+
+
+export function useGetBoardContent<TData = Awaited<ReturnType<typeof getBoardContent>>, TError = ErrorType<Error>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBoardContent>>,
+          TError,
+          Awaited<ReturnType<typeof getBoardContent>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBoardContent<TData = Awaited<ReturnType<typeof getBoardContent>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBoardContent>>,
+          TError,
+          Awaited<ReturnType<typeof getBoardContent>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBoardContent<TData = Awaited<ReturnType<typeof getBoardContent>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a board's enclosure, rows and modules
+ */
+
+export function useGetBoardContent<TData = Awaited<ReturnType<typeof getBoardContent>>, TError = ErrorType<Error>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardContent>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetBoardContentQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
+ * @summary Replace a board's enclosure, rows and modules
+ */
+export const saveBoardContent = (
+    id: string,
+    boardContentInput: BodyType<NonReadonly<BoardContentInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<BoardContent>(
+      {url: `/api/plans/${id}/board`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: boardContentInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getSaveBoardContentMutationKey = () => ['saveBoardContent'] as const;
+
+export const getSaveBoardContentMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveBoardContent>>, TError,SaveBoardContentMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof saveBoardContent>>, TError,SaveBoardContentMutationVariables, TContext> => {
+
+const mutationKey = getSaveBoardContentMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveBoardContent>>, SaveBoardContentMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  saveBoardContent(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveBoardContentMutationResult = NonNullable<Awaited<ReturnType<typeof saveBoardContent>>>
+    export type SaveBoardContentMutationBody = BodyType<NonReadonly<BoardContentInput>>
+    export type SaveBoardContentMutationError = ErrorType<Error>
+    export type SaveBoardContentMutationVariables = {id: string;data: BodyType<NonReadonly<BoardContentInput>>}
+
+    /**
+ * @summary Replace a board's enclosure, rows and modules
+ */
+export const useSaveBoardContent = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveBoardContent>>, TError,SaveBoardContentMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveBoardContent>>,
+        TError,
+        SaveBoardContentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveBoardContentMutationOptions(options), queryClient);
     }
     /**
  * @summary Get a plan's zones, placements and needs
@@ -716,6 +881,75 @@ export const useLockPlan = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getLockPlanMutationOptions(options), queryClient);
+    }
+    /**
+ * A plan of kind board after the version's last plan: with an enclosure of known size its rows (enclosureRows x enclosureTePerRow), else the rows given.
+ * @summary Add a distribution board
+ */
+export const createBoard = (
+    versionId: string,
+    boardCreate: BodyType<NonReadonly<BoardCreate>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Plan>(
+      {url: `/api/versions/${versionId}/boards`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: boardCreate, signal
+    },
+      );
+    }
+
+
+
+
+export const getCreateBoardMutationKey = () => ['createBoard'] as const;
+
+export const getCreateBoardMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoard>>, TError,CreateBoardMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createBoard>>, TError,CreateBoardMutationVariables, TContext> => {
+
+const mutationKey = getCreateBoardMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBoard>>, CreateBoardMutationVariables> = (props) => {
+          const {versionId,data} = props ?? {};
+
+          return  createBoard(versionId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBoardMutationResult = NonNullable<Awaited<ReturnType<typeof createBoard>>>
+    export type CreateBoardMutationBody = BodyType<NonReadonly<BoardCreate>>
+    export type CreateBoardMutationError = ErrorType<Error>
+    export type CreateBoardMutationVariables = {versionId: string;data: BodyType<NonReadonly<BoardCreate>>}
+
+    /**
+ * @summary Add a distribution board
+ */
+export const useCreateBoard = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoard>>, TError,CreateBoardMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createBoard>>,
+        TError,
+        CreateBoardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateBoardMutationOptions(options), queryClient);
     }
     /**
  * Every need of the version's plans, grouped by plan and zone, with totals per function type and load type.

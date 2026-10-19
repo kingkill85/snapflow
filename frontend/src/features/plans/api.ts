@@ -69,3 +69,10 @@ export function saveOnUnload(planId: string, input: PlanContentInput): boolean {
     return false
   }
 }
+
+/** A plan with a background image (kind floorplan); boards have none. */
+export type Floorplan = Plan & { image: NonNullable<Plan['image']> }
+
+export function isFloorplan(plan: Plan): plan is Floorplan {
+  return plan.kind === 'floorplan' && plan.image !== null
+}

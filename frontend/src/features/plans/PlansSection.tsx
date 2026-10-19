@@ -82,7 +82,7 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
             <li key={plan.id} className="flex flex-col overflow-hidden rounded-control border border-line bg-surface">
               <Link to={editorPath(projectId, versionId, plan.id)} className="group block focus-visible:outline-2 focus-visible:outline-focus">
                 <span className="block aspect-[4/3] border-b border-line bg-canvas">
-                  <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />
+                  {plan.image && <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />}
                 </span>
                 <span className="block px-3 pt-2 font-medium group-hover:underline">{plan.name}</span>
               </Link>

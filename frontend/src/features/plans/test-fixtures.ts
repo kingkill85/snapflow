@@ -32,6 +32,7 @@ export const plan = (n: number, over: Partial<Plan> = {}): Plan => ({
   name: n === 1 ? 'Ground floor' : `Floor ${n}`,
   position: n,
   image: { url: `/api/plans/${pid(500 + n)}/images/${pid(600 + n)}`, width: 1000, height: 800 },
+  board: null,
   zoneCount: 0,
   placementCount: 0,
   needCount: 0,

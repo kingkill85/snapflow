@@ -176,6 +176,67 @@
         ],
         "type": "object"
       },
+      "AssignmentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "busLineId": {
+            "description": "A line of the item's bus system",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gatewayItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gatewayPlanId": {
+            "description": "With gatewayItemId: a gateway of the item's wireless system",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "itemId"
+        ],
+        "type": "object"
+      },
+      "AssignmentsInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AssignmentsInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentInput"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "assignments"
+        ],
+        "type": "object"
+      },
       "AttributeDefinition": {
         "additionalProperties": false,
         "properties": {
@@ -638,6 +699,714 @@
         "required": [
           "id",
           "name"
+        ],
+        "type": "object"
+      },
+      "BoardContent": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BoardContent.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "capabilities": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Capabilities"
+            },
+            "description": "Capability summary of every variant used (modules, enclosure), by variant id",
+            "type": "object"
+          },
+          "capacityTe": {
+            "description": "Sum of the rows' capacity",
+            "format": "double",
+            "type": "number"
+          },
+          "contentUpdatedAt": {
+            "description": "Send it back as expectedContentUpdatedAt",
+            "format": "date-time",
+            "type": "string"
+          },
+          "enclosureVariantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modules": {
+            "description": "In order",
+            "items": {
+              "$ref": "#/components/schemas/BoardModule"
+            },
+            "type": "array"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "rows": {
+            "description": "In order",
+            "items": {
+              "$ref": "#/components/schemas/BoardRow"
+            },
+            "type": "array"
+          },
+          "rowsFromEnclosure": {
+            "description": "The enclosure gives rows and capacity (read-only in the editor)",
+            "type": "boolean"
+          },
+          "usedTe": {
+            "description": "Sum of the modules' widths",
+            "format": "double",
+            "type": "number"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/BoardWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "planId",
+          "contentUpdatedAt",
+          "enclosureVariantId",
+          "rowsFromEnclosure",
+          "rows",
+          "modules",
+          "capacityTe",
+          "usedTe",
+          "capabilities",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "BoardContentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BoardContentInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enclosureVariantId": {
+            "description": "The enclosure (catalog variant); null for none (free rails)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedContentUpdatedAt": {
+            "description": "contentUpdatedAt as last read; plan.stale otherwise",
+            "format": "date-time",
+            "type": "string"
+          },
+          "modules": {
+            "description": "In order (the array order is stored); at most 1000",
+            "items": {
+              "$ref": "#/components/schemas/BoardModuleInput"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "In order (the array order is stored); at most 50. With an enclosure of known size the rows are fitted to it (D357)",
+            "items": {
+              "$ref": "#/components/schemas/BoardRowInput"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "expectedContentUpdatedAt",
+          "enclosureVariantId",
+          "rows",
+          "modules"
+        ],
+        "type": "object"
+      },
+      "BoardCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BoardCreate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enclosureVariantId": {
+            "description": "An enclosure (catalog variant): its enclosureRows x enclosureTePerRow give the rows; rows sent are then ignored",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters, unique in the version ignoring case",
+            "type": "string"
+          },
+          "rows": {
+            "description": "Rows of DIN rail without an enclosure (or with one whose size is unknown)",
+            "items": {
+              "$ref": "#/components/schemas/BoardRowCreate"
+            },
+            "maxItems": 50,
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "BoardModule": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantIds": {
+            "description": "Chosen optional add-ons, as for placements",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "existing": {
+            "description": "The customer already has it: counts technically, never in BOM, prices or proposals",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the board, kept across saves and version copies",
+            "type": "string"
+          },
+          "instanceValues": {
+            "additionalProperties": {},
+            "description": "Values of the category's instanceAttributes",
+            "type": "object"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "offsetTe": {
+            "description": "Distance from the row's start in TE, at least 0, one decimal",
+            "format": "double",
+            "type": "number"
+          },
+          "rowId": {
+            "description": "A row of the same content",
+            "type": "string"
+          },
+          "variantId": {
+            "description": "null only for a stored module whose variant was deleted from the catalog",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widthTe": {
+            "description": "The variant's railWidthTe; 1 when unknown (warning module_width_unknown)",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "widthTe",
+          "id",
+          "rowId",
+          "offsetTe",
+          "variantId",
+          "label",
+          "existing",
+          "addonVariantIds",
+          "instanceValues"
+        ],
+        "type": "object"
+      },
+      "BoardModuleInput": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantIds": {
+            "description": "Chosen optional add-ons, as for placements",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "existing": {
+            "description": "The customer already has it: counts technically, never in BOM, prices or proposals",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the board, kept across saves and version copies",
+            "type": "string"
+          },
+          "instanceValues": {
+            "additionalProperties": {},
+            "description": "Values of the category's instanceAttributes",
+            "type": "object"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "offsetTe": {
+            "description": "Distance from the row's start in TE, at least 0, one decimal",
+            "format": "double",
+            "type": "number"
+          },
+          "rowId": {
+            "description": "A row of the same content",
+            "type": "string"
+          },
+          "variantId": {
+            "description": "null only for a stored module whose variant was deleted from the catalog",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "rowId",
+          "offsetTe",
+          "variantId",
+          "label",
+          "existing",
+          "addonVariantIds",
+          "instanceValues"
+        ],
+        "type": "object"
+      },
+      "BoardRow": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "format": "double",
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "usedTe": {
+            "description": "Sum of the widths of the row's modules (unknown width counts 1 TE)",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "capacityTe",
+          "usedTe"
+        ],
+        "type": "object"
+      },
+      "BoardRowCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "description": "Above 0, at most 999.9, one decimal",
+            "examples": [
+              12
+            ],
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "capacityTe"
+        ],
+        "type": "object"
+      },
+      "BoardRowInput": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "description": "Above 0, at most 999.9, one decimal; with an enclosure of known size the enclosure's TE per row (the value sent is ignored)",
+            "format": "double",
+            "type": "number"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the board, kept across saves and version copies",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "capacityTe"
+        ],
+        "type": "object"
+      },
+      "BoardWarning": {
+        "additionalProperties": false,
+        "properties": {
+          "addonVariantId": {
+            "description": "The add-on of an add-on warning",
+            "type": "string"
+          },
+          "code": {
+            "enum": [
+              "module_width_unknown",
+              "module_mounting_floorplan",
+              "row_overflow",
+              "enclosure_size_unknown",
+              "variant_deleted",
+              "variant_inactive",
+              "product_inactive",
+              "category_inactive",
+              "product_type_inactive",
+              "product_type_not_in_project",
+              "required_addon_unavailable",
+              "addon_unavailable",
+              "addon_not_linked"
+            ],
+            "type": "string"
+          },
+          "moduleId": {
+            "description": "The module; null for a warning of the enclosure",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "moduleId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "BusLine": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BusLine.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "description": "KNX area/line or HDL subnet for later programming; empty for none",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Kept by the version copy",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "description": "Order within the version, 1 first",
+            "format": "int32",
+            "type": "integer"
+          },
+          "productTypeId": {
+            "description": "The bus system (product type with topology bus)",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "productTypeId",
+          "name",
+          "address",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "BusLineInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BusLineInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "description": "At most 50 characters",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters, unique per system in the version ignoring case",
+            "type": "string"
+          },
+          "productTypeId": {
+            "description": "A product type with topology bus",
+            "type": "string"
+          }
+        },
+        "required": [
+          "productTypeId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "BusLineNetwork": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "KNX area/line or HDL subnet for later programming; empty for none",
+            "type": "string"
+          },
+          "busCurrentSuppliedMa": {
+            "description": "Sum of the power supplies' currents",
+            "format": "double",
+            "type": "number"
+          },
+          "busCurrentUsedMa": {
+            "description": "Sum of the known currents used",
+            "format": "double",
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deviceCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Kept by the version copy",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/BusMember"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "description": "Order within the version, 1 first",
+            "format": "int32",
+            "type": "integer"
+          },
+          "productTypeId": {
+            "description": "The bus system (product type with topology bus)",
+            "type": "string"
+          },
+          "unknownCurrentCount": {
+            "description": "Members without a known current used (power supplies excluded)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "members",
+          "deviceCount",
+          "busCurrentUsedMa",
+          "busCurrentSuppliedMa",
+          "unknownCurrentCount",
+          "id",
+          "versionId",
+          "productTypeId",
+          "name",
+          "address",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "BusLineOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BusLineOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every line of the version exactly once, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "BusLineUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BusLineUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "description": "At most 50 characters; empty for none",
+            "type": "string"
+          },
+          "name": {
+            "description": "1-100 characters, unique per system in the version ignoring case",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "address"
+        ],
+        "type": "object"
+      },
+      "BusMember": {
+        "additionalProperties": false,
+        "properties": {
+          "busCurrentSuppliedMa": {
+            "description": "Set for a power supply",
+            "format": "double",
+            "type": "number"
+          },
+          "busCurrentUsedMa": {
+            "description": "Absent when unknown",
+            "format": "double",
+            "type": "number"
+          },
+          "busCurrentUsedMaDefault": {
+            "description": "busCurrentUsedMa is the system's default",
+            "type": "boolean"
+          },
+          "existing": {
+            "type": "boolean"
+          },
+          "itemId": {
+            "description": "The placement or module id",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "pinned": {
+            "description": "Explicitly assigned; false = the default (the system's first line)",
+            "type": "boolean"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "powerSupply": {
+            "description": "Supplies bus current (busCurrentSuppliedMa \u003e 0)",
+            "type": "boolean"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "busCurrentUsedMaDefault",
+          "powerSupply",
+          "pinned",
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "variantId",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "BusSystem": {
+        "additionalProperties": false,
+        "properties": {
+          "lines": {
+            "description": "In order; the first is the default line",
+            "items": {
+              "$ref": "#/components/schemas/BusLineNetwork"
+            },
+            "type": "array"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/SystemRef"
+          },
+          "unassigned": {
+            "description": "Members without a line (only while the system has no line yet: read-only projects or readers)",
+            "items": {
+              "$ref": "#/components/schemas/BusMember"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "productType",
+          "lines",
+          "unassigned"
         ],
         "type": "object"
       },
@@ -2147,6 +2916,88 @@
         "required": [
           "functionType",
           "totals"
+        ],
+        "type": "object"
+      },
+      "Gateway": {
+        "additionalProperties": false,
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/WirelessDevice"
+            },
+            "type": "array"
+          },
+          "existing": {
+            "type": "boolean"
+          },
+          "itemId": {
+            "description": "The placement or module id",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "unknownPlacesCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "wirelessPlacesSupplied": {
+            "format": "double",
+            "type": "number"
+          },
+          "wirelessPlacesUsed": {
+            "description": "Sum of the known places its devices use",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "wirelessPlacesSupplied",
+          "wirelessPlacesUsed",
+          "unknownPlacesCount",
+          "devices",
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "variantId",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "existing"
         ],
         "type": "object"
       },
@@ -4404,6 +5255,60 @@
         ],
         "type": "object"
       },
+      "NetworkActions": {
+        "additionalProperties": false,
+        "properties": {
+          "update": {
+            "description": "Manage bus lines and assignments (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update"
+        ],
+        "type": "object"
+      },
+      "Networks": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Networks.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "busSystems": {
+            "description": "In product type order",
+            "items": {
+              "$ref": "#/components/schemas/BusSystem"
+            },
+            "type": "array"
+          },
+          "can": {
+            "$ref": "#/components/schemas/NetworkActions"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "wirelessSystems": {
+            "description": "In product type order",
+            "items": {
+              "$ref": "#/components/schemas/WirelessSystem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "versionId",
+          "busSystems",
+          "wirelessSystems",
+          "can"
+        ],
+        "type": "object"
+      },
       "NullableBOMAmounts": {
         "additionalProperties": false,
         "properties": {
@@ -4425,6 +5330,42 @@
           "discount",
           "services",
           "grandTotal"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableBoardSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "description": "Sum of the rows' capacity in TE",
+            "format": "double",
+            "type": "number"
+          },
+          "enclosureVariantId": {
+            "description": "The enclosure (catalog variant); null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "moduleCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "usedTe": {
+            "description": "Sum of the modules' widths in TE (unknown width counts 1 TE)",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "enclosureVariantId",
+          "moduleCount",
+          "capacityTe",
+          "usedTe"
         ],
         "type": [
           "object",
@@ -4625,6 +5566,36 @@
           "id",
           "key",
           "name"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullablePlanImage": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "url": {
+            "description": "Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant)",
+            "examples": [
+              "/api/plans/3f2c…/images/9a1b…"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Natural pixels of the stored image; all coordinates are image pixels",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "width",
+          "height"
         ],
         "type": [
           "object",
@@ -5055,6 +6026,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "board": {
+            "$ref": "#/components/schemas/NullableBoardSummary",
+            "description": "Board facts; null for a floorplan"
+          },
           "can": {
             "$ref": "#/components/schemas/PlanActions"
           },
@@ -5071,11 +6046,13 @@
             "type": "string"
           },
           "image": {
-            "$ref": "#/components/schemas/PlanImage"
+            "$ref": "#/components/schemas/NullablePlanImage",
+            "description": "The background image of a floorplan; null for a board"
           },
           "kind": {
             "enum": [
-              "floorplan"
+              "floorplan",
+              "board"
             ],
             "type": "string"
           },
@@ -5128,6 +6105,7 @@
           "name",
           "position",
           "image",
+          "board",
           "zoneCount",
           "placementCount",
           "needCount",
@@ -5290,33 +6268,6 @@
           "scale",
           "zones",
           "placements"
-        ],
-        "type": "object"
-      },
-      "PlanImage": {
-        "additionalProperties": false,
-        "properties": {
-          "height": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "url": {
-            "description": "Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant)",
-            "examples": [
-              "/api/plans/3f2c…/images/9a1b…"
-            ],
-            "type": "string"
-          },
-          "width": {
-            "description": "Natural pixels of the stored image; all coordinates are image pixels",
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "url",
-          "width",
-          "height"
         ],
         "type": "object"
       },
@@ -8147,6 +9098,35 @@
         ],
         "type": "object"
       },
+      "SystemRef": {
+        "additionalProperties": false,
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
       "Tenant": {
         "additionalProperties": false,
         "properties": {
@@ -8776,6 +9756,107 @@
           "functionTypes",
           "loadTypes",
           "totals"
+        ],
+        "type": "object"
+      },
+      "WirelessDevice": {
+        "additionalProperties": false,
+        "properties": {
+          "existing": {
+            "type": "boolean"
+          },
+          "itemId": {
+            "description": "The placement or module id",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "pinned": {
+            "description": "Explicitly assigned; false = the default gateway",
+            "type": "boolean"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "wirelessPlacesUsed": {
+            "description": "Absent when unknown",
+            "format": "double",
+            "type": "number"
+          },
+          "wirelessPlacesUsedDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "wirelessPlacesUsedDefault",
+          "pinned",
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "variantId",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "WirelessSystem": {
+        "additionalProperties": false,
+        "properties": {
+          "gateways": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/Gateway"
+            },
+            "type": "array"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/SystemRef"
+          },
+          "unassigned": {
+            "description": "Devices while the system has no gateway",
+            "items": {
+              "$ref": "#/components/schemas/WirelessDevice"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "productType",
+          "gateways",
+          "unassigned"
         ],
         "type": "object"
       }
@@ -11718,6 +12799,100 @@
         ]
       }
     },
+    "/api/plans/{id}/board": {
+      "get": {
+        "description": "With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.",
+        "operationId": "getBoardContent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardContent"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a board's enclosure, rows and modules",
+        "tags": [
+          "plans"
+        ]
+      },
+      "put": {
+        "description": "Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+        "operationId": "saveBoardContent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardContentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardContent"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace a board's enclosure, rows and modules",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
     "/api/plans/{id}/content": {
       "get": {
         "operationId": "getPlanContent",
@@ -14361,6 +15536,59 @@
         ]
       }
     },
+    "/api/versions/{versionId}/boards": {
+      "post": {
+        "description": "A plan of kind board after the version's last plan: with an enclosure of known size its rows (enclosureRows x enclosureTePerRow), else the rows given.",
+        "operationId": "createBoard",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a distribution board",
+        "tags": [
+          "plans"
+        ]
+      }
+    },
     "/api/versions/{versionId}/bom": {
       "get": {
         "description": "Computed from the placements of the version's plans (not existing ones) and its manual lines, priced from the version's snapshots, with groups, totals, pricing and manual lines.",
@@ -14401,6 +15629,262 @@
         "summary": "Get the bill of materials of a version",
         "tags": [
           "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/bus-lines": {
+      "get": {
+        "operationId": "listBusLines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BusLine"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the bus lines of a version",
+        "tags": [
+          "networks"
+        ]
+      },
+      "post": {
+        "description": "To a bus system (product type with topology bus; 422 bus_line.not_bus_system otherwise), after the version's last line.",
+        "operationId": "createBusLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusLineInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusLine"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a bus line",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/bus-lines/order": {
+      "put": {
+        "description": "ids must list every line of the version exactly once (422 bus_line.order_mismatch). The first line of a system is its default line.",
+        "operationId": "reorderBusLines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusLineOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BusLine"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Reorder the bus lines of a version",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/bus-lines/{id}": {
+      "delete": {
+        "description": "Refused while devices are explicitly assigned to it (409 bus_line.in_use).",
+        "operationId": "deleteBusLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a bus line",
+        "tags": [
+          "networks"
+        ]
+      },
+      "put": {
+        "operationId": "updateBusLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusLineUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusLine"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename a bus line or change its address",
+        "tags": [
+          "networks"
         ]
       }
     },
@@ -14795,6 +16279,102 @@
         "summary": "Get the needs of a version by plan and zone",
         "tags": [
           "plans"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/network-assignments": {
+      "put": {
+        "description": "Each entry assigns an item (placement or module) to a bus line or a gateway of its system; both targets null clears the assignment (back to the default). Returns the networks.",
+        "operationId": "setNetworkAssignments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Networks"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set or clear explicit network assignments",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/networks": {
+      "get": {
+        "description": "Bus systems with their lines and members, wireless systems with their gateways and devices; default and explicit (pinned) assignments. A bus system with members but no line gets its default line first when the caller may change the version.",
+        "operationId": "getNetworks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Networks"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the bus lines and gateways of a version",
+        "tags": [
+          "networks"
         ]
       }
     },

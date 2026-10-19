@@ -39,7 +39,7 @@ import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { type CopyItems, useShortcuts } from './use-shortcuts'
 import { ZonesPanel } from './ZonesPanel'
-import { saveOnUnload } from '../api'
+import { isFloorplan, saveOnUnload, type Floorplan } from '../api'
 
 /** /projects/:id/versions/:versionId/plans/:planId: loads what the editor needs. */
 export function PlanEditorPage() {
@@ -66,6 +66,13 @@ export function PlanEditorPage() {
   // contentUpdatedAt, so the first save would fail as stale.
   if (!plan.isFetchedAfterMount || !content.isFetchedAfterMount || !project.isFetchedAfterMount) return <Loading />
   if (!plan.data || !content.data || !project.data || !catalog.data) return <Loading />
+  if (!isFloorplan(plan.data)) {
+    return (
+      <Page title={t('editor.title')}>
+        <EmptyState title={t('editor.notFound')} action={<TextLink to={versionPath(id, versionId)}>{t('editor.back')}</TextLink>} />
+      </Page>
+    )
+  }
   return <PlanEditor key={plan.data.id} plan={plan.data} content={content.data} project={project.data} variants={catalog.data} />
 }
 
@@ -102,7 +109,7 @@ function useFillHeight() {
 
 type PanelTab = 'products' | 'zones' | 'layers' | 'inspector'
 
-type Props = { plan: Plan; content: PlanContent; project: Project; variants: VariantSearchItem[] }
+type Props = { plan: Floorplan; content: PlanContent; project: Project; variants: VariantSearchItem[] }
 
 function PlanEditor({ plan, content, project, variants }: Props) {
   const { t } = useTranslation('plans')

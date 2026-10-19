@@ -56,6 +56,13 @@
     "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
   },
+  "board": {
+    "overlap": "Dieses Modul überlappt ein anderes Modul in der Reihe.",
+    "row_not_found": "Diese Reihe existiert nicht mehr.",
+    "offset_invalid": "Die Position muss 0 bis {{max}} TE betragen, mit höchstens einer Nachkommastelle.",
+    "capacity_invalid": "Eine Reihe fasst mehr als 0 und höchstens {{max}} TE, mit höchstens einer Nachkommastelle.",
+    "enclosure_not_found": "Dieses Gehäuse existiert nicht mehr im Katalog."
+  },
   "bom": {
     "line_kind": "Wählen Sie entweder ein Katalogprodukt oder einen Namen und einen Stückpreis.",
     "line_not_found": "Diese Position existiert nicht mehr.",
@@ -68,6 +75,14 @@
     "unit_price_invalid": "Geben Sie einen Betrag ab 0 mit höchstens 2 Nachkommastellen ein.",
     "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
     "variant_unavailable": "Dieses Produkt ist nicht verfügbar (inaktiv) und kann nicht hinzugefügt werden."
+  },
+  "bus_line": {
+    "not_found": "Diese Buslinie existiert nicht mehr.",
+    "name_taken": "Dieses System hat bereits eine Linie namens „{{name}}“.",
+    "in_use": "Dieser Linie sind Geräte zugeordnet ({{count}}). Verschieben Sie sie zuerst auf eine andere Linie.",
+    "order_mismatch": "Die Buslinien dieser Version haben sich geändert. Neu laden und erneut versuchen.",
+    "not_bus_system": "Dieses System hat keine Bus-Topologie.",
+    "product_type_not_found": "Dieses System existiert nicht mehr."
   },
   "catalog_field": {
     "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",
@@ -178,7 +193,15 @@
     "zone_not_found": "Diese Zone existiert nicht mehr."
   },
   "network": {
-    "unavailable": "Keine Verbindung zum Server."
+    "unavailable": "Keine Verbindung zum Server.",
+    "item_not_found": "Dieses Gerät ist auf keinem Plan dieser Version mehr.",
+    "both_targets": "Wählen Sie eine Buslinie oder ein Gateway, nicht beides.",
+    "not_bus_device": "Dieses Gerät ist kein Busgerät.",
+    "line_mismatch": "Diese Linie gehört zu einem anderen System.",
+    "gateway_partial": "Wählen Sie ein Gateway.",
+    "not_wireless_device": "Dieses Gerät ist kein Funkgerät.",
+    "gateway_not_found": "Dieses Gateway gehört nicht zum System des Geräts.",
+    "changed": "Ein Plan oder eine Buslinie wurde inzwischen geändert. Neu laden und erneut versuchen."
   },
   "output_kind": {
     "alternative_cycle": "Diese Ausgangsart hat diese bereits als Alternative.",
@@ -209,7 +232,8 @@
     "zone_opacity": "Die Deckkraft muss zwischen 0 und 1 liegen.",
     "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
     "variant_required": "Wählen Sie ein Produkt.",
-    "addon_not_linked": "Dies ist kein Zubehör der gewählten Variante."
+    "addon_not_linked": "Dies ist kein Zubehör der gewählten Variante.",
+    "wrong_kind": "Dieser Plan ist von einer anderen Art. Laden Sie die Seite neu."
   },
   "pricing": {
     "amount_range": "Dieser Betrag ist zu groß (höchstens {{max}}).",

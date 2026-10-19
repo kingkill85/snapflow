@@ -3,7 +3,8 @@ import { type DragEvent, type RefObject, useEffect, useMemo, useRef, useState } 
 import { useTranslation } from 'react-i18next'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text, Wedge } from 'react-konva'
 
-import type { Plan, PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { Floorplan } from '../api'
+import type { PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import {
   angleTo,
   boundsOf,
@@ -79,7 +80,7 @@ type Interaction =
 type Draft = { tool: Tool; points: Point[]; cursor: Point | null; lastClick: number }
 
 type Props = {
-  plan: Plan
+  plan: Floorplan
   document: PlanDocument
   selection: string[]
   variants: Map<string, VariantSearchItem>

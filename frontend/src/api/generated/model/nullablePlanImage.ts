@@ -5,10 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface PlanImage {
+/**
+ * @nullable
+ */
+export type NullablePlanImage = {
   height: number;
   /** Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant) */
   url: string;
   /** Natural pixels of the stored image; all coordinates are image pixels */
   width: number;
-}
+} | null;
