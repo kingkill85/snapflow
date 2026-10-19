@@ -87,6 +87,16 @@ export function Inspector(props: Props) {
   return <PlacementInspector {...props} placement={placements[0]} />
 }
 
+/** Deletes one selected item (the Delete key does the same). */
+function DeleteItem({ id, editable, dispatch }: { id: string; editable: boolean; dispatch: (action: EditorAction) => void }) {
+  const { t } = useTranslation('common')
+  return (
+    <Button variant="danger-quiet" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'remove', ids: [id] } })}>
+      <Trash2 /> {t('action.delete')}
+    </Button>
+  )
+}
+
 /** Several items: their count, delete, and the existing switch for the placements among them. */
 function MultiInspector({ placements, zones, editable, dispatch }: Props) {
   const { t } = useTranslation('plans')
@@ -167,6 +177,7 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
           <Trash2 /> {t('zones.removeCorner')}
         </Button>
       </div>
+      <DeleteItem id={z.id} editable={editable} dispatch={dispatch} />
     </div>
   )
 }
@@ -233,6 +244,7 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
         />
       )}
       <SwitchField label={t('inspector.existing')} hint={t('inspector.existingHint')} checked={p.existing} disabled={!editable} onChange={(e) => update({ existing: e.target.checked })} />
+      <DeleteItem id={p.id} editable={editable} dispatch={dispatch} />
     </div>
   )
 }

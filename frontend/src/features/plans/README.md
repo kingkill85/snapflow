@@ -13,11 +13,11 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D21
 | `editor/history.ts`, `editor/editor-state.ts` | Undo history and the editor reducer (document history + selection) |
 | `editor/PlanCanvas.tsx` | The floorplan canvas: layers, pointer interactions, drop target |
 | `editor/Palette.tsx`, `editor/catalog.ts` | Products tab, catalog loading, palette grouping, default sizes |
-| `editor/Inspector.tsx` | Inspector tab: one placement (Change product, variant, add-ons, instance values, resize all), one zone, multi-selection |
+| `editor/Inspector.tsx` | Inspector tab: one placement (Change product, variant, add-ons, instance values, resize all, Delete), one zone (Delete), multi-selection (D219) |
 | `editor/zones.ts`, `editor/ZonesPanel.tsx` | Zone geometry (area, ray casting, smallest containing zone, corner edits, names, colours) and the Zones tab |
 | `editor/layers.ts`, `editor/LayersPanel.tsx` | Layer visibility (view state) and the Layers tab |
 | `editor/calibration.ts`, `editor/CalibrateDialog.tsx` | Scale from two points, metres parsing, scale bar |
-| `editor/export.ts` | PNG export at natural size (blob + object URL), file name |
+| `editor/export.ts` | PNG export at natural size (blob + object URL) with strokes and labels sized for the image (`exportPixel`, D217), file name |
 | `editor/use-autosave.ts`, `editor/save-errors.ts`, `editor/SaveIndicator.tsx` | Autosave state machine and error mapping (D201) |
 | `editor/use-plan-lock.ts`, `editor/LockBanner.tsx` | Edit lock (D202) |
 | `editor/use-shortcuts.ts` | Keyboard shortcuts (plain keys only off controls, `isCanvasKeyTarget`, D212) |
@@ -86,7 +86,8 @@ replaced, so it is cached immutably (D211).
    (`name="handle-nw|ne|se|sw|rotate"`), then the rubber band and drawing drafts
 
 Nodes that are UI and not content are named `chrome` (`export.ts`): the PNG export hides them.
-Strokes and labels are scaled by `k = 1 / viewport.scale` so they keep their screen size.
+Strokes and labels are scaled by `k = 1 / viewport.scale` so they keep their screen size (while the PNG export draws, `k = exportPixel(image)`, D217).
+The viewport keeps the image fitted while the stage changes size until the user zooms or pans (D218).
 `useCanvasTheme()` gives token colours for Konva.
 
 ## Tools and interactions
@@ -121,5 +122,7 @@ layers, export name, resize all), `editor/Inspector.test.tsx`, `editor/ZonesPane
 tab), `editor/CalibrateDialog.test.tsx`.
 
 E2E: `e2e/specs/plans.spec.ts` (place by click and drop, move/resize/rotate, rectangle and polygon zones,
-zone counts, undo/redo, reload, calibration, layers, PNG export, lock and take-over, read-only project) and
-the plans section and editor shell in `layout.spec.ts`.
+zone counts, undo/redo, reload, zone corners (drag, add at a midpoint, Alt-click remove), calibration, layers, PNG export, lock and
+take-over, read-only project), the plans section and editor shell in `layout.spec.ts` (German tabs at 768 px), and
+`plans-visual.spec.ts` (`make e2e-visual`: every state and dialog at 390/768/1280 px, light/dark, en/de, with the exported PNG).
+The leave guard (save on leave, ask only when the save fails) is in `editor/PlanEditorPage.test.tsx`.

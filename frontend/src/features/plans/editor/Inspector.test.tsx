@@ -135,6 +135,16 @@ describe('Inspector', () => {
       expect(screen.getByRole('button', { name: 'Remove selected corner' })).toBeDisabled()
     })
 
+    it('deletes the zone', async () => {
+      const spy = vi.fn()
+      const user = userEvent.setup()
+      const z = zone()
+      renderWithProviders(<Harness doc={docOf([], [z])} selection={[z.id]} spy={spy} />)
+      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      expect(lastChange(spy).action).toEqual({ type: 'remove', ids: [z.id] })
+      expect(screen.getByText(/Select a product or zone/)).toBeInTheDocument()
+    })
+
     it('cannot remove a corner without an active one', () => {
       const z = zone()
       renderWithProviders(<Harness doc={docOf([], [z])} selection={[z.id]} spy={vi.fn()} />)

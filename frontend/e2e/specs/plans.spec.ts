@@ -220,3 +220,47 @@ test('plans: the lock, take over, read-only projects', async ({ page, api, sessi
   await expect(page.getByText('View only')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Draw rectangle zone' })).toBeDisabled()
 })
+
+test('plans: zone corners are dragged, added and removed', async ({ page, api }) => {
+  const { project } = await seed(api, 'Corner switch')
+  const plan = await api.createPlan(project.versions[0].id, 'Corners', planImage())
+  await page.setViewportSize({ width: 1400, height: 900 })
+  await page.goto(`/projects/${project.id}/versions/${project.versions[0].id}/plans/${plan.id}`)
+  await saved(page)
+  const map = await imageToPage(page)
+  const near = (points: number[][], x: number, y: number) => points.some(([px, py]) => Math.abs(px - x) < 4 && Math.abs(py - y) < 4)
+
+  await page.getByRole('button', { name: 'Draw rectangle zone' }).click()
+  await drag(page, map.at(100, 100), map.at(500, 400))
+  await saved(page)
+  // Selected by a click inside: its corners and edge midpoints get handles.
+  const inside = map.at(300, 250)
+  await page.mouse.click(inside.x, inside.y)
+  await page.getByRole('tab', { name: 'Inspector' }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByText('4 corners')).toBeVisible()
+
+  // Drag the top right corner.
+  await drag(page, map.at(500, 100), map.at(560, 60))
+  await saved(page)
+  let points = (await api.planContent(plan.id)).zones[0].points
+  expect(points).toHaveLength(4)
+  expect(near(points, 560, 60), JSON.stringify(points)).toBe(true)
+
+  // A click on the top edge's midpoint adds a corner there.
+  const mid = map.at(330, 80)
+  await page.mouse.click(mid.x, mid.y)
+  await saved(page)
+  points = (await api.planContent(plan.id)).zones[0].points
+  expect(points, JSON.stringify(points)).toHaveLength(5)
+  expect(near(points, 330, 80), JSON.stringify(points)).toBe(true)
+
+  // Alt-click removes the bottom left corner.
+  const corner = map.at(100, 400)
+  await page.keyboard.down('Alt')
+  await page.mouse.click(corner.x, corner.y)
+  await page.keyboard.up('Alt')
+  await saved(page)
+  points = (await api.planContent(plan.id)).zones[0].points
+  expect(points, JSON.stringify(points)).toHaveLength(4)
+  expect(near(points, 100, 400)).toBe(false)
+})

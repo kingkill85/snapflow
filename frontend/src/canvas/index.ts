@@ -2,6 +2,6 @@
 export { type CanvasPointer, CanvasStage, ImageLayer } from './CanvasStage'
 export * from './geometry'
 export { isCanvasKeyTarget, isModKey, isTypingTarget } from './keyboard'
-export { type CanvasTheme, useCanvasTheme } from './theme'
+export { type CanvasTheme, paperColors, useCanvasTheme } from './theme'
 export { useHtmlImage, useHtmlImages } from './use-html-image'
 export { useViewport } from './use-viewport'

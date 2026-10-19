@@ -10,7 +10,6 @@ import {
   boxCorners,
   type CanvasPointer,
   CanvasStage,
-  type CanvasTheme,
   distance,
   isTypingTarget,
   type Corner,
@@ -23,7 +22,7 @@ import {
   screenToImage,
   type Size,
   snapAngle,
-  useCanvasTheme,
+  paperColors,
   useHtmlImages,
   type Viewport,
 } from '@/canvas'
@@ -97,7 +96,11 @@ type Props = {
   /** The two points of the calibration tool were picked. */
   onCalibrate: (a: Point, b: Point) => void
   stageRef?: RefObject<Konva.Stage | null>
+  /** While the PNG export draws: one screen pixel is this many image pixels (strokes and labels relative to the image, not the zoom). */
+  exportPixel?: number
 }
+
+type PlanColors = typeof paperColors
 
 const handleSize = 9 // screen px
 const rotateOffset = 24 // screen px above the box
@@ -131,9 +134,11 @@ export function PlanCanvas({
   onActiveVertex,
   onCalibrate,
   stageRef,
+  exportPixel,
 }: Props) {
   const { t } = useTranslation('plans')
-  const theme = useCanvasTheme()
+  // Drawn on the (light) plan image: the same colours in light and dark mode (D221).
+  const theme = paperColors
   const ownStage = useRef<Konva.Stage>(null)
   const stage = stageRef ?? ownStage
   const wrapper = useRef<HTMLDivElement>(null)
@@ -142,7 +147,7 @@ export function PlanCanvas({
   // A draft belongs to its tool: switching tools drops it.
   const draft = rawDraft?.tool === tool ? rawDraft : null
   const selected = useMemo(() => new Set(selection), [selection])
-  const k = 1 / viewport.scale // one screen pixel in image pixels
+  const k = exportPixel ?? 1 / viewport.scale // one screen pixel in image pixels
 
   const placements = useMemo(() => document.placements.filter((p) => placementVisible(p, layers, variants)), [document.placements, layers, variants])
   const zones = useMemo(() => document.zones.filter((z) => zoneVisible(z, layers)), [document.zones, layers])
@@ -482,7 +487,7 @@ export function PlanCanvas({
 }
 
 /** A zone: its polygon filled in its colour at its opacity, outline and name. */
-function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; selected: boolean; error: boolean; k: number; theme: CanvasTheme }) {
+function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; selected: boolean; error: boolean; k: number; theme: PlanColors }) {
   const flat = z.points.flat()
   const label = labelPoint(z)
   return (
@@ -499,6 +504,10 @@ function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; sele
         fontSize={14 * k}
         fontStyle="bold"
         fill={theme.ink}
+        stroke={theme.surface}
+        strokeWidth={3 * k}
+        lineJoin="round"
+        fillAfterStrokeEnabled
         listening={false}
       />
     </Group>
@@ -506,7 +515,7 @@ function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; sele
 }
 
 /** Corner handles of one selected zone (drag; Alt-click removes) and edge midpoints (drag or click adds a corner). */
-function VertexHandles({ zone, active, k, theme }: { zone: PlanZone; active: number; k: number; theme: CanvasTheme }) {
+function VertexHandles({ zone, active, k, theme }: { zone: PlanZone; active: number; k: number; theme: PlanColors }) {
   const s = handleSize * k
   return (
     <Group name={chromeName}>
@@ -539,7 +548,7 @@ type NodeProps = {
   selected: boolean
   /** One screen pixel in image pixels: strokes and labels keep their screen size. */
   k: number
-  theme: CanvasTheme
+  theme: PlanColors
   existingLabel: string
 }
 
@@ -604,6 +613,10 @@ function PlacementNode({ placement: p, image, color, warning, error, selected, k
           align="center"
           fontSize={12 * k}
           fill={theme.ink}
+          stroke={theme.surface}
+          strokeWidth={3 * k}
+          lineJoin="round"
+          fillAfterStrokeEnabled
           listening={false}
         />
       )}

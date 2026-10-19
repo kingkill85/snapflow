@@ -5,6 +5,16 @@ import type { Size } from '@/canvas'
 /** Names of canvas nodes that are UI, not content: left out of the PNG export. */
 export const chromeName = 'chrome'
 
+/**
+ * One screen pixel in image pixels while the export draws: strokes, handles and
+ * labels as at 100 % zoom for images up to 1200 px, and as if the image were
+ * shown 1200 px wide for bigger ones, so they stay readable on the whole image
+ * whatever the zoom was (D217).
+ */
+export function exportPixel(image: Size): number {
+  return Math.max(1, Math.max(image.width, image.height) / 1200)
+}
+
 /** "<project number> <plan name>.png" without characters file systems refuse. */
 export function exportFileName(projectNumber: string, planName: string): string {
   const base = [...`${projectNumber} ${planName}`]

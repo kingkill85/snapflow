@@ -23,6 +23,20 @@ const fallback: CanvasTheme = {
   canvas: '#fafafa',
 }
 
+/**
+ * Colours of what is drawn on the plan image (labels, markers, hatching,
+ * handles): the light theme's, in dark mode too. A floorplan is a light
+ * document whatever the UI theme, and the PNG export must not depend on it (D221).
+ */
+export const paperColors: Pick<CanvasTheme, 'primary' | 'danger' | 'warning' | 'surface' | 'ink' | 'muted'> = {
+  primary: fallback.primary,
+  danger: fallback.danger,
+  warning: fallback.warning,
+  surface: fallback.surface,
+  ink: fallback.ink,
+  muted: fallback.muted,
+}
+
 function read(): CanvasTheme {
   if (typeof window === 'undefined') return fallback
   const style = getComputedStyle(document.documentElement)

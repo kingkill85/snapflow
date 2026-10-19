@@ -124,7 +124,8 @@ export function PlanFormDialog({ open, onOpenChange, versionId, item, onSaved }:
           pending={pending && image !== undefined}
           progress={progress}
           onSelect={choose}
-          onRemove={() => form.setValue('image', undefined)}
+          // A plan always has an image: only a chosen file can be removed again (the current image stays).
+          onRemove={image ? () => form.setValue('image', undefined) : undefined}
         />
       </div>
     </FormDialog>

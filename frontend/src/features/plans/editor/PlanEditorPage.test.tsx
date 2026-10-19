@@ -57,7 +57,14 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
   return { saved, locks }
 }
 
-const open = () => renderRoutes([{ path: `/${editorRoute}`, element: <PlanEditorPage /> }], { route: editorPath(projectId, versionId, plan(1).id) })
+const open = () =>
+  renderRoutes(
+    [
+      { path: `/${editorRoute}`, element: <PlanEditorPage /> },
+      { path: '/projects/:id/versions/:versionId', element: <h1>Project page</h1> },
+    ],
+    { route: editorPath(projectId, versionId, plan(1).id) },
+  )
 
 describe('PlanEditorPage', () => {
   it('takes the lock, places a palette product and autosaves it', async () => {
@@ -168,5 +175,45 @@ describe('PlanEditorPage', () => {
     expect(screen.getByText('1 item could not be saved:')).toBeInTheDocument()
     const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })
     expect(within(inspector).getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('saves pending changes when leaving, without asking', async () => {
+    const { saved } = serve()
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+    await user.click(screen.getByRole('button', { name: /Motion sensor/ }))
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+
+    // Leaving before the autosave's debounce: saved at once, then the page changes.
+    await user.click(screen.getByRole('link', { name: new RegExp(villa.name) }))
+    expect(await screen.findByRole('heading', { name: 'Project page' })).toBeInTheDocument()
+    // (The previous test's editor may also save on unmount into this test's handler.)
+    expect(saved.length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+  })
+
+  it('asks before discarding changes that cannot be saved', async () => {
+    serve()
+    server.use(http.put('/api/plans/:id/content', () => problem(500, { code: 'internal' })))
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+    await user.click(screen.getByRole('button', { name: /Motion sensor/ }))
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+
+    const back = screen.getByRole('link', { name: new RegExp(villa.name) })
+    await user.click(back)
+    const dialog = await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })
+    // Stay keeps the editor and its changes.
+    await user.click(within(dialog).getByRole('button', { name: 'Stay' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-count', '1')
+
+    // Leave page discards them.
+    await user.click(back)
+    await user.click(within(await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })).getByRole('button', { name: 'Leave page' }))
+    expect(await screen.findByRole('heading', { name: 'Project page' })).toBeInTheDocument()
   })
 })

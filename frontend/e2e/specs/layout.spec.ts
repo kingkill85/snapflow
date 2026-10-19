@@ -280,6 +280,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
             await expectNoHorizontalOverflow(page)
             await screenshot(page, testInfo, `plan-editor-${tab.toLowerCase()}-${viewport.name}-${colorScheme}`)
           }
+          // The longer German tab names fit the panel too (no tab scrolls out of view).
+          await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'de'))
+          await page.reload()
+          const tabs = page.getByRole('tablist', { name: 'Planbereich' })
+          await expect(tabs.getByRole('tab', { name: 'Produkte' })).toBeVisible()
+          expect(await tabs.evaluate((el) => el.scrollWidth - el.clientWidth), 'the panel tabs overflow').toBeLessThanOrEqual(0)
+          for (const tab of await tabs.getByRole('tab').all()) {
+            const [box, list] = [(await tab.boundingBox())!, (await tabs.boundingBox())!]
+            expect(box.x + box.width, 'a tab ends outside the panel').toBeLessThanOrEqual(list.x + list.width + 0.5)
+          }
+          await expectNoHorizontalOverflow(page)
+          await screenshot(page, testInfo, `plan-editor-${viewport.name}-${colorScheme}-de`)
+          await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
         }
       })
 

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type Konva from 'konva'
 import { ArrowLeft, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useBlocker, useParams } from 'react-router'
 
@@ -21,7 +22,7 @@ import { editorReducer, initEditor } from './editor-state'
 import { canRedo, canUndo } from './history'
 import { CalibrateDialog } from './CalibrateDialog'
 import { scaleBar } from './calibration'
-import { download, exportFileName, stageToPng } from './export'
+import { download, exportFileName, exportPixel, stageToPng } from './export'
 import { Inspector } from './Inspector'
 import { allVisible, type Layers, visibleIds } from './layers'
 import { LayersPanel } from './LayersPanel'
@@ -254,11 +255,20 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const selectedPlacements = doc.placements.filter((p) => state.selection.includes(p.id))
   const selectedZones = doc.zones.filter((z) => state.selection.includes(z.id))
 
+  const [exporting, setExporting] = useState(false)
   const exportPng = () => {
     const stage = stageRef.current
     if (!stage) return
     const name = exportFileName(project.number, plan.name)
-    void stageToPng(stage, plan.image).then((png) => download(png, name))
+    // Drawn with strokes and labels sized for the image, whatever the zoom (D217).
+    flushSync(() => setExporting(true))
+    let png: Promise<Blob>
+    try {
+      png = stageToPng(stage, plan.image)
+    } finally {
+      setExporting(false)
+    }
+    void png.then((blob) => download(blob, name))
   }
   const errorIds = useMemo(() => new Set(saveErrors.keys()), [saveErrors])
 
@@ -285,6 +295,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       onActiveVertex={setActiveVertex}
       onCalibrate={(a, b) => setCalibration([a, b])}
       stageRef={stageRef}
+      exportPixel={exporting ? exportPixel(plan.image) : undefined}
     />
   )
   const canvasArea = (
@@ -377,9 +388,10 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     return (
       <div ref={fillRef} style={{ height: fillHeight }} className="flex flex-col">
         <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1">
-          {back}
-          <h1 className="min-w-0 flex-1 truncate font-semibold">{plan.name}</h1>
+          {/* The plan name gets a row of its own: beside the back link and zoom it was cut to a letter (D222). */}
+          <div className="min-w-0 flex-1">{back}</div>
           {zoomControls}
+          <h1 className="w-full truncate px-2 pb-1 font-semibold">{plan.name}</h1>
         </div>
         <div className="space-y-2 px-2 empty:hidden">{project.status !== 'active' && <Notice tone="warning">{t('editor.readOnlyProject')}</Notice>}</div>
         <div className="h-[55%] shrink-0 border-b border-line">{canvasArea}</div>
