@@ -13,6 +13,7 @@ import {
   pointInPolygon,
   polygonArea,
   removeVertex,
+  scaleZone,
   zoneAt,
   zoneColors,
   zoneCounts,
@@ -136,5 +137,92 @@ describe('vertex editing', () => {
     expect(canClose([{ x: 0, y: 0 }, { x: 10, y: 0 }])).toBe(false)
     expect(canClose([{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 10, y: 10 }])).toBe(false)
     expect(canClose([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }])).toBe(true)
+  })
+})
+
+describe('scaleZone (resize a zone as a whole, D252)', () => {
+  const image = { width: 1000, height: 800 }
+  const rect = square(100, 100, 200) // 100..300 both ways
+  const triangle = [
+    [100, 100],
+    [300, 100],
+    [100, 200],
+  ]
+
+  it('scales proportionally around the opposite corner', () => {
+    expect(scaleZone(rect, 'se', { x: 100, y: 20 }, false, image)).toEqual(square(100, 100, 300))
+  })
+
+  it('scales a triangle around the opposite corner of its bounds', () => {
+    // Bounds 100..300 x 100..200; dragging nw by -20 x shrinks... grows by 1.1 around (300, 200).
+    expect(scaleZone(triangle, 'nw', { x: -20, y: 0 }, false, image)).toEqual([
+      [80, 90],
+      [300, 90],
+      [80, 200],
+    ])
+  })
+
+  it('scales width and height independently when free (Shift)', () => {
+    expect(scaleZone(rect, 'se', { x: 100, y: 20 }, true, image)).toEqual([
+      [100, 100],
+      [400, 100],
+      [400, 320],
+      [100, 320],
+    ])
+    expect(scaleZone(rect, 'ne', { x: -100, y: -50 }, true, image)).toEqual([
+      [100, 50],
+      [200, 50],
+      [200, 300],
+      [100, 300],
+    ])
+  })
+
+  it('stretches one axis around the opposite side', () => {
+    expect(scaleZone(rect, 'e', { x: 50, y: 999 }, false, image)).toEqual([
+      [100, 100],
+      [350, 100],
+      [350, 300],
+      [100, 300],
+    ])
+    expect(scaleZone(rect, 'n', { x: 999, y: -40 }, false, image)).toEqual([
+      [100, 60],
+      [300, 60],
+      [300, 300],
+      [100, 300],
+    ])
+  })
+
+  it('keeps a minimum size and never flips', () => {
+    expect(scaleZone(rect, 'w', { x: 500, y: 0 }, false, image)).toEqual([
+      [290, 100],
+      [300, 100],
+      [300, 300],
+      [290, 300],
+    ])
+    expect(scaleZone(rect, 'se', { x: -400, y: -400 }, false, image)).toEqual(square(100, 100, 10))
+    // A zone already smaller than the minimum is not grown by shrinking it.
+    expect(scaleZone(square(10, 10, 4), 'e', { x: -10, y: 0 }, false, image)).toEqual(square(10, 10, 4))
+  })
+
+  it('stays inside the image', () => {
+    expect(scaleZone(rect, 'e', { x: 5000, y: 0 }, false, image)).toEqual([
+      [100, 100],
+      [1000, 100],
+      [1000, 300],
+      [100, 300],
+    ])
+    // Proportional: limited by the axis that reaches the edge first (here the top at 0).
+    expect(scaleZone(rect, 'nw', { x: -500, y: -500 }, false, image)).toEqual([
+      [0, 0],
+      [300, 0],
+      [300, 300],
+      [0, 300],
+    ])
+    expect(scaleZone(rect, 'sw', { x: 0, y: 5000 }, true, image)).toEqual([
+      [100, 100],
+      [300, 100],
+      [300, 800],
+      [100, 800],
+    ])
   })
 })

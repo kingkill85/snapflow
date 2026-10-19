@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions). Spec: `docs/specs/phase-2.md` → 2b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole). Spec: `docs/specs/phase-2.md` → 2b.
 
 ## Files
 
@@ -14,7 +14,7 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D21
 | `editor/PlanCanvas.tsx` | The floorplan canvas: layers, pointer interactions, drop target |
 | `editor/Palette.tsx`, `editor/catalog.ts` | Products tab, catalog loading, palette grouping, default sizes |
 | `editor/Inspector.tsx` | Inspector tab: one placement (Change product, variant, add-ons, instance values, resize all, Delete), one zone (Delete), multi-selection (D219) |
-| `editor/zones.ts`, `editor/ZonesPanel.tsx` | Zone geometry (area, ray casting, smallest containing zone, corner edits, names, colours) and the Zones tab |
+| `editor/zones.ts`, `editor/ZonesPanel.tsx` | Zone geometry (area, ray casting, smallest containing zone, corner edits, `scaleZone` for the frame, names, colours) and the Zones tab |
 | `editor/layers.ts`, `editor/LayersPanel.tsx` | Layer visibility (view state) and the Layers tab |
 | `editor/calibration.ts`, `editor/CalibrateDialog.tsx` | Scale from two points, metres parsing, scale bar |
 | `editor/export.ts` | PNG export at natural size (blob + object URL) with strokes and labels sized for the image (`exportPixel`, D217), file name |
@@ -79,7 +79,8 @@ replaced, so it is cached immutably (D211).
 `PlanCanvas` renders inside `CanvasStage` (zoom, pan, pointer events in image pixels):
 
 1. `ImageLayer` (the plan image, not listening)
-2. zones: `ZoneNode` per visible zone (`name="zone"`, `id=zone id`), `VertexHandles` for one selected zone
+2. zones: `ZoneNode` per visible zone (`name="zone"`, `id=zone id`); for one selected zone `ZoneFrame` (its bounds
+   10 screen px outside, `name="frame-nw|n|ne|e|se|s|sw|w"`, D252) and above it `VertexHandles`
    (`name="vertex-i"` corners, `name="mid-i"` edge midpoints)
 3. placements: `PlacementNode` per visible placement (`name="placement"`; hit-testing uses
    `findAncestor('.placement')`), alt-drag copies, `Handles` for one selected placement
@@ -95,7 +96,9 @@ The viewport keeps the image fitted while the stage changes size until the user 
 
 `Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate'`. Drags are `Interaction`s with a local
 preview committed as one change on pointer up: `move` (placements and zones), `resize`, `rotate`, `band`,
-`drawRect`, `vertex` (corner drag, also after inserting at an edge midpoint). Click tools (polygon,
+`drawRect`, `vertex` (corner drag, also after inserting at an edge midpoint), `scaleZone` (a frame handle: a corner
+scales proportionally around the opposite corner, Shift freely; a side stretches one axis; at least 10 image px
+per axis, inside the image, D252). Click tools (polygon,
 calibration) collect points in a `Draft` tied to the tool (switching tools drops it); Enter closes a
 polygon, Esc drops a draft. Drawing a zone or picking the calibration points returns to Select.
 
@@ -124,7 +127,7 @@ layers, export name, resize all), `editor/Inspector.test.tsx`, `editor/ZonesPane
 tab), `editor/CalibrateDialog.test.tsx`.
 
 E2E: `e2e/specs/plans.spec.ts` (place by click and drop, move/resize/rotate, rectangle and polygon zones,
-zone counts, undo/redo, reload, zone corners (drag, add at a midpoint, Alt-click remove), calibration, layers, PNG export, lock and
+zone counts, undo/redo, reload, zone corners (drag, add at a midpoint, Alt-click remove), resizing a zone by its frame (corner, side, undo), calibration, layers, PNG export, lock and
 take-over, read-only project), the plans section and editor shell in `layout.spec.ts` (German tabs at 768 px), and
 `plans-visual.spec.ts` (`make e2e-visual`: every state and dialog at 390/768/1280 px, light/dark, en/de, with the exported PNG).
 The leave guard (save on leave, ask only when the save fails) is in `editor/PlanEditorPage.test.tsx`.
