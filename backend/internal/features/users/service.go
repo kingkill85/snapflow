@@ -445,3 +445,24 @@ func toUser(actor auth.Actor, r store.User) User {
 		Can: auth.Actions{Update: manage, Delete: manage && r.ID != actor.UserID},
 	}
 }
+
+// DisplayName returns what other features show for a user (a plan's lock
+// holder): the full name, or the email when it is empty; "" for a user that
+// no longer exists. Any logged-in caller may ask: the caller has already
+// been shown a reference to the user (D193).
+func (s *Service) DisplayName(ctx context.Context, id uuid.UUID) (string, error) {
+	if _, err := auth.Require(ctx); err != nil {
+		return "", err
+	}
+	row, err := s.q.GetUser(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if row.FullName != "" {
+		return row.FullName, nil
+	}
+	return row.Email, nil
+}

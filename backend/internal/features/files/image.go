@@ -49,44 +49,46 @@ func decodeConfig(data []byte, contentType string) (image.Config, error) {
 }
 
 // process decodes an image completely (so a damaged one is refused) and
-// returns the bytes to store with their pixel size.
+// returns the bytes to store with their content type and pixel size.
 //
 // JPEG and PNG are always re-encoded in their own format with 8 bits per
 // channel, so nothing but pixels is stored: no EXIF (GPS position, camera,
-// thumbnail), no PNG text or eXIf chunks, no 16-bit samples. Images wider
-// than maxWidth (once upright) are scaled to maxWidth pixels wide, aspect
-// ratio kept. The scaled copy is made straight from the decoded image into
-// an 8-bit buffer of the target size, and only that small copy is turned
-// upright by the EXIF orientation of a JPEG; the full-size image is never
-// copied.
+// thumbnail), no PNG text or eXIf chunks, no 16-bit samples. Images larger
+// than lim allows (once upright: lim.MaxWidth wide, lim.MaxLongSide on the
+// long side) are scaled down to fit, aspect ratio kept. The scaled copy is
+// made straight from the decoded image into an 8-bit buffer of the target
+// size, and only that small copy is turned upright by the EXIF orientation of
+// a JPEG; the full-size image is never copied.
 //
-// WebP is decoded only to validate it and stored as uploaded: Go has no
-// WebP encoder, so its metadata chunks (EXIF, XMP) are kept.
-func process(data []byte, contentType string, orientation, maxWidth int) ([]byte, int, int, error) {
-	if contentType == TypeWebP {
+// WebP is decoded to validate it and, unless lim.ReencodeWebP, stored as
+// uploaded: Go has no WebP encoder, so its metadata chunks (EXIF, XMP) are
+// kept. With lim.ReencodeWebP it is re-encoded as PNG like a PNG upload.
+func process(data []byte, contentType string, orientation int, lim ImageLimits) ([]byte, string, int, int, error) {
+	if contentType == TypeWebP && !lim.ReencodeWebP {
 		img, err := webp.Decode(bytes.NewReader(data))
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, "", 0, 0, err
 		}
 		b := img.Bounds()
-		return data, b.Dx(), b.Dy(), nil
+		return data, contentType, b.Dx(), b.Dy(), nil
 	}
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, "", 0, 0, err
 	}
 	sb := src.Bounds()
 	// Scaled size before orientation (sw × sh) such that the upright image
-	// is at most maxWidth wide.
-	sw, sh := scaledSize(sb.Dx(), sb.Dy(), maxWidth, orientation >= 5)
+	// fits lim.
+	sw, sh := scaledSize(sb.Dx(), sb.Dy(), lim, orientation >= 5)
 	rect := image.Rect(0, 0, sw, sh)
 
 	var buf bytes.Buffer
-	if contentType == TypePNG {
+	if contentType == TypePNG || contentType == TypeWebP {
 		dst := image.NewNRGBA(rect) // 8 bits per channel, transparency kept
 		resample(dst, src)
 		err = (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, dst)
 		sw, sh = dst.Rect.Dx(), dst.Rect.Dy()
+		contentType = TypePNG
 	} else {
 		dst := image.NewRGBA(rect)
 		resample(dst, src)
@@ -95,23 +97,31 @@ func process(data []byte, contentType string, orientation, maxWidth int) ([]byte
 		sw, sh = dst.Rect.Dx(), dst.Rect.Dy()
 	}
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, "", 0, 0, err
 	}
-	return buf.Bytes(), sw, sh, nil
+	return buf.Bytes(), contentType, sw, sh, nil
 }
 
 // scaledSize returns the size (w × h) to scale a w × h image to so that,
-// turned upright (axes swapped when swap), it is at most maxWidth wide.
-func scaledSize(w, h, maxWidth int, swap bool) (int, int) {
+// turned upright (axes swapped when swap), it is at most lim.MaxWidth wide
+// and at most lim.MaxLongSide on its long side (0: no such bound).
+func scaledSize(w, h int, lim ImageLimits, swap bool) (int, int) {
 	uw, uh := w, h
 	if swap {
 		uw, uh = h, w
 	}
-	if uw <= maxWidth {
+	f := 1.0
+	if lim.MaxWidth > 0 && uw > lim.MaxWidth {
+		f = float64(lim.MaxWidth) / float64(uw)
+	}
+	if long := max(uw, uh); lim.MaxLongSide > 0 && long > lim.MaxLongSide {
+		f = min(f, float64(lim.MaxLongSide)/float64(long))
+	}
+	if f == 1 {
 		return w, h
 	}
-	nw := maxWidth
-	nh := max(1, int(math.Round(float64(uh)*float64(nw)/float64(uw))))
+	nw := max(1, int(math.Round(float64(uw)*f)))
+	nh := max(1, int(math.Round(float64(uh)*f)))
 	if swap {
 		return nh, nw
 	}
@@ -156,12 +166,12 @@ func bytesPerPixel(m color.Model) int64 {
 // decodeCost estimates the bytes processing an image needs at its peak: the
 // decoded source plus the 8-bit target, twice for a JPEG that is turned
 // upright (process).
-func decodeCost(cfg image.Config, contentType string, orientation, maxWidth int) int64 {
+func decodeCost(cfg image.Config, contentType string, orientation int, lim ImageLimits) int64 {
 	src := int64(cfg.Width) * int64(cfg.Height) * bytesPerPixel(cfg.ColorModel)
-	if contentType == TypeWebP {
+	if contentType == TypeWebP && !lim.ReencodeWebP {
 		return src
 	}
-	w, h := scaledSize(cfg.Width, cfg.Height, maxWidth, orientation >= 5)
+	w, h := scaledSize(cfg.Width, cfg.Height, lim, orientation >= 5)
 	dst := int64(w) * int64(h) * 4
 	if orientation > 1 {
 		dst *= 2

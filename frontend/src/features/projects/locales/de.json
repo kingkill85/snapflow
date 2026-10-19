@@ -63,7 +63,6 @@
     "renameVersion": "Umbenennen",
     "deleteVersion": "Version löschen",
     "lastVersionHint": "Die letzte Version kann nicht gelöscht werden. Löschen Sie stattdessen das Projekt.",
-    "noPlans": "Noch keine Pläne.",
     "readOnly": {
       "completed": "Dieses Projekt ist abgeschlossen. Öffnen Sie es wieder, um es zu ändern.",
       "cancelled": "Dieses Projekt ist storniert. Öffnen Sie es wieder, um es zu ändern."

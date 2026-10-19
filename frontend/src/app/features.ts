@@ -8,6 +8,7 @@ import { productTypesFeature } from '@/features/product-types'
 import { productsFeature } from '@/features/products'
 import { importsFeature } from '@/features/imports'
 import { projectsFeature } from '@/features/projects'
+import { plansFeature } from '@/features/plans'
 // scaffold:imports
 
 import type { FeatureModule } from './feature'
@@ -26,5 +27,6 @@ export const features: FeatureModule[] = [
   categoriesFeature,
   productsFeature,
   importsFeature,
+  plansFeature,
   // scaffold:features
 ]

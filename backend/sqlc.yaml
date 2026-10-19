@@ -93,6 +93,14 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
           type: Values
+      - column: plans.scale
+        go_type:
+          type: float64
+          pointer: true
+      - column: plan_placements.instance_values
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
+          type: Values
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -161,4 +169,11 @@ sql:
       go:
         <<: *go
         out: internal/features/projects/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/plans/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/plans/store
   # scaffold:sqlc

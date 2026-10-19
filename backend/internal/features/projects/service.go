@@ -52,8 +52,10 @@ type DB interface {
 }
 
 type Service struct {
-	db      DB
-	q       *store.Queries
+	db DB
+	q  *store.Queries
+	// copiers copy what other features own of a version (OnCopyVersion).
+	copiers []VersionCopier
 	types   *producttypes.Service
 	tenants *tenants.Service
 	// now is the clock of project numbers (their year, in UTC).
@@ -401,7 +403,8 @@ func (s *Service) CreateVersion(ctx context.Context, projectID uuid.UUID, in Pro
 		row   store.ProjectVersion
 		count int64
 	)
-	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(q *store.Queries) error {
+	err = database.InScope(ctx, s.db, actor, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
 		project, err := s.writable(ctx, actor, q, projectID)
 		if err != nil {
 			return err
@@ -426,7 +429,7 @@ func (s *Service) CreateVersion(ctx context.Context, projectID uuid.UUID, in Pro
 			return mapVersionErr(err, name)
 		}
 		if source != nil {
-			if err := copyVersion(ctx, q, *source, row); err != nil {
+			if err := s.copyVersion(ctx, tx, *source, row); err != nil {
 				return err
 			}
 		}
@@ -440,10 +443,17 @@ func (s *Service) CreateVersion(ctx context.Context, projectID uuid.UUID, in Pro
 }
 
 // copyVersion copies everything a version owns from source to target, in
-// the transaction that created target. In 2a a version owns only its row
-// (copied by CreateVersion); 2b (plans, zones, placements) and 2c (pricing
-// settings) add their tables here, each with its test.
-func copyVersion(_ context.Context, _ *store.Queries, _, _ store.ProjectVersion) error {
+// the transaction that created target: the row itself is copied by
+// CreateVersion, the tables of other features (2b: plans with zones and
+// placements; 2c: pricing settings) by the copiers they registered.
+func (s *Service) copyVersion(ctx context.Context, tx pgx.Tx, source, target store.ProjectVersion) error {
+	src := VersionRef{ID: source.ID, ProjectID: source.ProjectID, TenantID: source.TenantID, Status: StatusActive}
+	dst := VersionRef{ID: target.ID, ProjectID: target.ProjectID, TenantID: target.TenantID, Status: StatusActive}
+	for _, c := range s.copiers {
+		if err := c(ctx, tx, src, dst); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

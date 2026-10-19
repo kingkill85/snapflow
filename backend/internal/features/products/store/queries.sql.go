@@ -1263,3 +1263,48 @@ func (q *Queries) VariantExists(ctx context.Context, arg VariantExistsParams) (b
 	err := row.Scan(&exists)
 	return exists, err
 }
+
+const variantFacts = `-- name: VariantFacts :many
+SELECT v.id, v.product_id, v.is_active, p.is_active AS product_is_active, p.product_type_id, p.category_id
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY ($1::uuid[])
+`
+
+type VariantFactsRow struct {
+	ID              uuid.UUID
+	ProductID       uuid.UUID
+	IsActive        bool
+	ProductIsActive bool
+	ProductTypeID   uuid.UUID
+	CategoryID      uuid.UUID
+}
+
+// VariantFacts returns what a plan checks of the given variants (plans
+// feature, through PlacementVariants).
+func (q *Queries) VariantFacts(ctx context.Context, ids []uuid.UUID) ([]VariantFactsRow, error) {
+	rows, err := q.db.Query(ctx, variantFacts, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VariantFactsRow{}
+	for rows.Next() {
+		var i VariantFactsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.IsActive,
+			&i.ProductIsActive,
+			&i.ProductTypeID,
+			&i.CategoryID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

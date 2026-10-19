@@ -256,6 +256,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await screenshot(page, testInfo, `product-type-dialog-${viewport.name}-${colorScheme}`)
       })
 
+      test('the plans section and the plan editor fit the screen', async ({ page, api }, testInfo) => {
+        const kind = await api.createKind({ name: { en: 'Switches with a rather long category name' } }, { abbreviation: 'ZB', color: '#1f6feb' })
+        await api.createVariant((await api.createProduct({ ...kind.ids, name: { en: 'Wall switch with a long product name' } })).id, { name: { en: 'White' } })
+        const project = await api.createProject({ name: unique('Villa Mustermann-Schmidt') })
+        const version = project.versions[0].id
+        const image = { name: 'floorplan.png', mimeType: 'image/png', buffer: readFileSync(fileURLToPath(new URL('../assets/floorplan.png', import.meta.url))) }
+        const plan = await api.createPlan(version, 'Ground floor with a long plan name', image)
+        await api.createPlan(version, 'Attic', image)
+        await page.goto(`/projects/${project.id}`)
+        await expect(page.getByRole('link', { name: 'Attic' })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await screenshot(page, testInfo, `plans-section-${viewport.name}-${colorScheme}`, true)
+
+        await page.goto(`/projects/${project.id}/versions/${version}/plans/${plan.id}`)
+        await expect(page.getByTestId('plan-canvas')).toBeVisible()
+        await expect(page.getByText('Loading…')).toHaveCount(0)
+        await expectNoHorizontalOverflow(page)
+        await screenshot(page, testInfo, `plan-editor-${viewport.name}-${colorScheme}`)
+        if (viewport.size.width >= 768) {
+          for (const tab of ['Zones', 'Layers', 'Inspector', 'Products']) {
+            await page.getByRole('tab', { name: tab }).click()
+            await expectNoHorizontalOverflow(page)
+            await screenshot(page, testInfo, `plan-editor-${tab.toLowerCase()}-${viewport.name}-${colorScheme}`)
+          }
+          // The longer German tab names fit the panel too (no tab scrolls out of view).
+          await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'de'))
+          await page.reload()
+          const tabs = page.getByRole('tablist', { name: 'Planbereich' })
+          await expect(tabs.getByRole('tab', { name: 'Produkte' })).toBeVisible()
+          expect(await tabs.evaluate((el) => el.scrollWidth - el.clientWidth), 'the panel tabs overflow').toBeLessThanOrEqual(0)
+          for (const tab of await tabs.getByRole('tab').all()) {
+            const [box, list] = [(await tab.boundingBox())!, (await tabs.boundingBox())!]
+            expect(box.x + box.width, 'a tab ends outside the panel').toBeLessThanOrEqual(list.x + list.width + 0.5)
+          }
+          await expectNoHorizontalOverflow(page)
+          await screenshot(page, testInfo, `plan-editor-${viewport.name}-${colorScheme}-de`)
+          await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
+        }
+      })
+
       test('the product pages fit the screen', async ({ page, api }, testInfo) => {
         const image = await api.uploadFile('blue.png', 'image/png', readFileSync(fileURLToPath(new URL('../assets/blue.png', import.meta.url))))
         const { type, ids } = await api.createKind({

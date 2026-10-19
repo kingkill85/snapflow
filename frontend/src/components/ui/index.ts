@@ -37,6 +37,7 @@ export { FormSelectField, Select, SelectField, type SelectOption, type SelectPro
 export { GroupedSelect, type SelectGroup } from './grouped-select'
 export { Sheet, SheetGroup } from './sheet'
 export { SwitchField } from './switch'
+export { type TabItem, Tabs } from './tabs'
 export { TagsField } from './tags-field'
 export { TextLink } from './text-link'
 export { Thumbnail } from './thumbnail'

@@ -24,6 +24,8 @@ import importsDe from '@/features/imports/locales/de.json'
 import importsEn from '@/features/imports/locales/en.json'
 import projectsDe from '@/features/projects/locales/de.json'
 import projectsEn from '@/features/projects/locales/en.json'
+import plansDe from '@/features/plans/locales/de.json'
+import plansEn from '@/features/plans/locales/en.json'
 // scaffold:imports
 
 // One namespace per feature. `make feature` adds imports and entries here.
@@ -43,6 +45,7 @@ export const resources = {
     products: productsEn,
     imports: importsEn,
     projects: projectsEn,
+    plans: plansEn,
     // scaffold:i18n-en
   },
   de: {
@@ -59,6 +62,7 @@ export const resources = {
     products: productsDe,
     imports: importsDe,
     projects: projectsDe,
+    plans: plansDe,
     // scaffold:i18n-de
   },
 } as const

@@ -21,7 +21,7 @@ func TestDecodeCost(t *testing.T) {
 		"photo, scaled":                 {image.Config{ColorModel: color.YCbCrModel, Width: 4000, Height: 3000}, TypeJPEG, 1, 4000*3000*3 + 1600*1200*4},
 		"webp":                          {image.Config{ColorModel: color.NRGBAModel, Width: 100, Height: 100}, TypeWebP, 1, 100 * 100 * 4},
 	} {
-		got := decodeCost(tc.cfg, tc.contentType, tc.orientation, MaxWidth)
+		got := decodeCost(tc.cfg, tc.contentType, tc.orientation, CatalogImage)
 		if got != tc.want {
 			t.Errorf("%s: cost %d, want %d", name, got, tc.want)
 		}
@@ -42,7 +42,7 @@ func TestScaledSize(t *testing.T) {
 		{1000, 3200, false, 1000, 3200},
 		{1600, 20, false, 1600, 20},
 	} {
-		if w, h := scaledSize(tc.w, tc.h, MaxWidth, tc.swap); w != tc.ww || h != tc.wh {
+		if w, h := scaledSize(tc.w, tc.h, CatalogImage, tc.swap); w != tc.ww || h != tc.wh {
 			t.Errorf("%dx%d swap %v: %dx%d, want %dx%d", tc.w, tc.h, tc.swap, w, h, tc.ww, tc.wh)
 		}
 	}

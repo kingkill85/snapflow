@@ -285,3 +285,11 @@ DELETE FROM variant_addons WHERE variant_id = ANY (sqlc.arg(variant_ids)::uuid[]
 INSERT INTO variant_addons (variant_id, addon_variant_id, required, sort_order)
 SELECT (sqlc.arg(variant_ids)::uuid[])[i], (sqlc.arg(addon_ids)::uuid[])[i], (sqlc.arg(required)::boolean[])[i], (sqlc.arg(sort_orders)::integer[])[i]
 FROM generate_subscripts(sqlc.arg(variant_ids)::uuid[], 1) AS i;
+
+-- VariantFacts returns what a plan checks of the given variants (plans
+-- feature, through PlacementVariants).
+-- name: VariantFacts :many
+SELECT v.id, v.product_id, v.is_active, p.is_active AS product_is_active, p.product_type_id, p.category_id
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);

@@ -10,6 +10,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	functiontypesstore "github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
+	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
@@ -49,5 +50,8 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	projectSvc := projects.NewService(deps.DB, productTypes, c.tenants)
 	c.tenants.UseProjects(projectSvc)
 	projects.Register(api, projectSvc)
+	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users)
+	projectSvc.OnCopyVersion(planSvc.CopyVersion)
+	plans.Register(api, planSvc)
 	// scaffold:features
 }

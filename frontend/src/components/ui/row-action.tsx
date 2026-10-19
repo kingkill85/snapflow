@@ -12,6 +12,8 @@ type RowActionProps = Omit<ButtonProps, 'size' | 'children' | 'asChild'> & {
   /** Makes it a link, e.g. Edit to a page editor. */
   to?: To
   state?: unknown
+  /** Icon only below 1280 px, phones included, e.g. in narrow cards where the text would wrap the actions (D226). */
+  compact?: boolean
 }
 
 /**
@@ -20,15 +22,15 @@ type RowActionProps = Omit<ButtonProps, 'size' | 'children' | 'asChild'> & {
  * the columns keep their room. The text stays in the accessible name either
  * way, the tooltip shows it on hover. Delete is `variant="danger-quiet"`.
  */
-export function RowAction({ icon, label, to, state, variant = 'secondary', className, ...props }: RowActionProps) {
+export function RowAction({ icon, label, to, state, compact, variant = 'secondary', className, ...props }: RowActionProps) {
   const content = (
     <>
       {icon}
-      <span className="max-md:not-sr-only md:sr-only xl:not-sr-only">{label}</span>
+      <span className={compact ? 'sr-only xl:not-sr-only' : 'max-md:not-sr-only md:sr-only xl:not-sr-only'}>{label}</span>
     </>
   )
   // relative: the hidden text stays inside the button, not at the page edge of a scrolling table.
-  const classes = cn('relative px-3 md:w-8 md:px-0 xl:w-auto xl:px-3', className)
+  const classes = cn(compact ? 'relative w-8 px-0 xl:w-auto xl:px-3' : 'relative px-3 md:w-8 md:px-0 xl:w-auto xl:px-3', className)
   if (to !== undefined) {
     return (
       <Button asChild size="sm" variant={variant} title={label} className={classes}>

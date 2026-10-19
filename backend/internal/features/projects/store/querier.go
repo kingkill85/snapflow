@@ -40,6 +40,13 @@ type Querier interface {
 	NextProjectNumber(ctx context.Context, arg NextProjectNumberParams) (int32, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateVersion(ctx context.Context, arg UpdateVersionParams) (ProjectVersion, error)
+	// VersionAccess reads a version with what other features (plans) need of
+	// its project. The Share and Lock variants lock the project row: FOR SHARE
+	// orders content changes against status changes (which update the row),
+	// FOR UPDATE also against each other and against version changes.
+	VersionAccess(ctx context.Context, id uuid.UUID) (VersionAccessRow, error)
+	VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionAccessLockRow, error)
+	VersionAccessShare(ctx context.Context, id uuid.UUID) (VersionAccessShareRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

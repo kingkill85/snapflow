@@ -83,6 +83,11 @@ export type Project = { id: string; number: string; name: string; status: string
 export type StoredFile = { id: string; contentType: string; size: number; width: number; height: number; sha256: string }
 /** A user created by a spec, with the password it signs in with. */
 export type Account = User & { password: string }
+export type PlanContent = {
+  scale: number | null
+  zones: { id: string; name: string; color: string; opacity: number; points: number[][] }[]
+  placements: { id: string; x: number; y: number; width: number; height: number; rotation: number; zoneId: string | null }[]
+}
 
 let counter = 0
 /** A name no other spec (or earlier run) uses, e.g. "Tenant k3x9a1-2". */
@@ -303,6 +308,16 @@ export class Api {
   /** Uploads an image file (bytes) as the catalog would. */
   async uploadFile(name: string, mimeType: string, buffer: Buffer): Promise<StoredFile> {
     return this.json<StoredFile>(await this.ctx.post('/api/files', { multipart: { file: { name, mimeType, buffer } } }))
+  }
+
+  /** Adds a plan with an image to a version (multipart, as the Add plan dialog). */
+  async createPlan(versionId: string, name: string, image: { name: string; mimeType: string; buffer: Buffer }): Promise<{ id: string; name: string }> {
+    return this.json(await this.ctx.post(`/api/versions/${versionId}/plans`, { multipart: { name, image } }))
+  }
+
+  /** The stored content of a plan. */
+  async planContent(planId: string): Promise<PlanContent> {
+    return this.json<PlanContent>(await this.ctx.get(`/api/plans/${planId}/content`))
   }
 
   async dispose() {

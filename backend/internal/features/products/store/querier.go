@@ -109,6 +109,9 @@ type Querier interface {
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (ProductVariant, error)
 	VariantExists(ctx context.Context, arg VariantExistsParams) (bool, error)
+	// VariantFacts returns what a plan checks of the given variants (plans
+	// feature, through PlacementVariants).
+	VariantFacts(ctx context.Context, ids []uuid.UUID) ([]VariantFactsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

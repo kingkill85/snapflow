@@ -13,7 +13,8 @@ type ImageUploadProps = {
   src?: string
   /** A file was chosen or dropped; the caller uploads it. */
   onSelect: (file: File) => void
-  onRemove: () => void
+  /** Removes the image; without it there is no Remove button (an image that must stay). */
+  onRemove?: () => void
   /** While an upload runs: its progress from 0 to 1 (undefined if unknown). */
   pending?: boolean
   progress?: number
@@ -94,7 +95,8 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
             <ImagePlus />
           </span>
         )}
-        <div className="min-w-0 flex-1 space-y-2">
+        {/* At least room for the buttons beside the preview, else below it (phones, German labels). */}
+        <div className="min-w-40 flex-1 space-y-2">
           {pending ? (
             <div className="space-y-1">
               <p className="text-sm text-muted">{percent === undefined ? t('upload.uploading') : t('upload.progress', { percent })}</p>
@@ -130,7 +132,7 @@ export function ImageUpload({ label, src, onSelect, onRemove, pending, progress,
                   >
                     <Upload /> {src ? t('upload.replace') : t('upload.choose')}
                   </Button>
-                  {src && (
+                  {src && onRemove && (
                     <Button size="sm" variant="secondary" onClick={onRemove}>
                       <Trash2 /> {t('upload.remove')}
                     </Button>
