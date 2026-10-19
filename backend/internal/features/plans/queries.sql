@@ -147,7 +147,8 @@ WHERE p.version_id = $1
 ORDER BY m.plan_id, m.position;
 
 -- name: BOMEnclosures :many
-SELECT id AS plan_id, enclosure_catalog_variant_id, (enclosure_variant_id IS NULL)::boolean AS variant_deleted
+SELECT id AS plan_id, enclosure_catalog_variant_id, (enclosure_variant_id IS NULL)::boolean AS variant_deleted,
+       enclosure_existing
 FROM plans
 WHERE version_id = $1 AND enclosure_catalog_variant_id IS NOT NULL
 ORDER BY position, id;
@@ -184,7 +185,7 @@ RETURNING id;
 UPDATE plans SET name = $2, updated_at = now() WHERE id = $1;
 
 -- name: SetEnclosure :exec
-UPDATE plans SET enclosure_variant_id = $2, enclosure_catalog_variant_id = $3 WHERE id = $1;
+UPDATE plans SET enclosure_variant_id = $2, enclosure_catalog_variant_id = $3, enclosure_existing = $4 WHERE id = $1;
 
 -- name: ListBoardRows :many
 SELECT id, capacity_te::float8 AS capacity_te FROM board_rows WHERE plan_id = $1 ORDER BY position;
@@ -214,12 +215,32 @@ FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
     AS r (id uuid, row_id uuid, offset_te numeric, variant_id uuid, catalog_variant_id uuid, label text,
           existing boolean, addon_variant_ids uuid[], instance_values jsonb, position integer);
 
--- BoardModuleVariants returns the variant of every module of a version's
--- boards (plan cards: TE used).
--- name: BoardModuleVariants :many
-SELECT m.plan_id, m.variant_id
-FROM board_modules m JOIN plans p ON p.id = m.plan_id
-WHERE p.version_id = $1;
+-- BoardSketchModules returns the modules of a version's boards with their
+-- row's position (plan cards: TE used and the sketch).
+-- name: BoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN plans p ON p.id = m.plan_id JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position;
+
+-- name: BoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r JOIN plans p ON p.id = r.plan_id
+WHERE p.version_id = $1
+ORDER BY r.plan_id, r.position;
+
+-- PlanBoardSketchModules is BoardSketchModules of one board.
+-- name: PlanBoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
+WHERE m.plan_id = $1
+ORDER BY m.position;
+
+-- name: PlanBoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r
+WHERE r.plan_id = $1
+ORDER BY r.position;
 
 -- NetworkPlacements returns the placements of a version (networks
 -- feature, through NetworkItems).

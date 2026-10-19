@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardSketch } from './boardSketch';
 
 /**
  * @nullable
@@ -17,6 +18,8 @@ export type NullableBoardSummary = {
      */
   enclosureVariantId: string | null;
   moduleCount: number;
+  /** Rows and modules for the card's schematic */
+  sketch: BoardSketch;
   /** Sum of the modules' widths in TE (unknown width counts 1 TE) */
   usedTe: number;
 } | null;

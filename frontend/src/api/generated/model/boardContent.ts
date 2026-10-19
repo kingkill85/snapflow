@@ -18,6 +18,10 @@ export interface BoardContent {
   capacityTe: number;
   /** Send it back as expectedContentUpdatedAt */
   contentUpdatedAt: string;
+  /** The board has an enclosure whose variant was deleted from the catalog (warning variant_deleted; removeEnclosure removes it) */
+  enclosureDeleted: boolean;
+  /** The customer already has the enclosure: never in the BOM */
+  enclosureExisting: boolean;
   /** @nullable */
   enclosureVariantId: string | null;
   /** In order */

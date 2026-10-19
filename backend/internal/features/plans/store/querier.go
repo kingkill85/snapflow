@@ -19,9 +19,10 @@ type Querier interface {
 	// BOMPlacements).
 	BOMPlans(ctx context.Context, versionID uuid.UUID) ([]BOMPlansRow, error)
 	BOMZones(ctx context.Context, versionID uuid.UUID) ([]BOMZonesRow, error)
-	// BoardModuleVariants returns the variant of every module of a version's
-	// boards (plan cards: TE used).
-	BoardModuleVariants(ctx context.Context, versionID uuid.UUID) ([]BoardModuleVariantsRow, error)
+	// BoardSketchModules returns the modules of a version's boards with their
+	// row's position (plan cards: TE used and the sketch).
+	BoardSketchModules(ctx context.Context, versionID uuid.UUID) ([]BoardSketchModulesRow, error)
+	BoardSketchRows(ctx context.Context, versionID uuid.UUID) ([]BoardSketchRowsRow, error)
 	// CopyPlan copies a plan's row into another version (version copy): a new
 	// id, the same image file, no lock.
 	CopyPlan(ctx context.Context, arg CopyPlanParams) (uuid.UUID, error)
@@ -66,6 +67,9 @@ type Querier interface {
 	// feature, through NetworkItems).
 	NetworkPlacements(ctx context.Context, versionID uuid.UUID) ([]NetworkPlacementsRow, error)
 	NetworkPlans(ctx context.Context, versionID uuid.UUID) ([]NetworkPlansRow, error)
+	// PlanBoardSketchModules is BoardSketchModules of one board.
+	PlanBoardSketchModules(ctx context.Context, planID uuid.UUID) ([]PlanBoardSketchModulesRow, error)
+	PlanBoardSketchRows(ctx context.Context, planID uuid.UUID) ([]PlanBoardSketchRowsRow, error)
 	PlanIDsForCopy(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanIDsOfVersion(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanVersion(ctx context.Context, id uuid.UUID) (uuid.UUID, error)

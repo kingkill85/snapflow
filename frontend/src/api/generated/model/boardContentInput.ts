@@ -10,8 +10,10 @@ import type { BoardRowInput } from './boardRowInput';
 export interface BoardContentInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** The customer already has the enclosure: never in the BOM */
+  enclosureExisting?: boolean;
   /**
-     * The enclosure (catalog variant); null for none (free rails)
+     * The enclosure (catalog variant); null for none (free rails). null keeps an enclosure whose variant was deleted from the catalog unless removeEnclosure is set (D375)
      * @nullable
      */
   enclosureVariantId: string | null;
@@ -19,6 +21,8 @@ export interface BoardContentInput {
   expectedContentUpdatedAt: string;
   /** In order (the array order is stored); at most 1000 */
   modules: BoardModuleInput[];
+  /** Remove an enclosure whose variant was deleted from the catalog (with enclosureVariantId null) */
+  removeEnclosure?: boolean;
   /** In order (the array order is stored); at most 50. With an enclosure of known size the rows are fitted to it (D357) */
   rows: BoardRowInput[];
 }

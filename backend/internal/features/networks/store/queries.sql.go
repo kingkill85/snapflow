@@ -11,22 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const busLineAssignmentCount = `-- name: BusLineAssignmentCount :one
-SELECT count(*) FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2
-`
-
-type BusLineAssignmentCountParams struct {
-	VersionID uuid.UUID
-	BusLineID *uuid.UUID
-}
-
-func (q *Queries) BusLineAssignmentCount(ctx context.Context, arg BusLineAssignmentCountParams) (int64, error) {
-	row := q.db.QueryRow(ctx, busLineAssignmentCount, arg.VersionID, arg.BusLineID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const copyAssignments = `-- name: CopyAssignments :exec
 INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
 SELECT $1::uuid, $2::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.bus_line_id,
@@ -56,8 +40,8 @@ func (q *Queries) CopyAssignments(ctx context.Context, arg CopyAssignmentsParams
 }
 
 const copyBusLines = `-- name: CopyBusLines :exec
-INSERT INTO bus_lines (tenant_id, version_id, id, product_type_id, name, address, position)
-SELECT $1::uuid, $2::uuid, id, product_type_id, name, address, position
+INSERT INTO bus_lines (tenant_id, version_id, id, product_type_id, name, address, devices_max, position)
+SELECT $1::uuid, $2::uuid, id, product_type_id, name, address, devices_max, position
 FROM bus_lines WHERE version_id = $3::uuid
 `
 
@@ -74,9 +58,9 @@ func (q *Queries) CopyBusLines(ctx context.Context, arg CopyBusLinesParams) erro
 }
 
 const createBusLine = `-- name: CreateBusLine :one
-INSERT INTO bus_lines (tenant_id, version_id, product_type_id, name, address, position)
-VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(position), 0) + 1 FROM bus_lines WHERE version_id = $2))
-RETURNING version_id, id, tenant_id, product_type_id, name, address, position, created_at, updated_at
+INSERT INTO bus_lines (tenant_id, version_id, product_type_id, name, address, devices_max, position)
+VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(position), 0) + 1 FROM bus_lines WHERE version_id = $2))
+RETURNING version_id, id, tenant_id, product_type_id, name, address, devices_max, position, created_at, updated_at
 `
 
 type CreateBusLineParams struct {
@@ -85,6 +69,7 @@ type CreateBusLineParams struct {
 	ProductTypeID uuid.UUID
 	Name          string
 	Address       string
+	DevicesMax    *int32
 }
 
 // CreateBusLine adds a line after the version's last one (the caller holds
@@ -96,6 +81,7 @@ func (q *Queries) CreateBusLine(ctx context.Context, arg CreateBusLineParams) (B
 		arg.ProductTypeID,
 		arg.Name,
 		arg.Address,
+		arg.DevicesMax,
 	)
 	var i BusLine
 	err := row.Scan(
@@ -105,6 +91,7 @@ func (q *Queries) CreateBusLine(ctx context.Context, arg CreateBusLineParams) (B
 		&i.ProductTypeID,
 		&i.Name,
 		&i.Address,
+		&i.DevicesMax,
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -144,7 +131,7 @@ func (q *Queries) DeleteBusLine(ctx context.Context, arg DeleteBusLineParams) (i
 }
 
 const getBusLine = `-- name: GetBusLine :one
-SELECT version_id, id, tenant_id, product_type_id, name, address, position, created_at, updated_at FROM bus_lines WHERE version_id = $1 AND id = $2
+SELECT version_id, id, tenant_id, product_type_id, name, address, devices_max, position, created_at, updated_at FROM bus_lines WHERE version_id = $1 AND id = $2
 `
 
 type GetBusLineParams struct {
@@ -162,6 +149,7 @@ func (q *Queries) GetBusLine(ctx context.Context, arg GetBusLineParams) (BusLine
 		&i.ProductTypeID,
 		&i.Name,
 		&i.Address,
+		&i.DevicesMax,
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -204,7 +192,7 @@ func (q *Queries) ListAssignments(ctx context.Context, versionID uuid.UUID) ([]N
 
 const listBusLines = `-- name: ListBusLines :many
 
-SELECT version_id, id, tenant_id, product_type_id, name, address, position, created_at, updated_at FROM bus_lines WHERE version_id = $1 ORDER BY position, id
+SELECT version_id, id, tenant_id, product_type_id, name, address, devices_max, position, created_at, updated_at FROM bus_lines WHERE version_id = $1 ORDER BY position, id
 `
 
 // Every query of this feature runs in database.InScope: row-level security
@@ -225,6 +213,7 @@ func (q *Queries) ListBusLines(ctx context.Context, versionID uuid.UUID) ([]BusL
 			&i.ProductTypeID,
 			&i.Name,
 			&i.Address,
+			&i.DevicesMax,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -237,6 +226,57 @@ func (q *Queries) ListBusLines(ctx context.Context, versionID uuid.UUID) ([]BusL
 		return nil, err
 	}
 	return items, nil
+}
+
+const listLineAssignments = `-- name: ListLineAssignments :many
+SELECT plan_id, item_id, tenant_id, version_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2
+`
+
+type ListLineAssignmentsParams struct {
+	VersionID uuid.UUID
+	BusLineID *uuid.UUID
+}
+
+// ListLineAssignments returns the explicit assignments to a line (the
+// service counts those whose item is a current member of the line).
+func (q *Queries) ListLineAssignments(ctx context.Context, arg ListLineAssignmentsParams) ([]NetworkAssignment, error) {
+	rows, err := q.db.Query(ctx, listLineAssignments, arg.VersionID, arg.BusLineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []NetworkAssignment{}
+	for rows.Next() {
+		var i NetworkAssignment
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ItemID,
+			&i.TenantID,
+			&i.VersionID,
+			&i.BusLineID,
+			&i.GatewayPlanID,
+			&i.GatewayItemID,
+			&i.Pinned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockVersionLines = `-- name: LockVersionLines :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 3))
+`
+
+// LockVersionLines serialises the default line creation of a version
+// (content saves of two plans of one version at once).
+func (q *Queries) LockVersionLines(ctx context.Context, versionID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockVersionLines, versionID)
+	return err
 }
 
 const setBusLineOrder = `-- name: SetBusLineOrder :exec
@@ -257,16 +297,17 @@ func (q *Queries) SetBusLineOrder(ctx context.Context, arg SetBusLineOrderParams
 }
 
 const updateBusLine = `-- name: UpdateBusLine :one
-UPDATE bus_lines SET name = $3, address = $4, updated_at = now()
+UPDATE bus_lines SET name = $3, address = $4, devices_max = $5, updated_at = now()
 WHERE version_id = $1 AND id = $2
-RETURNING version_id, id, tenant_id, product_type_id, name, address, position, created_at, updated_at
+RETURNING version_id, id, tenant_id, product_type_id, name, address, devices_max, position, created_at, updated_at
 `
 
 type UpdateBusLineParams struct {
-	VersionID uuid.UUID
-	ID        uuid.UUID
-	Name      string
-	Address   string
+	VersionID  uuid.UUID
+	ID         uuid.UUID
+	Name       string
+	Address    string
+	DevicesMax *int32
 }
 
 func (q *Queries) UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (BusLine, error) {
@@ -275,6 +316,7 @@ func (q *Queries) UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (B
 		arg.ID,
 		arg.Name,
 		arg.Address,
+		arg.DevicesMax,
 	)
 	var i BusLine
 	err := row.Scan(
@@ -284,6 +326,7 @@ func (q *Queries) UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (B
 		&i.ProductTypeID,
 		&i.Name,
 		&i.Address,
+		&i.DevicesMax,
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,

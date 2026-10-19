@@ -19,6 +19,8 @@ ALTER TABLE plans ADD CONSTRAINT plans_image_by_kind CHECK (
 -- (the BOM still finds its snapshot, D229).
 ALTER TABLE plans ADD COLUMN enclosure_variant_id uuid REFERENCES product_variants (id) ON DELETE SET NULL;
 ALTER TABLE plans ADD COLUMN enclosure_catalog_variant_id uuid;
+-- The customer already has the enclosure: never in the BOM (D372).
+ALTER TABLE plans ADD COLUMN enclosure_existing boolean NOT NULL DEFAULT false;
 ALTER TABLE plans ADD CONSTRAINT plans_enclosure_board CHECK (kind = 'board' OR enclosure_catalog_variant_id IS NULL);
 CREATE INDEX plans_enclosure_variant_idx ON plans (enclosure_variant_id);
 
@@ -59,10 +61,13 @@ CREATE TABLE bus_lines (
     version_id      uuid NOT NULL,
     id              uuid NOT NULL DEFAULT gen_random_uuid(),
     tenant_id       uuid NOT NULL,
-    product_type_id uuid NOT NULL REFERENCES product_types (id) ON DELETE CASCADE,
+    -- A product type used by a line cannot be deleted (product_type.in_use).
+    product_type_id uuid NOT NULL REFERENCES product_types (id) ON DELETE RESTRICT,
     name            text NOT NULL CHECK (btrim(name) <> '' AND char_length(name) <= 100),
     -- KNX area/line or HDL subnet, free text for later programming.
     address         text NOT NULL DEFAULT '' CHECK (char_length(address) <= 50),
+    -- Devices the line may take; null = the system's default (3d checks).
+    devices_max     integer CHECK (devices_max BETWEEN 1 AND 10000),
     position        integer NOT NULL,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
@@ -119,6 +124,7 @@ DROP TABLE board_modules;
 DROP TABLE board_rows;
 DELETE FROM plans WHERE kind = 'board';
 ALTER TABLE plans DROP CONSTRAINT plans_enclosure_board;
+ALTER TABLE plans DROP COLUMN enclosure_existing;
 ALTER TABLE plans DROP COLUMN enclosure_catalog_variant_id;
 ALTER TABLE plans DROP COLUMN enclosure_variant_id;
 ALTER TABLE plans DROP CONSTRAINT plans_image_by_kind;

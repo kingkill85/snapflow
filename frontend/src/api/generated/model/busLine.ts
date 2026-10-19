@@ -11,6 +11,11 @@ export interface BusLine {
   /** KNX area/line or HDL subnet for later programming; empty for none */
   address: string;
   createdAt: string;
+  /**
+     * Devices the line may take (3d checks); null = the system's busDevicesMax
+     * @nullable
+     */
+  devicesMax: number | null;
   /** Kept by the version copy */
   id: string;
   name: string;

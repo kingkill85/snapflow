@@ -82,7 +82,10 @@
     "in_use": "Dieser Linie sind Geräte zugeordnet ({{count}}). Verschieben Sie sie zuerst auf eine andere Linie.",
     "order_mismatch": "Die Buslinien dieser Version haben sich geändert. Neu laden und erneut versuchen.",
     "not_bus_system": "Dieses System hat keine Bus-Topologie.",
-    "product_type_not_found": "Dieses System existiert nicht mehr."
+    "product_type_not_found": "Dieses System existiert nicht mehr.",
+    "product_type_inactive": "Dieses System ist inaktiv.",
+    "product_type_not_in_project": "Das Projekt verwendet dieses System nicht. Fügen Sie es zuerst dem Projekt hinzu.",
+    "devices_max_invalid": "Geben Sie eine Zahl von 1 bis {{max}} ein oder lassen Sie das Feld leer."
   },
   "catalog_field": {
     "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",

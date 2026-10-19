@@ -10,8 +10,13 @@ export interface BusLineInput {
   readonly $schema?: string;
   /** At most 50 characters */
   address?: string;
+  /**
+     * 1-10000; absent or null = the system's busDevicesMax
+     * @nullable
+     */
+  devicesMax?: number | null;
   /** 1-100 characters, unique per system in the version ignoring case */
   name: string;
-  /** A product type with topology bus */
+  /** An active product type with topology bus that the project uses */
   productTypeId: string;
 }

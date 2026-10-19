@@ -68,10 +68,30 @@ type NullablePlanImage struct {
 
 // BoardSummary is what a plan card shows of a board.
 type BoardSummary struct {
-	EnclosureVariantID *uuid.UUID `json:"enclosureVariantId" nullable:"true" doc:"The enclosure (catalog variant); null for none"`
-	ModuleCount        int64      `json:"moduleCount"`
-	CapacityTE         float64    `json:"capacityTe" doc:"Sum of the rows' capacity in TE"`
-	UsedTE             float64    `json:"usedTe" doc:"Sum of the modules' widths in TE (unknown width counts 1 TE)"`
+	EnclosureVariantID *uuid.UUID  `json:"enclosureVariantId" nullable:"true" doc:"The enclosure (catalog variant); null for none"`
+	ModuleCount        int64       `json:"moduleCount"`
+	CapacityTE         float64     `json:"capacityTe" doc:"Sum of the rows' capacity in TE"`
+	UsedTE             float64     `json:"usedTe" doc:"Sum of the modules' widths in TE (unknown width counts 1 TE)"`
+	Sketch             BoardSketch `json:"sketch" doc:"Rows and modules for the card's schematic"`
+}
+
+// BoardSketch is the compact geometry of a board (plan card schematic).
+type BoardSketch struct {
+	Rows    []BoardSketchRow    `json:"rows" doc:"In order"`
+	Modules []BoardSketchModule `json:"modules"`
+}
+
+// BoardSketchRow is a row of a sketch.
+type BoardSketchRow struct {
+	CapacityTE float64 `json:"capacityTe"`
+}
+
+// BoardSketchModule is a module of a sketch.
+type BoardSketchModule struct {
+	Row      int     `json:"row" doc:"Index of the module's row in rows, 0 first"`
+	OffsetTE float64 `json:"offsetTe"`
+	WidthTE  float64 `json:"widthTe" doc:"1 when unknown"`
+	Existing bool    `json:"existing"`
 }
 
 // NullableBoardSummary is a BoardSummary that may be null.

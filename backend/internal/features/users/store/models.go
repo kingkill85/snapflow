@@ -43,6 +43,7 @@ type BusLine struct {
 	ProductTypeID uuid.UUID
 	Name          string
 	Address       string
+	DevicesMax    *int32
 	Position      int32
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -246,6 +247,7 @@ type Plan struct {
 	ContentUpdatedAt          time.Time
 	EnclosureVariantID        *uuid.UUID
 	EnclosureCatalogVariantID *uuid.UUID
+	EnclosureExisting         bool
 }
 
 type PlanNeed struct {

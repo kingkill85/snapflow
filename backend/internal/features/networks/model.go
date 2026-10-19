@@ -13,6 +13,7 @@ const (
 	MaxNameLength    = 100
 	MaxAddressLength = 50
 	MaxAssignments   = 1000
+	MaxDevicesMax    = 10000
 	TopologyBus      = "bus"
 	TopologyWireless = "wireless"
 )
@@ -25,21 +26,24 @@ type BusLine struct {
 	Name          string    `json:"name"`
 	Address       string    `json:"address" doc:"KNX area/line or HDL subnet for later programming; empty for none"`
 	Position      int32     `json:"position" doc:"Order within the version, 1 first"`
+	DevicesMax    *int32    `json:"devicesMax" nullable:"true" doc:"Devices the line may take (3d checks); null = the system's busDevicesMax"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // BusLineInput creates a bus line.
 type BusLineInput struct {
-	ProductTypeID uuid.UUID `json:"productTypeId" doc:"A product type with topology bus"`
+	ProductTypeID uuid.UUID `json:"productTypeId" doc:"An active product type with topology bus that the project uses"`
 	Name          string    `json:"name" doc:"1-100 characters, unique per system in the version ignoring case"`
 	Address       string    `json:"address,omitempty" doc:"At most 50 characters"`
+	DevicesMax    *int32    `json:"devicesMax,omitempty" nullable:"true" doc:"1-10000; absent or null = the system's busDevicesMax"`
 }
 
 // BusLineUpdate renames a bus line or changes its address.
 type BusLineUpdate struct {
-	Name    string `json:"name" doc:"1-100 characters, unique per system in the version ignoring case"`
-	Address string `json:"address" doc:"At most 50 characters; empty for none"`
+	Name       string `json:"name" doc:"1-100 characters, unique per system in the version ignoring case"`
+	Address    string `json:"address" doc:"At most 50 characters; empty for none"`
+	DevicesMax *int32 `json:"devicesMax,omitempty" nullable:"true" doc:"1-10000; absent or null = the system's busDevicesMax"`
 }
 
 // SystemRef names a product type (system).
@@ -90,7 +94,7 @@ type BusLineNetwork struct {
 type BusSystem struct {
 	ProductType SystemRef        `json:"productType"`
 	Lines       []BusLineNetwork `json:"lines" doc:"In order; the first is the default line"`
-	Unassigned  []BusMember      `json:"unassigned" doc:"Members without a line (only while the system has no line yet: read-only projects or readers)"`
+	Unassigned  []BusMember      `json:"unassigned" doc:"Members without a line: only while the system has no line yet (the next content save of a plan with a member creates the default line, D372)"`
 }
 
 // WirelessDevice is a wireless device assigned to a gateway.

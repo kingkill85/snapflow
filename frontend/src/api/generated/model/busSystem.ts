@@ -12,6 +12,6 @@ export interface BusSystem {
   /** In order; the first is the default line */
   lines: BusLineNetwork[];
   productType: SystemRef;
-  /** Members without a line (only while the system has no line yet: read-only projects or readers) */
+  /** Members without a line: only while the system has no line yet (the next content save of a plan with a member creates the default line, D372) */
   unassigned: BusMember[];
 }

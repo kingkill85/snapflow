@@ -52,11 +52,14 @@ func (s *Service) boardCatalog(ctx context.Context, ids []uuid.UUID) (boardCatal
 	return boardCatalog{variants: v, caps: c}, nil
 }
 
-// width is a module's width in TE: its railWidthTe, 1 when unknown.
+// width is a module's width in TE: its railWidthTe rounded to 0.1 TE (the
+// editor rounds the same way, D376), 1 when unknown or not above 0.
 func (c boardCatalog) width(variantID *uuid.UUID) (float64, bool) {
 	if variantID != nil {
-		if cp, ok := c.caps[*variantID]; ok && cp.RailWidthTE != nil && *cp.RailWidthTE > 0 {
-			return *cp.RailWidthTE, true
+		if cp, ok := c.caps[*variantID]; ok && cp.RailWidthTE != nil && finite(*cp.RailWidthTE) {
+			if w := roundTE(*cp.RailWidthTE); w > 0 && w <= MaxRowTE {
+				return w, true
+			}
 		}
 	}
 	return 1, false
@@ -70,6 +73,9 @@ func (c boardCatalog) enclosureSize(variantID *uuid.UUID) (rows int, te float64,
 	}
 	cp, found := c.caps[*variantID]
 	if !found || cp.EnclosureRows == nil || cp.EnclosureTEPerRow == nil {
+		return 0, 0, false
+	}
+	if !finite(*cp.EnclosureRows) || !finite(*cp.EnclosureTEPerRow) || *cp.EnclosureRows > MaxBoardRows+1 {
 		return 0, 0, false
 	}
 	rows, te = int(math.Floor(*cp.EnclosureRows)), roundTE(*cp.EnclosureTEPerRow)
@@ -332,7 +338,9 @@ func boardVariantIDs(enclosure *uuid.UUID, modules []BoardModule, addons bool) [
 func (s *Service) boardOf(ref projects.VersionRef, plan store.GetPlanRow, rows []BoardRowInput, modules []BoardModule, cat boardCatalog) BoardContent {
 	out := BoardContent{
 		PlanID: plan.ID, ContentUpdatedAt: plan.ContentUpdatedAt, EnclosureVariantID: plan.EnclosureVariantID,
-		Rows: []BoardRow{}, Modules: []BoardModule{}, Capabilities: map[string]capabilities.Capabilities{}, Warnings: []BoardWarning{},
+		EnclosureExisting: plan.EnclosureExisting,
+		EnclosureDeleted:  plan.EnclosureVariantID == nil && plan.EnclosureCatalogVariantID != nil,
+		Rows:              []BoardRow{}, Modules: []BoardModule{}, Capabilities: map[string]capabilities.Capabilities{}, Warnings: []BoardWarning{},
 	}
 	_, _, out.RowsFromEnclosure = cat.enclosureSize(plan.EnclosureVariantID)
 	warn := func(module *uuid.UUID, code BoardWarningCode, addon *uuid.UUID) {
@@ -379,10 +387,17 @@ func (s *Service) boardOf(ref projects.VersionRef, plan store.GetPlanRow, rows [
 		out.Rows = append(out.Rows, BoardRow{ID: r.ID, CapacityTE: r.CapacityTE, UsedTE: roundTE(used[r.ID])})
 		out.CapacityTE += r.CapacityTE
 	}
-	for _, m := range out.Modules {
+	for i, m := range out.Modules {
+		id := m.ID
 		if m.OffsetTE+m.WidthTE > capacity[m.RowID]+teEpsilon {
-			id := m.ID
 			warn(&id, WarnRowOverflow, nil)
+		}
+		// Stored modules can overlap after a catalog width change (D374).
+		for _, o := range out.Modules[:i] {
+			if overlaps(m, o) {
+				warn(&id, WarnModuleOverlap, nil)
+				break
+			}
 		}
 	}
 	out.CapacityTE, out.UsedTE = roundTE(out.CapacityTE), roundTE(out.UsedTE)
@@ -440,9 +455,11 @@ func (s *Service) SaveBoard(ctx context.Context, id uuid.UUID, in BoardContentIn
 	if err != nil {
 		return BoardContent{}, err
 	}
-	var enclosureCatalog *uuid.UUID
-	if in.EnclosureVariantID != nil {
-		enclosureCatalog = in.EnclosureVariantID
+	// null keeps an enclosure whose variant was deleted (its catalog id, so
+	// the BOM keeps it); only removeEnclosure removes it (D375).
+	enclosureCatalog := in.EnclosureVariantID
+	if in.EnclosureVariantID == nil && st.plan.EnclosureVariantID == nil && !in.RemoveEnclosure {
+		enclosureCatalog = st.plan.EnclosureCatalogVariantID
 	}
 	prepared, err := s.prepareContentHooksIDs(ctx, st.plan.VersionID, boardVariantIDs(in.EnclosureVariantID, modules, true))
 	if err != nil {
@@ -467,7 +484,10 @@ func (s *Service) SaveBoard(ctx context.Context, id uuid.UUID, in BoardContentIn
 		if err := writeBoard(ctx, q, locked.TenantID, id, rows, modules); err != nil {
 			return err
 		}
-		if err := q.SetEnclosure(ctx, store.SetEnclosureParams{ID: id, EnclosureVariantID: in.EnclosureVariantID, EnclosureCatalogVariantID: enclosureCatalog}); err != nil {
+		if err := q.SetEnclosure(ctx, store.SetEnclosureParams{
+			ID: id, EnclosureVariantID: in.EnclosureVariantID, EnclosureCatalogVariantID: enclosureCatalog,
+			EnclosureExisting: in.EnclosureExisting && enclosureCatalog != nil,
+		}); err != nil {
 			return err
 		}
 		if err := s.runContentHooks(ctx, tx, ref, prepared); err != nil {
@@ -598,11 +618,18 @@ func validateBoard(st storedBoard, cat boardCatalog, in BoardContentInput) ([]Bo
 	if len(errs) > 0 {
 		return nil, nil, apperr.Validation(errs...)
 	}
-	// No overlap within a row: [offset, offset + width).
+	// No overlap within a row: [offset, offset + width). Two stored modules
+	// that overlap only because a catalog width changed are kept (warning
+	// module_overlap, D374); a module that was added or moved (row, offset)
+	// or changed its product must not overlap.
+	moved := func(m BoardModule) bool {
+		prev, ok := stored[m.ID]
+		return !ok || prev.RowID != m.RowID || math.Abs(prev.OffsetTE-m.OffsetTE) > teEpsilon || !sameVariant(prev.VariantID, m.VariantID)
+	}
 	for i, a := range modules {
 		for j := range i {
 			b := modules[j]
-			if a.RowID == b.RowID && a.OffsetTE < b.OffsetTE+b.WidthTE-teEpsilon && b.OffsetTE < a.OffsetTE+a.WidthTE-teEpsilon {
+			if overlaps(a, b) && (moved(a) || moved(b)) {
 				add(fmt.Sprintf("body.modules[%d].offsetTe", i), "board.overlap", "the module overlaps another one in the row",
 					"moduleId", b.ID.String())
 				break
@@ -616,6 +643,16 @@ func validateBoard(st storedBoard, cat boardCatalog, in BoardContentInput) ([]Bo
 		rows, modules = fitRows(rows, modules, enclosureRows, enclosureTE)
 	}
 	return rows, modules, nil
+}
+
+// overlaps reports whether two modules overlap in a row: [offset, offset +
+// width), touching is fine (half TE and decimals with teEpsilon).
+func overlaps(a, b BoardModule) bool {
+	return a.RowID == b.RowID && a.OffsetTE < b.OffsetTE+b.WidthTE-teEpsilon && b.OffsetTE < a.OffsetTE+a.WidthTE-teEpsilon
+}
+
+func sameVariant(a, b *uuid.UUID) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 // fitRows fits rows to an enclosure of n rows of te each (D357).
@@ -653,16 +690,14 @@ func fitRows(rows []BoardRowInput, modules []BoardModule, n int, te float64) ([]
 
 // ---------------------------------------------------------------- plan cards
 
-// usedTE sums the module widths of the boards of rows (plan cards).
-func (s *Service) usedTE(ctx context.Context, rows []store.BoardModuleVariantsRow) (map[uuid.UUID]float64, error) {
-	out := map[uuid.UUID]float64{}
-	if len(rows) == 0 {
-		return out, nil
-	}
+// boardSummaries computes the TE used and the sketch of the boards of the
+// rows and modules given (plan cards).
+func (s *Service) boardSummaries(ctx context.Context, rows []store.BoardSketchRowsRow, modules []store.BoardSketchModulesRow) (map[uuid.UUID]BoardSummary, error) {
+	out := map[uuid.UUID]BoardSummary{}
 	var ids []uuid.UUID
-	for _, r := range rows {
-		if r.VariantID != nil {
-			ids = append(ids, *r.VariantID)
+	for _, m := range modules {
+		if m.VariantID != nil {
+			ids = append(ids, *m.VariantID)
 		}
 	}
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
@@ -675,12 +710,28 @@ func (s *Service) usedTE(ctx context.Context, rows []store.BoardModuleVariantsRo
 		}
 	}
 	cat := boardCatalog{caps: caps}
+	get := func(id uuid.UUID) BoardSummary {
+		b, ok := out[id]
+		if !ok {
+			b.Sketch = BoardSketch{Rows: []BoardSketchRow{}, Modules: []BoardSketchModule{}}
+		}
+		return b
+	}
 	for _, r := range rows {
-		w, _ := cat.width(r.VariantID)
-		out[r.PlanID] += w
+		b := get(r.PlanID)
+		b.Sketch.Rows = append(b.Sketch.Rows, BoardSketchRow{CapacityTE: r.CapacityTe})
+		out[r.PlanID] = b
+	}
+	for _, m := range modules {
+		b := get(m.PlanID)
+		w, _ := cat.width(m.VariantID)
+		b.UsedTE += w
+		b.Sketch.Modules = append(b.Sketch.Modules, BoardSketchModule{Row: int(m.RowPosition) - 1, OffsetTE: m.OffsetTe, WidthTE: w, Existing: m.Existing})
+		out[m.PlanID] = b
 	}
 	for k, v := range out {
-		out[k] = roundTE(v)
+		v.UsedTE = roundTE(v.UsedTE)
+		out[k] = v
 	}
 	return out, nil
 }

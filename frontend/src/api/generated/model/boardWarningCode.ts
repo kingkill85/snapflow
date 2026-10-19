@@ -13,6 +13,7 @@ export const BoardWarningCode = {
   module_mounting_floorplan: 'module_mounting_floorplan',
   row_overflow: 'row_overflow',
   enclosure_size_unknown: 'enclosure_size_unknown',
+  module_overlap: 'module_overlap',
   variant_deleted: 'variant_deleted',
   variant_inactive: 'variant_inactive',
   product_inactive: 'product_inactive',

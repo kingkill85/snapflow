@@ -14,7 +14,8 @@ import (
 )
 
 const bOMEnclosures = `-- name: BOMEnclosures :many
-SELECT id AS plan_id, enclosure_catalog_variant_id, (enclosure_variant_id IS NULL)::boolean AS variant_deleted
+SELECT id AS plan_id, enclosure_catalog_variant_id, (enclosure_variant_id IS NULL)::boolean AS variant_deleted,
+       enclosure_existing
 FROM plans
 WHERE version_id = $1 AND enclosure_catalog_variant_id IS NOT NULL
 ORDER BY position, id
@@ -24,6 +25,7 @@ type BOMEnclosuresRow struct {
 	PlanID                    uuid.UUID
 	EnclosureCatalogVariantID *uuid.UUID
 	VariantDeleted            bool
+	EnclosureExisting         bool
 }
 
 func (q *Queries) BOMEnclosures(ctx context.Context, versionID uuid.UUID) ([]BOMEnclosuresRow, error) {
@@ -35,7 +37,12 @@ func (q *Queries) BOMEnclosures(ctx context.Context, versionID uuid.UUID) ([]BOM
 	items := []BOMEnclosuresRow{}
 	for rows.Next() {
 		var i BOMEnclosuresRow
-		if err := rows.Scan(&i.PlanID, &i.EnclosureCatalogVariantID, &i.VariantDeleted); err != nil {
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.EnclosureCatalogVariantID,
+			&i.VariantDeleted,
+			&i.EnclosureExisting,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -200,29 +207,71 @@ func (q *Queries) BOMZones(ctx context.Context, versionID uuid.UUID) ([]BOMZones
 	return items, nil
 }
 
-const boardModuleVariants = `-- name: BoardModuleVariants :many
-SELECT m.plan_id, m.variant_id
-FROM board_modules m JOIN plans p ON p.id = m.plan_id
+const boardSketchModules = `-- name: BoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN plans p ON p.id = m.plan_id JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
 WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position
 `
 
-type BoardModuleVariantsRow struct {
-	PlanID    uuid.UUID
-	VariantID *uuid.UUID
+type BoardSketchModulesRow struct {
+	PlanID      uuid.UUID
+	VariantID   *uuid.UUID
+	RowPosition int32
+	OffsetTe    float64
+	Existing    bool
 }
 
-// BoardModuleVariants returns the variant of every module of a version's
-// boards (plan cards: TE used).
-func (q *Queries) BoardModuleVariants(ctx context.Context, versionID uuid.UUID) ([]BoardModuleVariantsRow, error) {
-	rows, err := q.db.Query(ctx, boardModuleVariants, versionID)
+// BoardSketchModules returns the modules of a version's boards with their
+// row's position (plan cards: TE used and the sketch).
+func (q *Queries) BoardSketchModules(ctx context.Context, versionID uuid.UUID) ([]BoardSketchModulesRow, error) {
+	rows, err := q.db.Query(ctx, boardSketchModules, versionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []BoardModuleVariantsRow{}
+	items := []BoardSketchModulesRow{}
 	for rows.Next() {
-		var i BoardModuleVariantsRow
-		if err := rows.Scan(&i.PlanID, &i.VariantID); err != nil {
+		var i BoardSketchModulesRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.VariantID,
+			&i.RowPosition,
+			&i.OffsetTe,
+			&i.Existing,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const boardSketchRows = `-- name: BoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r JOIN plans p ON p.id = r.plan_id
+WHERE p.version_id = $1
+ORDER BY r.plan_id, r.position
+`
+
+type BoardSketchRowsRow struct {
+	PlanID     uuid.UUID
+	CapacityTe float64
+}
+
+func (q *Queries) BoardSketchRows(ctx context.Context, versionID uuid.UUID) ([]BoardSketchRowsRow, error) {
+	rows, err := q.db.Query(ctx, boardSketchRows, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BoardSketchRowsRow{}
+	for rows.Next() {
+		var i BoardSketchRowsRow
+		if err := rows.Scan(&i.PlanID, &i.CapacityTe); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -375,7 +424,7 @@ func (q *Queries) DeleteZones(ctx context.Context, planID uuid.UUID) error {
 }
 
 const getPlan = `-- name: GetPlan :one
-SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at, p.enclosure_variant_id, p.enclosure_catalog_variant_id,
+SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at, p.enclosure_variant_id, p.enclosure_catalog_variant_id, p.enclosure_existing,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
     (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count,
@@ -403,6 +452,7 @@ type GetPlanRow struct {
 	ContentUpdatedAt          time.Time
 	EnclosureVariantID        *uuid.UUID
 	EnclosureCatalogVariantID *uuid.UUID
+	EnclosureExisting         bool
 	ZoneCount                 int64
 	PlacementCount            int64
 	NeedCount                 int64
@@ -431,6 +481,7 @@ func (q *Queries) GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error)
 		&i.ContentUpdatedAt,
 		&i.EnclosureVariantID,
 		&i.EnclosureCatalogVariantID,
+		&i.EnclosureExisting,
 		&i.ZoneCount,
 		&i.PlacementCount,
 		&i.NeedCount,
@@ -703,7 +754,7 @@ func (q *Queries) ListPlacements(ctx context.Context, planID uuid.UUID) ([]PlanP
 
 const listPlans = `-- name: ListPlans :many
 
-SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at, p.enclosure_variant_id, p.enclosure_catalog_variant_id,
+SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at, p.enclosure_variant_id, p.enclosure_catalog_variant_id, p.enclosure_existing,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
     (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count,
@@ -732,6 +783,7 @@ type ListPlansRow struct {
 	ContentUpdatedAt          time.Time
 	EnclosureVariantID        *uuid.UUID
 	EnclosureCatalogVariantID *uuid.UUID
+	EnclosureExisting         bool
 	ZoneCount                 int64
 	PlacementCount            int64
 	NeedCount                 int64
@@ -768,6 +820,7 @@ func (q *Queries) ListPlans(ctx context.Context, versionID uuid.UUID) ([]ListPla
 			&i.ContentUpdatedAt,
 			&i.EnclosureVariantID,
 			&i.EnclosureCatalogVariantID,
+			&i.EnclosureExisting,
 			&i.ZoneCount,
 			&i.PlacementCount,
 			&i.NeedCount,
@@ -818,7 +871,7 @@ func (q *Queries) ListZones(ctx context.Context, planID uuid.UUID) ([]PlanZone, 
 }
 
 const lockPlan = `-- name: LockPlan :one
-SELECT id, tenant_id, version_id, kind, name, position, image_file_id, image_width, image_height, scale, lock_user_id, lock_expires_at, created_at, updated_at, content_updated_at, enclosure_variant_id, enclosure_catalog_variant_id FROM plans WHERE id = $1 FOR UPDATE
+SELECT id, tenant_id, version_id, kind, name, position, image_file_id, image_width, image_height, scale, lock_user_id, lock_expires_at, created_at, updated_at, content_updated_at, enclosure_variant_id, enclosure_catalog_variant_id, enclosure_existing FROM plans WHERE id = $1 FOR UPDATE
 `
 
 // LockPlan locks a plan for a change of it, its content or its edit lock
@@ -844,6 +897,7 @@ func (q *Queries) LockPlan(ctx context.Context, id uuid.UUID) (Plan, error) {
 		&i.ContentUpdatedAt,
 		&i.EnclosureVariantID,
 		&i.EnclosureCatalogVariantID,
+		&i.EnclosureExisting,
 	)
 	return i, err
 }
@@ -968,6 +1022,80 @@ func (q *Queries) NetworkPlans(ctx context.Context, versionID uuid.UUID) ([]Netw
 	return items, nil
 }
 
+const planBoardSketchModules = `-- name: PlanBoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
+WHERE m.plan_id = $1
+ORDER BY m.position
+`
+
+type PlanBoardSketchModulesRow struct {
+	PlanID      uuid.UUID
+	VariantID   *uuid.UUID
+	RowPosition int32
+	OffsetTe    float64
+	Existing    bool
+}
+
+// PlanBoardSketchModules is BoardSketchModules of one board.
+func (q *Queries) PlanBoardSketchModules(ctx context.Context, planID uuid.UUID) ([]PlanBoardSketchModulesRow, error) {
+	rows, err := q.db.Query(ctx, planBoardSketchModules, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PlanBoardSketchModulesRow{}
+	for rows.Next() {
+		var i PlanBoardSketchModulesRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.VariantID,
+			&i.RowPosition,
+			&i.OffsetTe,
+			&i.Existing,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const planBoardSketchRows = `-- name: PlanBoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r
+WHERE r.plan_id = $1
+ORDER BY r.position
+`
+
+type PlanBoardSketchRowsRow struct {
+	PlanID     uuid.UUID
+	CapacityTe float64
+}
+
+func (q *Queries) PlanBoardSketchRows(ctx context.Context, planID uuid.UUID) ([]PlanBoardSketchRowsRow, error) {
+	rows, err := q.db.Query(ctx, planBoardSketchRows, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PlanBoardSketchRowsRow{}
+	for rows.Next() {
+		var i PlanBoardSketchRowsRow
+		if err := rows.Scan(&i.PlanID, &i.CapacityTe); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const planIDsForCopy = `-- name: PlanIDsForCopy :many
 SELECT id FROM plans WHERE version_id = $1 ORDER BY position, id
 `
@@ -1068,17 +1196,23 @@ func (q *Queries) RenamePlan(ctx context.Context, arg RenamePlanParams) error {
 }
 
 const setEnclosure = `-- name: SetEnclosure :exec
-UPDATE plans SET enclosure_variant_id = $2, enclosure_catalog_variant_id = $3 WHERE id = $1
+UPDATE plans SET enclosure_variant_id = $2, enclosure_catalog_variant_id = $3, enclosure_existing = $4 WHERE id = $1
 `
 
 type SetEnclosureParams struct {
 	ID                        uuid.UUID
 	EnclosureVariantID        *uuid.UUID
 	EnclosureCatalogVariantID *uuid.UUID
+	EnclosureExisting         bool
 }
 
 func (q *Queries) SetEnclosure(ctx context.Context, arg SetEnclosureParams) error {
-	_, err := q.db.Exec(ctx, setEnclosure, arg.ID, arg.EnclosureVariantID, arg.EnclosureCatalogVariantID)
+	_, err := q.db.Exec(ctx, setEnclosure,
+		arg.ID,
+		arg.EnclosureVariantID,
+		arg.EnclosureCatalogVariantID,
+		arg.EnclosureExisting,
+	)
 	return err
 }
 

@@ -84,9 +84,10 @@ func (s *Service) List(ctx context.Context, versionID uuid.UUID) ([]Plan, error)
 		return nil, err
 	}
 	var (
-		ref     projects.VersionRef
-		rows    []store.ListPlansRow
-		modules []store.BoardModuleVariantsRow
+		ref       projects.VersionRef
+		rows      []store.ListPlansRow
+		boardRows []store.BoardSketchRowsRow
+		modules   []store.BoardSketchModulesRow
 	)
 	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
@@ -96,13 +97,16 @@ func (s *Service) List(ctx context.Context, versionID uuid.UUID) ([]Plan, error)
 		if rows, err = q.ListPlans(ctx, versionID); err != nil {
 			return err
 		}
-		modules, err = q.BoardModuleVariants(ctx, versionID)
+		if boardRows, err = q.BoardSketchRows(ctx, versionID); err != nil {
+			return err
+		}
+		modules, err = q.BoardSketchModules(ctx, versionID)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	used, err := s.usedTE(ctx, modules)
+	used, err := s.boardSummaries(ctx, boardRows, modules)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +130,10 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Plan, error) {
 
 func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (Plan, error) {
 	var (
-		ref     projects.VersionRef
-		row     store.GetPlanRow
-		modules []store.BoardModuleVariantsRow
+		ref       projects.VersionRef
+		row       store.GetPlanRow
+		boardRows []store.BoardSketchRowsRow
+		modules   []store.BoardSketchModulesRow
 	)
 	err := s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
@@ -140,14 +145,19 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 			return notFound(err)
 		}
 		if row.Kind == KindBoard {
-			all, err := q.BoardModuleVariants(ctx, row.VersionID)
+			rs, err := q.PlanBoardSketchRows(ctx, id)
 			if err != nil {
 				return err
 			}
-			for _, m := range all {
-				if m.PlanID == id {
-					modules = append(modules, m)
-				}
+			for _, r := range rs {
+				boardRows = append(boardRows, store.BoardSketchRowsRow(r))
+			}
+			ms, err := q.PlanBoardSketchModules(ctx, id)
+			if err != nil {
+				return err
+			}
+			for _, m := range ms {
+				modules = append(modules, store.BoardSketchModulesRow(m))
 			}
 		}
 		return nil
@@ -155,7 +165,7 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 	if err != nil {
 		return Plan{}, err
 	}
-	used, err := s.usedTE(ctx, modules)
+	used, err := s.boardSummaries(ctx, boardRows, modules)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -512,7 +522,7 @@ func (s *Service) readPlanVersion(ctx context.Context, actor auth.Actor, tx pgx.
 	return s.projects.ReadVersion(ctx, tx, versionID)
 }
 
-func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.VersionRef, r store.GetPlanRow, usedTE map[uuid.UUID]float64) (Plan, error) {
+func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.VersionRef, r store.GetPlanRow, boards map[uuid.UUID]BoardSummary) (Plan, error) {
 	write := actor.Can(auth.PermProjectsWrite) && ref.Writable()
 	p := Plan{
 		ID: r.ID, VersionID: r.VersionID, ProjectID: ref.ProjectID, Kind: r.Kind, Name: r.Name, Position: r.Position,
@@ -524,9 +534,12 @@ func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.Ver
 		p.Image = &NullablePlanImage{PlanImage: PlanImage{URL: imageURL(r.ID, *r.ImageFileID), Width: deref(r.ImageWidth), Height: deref(r.ImageHeight)}}
 	}
 	if r.Kind == KindBoard {
-		p.Board = &NullableBoardSummary{BoardSummary: BoardSummary{
-			EnclosureVariantID: r.EnclosureVariantID, ModuleCount: r.ModuleCount, CapacityTE: r.CapacityTe, UsedTE: usedTE[r.ID],
-		}}
+		b, ok := boards[r.ID]
+		if !ok {
+			b.Sketch = BoardSketch{Rows: []BoardSketchRow{}, Modules: []BoardSketchModule{}}
+		}
+		b.EnclosureVariantID, b.ModuleCount, b.CapacityTE = r.EnclosureVariantID, r.ModuleCount, r.CapacityTe
+		p.Board = &NullableBoardSummary{BoardSummary: b}
 	}
 	if s.live(r.LockUserID, r.LockExpiresAt) {
 		name, err := s.users.DisplayName(ctx, *r.LockUserID)

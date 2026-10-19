@@ -731,6 +731,14 @@
             "format": "date-time",
             "type": "string"
           },
+          "enclosureDeleted": {
+            "description": "The board has an enclosure whose variant was deleted from the catalog (warning variant_deleted; removeEnclosure removes it)",
+            "type": "boolean"
+          },
+          "enclosureExisting": {
+            "description": "The customer already has the enclosure: never in the BOM",
+            "type": "boolean"
+          },
           "enclosureVariantId": {
             "type": [
               "string",
@@ -774,6 +782,8 @@
           "planId",
           "contentUpdatedAt",
           "enclosureVariantId",
+          "enclosureExisting",
+          "enclosureDeleted",
           "rowsFromEnclosure",
           "rows",
           "modules",
@@ -796,8 +806,12 @@
             "readOnly": true,
             "type": "string"
           },
+          "enclosureExisting": {
+            "description": "The customer already has the enclosure: never in the BOM",
+            "type": "boolean"
+          },
           "enclosureVariantId": {
-            "description": "The enclosure (catalog variant); null for none (free rails)",
+            "description": "The enclosure (catalog variant); null for none (free rails). null keeps an enclosure whose variant was deleted from the catalog unless removeEnclosure is set (D375)",
             "type": [
               "string",
               "null"
@@ -814,6 +828,10 @@
               "$ref": "#/components/schemas/BoardModuleInput"
             },
             "type": "array"
+          },
+          "removeEnclosure": {
+            "description": "Remove an enclosure whose variant was deleted from the catalog (with enclosureVariantId null)",
+            "type": "boolean"
           },
           "rows": {
             "description": "In order (the array order is stored); at most 50. With an enclosure of known size the rows are fitted to it (D357)",
@@ -1042,6 +1060,71 @@
         ],
         "type": "object"
       },
+      "BoardSketch": {
+        "additionalProperties": false,
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/BoardSketchModule"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "In order",
+            "items": {
+              "$ref": "#/components/schemas/BoardSketchRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "modules"
+        ],
+        "type": "object"
+      },
+      "BoardSketchModule": {
+        "additionalProperties": false,
+        "properties": {
+          "existing": {
+            "type": "boolean"
+          },
+          "offsetTe": {
+            "format": "double",
+            "type": "number"
+          },
+          "row": {
+            "description": "Index of the module's row in rows, 0 first",
+            "format": "int64",
+            "type": "integer"
+          },
+          "widthTe": {
+            "description": "1 when unknown",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "row",
+          "offsetTe",
+          "widthTe",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "BoardSketchRow": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "capacityTe"
+        ],
+        "type": "object"
+      },
       "BoardWarning": {
         "additionalProperties": false,
         "properties": {
@@ -1055,6 +1138,7 @@
               "module_mounting_floorplan",
               "row_overflow",
               "enclosure_size_unknown",
+              "module_overlap",
               "variant_deleted",
               "variant_inactive",
               "product_inactive",
@@ -1101,6 +1185,14 @@
             "format": "date-time",
             "type": "string"
           },
+          "devicesMax": {
+            "description": "Devices the line may take (3d checks); null = the system's busDevicesMax",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "id": {
             "description": "Kept by the version copy",
             "type": "string"
@@ -1132,6 +1224,7 @@
           "name",
           "address",
           "position",
+          "devicesMax",
           "createdAt",
           "updatedAt"
         ],
@@ -1153,12 +1246,20 @@
             "description": "At most 50 characters",
             "type": "string"
           },
+          "devicesMax": {
+            "description": "1-10000; absent or null = the system's busDevicesMax",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "name": {
             "description": "1-100 characters, unique per system in the version ignoring case",
             "type": "string"
           },
           "productTypeId": {
-            "description": "A product type with topology bus",
+            "description": "An active product type with topology bus that the project uses",
             "type": "string"
           }
         },
@@ -1192,6 +1293,14 @@
           "deviceCount": {
             "format": "int64",
             "type": "integer"
+          },
+          "devicesMax": {
+            "description": "Devices the line may take (3d checks); null = the system's busDevicesMax",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "id": {
             "description": "Kept by the version copy",
@@ -1240,6 +1349,7 @@
           "name",
           "address",
           "position",
+          "devicesMax",
           "createdAt",
           "updatedAt"
         ],
@@ -1286,6 +1396,14 @@
           "address": {
             "description": "At most 50 characters; empty for none",
             "type": "string"
+          },
+          "devicesMax": {
+            "description": "1-10000; absent or null = the system's busDevicesMax",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "name": {
             "description": "1-100 characters, unique per system in the version ignoring case",
@@ -1396,7 +1514,7 @@
             "$ref": "#/components/schemas/SystemRef"
           },
           "unassigned": {
-            "description": "Members without a line (only while the system has no line yet: read-only projects or readers)",
+            "description": "Members without a line: only while the system has no line yet (the next content save of a plan with a member creates the default line, D372)",
             "items": {
               "$ref": "#/components/schemas/BusMember"
             },
@@ -5355,6 +5473,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "sketch": {
+            "$ref": "#/components/schemas/BoardSketch",
+            "description": "Rows and modules for the card's schematic"
+          },
           "usedTe": {
             "description": "Sum of the modules' widths in TE (unknown width counts 1 TE)",
             "format": "double",
@@ -5365,7 +5487,8 @@
           "enclosureVariantId",
           "moduleCount",
           "capacityTe",
-          "usedTe"
+          "usedTe",
+          "sketch"
         ],
         "type": [
           "object",
@@ -9598,7 +9721,7 @@
           },
           "capabilities": {
             "$ref": "#/components/schemas/Capabilities",
-            "description": "As on the variant (mounting, rail width, enclosure size, channels)"
+            "description": "As on the variant (mounting, rail width, enclosure size, channels); only with withCapabilities"
           },
           "category": {
             "$ref": "#/components/schemas/CategoryRef"
@@ -9658,8 +9781,7 @@
           "productName",
           "name",
           "price",
-          "available",
-          "capabilities"
+          "available"
         ],
         "type": "object"
       },
@@ -15510,6 +15632,16 @@
               "maximum": 1073741824,
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Include each variant's capability summary (board and floorplan palettes)",
+            "explode": false,
+            "in": "query",
+            "name": "withCapabilities",
+            "schema": {
+              "description": "Include each variant's capability summary (board and floorplan palettes)",
+              "type": "boolean"
             }
           }
         ],

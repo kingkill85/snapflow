@@ -722,16 +722,19 @@ func (s *Service) SearchVariants(ctx context.Context, p VariantSearchParams) (Va
 			Available: r.IsActive && r.ProductIsActive && pt.IsActive && c.IsActive,
 		}
 	}
-	ids := make([]uuid.UUID, len(items))
-	for i, it := range items {
-		ids[i] = it.ID
-	}
-	caps, err := s.Capabilities(ctx, ids)
-	if err != nil {
-		return VariantPage{}, err
-	}
-	for i := range items {
-		items[i].Capabilities = caps[items[i].ID]
+	if p.WithCapabilities && len(items) > 0 {
+		ids := make([]uuid.UUID, len(items))
+		for i, it := range items {
+			ids[i] = it.ID
+		}
+		caps, err := s.Capabilities(ctx, ids)
+		if err != nil {
+			return VariantPage{}, err
+		}
+		for i := range items {
+			c := caps[items[i].ID]
+			items[i].Capabilities = &c
+		}
 	}
 	return VariantPage{Items: items, Total: total}, nil
 }

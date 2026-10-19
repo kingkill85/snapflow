@@ -57,7 +57,9 @@ type BoardModule struct {
 // BoardContentInput replaces a board's content as a whole.
 type BoardContentInput struct {
 	ExpectedContentUpdatedAt time.Time          `json:"expectedContentUpdatedAt" doc:"contentUpdatedAt as last read; plan.stale otherwise"`
-	EnclosureVariantID       *uuid.UUID         `json:"enclosureVariantId" nullable:"true" doc:"The enclosure (catalog variant); null for none (free rails)"`
+	EnclosureVariantID       *uuid.UUID         `json:"enclosureVariantId" nullable:"true" doc:"The enclosure (catalog variant); null for none (free rails). null keeps an enclosure whose variant was deleted from the catalog unless removeEnclosure is set (D375)"`
+	EnclosureExisting        bool               `json:"enclosureExisting,omitempty" doc:"The customer already has the enclosure: never in the BOM"`
+	RemoveEnclosure          bool               `json:"removeEnclosure,omitempty" doc:"Remove an enclosure whose variant was deleted from the catalog (with enclosureVariantId null)"`
 	Rows                     []BoardRowInput    `json:"rows" doc:"In order (the array order is stored); at most 50. With an enclosure of known size the rows are fitted to it (D357)"`
 	Modules                  []BoardModuleInput `json:"modules" doc:"In order (the array order is stored); at most 1000"`
 }
@@ -71,6 +73,7 @@ const (
 	WarnModuleMountingFloorplan BoardWarningCode = "module_mounting_floorplan"
 	WarnRowOverflow             BoardWarningCode = "row_overflow"
 	WarnEnclosureSizeUnknown    BoardWarningCode = "enclosure_size_unknown"
+	WarnModuleOverlap           BoardWarningCode = "module_overlap"
 )
 
 // BoardWarning is one warning of a board: of a module (moduleId set) or of
@@ -78,7 +81,7 @@ const (
 // placements (D54).
 type BoardWarning struct {
 	ModuleID       *uuid.UUID       `json:"moduleId" nullable:"true" doc:"The module; null for a warning of the enclosure"`
-	Code           BoardWarningCode `json:"code" enum:"module_width_unknown,module_mounting_floorplan,row_overflow,enclosure_size_unknown,variant_deleted,variant_inactive,product_inactive,category_inactive,product_type_inactive,product_type_not_in_project,required_addon_unavailable,addon_unavailable,addon_not_linked"`
+	Code           BoardWarningCode `json:"code" enum:"module_width_unknown,module_mounting_floorplan,row_overflow,enclosure_size_unknown,module_overlap,variant_deleted,variant_inactive,product_inactive,category_inactive,product_type_inactive,product_type_not_in_project,required_addon_unavailable,addon_unavailable,addon_not_linked"`
 	AddonVariantID *uuid.UUID       `json:"addonVariantId,omitempty" doc:"The add-on of an add-on warning"`
 }
 
@@ -87,6 +90,8 @@ type BoardContent struct {
 	PlanID             uuid.UUID     `json:"planId"`
 	ContentUpdatedAt   time.Time     `json:"contentUpdatedAt" doc:"Send it back as expectedContentUpdatedAt"`
 	EnclosureVariantID *uuid.UUID    `json:"enclosureVariantId" nullable:"true"`
+	EnclosureExisting  bool          `json:"enclosureExisting" doc:"The customer already has the enclosure: never in the BOM"`
+	EnclosureDeleted   bool          `json:"enclosureDeleted" doc:"The board has an enclosure whose variant was deleted from the catalog (warning variant_deleted; removeEnclosure removes it)"`
 	RowsFromEnclosure  bool          `json:"rowsFromEnclosure" doc:"The enclosure gives rows and capacity (read-only in the editor)"`
 	Rows               []BoardRow    `json:"rows" doc:"In order"`
 	Modules            []BoardModule `json:"modules" doc:"In order"`

@@ -11,7 +11,6 @@ import (
 )
 
 type Querier interface {
-	BusLineAssignmentCount(ctx context.Context, arg BusLineAssignmentCountParams) (int64, error)
 	// CopyAssignments copies the assignments of a version into another with
 	// the plan ids mapped (a JSON object source id -> copy id).
 	CopyAssignments(ctx context.Context, arg CopyAssignmentsParams) error
@@ -27,6 +26,12 @@ type Querier interface {
 	// Every query of this feature runs in database.InScope: row-level security
 	// limits it to the tenants the caller may see.
 	ListBusLines(ctx context.Context, versionID uuid.UUID) ([]BusLine, error)
+	// ListLineAssignments returns the explicit assignments to a line (the
+	// service counts those whose item is a current member of the line).
+	ListLineAssignments(ctx context.Context, arg ListLineAssignmentsParams) ([]NetworkAssignment, error)
+	// LockVersionLines serialises the default line creation of a version
+	// (content saves of two plans of one version at once).
+	LockVersionLines(ctx context.Context, versionID uuid.UUID) error
 	// SetBusLineOrder sets the positions to the order of ids (1..n).
 	SetBusLineOrder(ctx context.Context, arg SetBusLineOrderParams) error
 	UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (BusLine, error)

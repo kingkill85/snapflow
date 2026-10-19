@@ -12,8 +12,8 @@ import type { VariantSearchItemProductName } from './variantSearchItemProductNam
 
 export interface VariantSearchItem {
   available: boolean;
-  /** As on the variant (mounting, rail width, enclosure size, channels) */
-  capabilities: Capabilities;
+  /** As on the variant (mounting, rail width, enclosure size, channels); only with withCapabilities */
+  capabilities?: Capabilities;
   category: CategoryRef;
   categoryId: string;
   id: string;

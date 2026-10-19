@@ -10,6 +10,11 @@ export interface BusLineUpdate {
   readonly $schema?: string;
   /** At most 50 characters; empty for none */
   address: string;
+  /**
+     * 1-10000; absent or null = the system's busDevicesMax
+     * @nullable
+     */
+  devicesMax?: number | null;
   /** 1-100 characters, unique per system in the version ignoring case */
   name: string;
 }

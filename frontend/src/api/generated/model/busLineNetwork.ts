@@ -15,6 +15,11 @@ export interface BusLineNetwork {
   busCurrentUsedMa: number;
   createdAt: string;
   deviceCount: number;
+  /**
+     * Devices the line may take (3d checks); null = the system's busDevicesMax
+     * @nullable
+     */
+  devicesMax: number | null;
   /** Kept by the version copy */
   id: string;
   members: BusMember[];

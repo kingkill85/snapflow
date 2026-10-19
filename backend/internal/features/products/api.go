@@ -81,6 +81,8 @@ type variantSearchInput struct {
 	Search        string    `query:"search" maxLength:"200" doc:"Case-insensitive substring of model number, product name or description, variant name (en/de) or SKU; empty lists every variant"`
 	Limit         int       `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"Page size, 1-200"`
 	Offset        int       `query:"offset" default:"0" minimum:"0" maximum:"1073741824" doc:"Rows to skip"`
+	// The palettes need the capabilities; other pickers skip computing them.
+	WithCapabilities bool `query:"withCapabilities" doc:"Include each variant's capability summary (board and floorplan palettes)"`
 }
 
 type variantSearchOutput struct {
@@ -253,7 +255,7 @@ func Register(api huma.API, svc *Service) {
 			"Lists inactive variants too, flagged by available.",
 		Tags: []string{tag},
 	}, func(ctx context.Context, in *variantSearchInput) (*variantSearchOutput, error) {
-		p := VariantSearchParams{Search: in.Search, Limit: in.Limit, Offset: in.Offset}
+		p := VariantSearchParams{Search: in.Search, Limit: in.Limit, Offset: in.Offset, WithCapabilities: in.WithCapabilities}
 		if in.ProductTypeID != uuid.Nil {
 			p.ProductTypeID = &in.ProductTypeID
 		}

@@ -10,20 +10,27 @@ SELECT * FROM bus_lines WHERE version_id = $1 AND id = $2;
 -- CreateBusLine adds a line after the version's last one (the caller holds
 -- the project's lock).
 -- name: CreateBusLine :one
-INSERT INTO bus_lines (tenant_id, version_id, product_type_id, name, address, position)
-VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(position), 0) + 1 FROM bus_lines WHERE version_id = $2))
+INSERT INTO bus_lines (tenant_id, version_id, product_type_id, name, address, devices_max, position)
+VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(position), 0) + 1 FROM bus_lines WHERE version_id = $2))
 RETURNING *;
 
 -- name: UpdateBusLine :one
-UPDATE bus_lines SET name = $3, address = $4, updated_at = now()
+UPDATE bus_lines SET name = $3, address = $4, devices_max = $5, updated_at = now()
 WHERE version_id = $1 AND id = $2
 RETURNING *;
 
 -- name: DeleteBusLine :execrows
 DELETE FROM bus_lines WHERE version_id = $1 AND id = $2;
 
--- name: BusLineAssignmentCount :one
-SELECT count(*) FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2;
+-- ListLineAssignments returns the explicit assignments to a line (the
+-- service counts those whose item is a current member of the line).
+-- name: ListLineAssignments :many
+SELECT * FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2;
+
+-- LockVersionLines serialises the default line creation of a version
+-- (content saves of two plans of one version at once).
+-- name: LockVersionLines :exec
+SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(version_id)::uuid::text, 3));
 
 -- SetBusLineOrder sets the positions to the order of ids (1..n).
 -- name: SetBusLineOrder :exec
@@ -45,8 +52,8 @@ DELETE FROM network_assignments WHERE plan_id = $1 AND item_id = $2;
 
 -- CopyBusLines copies the lines of a version into another, ids kept.
 -- name: CopyBusLines :exec
-INSERT INTO bus_lines (tenant_id, version_id, id, product_type_id, name, address, position)
-SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, id, product_type_id, name, address, position
+INSERT INTO bus_lines (tenant_id, version_id, id, product_type_id, name, address, devices_max, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, id, product_type_id, name, address, devices_max, position
 FROM bus_lines WHERE version_id = sqlc.arg(source_id)::uuid;
 
 -- CopyAssignments copies the assignments of a version into another with

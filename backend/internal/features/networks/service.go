@@ -51,10 +51,12 @@ type Service struct {
 }
 
 // NewService wires the networks feature; it registers its plan copier (bus
-// lines and assignments follow a version copy with ids kept).
+// lines and assignments follow a version copy with ids kept) and its content
+// hook (a content save creates the default line of a bus system, D372).
 func NewService(db DB, projectSvc *projects.Service, planSvc *plans.Service, productSvc *products.Service, typeSvc *producttypes.Service) *Service {
 	s := &Service{db: db, q: store.New(db), projects: projectSvc, plans: planSvc, products: productSvc, types: typeSvc}
 	planSvc.OnCopyPlans(s.copyPlans)
+	planSvc.OnContentSave(s.defaultLinesHook())
 	return s
 }
 
@@ -94,7 +96,7 @@ func (s *Service) CreateBusLine(ctx context.Context, versionID uuid.UUID, in Bus
 	if err != nil {
 		return BusLine{}, err
 	}
-	name, address, err := validateLine(in.Name, in.Address)
+	name, address, err := validateLine(in.Name, in.Address, in.DevicesMax)
 	if err != nil {
 		return BusLine{}, err
 	}
@@ -109,15 +111,27 @@ func (s *Service) CreateBusLine(ctx context.Context, versionID uuid.UUID, in Bus
 	if t.Topology != TopologyBus {
 		return BusLine{}, apperr.Invalid("body.productTypeId", "bus_line.not_bus_system", "the product type is not a bus system")
 	}
+	if !t.IsActive {
+		return BusLine{}, apperr.Invalid("body.productTypeId", "bus_line.product_type_inactive", "the product type is inactive")
+	}
 	var row store.BusLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
 		if err != nil {
 			return err
 		}
+		// The project's types as of this transaction (the project is locked).
+		if !slices.Contains(ref.ProductTypeIDs, in.ProductTypeID) {
+			return apperr.Invalid("body.productTypeId", "bus_line.product_type_not_in_project", "the project does not use this product type")
+		}
 		row, err = q.CreateBusLine(ctx, store.CreateBusLineParams{
 			TenantID: ref.TenantID, VersionID: versionID, ProductTypeID: in.ProductTypeID, Name: name, Address: address,
+			DevicesMax: in.DevicesMax,
 		})
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return apperr.Invalid("body.productTypeId", "bus_line.product_type_not_found", "no such product type")
+		}
 		return mapNameErr(err, name)
 	})
 	if err != nil {
@@ -132,7 +146,7 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 	if err != nil {
 		return BusLine{}, err
 	}
-	name, address, err := validateLine(in.Name, in.Address)
+	name, address, err := validateLine(in.Name, in.Address, in.DevicesMax)
 	if err != nil {
 		return BusLine{}, err
 	}
@@ -141,7 +155,7 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 		if _, err := s.projects.WriteVersion(ctx, tx, versionID, false); err != nil {
 			return err
 		}
-		row, err = q.UpdateBusLine(ctx, store.UpdateBusLineParams{VersionID: versionID, ID: id, Name: name, Address: address})
+		row, err = q.UpdateBusLine(ctx, store.UpdateBusLineParams{VersionID: versionID, ID: id, Name: name, Address: address, DevicesMax: in.DevicesMax})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errLineNotFound()
 		}
@@ -153,21 +167,42 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 	return lineOf(row), nil
 }
 
-// DeleteBusLine removes a line; refused while items are explicitly assigned
-// to it (bus_line.in_use). Members by default follow the system's first
-// remaining line (D360).
+// DeleteBusLine removes a line; refused while current members are pinned
+// to it (bus_line.in_use, D373): explicit assignments of items that are
+// still members of the line's system. Dangling assignments (item removed,
+// product changed) do not count and go with the line. Members by default
+// follow the system's first remaining line (D360).
 func (s *Service) DeleteBusLine(ctx context.Context, versionID, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
 		return err
 	}
+	st, err := s.load(ctx, actor, versionID)
+	if err != nil {
+		return err
+	}
+	pinned := map[[2]uuid.UUID]bool{}
+	for _, m := range st.members() {
+		if m.Pinned && m.LineID != nil && *m.LineID == id {
+			pinned[[2]uuid.UUID{m.PlanID, m.ItemID}] = true
+		}
+	}
 	return s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		if _, err := s.projects.WriteVersion(ctx, tx, versionID, true); err != nil {
 			return err
 		}
-		n, err := q.BusLineAssignmentCount(ctx, store.BusLineAssignmentCountParams{VersionID: versionID, BusLineID: &id})
+		rows, err := q.ListLineAssignments(ctx, store.ListLineAssignmentsParams{VersionID: versionID, BusLineID: &id})
 		if err != nil {
 			return err
+		}
+		n := 0
+		for _, a := range rows {
+			key := [2]uuid.UUID{a.PlanID, a.ItemID}
+			prev, known := st.assignments[key]
+			// An assignment made after the snapshot counts (conservative).
+			if pinned[key] || !known || prev.BusLineID == nil || *prev.BusLineID != id {
+				n++
+			}
 		}
 		if n > 0 {
 			return apperr.Conflict("bus_line.in_use", "devices are assigned to the line; move them first").With("count", n)
@@ -219,6 +254,9 @@ type state struct {
 	assignments map[[2]uuid.UUID]store.NetworkAssignment
 	variants    map[uuid.UUID]products.BOMVariant
 	caps        map[uuid.UUID]capabilities.Capabilities
+	// types are all product types (also inactive), by id: names, badges
+	// and order of systems that have lines but no members.
+	types map[uuid.UUID]producttypes.ProductType
 }
 
 func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUID) (state, error) {
@@ -252,6 +290,14 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 		if st.caps, err = s.products.Capabilities(ctx, ids); err != nil {
 			return st, err
 		}
+	}
+	types, err := s.types.List(ctx, true)
+	if err != nil {
+		return st, err
+	}
+	st.types = make(map[uuid.UUID]producttypes.ProductType, len(types))
+	for _, t := range types {
+		st.types[t.ID] = t
 	}
 	return st, nil
 }
@@ -312,9 +358,8 @@ func (st *state) items() []item {
 	return out
 }
 
-// Get returns the networks of a version. A bus system with members but no
-// line gets its default line first (when the caller may change the
-// version, D358).
+// Get returns the networks of a version. It never writes: a bus system
+// whose members have no line yet lists them in unassigned (D372).
 func (s *Service) Get(ctx context.Context, versionID uuid.UUID) (Networks, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
@@ -324,61 +369,164 @@ func (s *Service) Get(ctx context.Context, versionID uuid.UUID) (Networks, error
 	if err != nil {
 		return Networks{}, err
 	}
-	can := actor.Can(auth.PermProjectsWrite) && st.ref.Writable()
-	if can {
-		created, err := s.ensureDefaultLines(ctx, actor, st)
-		if err != nil {
-			return Networks{}, err
-		}
-		if created {
-			if st, err = s.load(ctx, actor, versionID); err != nil {
-				return Networks{}, err
-			}
-		}
-	}
-	return st.view(can), nil
+	return st.view(actor.Can(auth.PermProjectsWrite) && st.ref.Writable()), nil
 }
 
-// ensureDefaultLines creates the default line of every bus system that has
-// members but no line; reports whether it created any.
-func (s *Service) ensureDefaultLines(ctx context.Context, actor auth.Actor, st state) (bool, error) {
-	has := map[uuid.UUID]bool{}
-	for _, l := range st.lines {
-		has[l.ProductTypeID] = true
+// Membership returns where every bus and wireless item of a version
+// belongs (the rule the view, line deletes and 3d's checks share).
+func (s *Service) Membership(ctx context.Context, versionID uuid.UUID) ([]Member, error) {
+	actor, err := auth.Require(ctx, auth.PermProjectsRead)
+	if err != nil {
+		return nil, err
 	}
-	var missing []uuid.UUID
-	names := map[uuid.UUID]string{}
-	for _, it := range st.items() {
-		if it.topo == TopologyBus && !has[it.system] && !slices.Contains(missing, it.system) {
-			missing = append(missing, it.system)
-			names[it.system] = defaultLineName(st.variants[it.ref.VariantID].ProductType)
+	st, err := s.load(ctx, actor, versionID)
+	if err != nil {
+		return nil, err
+	}
+	return st.members(), nil
+}
+
+// Member is a bus or wireless item of a version and where it belongs.
+type Member struct {
+	PlanID, ItemID uuid.UUID
+	// SystemID is the item's product type; Topology bus or wireless.
+	SystemID uuid.UUID
+	Topology string
+	// Gateway: a wireless item that supplies places (never a device).
+	Gateway bool
+	// LineID is a bus item's line: its explicit one, else the system's
+	// first line; nil while the system has no line.
+	LineID *uuid.UUID
+	// GatewayPlanID/GatewayItemID are a wireless device's gateway: its
+	// explicit one, else the default (D359); nil without a gateway.
+	GatewayPlanID, GatewayItemID *uuid.UUID
+	// Pinned: the line or gateway is an explicit assignment.
+	Pinned bool
+	// item is the view's data of the item.
+	item item
+}
+
+// members applies the membership rule to the state's items, in plan and
+// item order.
+func (st state) members() []Member {
+	items := st.items()
+	firstLine := map[uuid.UUID]uuid.UUID{}
+	lineSystem := map[uuid.UUID]uuid.UUID{}
+	for _, l := range st.lines { // in line order
+		lineSystem[l.ID] = l.ProductTypeID
+		if _, ok := firstLine[l.ProductTypeID]; !ok {
+			firstLine[l.ProductTypeID] = l.ID
 		}
 	}
-	if len(missing) == 0 {
-		return false, nil
+	var gws []item
+	gwSystem := map[[2]uuid.UUID]uuid.UUID{}
+	for _, it := range items {
+		if it.gateway {
+			gws = append(gws, it)
+			gwSystem[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}] = it.system
+		}
 	}
-	err := s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		ref, err := s.projects.WriteVersion(ctx, tx, st.ref.ID, true)
-		if err != nil {
-			return err
-		}
-		lines, err := q.ListBusLines(ctx, st.ref.ID)
-		if err != nil {
-			return err
-		}
-		for _, system := range missing {
-			if slices.ContainsFunc(lines, func(l store.BusLine) bool { return l.ProductTypeID == system }) {
-				continue // created concurrently
+	out := make([]Member, 0, len(items))
+	for _, it := range items {
+		m := Member{PlanID: it.ref.PlanID, ItemID: it.ref.ItemID, SystemID: it.system, Topology: it.topo, Gateway: it.gateway, item: it}
+		a, assigned := st.assignments[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}]
+		switch {
+		case it.topo == TopologyBus:
+			if assigned && a.BusLineID != nil && lineSystem[*a.BusLineID] == it.system {
+				id := *a.BusLineID
+				m.LineID, m.Pinned = &id, true
+			} else if id, ok := firstLine[it.system]; ok {
+				m.LineID = &id
 			}
-			if _, err := q.CreateBusLine(ctx, store.CreateBusLineParams{
-				TenantID: ref.TenantID, VersionID: st.ref.ID, ProductTypeID: system, Name: names[system],
-			}); err != nil {
+		case it.topo == TopologyWireless && !it.gateway:
+			if assigned && a.GatewayPlanID != nil && a.GatewayItemID != nil {
+				if sys, ok := gwSystem[[2]uuid.UUID{*a.GatewayPlanID, *a.GatewayItemID}]; ok && sys == it.system {
+					p, i := *a.GatewayPlanID, *a.GatewayItemID
+					m.GatewayPlanID, m.GatewayItemID, m.Pinned = &p, &i, true
+				}
+			}
+			if !m.Pinned {
+				if g, ok := defaultGateway(gws, it); ok {
+					p, i := g.ref.PlanID, g.ref.ItemID
+					m.GatewayPlanID, m.GatewayItemID = &p, &i
+				}
+			}
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// defaultLinesHook creates the default line ("<badge> 1") of every bus
+// system that has members in the version but no line yet, inside the
+// content save of a floorplan or board (D372). Prepare finds the bus
+// systems of the saved variants; Apply checks the version's items in the
+// save's transaction, so add-ons and removed items create nothing.
+func (s *Service) defaultLinesHook() plans.ContentHook {
+	return plans.ContentHook{
+		Prepare: func(ctx context.Context, _ uuid.UUID, ids []uuid.UUID) (any, error) {
+			variants, err := s.products.BOMVariants(ctx, ids)
+			if err != nil {
+				return nil, err
+			}
+			bus := map[uuid.UUID]producttypes.ProductType{}
+			for id, v := range variants {
+				if v.ProductType.Topology == TopologyBus {
+					bus[id] = v.ProductType
+				}
+			}
+			return bus, nil
+		},
+		Apply: func(ctx context.Context, tx pgx.Tx, ref projects.VersionRef, prepared any) error {
+			bus, _ := prepared.(map[uuid.UUID]producttypes.ProductType)
+			if len(bus) == 0 {
+				return nil
+			}
+			q := s.q.WithTx(tx)
+			if err := q.LockVersionLines(ctx, ref.ID); err != nil {
 				return err
 			}
-		}
-		return nil
-	})
-	return err == nil, err
+			lines, err := q.ListBusLines(ctx, ref.ID)
+			if err != nil {
+				return err
+			}
+			has := map[uuid.UUID]bool{}
+			for _, l := range lines {
+				has[l.ProductTypeID] = true
+			}
+			missing := false
+			for _, t := range bus {
+				if !has[t.ID] {
+					missing = true
+				}
+			}
+			if !missing {
+				return nil
+			}
+			planItems, err := s.plans.NetworkItems(ctx, tx, ref.ID)
+			if err != nil {
+				return err
+			}
+			for _, p := range planItems {
+				for _, it := range p.Items {
+					if it.VariantID == nil {
+						continue
+					}
+					t, ok := bus[*it.VariantID]
+					if !ok || has[t.ID] {
+						continue
+					}
+					if _, err := q.CreateBusLine(ctx, store.CreateBusLineParams{
+						TenantID: ref.TenantID, VersionID: ref.ID, ProductTypeID: t.ID, Name: defaultLineName(t),
+					}); err != nil {
+						return err
+					}
+					has[t.ID] = true
+				}
+			}
+			return nil
+		},
+	}
 }
 
 // defaultLineName is the name of a system's default line: its badge (or
@@ -391,13 +539,24 @@ func defaultLineName(t producttypes.ProductType) string {
 	return base + " 1"
 }
 
-// view computes the networks from the state.
+// view computes the networks from the state (members, D372).
 func (st state) view(can bool) Networks {
 	out := Networks{VersionID: st.ref.ID, BusSystems: []BusSystem{}, WirelessSystems: []WirelessSystem{}, Can: NetworkActions{Update: can}}
-	items := st.items()
-	systems := map[uuid.UUID]producttypes.ProductType{}
-	for _, it := range items {
-		systems[it.system] = st.variants[it.ref.VariantID].ProductType
+	members := st.members()
+	systemType := func(id uuid.UUID) producttypes.ProductType {
+		if t, ok := st.types[id]; ok {
+			return t
+		}
+		for _, m := range members { // a type created after the catalog read
+			if m.SystemID == id {
+				return st.variants[m.item.ref.VariantID].ProductType
+			}
+		}
+		return producttypes.ProductType{ID: id}
+	}
+	refOf := func(id uuid.UUID) SystemRef {
+		t := systemType(id)
+		return SystemRef{ID: id, Key: t.Key, Name: t.Name, Abbreviation: t.Abbreviation, Color: t.Color}
 	}
 
 	// Bus systems: every system with a line or a member.
@@ -407,11 +566,7 @@ func (st state) view(can bool) Networks {
 		if i, ok := busIndex[id]; ok {
 			return i
 		}
-		ref := SystemRef{ID: id}
-		if t, ok := systems[id]; ok {
-			ref = SystemRef{ID: t.ID, Key: t.Key, Name: t.Name, Abbreviation: t.Abbreviation, Color: t.Color}
-		}
-		out.BusSystems = append(out.BusSystems, BusSystem{ProductType: ref, Lines: []BusLineNetwork{}, Unassigned: []BusMember{}})
+		out.BusSystems = append(out.BusSystems, BusSystem{ProductType: refOf(id), Lines: []BusLineNetwork{}, Unassigned: []BusMember{}})
 		busIndex[id] = len(out.BusSystems) - 1
 		return busIndex[id]
 	}
@@ -420,30 +575,24 @@ func (st state) view(can bool) Networks {
 		out.BusSystems[i].Lines = append(out.BusSystems[i].Lines, BusLineNetwork{BusLine: lineOf(l), Members: []BusMember{}})
 		lineIndex[l.ID] = [2]int{i, len(out.BusSystems[i].Lines) - 1}
 	}
-	for _, it := range items {
-		if it.topo != TopologyBus {
+	for _, mem := range members {
+		if mem.Topology != TopologyBus {
 			continue
 		}
+		it := mem.item
 		i := addBus(it.system)
 		m := BusMember{
 			ItemRef: it.ref, BusCurrentUsedMa: it.caps.BusCurrentUsedMa, BusCurrentUsedMaDefault: it.caps.BusCurrentUsedMaDefault,
 			BusCurrentSuppliedMa: it.caps.BusCurrentSuppliedMa,
 			PowerSupply:          it.caps.BusCurrentSuppliedMa != nil && *it.caps.BusCurrentSuppliedMa > 0,
+			Pinned:               mem.Pinned,
 		}
-		target := -1
-		if a, ok := st.assignments[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}]; ok && a.BusLineID != nil {
-			if li, ok := lineIndex[*a.BusLineID]; ok && li[0] == i {
-				target, m.Pinned = li[1], true
-			}
-		}
-		if target < 0 && len(out.BusSystems[i].Lines) > 0 {
-			target = 0
-		}
-		if target < 0 {
+		if mem.LineID == nil {
 			out.BusSystems[i].Unassigned = append(out.BusSystems[i].Unassigned, m)
 			continue
 		}
-		line := &out.BusSystems[i].Lines[target]
+		li := lineIndex[*mem.LineID]
+		line := &out.BusSystems[li[0]].Lines[li[1]]
 		line.Members = append(line.Members, m)
 		line.DeviceCount++
 		if m.PowerSupply {
@@ -459,52 +608,39 @@ func (st state) view(can bool) Networks {
 
 	// Wireless systems: gateways first, then the devices.
 	wIndex := map[uuid.UUID]int{}
-	gateways := map[[2]uuid.UUID]gwPos{}
-	var gwList []gwPos
+	gateways := map[[2]uuid.UUID][2]int{}
 	addWireless := func(id uuid.UUID) int {
 		if i, ok := wIndex[id]; ok {
 			return i
 		}
-		t := systems[id]
-		out.WirelessSystems = append(out.WirelessSystems, WirelessSystem{
-			ProductType: SystemRef{ID: t.ID, Key: t.Key, Name: t.Name, Abbreviation: t.Abbreviation, Color: t.Color},
-			Gateways:    []Gateway{}, Unassigned: []WirelessDevice{},
-		})
+		out.WirelessSystems = append(out.WirelessSystems, WirelessSystem{ProductType: refOf(id), Gateways: []Gateway{}, Unassigned: []WirelessDevice{}})
 		wIndex[id] = len(out.WirelessSystems) - 1
 		return wIndex[id]
 	}
-	for _, it := range items {
-		if !it.gateway {
+	for _, mem := range members {
+		if !mem.Gateway {
 			continue
 		}
+		it := mem.item
 		i := addWireless(it.system)
 		out.WirelessSystems[i].Gateways = append(out.WirelessSystems[i].Gateways, Gateway{
 			ItemRef: it.ref, WirelessPlacesSupplied: *it.caps.WirelessPlacesSupplied, Devices: []WirelessDevice{},
 		})
-		g := gwPos{sys: i, gw: len(out.WirelessSystems[i].Gateways) - 1, planPos: it.planPos, planID: it.ref.PlanID}
-		gateways[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}] = g
-		gwList = append(gwList, g)
+		gateways[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}] = [2]int{i, len(out.WirelessSystems[i].Gateways) - 1}
 	}
-	for _, it := range items {
-		if it.topo != TopologyWireless || it.gateway {
+	for _, mem := range members {
+		if mem.Topology != TopologyWireless || mem.Gateway {
 			continue
 		}
+		it := mem.item
 		i := addWireless(it.system)
-		d := WirelessDevice{ItemRef: it.ref, WirelessPlacesUsed: it.caps.WirelessPlacesUsed, WirelessPlacesUsedDefault: it.caps.WirelessPlacesUsedDefault}
-		target := -1
-		if a, ok := st.assignments[[2]uuid.UUID{it.ref.PlanID, it.ref.ItemID}]; ok && a.GatewayPlanID != nil && a.GatewayItemID != nil {
-			if g, ok := gateways[[2]uuid.UUID{*a.GatewayPlanID, *a.GatewayItemID}]; ok && g.sys == i {
-				target, d.Pinned = g.gw, true
-			}
-		}
-		if target < 0 {
-			target = defaultGateway(gwList, i, it.ref.PlanID, it.planPos)
-		}
-		if target < 0 {
+		d := WirelessDevice{ItemRef: it.ref, WirelessPlacesUsed: it.caps.WirelessPlacesUsed, WirelessPlacesUsedDefault: it.caps.WirelessPlacesUsedDefault, Pinned: mem.Pinned}
+		if mem.GatewayPlanID == nil {
 			out.WirelessSystems[i].Unassigned = append(out.WirelessSystems[i].Unassigned, d)
 			continue
 		}
-		g := &out.WirelessSystems[i].Gateways[target]
+		gi := gateways[[2]uuid.UUID{*mem.GatewayPlanID, *mem.GatewayItemID}]
+		g := &out.WirelessSystems[gi[0]].Gateways[gi[1]]
 		g.Devices = append(g.Devices, d)
 		if d.WirelessPlacesUsed != nil {
 			g.WirelessPlacesUsed += *d.WirelessPlacesUsed
@@ -512,10 +648,10 @@ func (st state) view(can bool) Networks {
 			g.UnknownPlacesCount++
 		}
 	}
-	sortSystems := func(id uuid.UUID) int32 { return systems[id].SortOrder }
-	slices.SortStableFunc(out.BusSystems, func(a, b BusSystem) int { return int(sortSystems(a.ProductType.ID) - sortSystems(b.ProductType.ID)) })
+	order := func(id uuid.UUID) int32 { return systemType(id).SortOrder }
+	slices.SortStableFunc(out.BusSystems, func(a, b BusSystem) int { return int(order(a.ProductType.ID) - order(b.ProductType.ID)) })
 	slices.SortStableFunc(out.WirelessSystems, func(a, b WirelessSystem) int {
-		return int(sortSystems(a.ProductType.ID) - sortSystems(b.ProductType.ID))
+		return int(order(a.ProductType.ID) - order(b.ProductType.ID))
 	})
 	return out
 }
@@ -523,31 +659,26 @@ func (st state) view(can bool) Networks {
 // defaultGateway picks a wireless device's gateway (D359): the first
 // gateway of its system on the same plan, else the nearest by plan order
 // (the earlier plan on a tie), which is also the first when all are equally
-// far. -1 without gateways.
-// gwPos is a gateway: its system and gateway index in the view, its plan.
-type gwPos struct {
-	sys, gw, planPos int
-	planID           uuid.UUID
-}
-
-func defaultGateway(list []gwPos, system int, planID uuid.UUID, planPos int) int {
-	best, bestDist, bestPos := -1, 0, 0
-	for _, g := range list {
-		if g.sys != system {
+// far. gws are the gateways in plan and item order.
+func defaultGateway(gws []item, dev item) (item, bool) {
+	var best item
+	found, bestDist := false, 0
+	for _, g := range gws {
+		if g.system != dev.system {
 			continue
 		}
-		if g.planID == planID {
-			return g.gw
+		if g.ref.PlanID == dev.ref.PlanID {
+			return g, true
 		}
-		d := g.planPos - planPos
+		d := g.planPos - dev.planPos
 		if d < 0 {
 			d = -d
 		}
-		if best < 0 || d < bestDist || (d == bestDist && g.planPos < bestPos) {
-			best, bestDist, bestPos = g.gw, d, g.planPos
+		if !found || d < bestDist || (d == bestDist && g.planPos < best.planPos) {
+			best, bestDist, found = g, d, true
 		}
 	}
-	return best
+	return best, found
 }
 
 // ---------------------------------------------------------------- assignments
@@ -580,6 +711,9 @@ func (s *Service) SetAssignments(ctx context.Context, versionID uuid.UUID, in As
 	var errs []apperr.FieldError
 	for i, a := range in.Assignments {
 		loc := fmt.Sprintf("body.assignments[%d]", i)
+		if a.BusLineID == nil && a.GatewayPlanID == nil && a.GatewayItemID == nil {
+			continue // clearing also works for an item removed meanwhile
+		}
 		it, ok := byKey[[2]uuid.UUID{a.PlanID, a.ItemID}]
 		if !ok {
 			errs = append(errs, apperr.Field(loc+".itemId", "network.item_not_found", "no bus or wireless item of the version"))
@@ -674,11 +808,11 @@ func (s *Service) copyPlans(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUI
 func lineOf(r store.BusLine) BusLine {
 	return BusLine{
 		ID: r.ID, VersionID: r.VersionID, ProductTypeID: r.ProductTypeID, Name: r.Name, Address: r.Address, Position: r.Position,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		DevicesMax: r.DevicesMax, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
 
-func validateLine(name, address string) (string, string, error) {
+func validateLine(name, address string, devicesMax *int32) (string, string, error) {
 	name, address = strings.TrimSpace(name), strings.TrimSpace(address)
 	var errs []apperr.FieldError
 	switch {
@@ -694,6 +828,9 @@ func validateLine(name, address string) (string, string, error) {
 		errs = append(errs, apperr.Field("body.address", "validation.too_long", "too long").With("max", MaxAddressLength))
 	case strings.ContainsFunc(address, unicode.IsControl):
 		errs = append(errs, apperr.Field("body.address", "validation.control_chars", "control characters are not allowed"))
+	}
+	if devicesMax != nil && (*devicesMax < 1 || *devicesMax > MaxDevicesMax) {
+		errs = append(errs, apperr.Field("body.devicesMax", "bus_line.devices_max_invalid", "1-10000 or empty").With("max", MaxDevicesMax))
 	}
 	if len(errs) > 0 {
 		return "", "", apperr.Validation(errs...)

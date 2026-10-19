@@ -153,7 +153,8 @@ func (s *Service) BOMPlacements(ctx context.Context, tx pgx.Tx, versionID uuid.U
 	for _, e := range enclosures {
 		if i, ok := index[e.PlanID]; ok {
 			out[i].Placements = append(out[i].Placements, BOMPlacement{
-				ID: e.PlanID, VariantID: e.EnclosureCatalogVariantID, VariantDeleted: e.VariantDeleted, AddonVariantIDs: []uuid.UUID{},
+				ID: e.PlanID, VariantID: e.EnclosureCatalogVariantID, VariantDeleted: e.VariantDeleted, Existing: e.EnclosureExisting,
+				AddonVariantIDs: []uuid.UUID{},
 			})
 		}
 	}
