@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
-import { getGetBomQueryKey, getListManualLinesQueryKey } from '@/api/generated/bom/bom'
+import { getGetBomQueryKey, getGetPricingQueryKey, getListManualLinesQueryKey } from '@/api/generated/bom/bom'
 import type { Project } from '@/api/generated/model'
 import { getGetProjectQueryKey, useRefreshProjectExchangeRate, useSetProjectExchangeRate } from '@/api/generated/projects/projects'
 import { decimalSeparator, formatDecimal, parseDecimal } from '@/catalog/decimal'
@@ -49,6 +49,7 @@ export function RateBar({ project, versionId }: Props) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: getGetBomQueryKey(versionId) }),
       queryClient.invalidateQueries({ queryKey: getListManualLinesQueryKey(versionId) }),
+      queryClient.invalidateQueries({ queryKey: getGetPricingQueryKey(versionId) }),
       queryClient.invalidateQueries({ queryKey: ['pricing-preview', versionId] }),
     ])
   }

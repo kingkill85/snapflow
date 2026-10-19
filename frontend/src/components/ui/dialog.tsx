@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from './button'
+import { keepDialogOnComboboxEscape } from './combobox'
 
 type DialogProps = {
   open: boolean
@@ -19,7 +20,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl">
+        <DialogPrimitive.Content onEscapeKeyDown={keepDialogOnComboboxEscape} className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 z-40 rounded-control border border-edge bg-raised p-6 shadow-2xl">
           <div className="space-y-1">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
             {description ? (
@@ -69,6 +70,7 @@ export function FormDialog({ open, onOpenChange, title, submitLabel, submitting,
       <DialogPrimitive.Portal container={container ?? undefined}>
         {!docked && <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />}
         <DialogPrimitive.Content
+          onEscapeKeyDown={keepDialogOnComboboxEscape}
           onInteractOutside={docked ? (e) => e.preventDefault() : undefined}
           className={
             docked

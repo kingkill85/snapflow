@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react'
-import { type KeyboardEvent, type Ref, useId, useRef, useState } from 'react'
+import { type CSSProperties, type KeyboardEvent, type Ref, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { type Control, type FieldPath, type FieldValues, useController } from 'react-hook-form'
 
 import { cn } from '@/lib/cn'
@@ -25,6 +26,8 @@ export type ComboboxProps = {
   emptyText?: string
   onBlur?: () => void
   ref?: Ref<HTMLInputElement>
+  /** The id of the label naming the input, also naming the list. */
+  labelId?: string
   'aria-label'?: string
   'aria-invalid'?: boolean
   'aria-describedby'?: string
@@ -37,12 +40,45 @@ const matches = (o: ComboboxOption, query: string) => {
 }
 
 /**
+ * For a dialog's `onEscapeKeyDown`: Escape in an open combobox closes its
+ * list, not the dialog. Radix catches Escape on the document before the
+ * input sees it, so the combobox cannot stop it itself.
+ */
+export function keepDialogOnComboboxEscape(e: globalThis.KeyboardEvent) {
+  const target = e.target
+  if (target instanceof HTMLElement && target.getAttribute('role') === 'combobox' && target.getAttribute('aria-expanded') === 'true') e.preventDefault()
+}
+
+/** Where the list is drawn: in the dialog around the input (so focus trap and outside clicks keep working), else the body. */
+const listContainer = (input: HTMLElement | null) => (input?.closest<HTMLElement>('[role="dialog"]') ?? input?.ownerDocument.body) || null
+
+/** The list's position in its container: under the input, above it when there is more room there. */
+function listPosition(input: HTMLElement, container: HTMLElement): CSSProperties {
+  const r = input.getBoundingClientRect()
+  const isBody = container === input.ownerDocument.body
+  const c = isBody ? { top: -window.scrollY, left: -window.scrollX } : container.getBoundingClientRect()
+  const offsetTop = isBody ? 0 : container.clientTop - container.scrollTop
+  const offsetLeft = isBody ? 0 : container.clientLeft - container.scrollLeft
+  const below = window.innerHeight - r.bottom
+  const up = below < 240 && r.top > below
+  const left = r.left - c.left - offsetLeft
+  return up
+    ? { position: 'absolute', left, width: r.width, bottom: undefined, top: r.top - c.top - offsetTop - 4, transform: 'translateY(-100%)', maxHeight: Math.min(240, r.top - 8) }
+    : { position: 'absolute', left, width: r.width, top: r.bottom - c.top - offsetTop + 4, maxHeight: Math.max(120, Math.min(240, below - 8)) }
+}
+
+/**
  * A searchable dropdown for long lists (currencies): an input with
  * role="combobox" that filters a listbox as one types. Arrow keys move,
- * Enter picks, Escape closes; closed, the input shows the chosen option's label.
+ * Home/End jump (while the list is open), Enter picks, Escape closes the list
+ * (dialogs keep open: they pass keepDialogOnComboboxEscape), Tab picks the
+ * highlighted option and moves on, as a native select does; closed, the input
+ * shows the chosen option's label. The list is drawn in the surrounding dialog
+ * (or the body), positioned at the input, so a scrolling dialog body does not
+ * clip it on phones.
  * Controlled: `value` + `onValueChange`; in a react-hook-form use FormComboboxField.
  */
-export function Combobox({ value, onValueChange, options, id, disabled, className, placeholder, emptyText, onBlur, ref, ...aria }: ComboboxProps) {
+export function Combobox({ value, onValueChange, options, id, disabled, className, placeholder, emptyText, onBlur, ref, labelId, ...aria }: ComboboxProps) {
   const generated = useId()
   const inputId = id ?? generated
   const listId = `${inputId}-list`
@@ -50,6 +86,28 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [position, setPosition] = useState<{ container: HTMLElement; style: CSSProperties } | null>(null)
+  const setInput = (el: HTMLInputElement | null) => {
+    inputRef.current = el
+    if (typeof ref === 'function') ref(el)
+    else if (ref) ref.current = el
+  }
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const input = inputRef.current
+      const container = listContainer(input)
+      if (input && container) setPosition({ container, style: listPosition(input, container) })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
   const selected = options.find((o) => o.value === value)
   const filtered = open ? options.filter((o) => !o.disabled && matches(o, query)) : []
 
@@ -73,7 +131,9 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
   const move = (by: number) => {
     if (!open) return show('')
     if (filtered.length === 0) return
-    const i = (active + by + filtered.length) % filtered.length
+    goTo((active + by + filtered.length) % filtered.length)
+  }
+  const goTo = (i: number) => {
     setActive(i)
     scrollTo(i)
   }
@@ -90,9 +150,16 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
         const o = filtered[active]
         if (o) pick(o)
       }
+    } else if ((e.key === 'Home' || e.key === 'End') && open && filtered.length > 0) {
+      e.preventDefault()
+      goTo(e.key === 'Home' ? 0 : filtered.length - 1)
+    } else if (e.key === 'Tab' && open) {
+      const o = filtered[active]
+      if (o) onValueChange(o.value) // focus moves on as usual
+      close()
     } else if (e.key === 'Escape' && open) {
       e.preventDefault()
-      e.stopPropagation() // closes the list, not the dialog
+      e.stopPropagation()
       close()
     }
   }
@@ -101,7 +168,7 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
   return (
     <div className={cn('relative', className)}>
       <input
-        ref={ref}
+        ref={setInput}
         id={inputId}
         role="combobox"
         aria-expanded={open}
@@ -124,12 +191,17 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
         {...aria}
       />
       <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-2.5 right-2.5 size-4 text-muted" />
-      {open && (
+      {open &&
+        position &&
+        createPortal(
         <ul
           ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-control border border-edge bg-raised p-1 text-sm text-ink shadow-lg"
+          aria-labelledby={labelId}
+          aria-label={labelId ? undefined : aria['aria-label']}
+          style={position.style}
+          className="z-50 max-h-60 overflow-auto rounded-control border border-edge bg-raised p-1 text-sm text-ink shadow-lg"
         >
           {filtered.length === 0 && emptyText && <li className="px-2 py-1.5 text-muted">{emptyText}</li>}
           {filtered.map((o, i) => (
@@ -149,8 +221,9 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
               {o.value === value && <Check aria-hidden="true" className="absolute right-2 size-4 text-primary" />}
             </li>
           ))}
-        </ul>
-      )}
+        </ul>,
+          position.container,
+        )}
     </div>
   )
 }
@@ -167,13 +240,15 @@ export function ComboboxField({ label, error, hint, required, id, 'aria-required
   const generated = useId()
   const inputId = id ?? generated
   const messageId = `${inputId}-message`
+  const labelId = `${inputId}-label`
   return (
     <div className="group/field min-w-0 space-y-1.5">
-      <FieldLabel htmlFor={inputId} required={required}>
+      <FieldLabel htmlFor={inputId} id={labelId} required={required}>
         {label}
       </FieldLabel>
       <Combobox
         id={inputId}
+        labelId={labelId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? messageId : undefined}
         aria-required={required || ariaRequired || undefined}

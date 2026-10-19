@@ -280,4 +280,12 @@ describe('ProposalsTab', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(clicked).toHaveLength(0)
   })
+
+  it('without an exchange rate: says so, links to the Pricing tab, cannot create', async () => {
+    serve([], { ...bomEur, totals: { ...bomEur.totals, rate: '', converted: null } })
+    renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />, { route: '/projects/p1?v=2&tab=proposals' })
+    expect(await screen.findByText(/no exchange rate for EUR yet/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set the rate on the Pricing tab' })).toHaveAttribute('href', '/projects/p1?v=2&tab=pricing')
+    expect(screen.getByRole('button', { name: 'Create proposal' })).toBeDisabled()
+  })
 })

@@ -7,6 +7,9 @@ import type { Project } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
+import { PricingTab } from '@/features/bom/PricingTab'
+import { bom, versionId } from '@/features/bom/test-fixtures'
+
 import { ProjectFormDialog } from './ProjectFormDialog'
 import { RateBar } from './RateBar'
 import { currencies, problem, productTypes, villa } from './test-fixtures'
@@ -249,5 +252,31 @@ describe('RateBar', () => {
     unmount()
     renderWithProviders(<RateBar project={{ ...villa, currency: 'USD', exchangeRate: '1' }} versionId={villa.versions[0].id} />)
     expect(screen.queryByTestId('rate-bar')).not.toBeInTheDocument()
+  })
+
+  it('a new rate reloads the BOM and the pricing preview', async () => {
+    serveRate()
+    const loads: string[] = []
+    server.use(
+      http.get('/api/versions/:versionId/pricing', () => {
+        loads.push('pricing')
+        return HttpResponse.json(bom.pricing)
+      }),
+      http.post('/api/versions/:versionId/pricing/preview', () => {
+        loads.push('preview')
+        return HttpResponse.json(bom.totals)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <RateBar project={villa} versionId={versionId} />
+        <PricingTab versionId={versionId} canWrite />
+      </>,
+    )
+    await waitFor(() => expect(loads).toContain('preview'))
+    const before = loads.length
+    await user.click(screen.getByRole('button', { name: 'Update rate' }))
+    await waitFor(() => expect(loads.slice(before)).toEqual(expect.arrayContaining(['pricing', 'preview'])))
   })
 })

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 
 import { ComboboxField, type ComboboxOption } from './combobox'
+import { FormDialog } from './dialog'
 
 const options: ComboboxOption[] = [
   { value: 'USD', label: 'USD – US Dollar' },
@@ -54,5 +55,50 @@ describe('ComboboxField', () => {
     await user.click(screen.getByRole('combobox', { name: 'Currency' }))
     await user.click(screen.getByRole('option', { name: 'EUR – Euro' }))
     expect(screen.getByText('value=EUR')).toBeInTheDocument()
+  })
+
+  it('Home/End jump, Tab picks the highlighted option, the list is named by the label', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const input = screen.getByRole('combobox', { name: 'Currency' })
+    await user.click(input)
+    expect(screen.getByRole('listbox', { name: 'Currency' })).toBeInTheDocument()
+    await user.keyboard('{End}')
+    expect(input).toHaveAttribute('aria-activedescendant', expect.stringMatching(/-2$/))
+    await user.keyboard('{Home}')
+    expect(input).toHaveAttribute('aria-activedescendant', expect.stringMatching(/-0$/))
+    await user.keyboard('{ArrowDown}{Tab}')
+    expect(screen.getByText('value=EUR')).toBeInTheDocument()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    // Closed, Tab moves on without changing anything.
+    await user.click(input)
+    await user.keyboard('{Escape}{Tab}')
+    expect(screen.getByText('value=EUR')).toBeInTheDocument()
+  })
+
+  it('Escape in a dialog closes the list, a second Escape the dialog', async () => {
+    const user = userEvent.setup()
+    function InDialog() {
+      const [open, setOpen] = useState(true)
+      const [value, setValue] = useState('USD')
+      return (
+        <>
+          <FormDialog open={open} onOpenChange={setOpen} title="Edit" submitLabel="Save" submitting={false} onSubmit={() => {}}>
+            <ComboboxField label="Currency" value={value} onValueChange={setValue} options={options} />
+          </FormDialog>
+          <output>open={String(open)}</output>
+        </>
+      )
+    }
+    render(<InDialog />)
+    await user.click(screen.getByRole('combobox', { name: 'Currency' }))
+    const list = screen.getByRole('listbox')
+    // Drawn inside the dialog (not clipped by its scrolling body, still in its focus trap).
+    expect(screen.getByRole('dialog')).toContainElement(list)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByText('open=true')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.getByText('open=false')).toBeInTheDocument()
   })
 })
