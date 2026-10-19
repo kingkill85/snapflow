@@ -188,7 +188,7 @@ describe('NetworksTab', () => {
         { busLineId: lineOne.id, name: 'KNX 1', productTypeId: knx.id, reservePercent: 20, currentUsedMa: 612, currentDefaultMa: 0, currentSuppliedMa: 640, unknownCurrentCount: 0, currentStatus: 'amber', devices: 2, devicesStatus: 'unknown' },
       ],
       gateways: [
-        { planId: gatewayGround.planId, itemId: gatewayGround.itemId, label: '', productTypeId: knx.id, reservePercent: 10, placesUsed: 1, placesSupplied: 50, unknownCount: 0, devices: 1, routers: 0, status: 'ok' },
+        { planId: gatewayGround.planId, itemId: gatewayGround.itemId, label: '', productName: null, productTypeId: knx.id, reservePercent: 10, placesUsed: 1, placesSupplied: 50, unknownCount: 0, devices: 1, routers: 0, status: 'ok' },
       ],
     })
     const scrolled: string[] = []

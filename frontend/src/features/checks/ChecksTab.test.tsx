@@ -8,7 +8,7 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ChecksTab } from './ChecksTab'
-import { batchId, boardId, checks, lineId, ceiling, dimmer, dimmerKind, floorId, kitchen, living, projectId, relay, relayKind, serveChecks, versionId, wiring } from './test-fixtures'
+import { batchId, boardId, checks, lineId, ceiling, dimmer, dimmerKind, floorId, kitchen, projectId, relay, relayKind, serveChecks, versionId, wiring } from './test-fixtures'
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const render = () => renderWithProviders(<ChecksTab projectId={projectId} versionId={versionId} />)

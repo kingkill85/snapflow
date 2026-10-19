@@ -158,7 +158,7 @@ async function catalog(api: Api, lang: Lang) {
   await product('panel', hdl, room, L('HDL Granite panel 4-button', 'HDL Granite Taster 4-fach'), { busMa: 25 })
   await product('knxPsu', knx, actuators, L('KNX power supply 160 mA', 'KNX Spannungsversorgung 160 mA'), { width: 2, supplyMa: 160 })
   await product('presence', knx, room, L('KNX presence detector', 'KNX Präsenzmelder'), { busMa: 12 })
-  await product('touch', knx, room, L('KNX touch panel 4.3"', 'KNX Touchpanel 4,3"'), { busMa: 45 })
+  await product('touch', knx, room, L('KNX touch panel 4.3"', 'KNX Touchpanel 4,3"'), { busMa: 55 })
   await product('thermostat', knx, room, L('KNX room thermostat', 'KNX Raumthermostat'), {})
   await product('gateway', zigbee, room, L('Zigbee gateway', 'Zigbee-Gateway'), { places: 64 })
   await product('bulb', zigbee, room, L('Zigbee bulb E27', 'Zigbee Leuchtmittel E27'), {})
@@ -246,7 +246,7 @@ async function villa(api: Api, cat: Catalog, lang: Lang, name: string) {
     const plan = await api.createPlan(version, floor.name, planImage())
     const zones = floor.rooms.map((key, z) => ({ id: crypto.randomUUID(), key, name: names[key][lang], color: colors[z], opacity: 0.25, points: boxes[z] }))
     const needs = zones.flatMap((z) => templates[z.key].map((l) => ({ id: crypto.randomUUID(), zoneId: z.id, ...l })))
-    const content = { zones: zones.map(({ key: _, ...z }) => z), placements: devices[i], needs }
+    const content = { zones: zones.map((z) => ({ id: z.id, name: z.name, color: z.color, opacity: z.opacity, points: z.points })), placements: devices[i], needs }
     await api.savePlanContent(plan.id, content)
     plans.push({ id: plan.id, name: floor.name, zones, content })
   }

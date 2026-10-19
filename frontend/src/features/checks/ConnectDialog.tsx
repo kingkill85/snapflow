@@ -155,8 +155,9 @@ export function ConnectDialog({ versionId, wiring, target, onOpenChange, onConne
                       { channel: wiring.channelText(c), need: wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId))), item: wiring.itemName(wiring.items.get(`${c.targetPlanId}/${c.targetItemId}`)) },
                     )
                     const name = describe(c)
+                    const short = target?.kind === 'need' ? name : wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId)))
                     // The rule's sentence mostly names the candidate already (D417).
-                    return <li key={`${c.needId}/${c.targetItemId}/${c.outputKindId}/${c.channelNo}`}>{words.includes(name) ? words : `${name}: ${words}`}</li>
+                    return <li key={`${c.needId}/${c.targetItemId}/${c.outputKindId}/${c.channelNo}`}>{words.includes(short) ? words : `${name}: ${words}`}</li>
                   })}
                   {broken.length > shownProblems && <li>{t('connect.more', { count: broken.length - shownProblems })}</li>}
                 </ul>

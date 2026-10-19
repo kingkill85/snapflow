@@ -12,7 +12,7 @@ import { useGetChecks } from '@/api/generated/wiring/wiring'
 import { isModKey, isTypingTarget } from '@/canvas'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
-import { itemKey, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
+import { boardStatus, itemKey, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -511,7 +511,7 @@ function BoardCheck({ check, kindName }: { check: BoardStatus; kindName: (id: st
   const list = check.channels.map((c) => `${kindName(c.outputKindId)}${c.alternative ? ` (${t('board.channelAlternative')})` : ''} ${c.free}/${c.total}`).join(', ')
   return (
     <span data-testid="board-check" className="flex items-center gap-2 text-sm text-muted">
-      <StatusChip status={check.status} />
+      <StatusChip status={boardStatus(check)} />
       {list && <span className="hidden truncate lg:inline">{t('board.channelTotals', { list })}</span>}
     </span>
   )

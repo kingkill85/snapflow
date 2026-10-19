@@ -12,7 +12,7 @@ import { useLocalized } from '@/i18n/localized'
 
 import { AutoConnectDialog } from './AutoConnectDialog'
 import { ConnectDialog, type ConnectTarget } from './ConnectDialog'
-import { areaOf, areas, useFindingText } from './format'
+import { areaOf, areas, boardStatus, useFindingText, worstStatus } from './format'
 import { StatusChip } from './StatusChip'
 import { useRefreshWiring, useWiringModel } from './wiring'
 
@@ -146,7 +146,7 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
         status={<Badge variant={c.errors > 0 ? 'danger' : c.warnings > 0 ? 'warning' : 'success'}>{t(c.errors > 0 ? 'overview.toFix' : c.warnings > 0 ? 'overview.toReview' : 'overview.allClear')}</Badge>}
       />
       {checks.boards.map((b) => (
-        <Card key={b.planId} title={t('overview.board', { name: b.name })} status={<StatusChip status={b.rows.reduce((s, r) => worst(s, r.status), b.status as string)} />}>
+        <Card key={b.planId} title={t('overview.board', { name: b.name })} status={<StatusChip status={boardStatus(b)} />}>
           <p className="text-sm">{t('overview.te', { used: b.usedTe, capacity: b.capacityTe })}</p>
           {b.rows.map((r, i) =>
             r.status === 'red' || r.status === 'amber' ? (
@@ -166,7 +166,7 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
         </Card>
       ))}
       {checks.busLines.map((l) => (
-        <Card key={l.busLineId} title={t('overview.busLine', { name: l.name })} status={<StatusChip status={worst(l.currentStatus, l.devicesStatus)} />}>
+        <Card key={l.busLineId} title={t('overview.busLine', { name: l.name })} status={<StatusChip status={worstStatus(l.currentStatus, l.devicesStatus)} />}>
           <p className="flex flex-wrap items-center gap-2 text-sm">
             {t('overview.current', { used: l.currentUsedMa, supplied: l.currentSuppliedMa, reserve: l.reservePercent })}
             <StatusChip status={l.currentStatus} />
@@ -188,8 +188,6 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
   )
 }
 
-const rank: Record<string, number> = { red: 3, amber: 2, unknown: 1, ok: 0 }
-const worst = (a: string, b: string) => ((rank[a] ?? 0) >= (rank[b] ?? 0) ? a : b)
 
 function Findings({
   checks,

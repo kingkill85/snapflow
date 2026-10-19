@@ -27,6 +27,18 @@ export type FindingNames = {
 export type Status = 'ok' | 'amber' | 'red' | 'unknown'
 
 /** The badge variant of a reserve status: colour always goes with the status text (`checks:status.*`). */
+const statusRank: Record<string, number> = { red: 3, amber: 2, unknown: 1, ok: 0 }
+
+/** The worse of two reserve statuses (a card or header shows the worst of its parts). */
+export function worstStatus(a: string, b: string): string {
+  return (statusRank[a] ?? 0) >= (statusRank[b] ?? 0) ? a : b
+}
+
+/** A board's status as one chip: the worst of its total and its rows (D417). */
+export function boardStatus(b: { status: string; rows: { status: string }[] }): string {
+  return b.rows.reduce((s, r) => worstStatus(s, r.status), b.status)
+}
+
 export function statusTone(status: Status | string): 'success' | 'warning' | 'danger' | 'neutral' {
   switch (status) {
     case 'ok':
