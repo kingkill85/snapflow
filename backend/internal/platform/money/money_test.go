@@ -1,6 +1,7 @@
 package money_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/money"
@@ -150,5 +151,17 @@ func TestConverter(t *testing.T) {
 	}
 	if !gt.Equal(combined.GrandTotal) {
 		t.Errorf("JPY split %s, combined %s", gt, combined.GrandTotal)
+	}
+}
+
+func TestCurrencies(t *testing.T) {
+	codes := money.Currencies()
+	if !slices.IsSorted(codes) || len(codes) < 150 || !money.IsCurrency("EUR") || !money.IsCurrency("USD") || money.IsCurrency("XYZ") {
+		t.Fatalf("currencies: %d sorted=%v", len(codes), slices.IsSorted(codes))
+	}
+	for _, c := range []string{"JPY", "KWD", "PKR", "CHF"} {
+		if !money.IsCurrency(c) {
+			t.Errorf("%s missing", c)
+		}
 	}
 }
