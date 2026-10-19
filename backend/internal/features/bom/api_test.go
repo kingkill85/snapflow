@@ -627,6 +627,15 @@ func TestCatalogChangeEffects(t *testing.T) {
 		changes.GrandTotalAfter != "141.80" || changes.Effect != "27.90" {
 		t.Fatalf("preview: %+v", changes)
 	}
+	// Required add-ons are named by product and variant.
+	for _, ch := range changes.Items {
+		if ch.VariantID.String() != c.Main || ch.After == nil {
+			continue
+		}
+		if a := ch.After.RequiredAddons; len(a) != 2 || a[1].VariantName["en"] != "Required 2" || len(a[1].ProductName) == 0 || len(ch.Before.RequiredAddons[0].ProductName) == 0 {
+			t.Errorf("required add-ons: %+v → %+v", ch.Before.RequiredAddons, a)
+		}
+	}
 
 	resp = api.Post("/api/versions/"+vs+"/catalog-changes/apply", admin, map[string]any{"variantIds": []string{c.Main}})
 	wantCode(t, resp, http.StatusOK, "")

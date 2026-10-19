@@ -149,9 +149,16 @@ function FieldDiff({ item, after }: { item: CatalogChange; after: ChangeValues }
       case 'image':
         return values.imageUrl ? <Thumbnail src={values.imageUrl} /> : t('changes.noImage')
       case 'requiredAddons':
-        return values.requiredAddons.length
-          ? values.requiredAddons.map((a) => [a.modelNumber, localize(a.variantName)].filter(Boolean).join(' ')).join(', ')
-          : t('changes.noAddons')
+        // One per line, named as BOM lines are ("Product – Variant"); the model number when the name is unknown.
+        return values.requiredAddons.length ? (
+          <ul className="space-y-1">
+            {values.requiredAddons.map((a) => (
+              <li key={a.variantId}>{[localize(a.productName), localize(a.variantName)].filter(Boolean).join(' – ') || a.modelNumber}</li>
+            ))}
+          </ul>
+        ) : (
+          t('changes.noAddons')
+        )
     }
   }
   const rows = fieldKeys.filter((f) => item.fields.includes(f))

@@ -189,6 +189,15 @@ describe('BomTab', () => {
     expect(within(totals).getByTestId('total-grandTotal')).toHaveTextContent('$255.00')
   })
 
+  it('shows the empty state without filters or update for an empty BOM', async () => {
+    serve({ ...bom, lines: [], groups: [], manualLines: [] })
+    render()
+    expect(await screen.findByText('Nothing to list yet: place products in a plan or add a manual line.')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Plan' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Update from catalog' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add product' })).toBeInTheDocument()
+  })
+
   it('links a placement without snapshot to its plan', async () => {
     serve({ ...bom, warnings: [{ code: 'placement_without_snapshot', planId: bom.plans[0].id, placementId: 'p1' }] })
     render()

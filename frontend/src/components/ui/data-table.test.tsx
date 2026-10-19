@@ -25,6 +25,23 @@ describe('DataTable', () => {
     expect(removable.lastElementChild).not.toHaveClass('max-md:hidden')
   })
 
+  it('leaves out a phone card line without a value', () => {
+    render(
+      <DataTable
+        rows={rows}
+        rowKey={(r) => r.id}
+        columns={[
+          { header: 'Name', cell: (r) => r.name },
+          { header: 'Note', cell: (r) => (r.deletable ? 'Spare' : null) },
+        ]}
+        empty={null}
+      />,
+    )
+    const [kept, removable] = screen.getAllByRole('row').slice(1)
+    expect(kept.children[1]).toHaveClass('max-md:hidden')
+    expect(removable.children[1]).not.toHaveClass('max-md:hidden')
+  })
+
   it('keeps the column headers for screen readers only when asked to hide them', () => {
     const { rerender } = render(<DataTable flat rows={rows} rowKey={(r) => r.id} columns={[{ header: 'Name', cell: (r) => r.name }]} empty={null} />)
     expect(screen.getAllByRole('rowgroup')[0]).not.toHaveClass('sr-only')

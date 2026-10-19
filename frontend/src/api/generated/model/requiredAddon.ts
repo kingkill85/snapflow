@@ -4,11 +4,14 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { RequiredAddonProductName } from './requiredAddonProductName';
 import type { RequiredAddonVariantName } from './requiredAddonVariantName';
 
 export interface RequiredAddon {
   /** Empty when unknown (deleted) */
   modelNumber: string;
+  /** Empty when unknown (deleted) */
+  productName: RequiredAddonProductName;
   variantId: string;
   /** Empty when unknown (deleted) */
   variantName: RequiredAddonVariantName;

@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 import { ApiError } from '@/api/client'
 import { getGetBomQueryKey, previewPricing, useGetPricing, useUpdatePricing } from '@/api/generated/bom/bom'
-import type { Pricing, PricingInput } from '@/api/generated/model'
+import type { BOMTotals, Pricing, PricingInput } from '@/api/generated/model'
 import { contentLocales } from '@/i18n/content-locales'
 import type { LocalizedText } from '@/i18n/localized'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
@@ -88,6 +88,9 @@ function toInput(v: FormValues, defaultLabel: LocalizedText): PricingInput | und
   }
 }
 
+/** "5.00" → "5", "12.50" stays: the form shows a whole percent or amount without zero decimals. */
+const wholeNumber = (value: string) => value.replace(/\.0+$/, '')
+
 type Props = {
   versionId: string
   canWrite: boolean
@@ -117,9 +120,9 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
   base.current = pricing
   const toForm = (p: Pricing): FormValues => ({
     discountKind: p.discountKind,
-    discountValue: p.discountKind === 'none' ? '' : formatDecimal(p.discountValue, separator),
+    discountValue: p.discountKind === 'none' ? '' : formatDecimal(wholeNumber(p.discountValue), separator),
     servicesKind: p.servicesKind,
-    servicesValue: p.servicesKind === 'none' ? '' : formatDecimal(p.servicesValue, separator),
+    servicesValue: p.servicesKind === 'none' ? '' : formatDecimal(wholeNumber(p.servicesValue), separator),
     servicesLabel: toTranslatable(p.servicesLabel),
   })
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toForm(pricing) })
@@ -176,7 +179,11 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
       />
     )
   }
-  const previewTotals = preview.data
+  // The last totals the preview computed: shown dimmed while the values are invalid (the field says why).
+  const lastTotals = useRef<BOMTotals | undefined>(undefined)
+  if (preview.data) lastTotals.current = preview.data
+  const invalid = (preview.isError && preview.error instanceof ApiError && preview.error.status === 422) || (input === undefined && !!lastTotals.current)
+  const previewTotals = preview.isError ? (invalid ? lastTotals.current : undefined) : preview.data
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start">
@@ -216,13 +223,13 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
           <TotalsBlock
             totals={previewTotals}
             servicesLabel={optionalTranslatable(values.servicesLabel) ?? pricing.servicesLabel}
-            title={t('pricing.preview')}
-            pending={preview.isFetching || JSON.stringify(debounced) !== inputKey}
+            title={canWrite ? t('pricing.preview') : undefined}
+            pending={invalid || preview.isFetching || JSON.stringify(debounced) !== inputKey}
           />
         ) : preview.isError ? null : (
           <Loading />
         )}
-        {preview.isError && <ErrorMessage error={preview.error} />}
+        {invalid ? <p className="ml-auto w-full max-w-md text-xs text-muted">{t('pricing.previewInvalid')}</p> : preview.isError && <ErrorMessage error={preview.error} />}
       </div>
     </div>
   )

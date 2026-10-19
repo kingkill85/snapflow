@@ -121,6 +121,9 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
                   {columns.map((c, i) => {
                     const line = c.mobile !== 'media' && i !== titleIndex
                     const block = c.mobile === 'block'
+                    const content = c.cell(row)
+                    // A phone's card leaves out a label line without a value (e.g. an empty note).
+                    const blank = content == null || content === false || content === ''
                     return (
                       <td
                         key={c.key ?? c.header}
@@ -134,9 +137,10 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
                           flat ? 'py-1.5 align-top first:pl-0 last:pr-0' : 'py-2.5 first:pl-4 last:pr-4',
                           c.className,
                           cellClass(c, i),
+                          line && blank && 'max-md:hidden',
                         )}
                       >
-                        {line ? <div className="min-w-0 break-words md:contents">{c.cell(row)}</div> : c.cell(row)}
+                        {line ? <div className="min-w-0 break-words md:contents">{content}</div> : content}
                       </td>
                     )
                   })}

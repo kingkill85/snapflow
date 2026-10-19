@@ -230,6 +230,7 @@ export * from './projectVersionActions';
 export * from './projectVersionCreate';
 export * from './projectVersionUpdate';
 export * from './requiredAddon';
+export * from './requiredAddonProductName';
 export * from './requiredAddonVariantName';
 export * from './role';
 export * from './roleMatrix';

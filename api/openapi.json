@@ -5105,6 +5105,13 @@
             "description": "Empty when unknown (deleted)",
             "type": "string"
           },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Empty when unknown (deleted)",
+            "type": "object"
+          },
           "variantId": {
             "type": "string"
           },
@@ -5119,6 +5126,7 @@
         "required": [
           "variantId",
           "modelNumber",
+          "productName",
           "variantName"
         ],
         "type": "object"

@@ -13,6 +13,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
+	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 )
 
@@ -46,11 +47,11 @@ func (st *state) values(it store.VersionItem) ChangeValues {
 		ModelNumber: it.ModelNumber, SKU: deref(it.Sku), ImageURL: imageURL(it.ImageFileID), RequiredAddons: []RequiredAddon{},
 	}
 	for _, id := range it.RequiredAddonIds {
-		r := RequiredAddon{VariantID: id}
+		r := RequiredAddon{VariantID: id, ProductName: i18n.Text{}, VariantName: i18n.Text{}}
 		if a, ok := st.items[id]; ok {
-			r.ModelNumber, r.VariantName = a.ModelNumber, a.VariantName
+			r.ModelNumber, r.ProductName, r.VariantName = a.ModelNumber, a.ProductName, a.VariantName
 		} else if f, ok := st.catalog[id]; ok {
-			r.ModelNumber, r.VariantName = f.ModelNumber, f.VariantName
+			r.ModelNumber, r.ProductName, r.VariantName = f.ModelNumber, f.ProductName, f.VariantName
 		}
 		v.RequiredAddons = append(v.RequiredAddons, r)
 	}

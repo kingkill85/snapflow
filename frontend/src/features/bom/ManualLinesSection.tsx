@@ -93,7 +93,7 @@ export function ManualLinesSection({ versionId, lines, canWrite, productTypeIds 
           },
           { header: t('manual.columns.unitPrice'), className: 'text-right', cell: (l) => <span className="whitespace-nowrap tabular-nums">{money(l.unitPrice)}</span> },
           { header: t('manual.columns.quantity'), className: 'text-right', cell: (l) => <span className="tabular-nums">{l.quantity}</span> },
-          { header: t('manual.columns.note'), cell: (l) => <span className="whitespace-pre-line text-muted">{l.note}</span> },
+          { header: t('manual.columns.note'), cell: (l) => (l.note ? <span className="whitespace-pre-line text-muted">{l.note}</span> : null) },
         ]}
         actions={
           canWrite

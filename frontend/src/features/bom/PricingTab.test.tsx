@@ -148,10 +148,35 @@ describe('PricingTab', () => {
     expect(await screen.findByText(/changed the pricing|inzwischen|meantime/)).toBeInTheDocument()
   })
 
+  it('keeps the last totals dimmed while the values are invalid', async () => {
+    serve({ ...bom.pricing, discountValue: '10.00', servicesValue: '50.00' })
+    server.use(
+      http.post('/api/versions/:versionId/pricing/preview', async ({ request }) => {
+        const body = (await request.json()) as { discountValue: string }
+        if (body.discountValue === '150') return problem(422, { code: 'validation.failed', fields: [{ location: 'body.discountValue', code: 'pricing.percent_range', params: { max: 100 } }] })
+        return HttpResponse.json(bom.totals)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    // Whole numbers without zero decimals.
+    const value = await screen.findByRole('textbox', { name: /^Discount value/ })
+    expect(value).toHaveValue('10')
+    expect(screen.getByRole('textbox', { name: /^Services value/ })).toHaveValue('50')
+    const totals = await screen.findByRole('region', { name: 'Totals with these values' })
+    await user.clear(value)
+    await user.type(value, '150')
+    expect(await screen.findByText('The totals update once the values are valid.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Totals with these values' })).toHaveAttribute('aria-busy', 'true')
+    expect(totals).toBeInTheDocument()
+  })
+
   it('is read-only without write access', async () => {
     serve()
     renderWithProviders(<PricingTab versionId={versionId} canWrite={false} />)
     expect(await screen.findByRole('textbox', { name: /^Discount value/ })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    // The saved totals, not a preview of values to try.
+    expect(await screen.findByRole('region', { name: 'Totals' })).toBeInTheDocument()
   })
 })

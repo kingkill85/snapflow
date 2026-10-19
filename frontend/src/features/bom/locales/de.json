@@ -95,6 +95,7 @@
     "servicesLabelHint": "Erscheint im Angebot; leer für die Standardbezeichnung.",
     "preview": "Summen mit diesen Werten",
     "previewPending": "Wird aktualisiert …",
+    "previewInvalid": "Die Summen werden aktualisiert, sobald die Werte gültig sind.",
     "saved": "Preise gespeichert.",
     "save": "Speichern"
   },

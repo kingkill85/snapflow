@@ -224,6 +224,7 @@ type ChangeValues struct {
 type RequiredAddon struct {
 	VariantID   uuid.UUID `json:"variantId"`
 	ModelNumber string    `json:"modelNumber" doc:"Empty when unknown (deleted)"`
+	ProductName i18n.Text `json:"productName" doc:"Empty when unknown (deleted)"`
 	VariantName i18n.Text `json:"variantName" doc:"Empty when unknown (deleted)"`
 }
 

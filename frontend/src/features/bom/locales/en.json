@@ -95,6 +95,7 @@
     "servicesLabelHint": "Printed on the proposal; empty for the default.",
     "preview": "Totals with these values",
     "previewPending": "Updating…",
+    "previewInvalid": "The totals update once the values are valid.",
     "saved": "Pricing saved.",
     "save": "Save"
   },
