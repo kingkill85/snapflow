@@ -88,21 +88,25 @@ test('installation: assign addresses, generate manual and labels, download the e
   const again = await downloadOf(page, () => table.getByRole('row').filter({ hasText: manualNumber }).getByRole('link', { name: 'Download' }).click())
   expect(again.suggestedFilename()).toBe(manual.suggestedFilename())
 
-  // Exports: KNX group addresses (CSV) and the KNX device list; HDL and Zigbee are disabled with the reason.
+  // Exports (fetched as files, saved through an object URL): KNX group addresses (CSV, ETS 1/1, TAB) and the
+  // KNX device list; HDL and the wireless list are disabled with the reason.
   const exports = page.getByRole('region', { name: 'Programming exports' })
-  const csv = await downloadOf(page, () => exports.getByRole('link', { name: 'Download: KNX group addresses (CSV)' }).click())
+  const csv = await downloadOf(page, () => exports.getByRole('button', { name: 'Download: KNX group addresses (CSV)' }).click())
   expect(csv.suggestedFilename()).toMatch(/\.csv$/)
   const text = readFileSync(await csv.path(), 'utf8').replace(/^﻿/, '')
   const lines = text.split('\r\n')
-  expect(lines[0]).toBe('"Main","Middle","Sub","Address","Central","Unfiltered","Description","DatapointType","Security"')
-  expect(lines.some((l) => l.startsWith('"Ground floor","","","1/-/-"'))).toBe(true)
+  expect(lines[0]).toBe('"Group name"\t"Address"\t"Central"\t"Unfiltered"\t"Description"\t"DatapointType"\t"Security"')
+  expect(lines.some((l) => l.startsWith('"Ground floor"\t"1/-/-"'))).toBe(true)
   expect(lines.some((l) => l.includes('Kitchen Spots Switch') && l.includes('"DPST-1-1"'))).toBe(true)
+  // The numbers are stored now; an update keeps them and reports the count.
+  await exports.getByRole('button', { name: 'Update group addresses' }).click()
+  await expect(exports.getByRole('status').filter({ hasText: /Group addresses updated: 0 new/ })).toBeVisible()
 
-  const knxList = await downloadOf(page, () => exports.getByRole('link', { name: 'Download: KNX device list (XLSX)' }).click())
+  const knxList = await downloadOf(page, () => exports.getByRole('button', { name: 'Download: KNX device list (XLSX)' }).click())
   expect((await zipParts(knxList)).get('xl/workbook.xml')).toBeDefined()
   await expect(exports.getByRole('button', { name: 'Download: HDL commissioning list (XLSX)' })).toBeDisabled()
   await expect(exports.getByText('This version has no HDL devices.')).toBeVisible()
-  await expect(exports.getByRole('button', { name: 'Download: Zigbee device list (XLSX)' })).toBeDisabled()
+  await expect(exports.getByRole('button', { name: 'Download: Wireless device list (EUI-64) (XLSX)' })).toBeDisabled()
 
   // The old tab name still opens the tab.
   await page.goto(`/projects/${s.project.id}/versions/${s.versionId}?tab=proposals`)
@@ -126,7 +130,7 @@ test('installation: HDL addresses and the HDL commissioning list', async ({ page
 
   await page.getByRole('tab', { name: 'Documents' }).click()
   const exports = page.getByRole('region', { name: 'Programming exports' })
-  const hdl = await downloadOf(page, () => exports.getByRole('link', { name: 'Download: HDL commissioning list (XLSX)' }).click())
+  const hdl = await downloadOf(page, () => exports.getByRole('button', { name: 'Download: HDL commissioning list (XLSX)' }).click())
   expect(hdl.suggestedFilename()).toMatch(/\.xlsx$/)
   const parts = await zipParts(hdl)
   expect(parts.get('xl/workbook.xml')).toBeDefined()

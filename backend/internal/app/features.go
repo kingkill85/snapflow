@@ -24,6 +24,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/wiring"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx"
+	"github.com/kingkill85/snapflow/backend/internal/platform/generation"
 	// scaffold:imports
 )
 
@@ -83,17 +84,18 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
 		document.NewRegistry(docx.Exporter{}))
+	// One generation limiter for proposals and installation documents (D268).
+	limiter := generation.New(generation.Default)
 	if deps.ProposalGenerations > 0 {
-		proposalSvc.SetConcurrency(deps.ProposalGenerations)
+		limiter = generation.New(deps.ProposalGenerations)
 	}
+	proposalSvc.UseLimiter(limiter)
 	projectSvc.OnDeleteVersions(proposalSvc.DeleteVersionFiles)
 	proposals.Register(api, proposalSvc)
 	installationSvc := installation.NewService(deps.DB, installation.Deps{Projects: projectSvc, Plans: planSvc, Wiring: wiringSvc,
 		Networks: networkSvc, Products: productSvc, Capabilities: capSvc, FunctionTypes: functionTypeSvc, Tenants: c.tenants,
 		Files: fileSvc, Users: c.users, DOCX: docx.Exporter{}})
-	if deps.ProposalGenerations > 0 {
-		installationSvc.SetConcurrency(deps.ProposalGenerations)
-	}
+	installationSvc.UseLimiter(limiter)
 	projectSvc.OnDeleteVersions(installationSvc.DeleteVersionFiles)
 	installation.Register(api, installationSvc)
 	// Every feature with a file id column answers the files feature's

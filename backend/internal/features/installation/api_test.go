@@ -90,8 +90,16 @@ func setup(t *testing.T, lang string) world {
 		want(t, resp, http.StatusCreated, "")
 		return decode[struct{ ID uuid.UUID }](t, resp).ID
 	}
-	dimming := post("/api/function-types", map[string]any{"key": "dimming", "name": text("Dimming", "Dimmen"), "allowsCircuit": true})
-	blind := post("/api/function-types", map[string]any{"key": "blind", "name": text("Blind", "Jalousie")})
+	obj := func(key, en, dpst string) map[string]any {
+		return map[string]any{"key": key, "name": text(en, en), "dpst": dpst}
+	}
+	dimming := post("/api/function-types", map[string]any{"key": "dimming", "name": text("Dimming", "Dimmen"), "allowsCircuit": true,
+		"knxObjects": []any{obj("switch", "Switch", "DPST-1-1"), obj("switch_status", "Switch status", "DPST-1-1"),
+			obj("dim_relative", "Dim relative", "DPST-3-7"), obj("brightness", "Brightness value", "DPST-5-1"),
+			obj("brightness_status", "Brightness status", "DPST-5-1")}})
+	blind := post("/api/function-types", map[string]any{"key": "blind", "name": text("Blind", "Jalousie"),
+		"knxObjects": []any{obj("up_down", "Up/Down", "DPST-1-8"), obj("stop_step", "Stop/Step", "DPST-1-7"),
+			obj("position", "Position", "DPST-5-1"), obj("position_status", "Position status", "DPST-5-1")}})
 	led := post("/api/load-types", map[string]any{"key": "led", "name": text("LED", "LED"), "isActive": true})
 	w.dimKind = post("/api/output-kinds", map[string]any{"key": "dimmer_output", "name": text("Dimmer", "Dimmer"), "isActive": true,
 		"functionTypeIds": []any{dimming}})
@@ -270,29 +278,73 @@ func TestGroupAddressesCSV(t *testing.T) {
 		t.Errorf("content type %q", ct)
 	}
 	got := resp.Body.String()
-	// Golden: the ETS 3/1 layout (D422). Spots on Lights ch 1 (dimmer
-	// objects), the blind on the blind actuator (blind objects).
+	// Golden: the ETS 1/1 layout, TAB separated (D422). Spots on Lights
+	// ch 1 (dimmer objects), the blind on the blind actuator (blind
+	// objects), from the function types' KNX objects.
+	row := func(fields ...string) string { return `"` + strings.Join(fields, "\"\t\"") + `"` }
 	golden := "\ufeff" + strings.Join([]string{
-		`"Main","Middle","Sub","Address","Central","Unfiltered","Description","DatapointType","Security"`,
-		`"Ground floor","","","1/-/-","","","","","Auto"`,
-		`"","Living room","","1/0/-","","","","","Auto"`,
-		`"","","Living room Ceiling spots Switch","1/0/1","","","Main board D2 Lights Dimmer 1","DPST-1-1","Auto"`,
-		`"","","Living room Ceiling spots Switch status","1/0/2","","","Main board D2 Lights Dimmer 1","DPST-1-1","Auto"`,
-		`"","","Living room Ceiling spots Dim relative","1/0/3","","","Main board D2 Lights Dimmer 1","DPST-3-7","Auto"`,
-		`"","","Living room Ceiling spots Brightness value","1/0/4","","","Main board D2 Lights Dimmer 1","DPST-5-1","Auto"`,
-		`"","","Living room Ceiling spots Brightness status","1/0/5","","","Main board D2 Lights Dimmer 1","DPST-5-1","Auto"`,
-		`"","","Living room Blind Up/Down","1/0/6","","","Main board D3 Blind 1","DPST-1-8","Auto"`,
-		`"","","Living room Blind Stop/Step","1/0/7","","","Main board D3 Blind 1","DPST-1-7","Auto"`,
-		`"","","Living room Blind Position","1/0/8","","","Main board D3 Blind 1","DPST-5-1","Auto"`,
-		`"","","Living room Blind Position status","1/0/9","","","Main board D3 Blind 1","DPST-5-1","Auto"`,
+		row("Group name", "Address", "Central", "Unfiltered", "Description", "DatapointType", "Security"),
+		row("Ground floor", "1/-/-", "", "", "", "", "Auto"),
+		row("Living room", "1/0/-", "", "", "", "", "Auto"),
+		row("Living room Ceiling spots Switch", "1/0/1", "", "", "Main board D2 Lights Dimmer 1", "DPST-1-1", "Auto"),
+		row("Living room Ceiling spots Switch status", "1/0/2", "", "", "Main board D2 Lights Dimmer 1", "DPST-1-1", "Auto"),
+		row("Living room Ceiling spots Dim relative", "1/0/3", "", "", "Main board D2 Lights Dimmer 1", "DPST-3-7", "Auto"),
+		row("Living room Ceiling spots Brightness value", "1/0/4", "", "", "Main board D2 Lights Dimmer 1", "DPST-5-1", "Auto"),
+		row("Living room Ceiling spots Brightness status", "1/0/5", "", "", "Main board D2 Lights Dimmer 1", "DPST-5-1", "Auto"),
+		row("Living room Blind Up/Down", "1/0/6", "", "", "Main board D3 Blind 1", "DPST-1-8", "Auto"),
+		row("Living room Blind Stop/Step", "1/0/7", "", "", "Main board D3 Blind 1", "DPST-1-7", "Auto"),
+		row("Living room Blind Position", "1/0/8", "", "", "Main board D3 Blind 1", "DPST-5-1", "Auto"),
+		row("Living room Blind Position status", "1/0/9", "", "", "Main board D3 Blind 1", "DPST-5-1", "Auto"),
 	}, "\r\n") + "\r\n"
 	if got != golden {
 		t.Errorf("csv:\n%s\nwant:\n%s", got, golden)
 	}
-	// Stable: the same again.
+	// Stable: the same again (now from the stored rows).
 	if again := w.api.Get(w.url("/exports/knx-group-addresses.csv"), w.user.Cookie).Body.String(); again != got {
 		t.Error("not deterministic")
 	}
+	// The 3/1 layout, comma separated.
+	resp = w.api.Get(w.url("/exports/knx-group-addresses.csv?format=3-1"), w.user.Cookie)
+	want(t, resp, http.StatusOK, "")
+	if lines := strings.Split(resp.Body.String(), "\r\n"); len(lines) != 13 ||
+		lines[3] != `"","","Living room Ceiling spots Switch","1/0/1","","","Main board D2 Lights Dimmer 1","DPST-1-1","Auto"` {
+		t.Errorf("3/1: %q", lines)
+	}
+	want(t, w.api.Get(w.url("/exports/knx-group-addresses.csv?format=x"), w.user.Cookie), http.StatusUnprocessableEntity, "")
+	var stored int
+	if err := w.api.DB.QueryRow(t.Context(), `SELECT count(*) FROM group_addresses WHERE version_id = $1`, w.version).Scan(&stored); err != nil || stored != 9 {
+		t.Errorf("stored %d %v", stored, err)
+	}
+
+	// Assign: nothing new; a plain read user cannot.
+	resp = w.api.Post(w.url("/group-addresses/assign"), w.user.Cookie)
+	want(t, resp, http.StatusOK, "")
+	if sum := decode[installation.GroupAddressSummary](t, resp); sum.Added != 0 || sum.Total != 9 {
+		t.Errorf("summary %+v", sum)
+	}
+
+	// A version copy keeps the group addresses (plan ids mapped).
+	resp = w.api.Post("/api/projects/"+w.project.String()+"/versions", w.user.Cookie, map[string]any{"sourceVersionId": w.version, "name": "V2"})
+	want(t, resp, http.StatusCreated, "")
+	copyID := decode[struct{ ID uuid.UUID }](t, resp).ID
+	resp = w.api.Get("/api/versions/"+copyID.String()+"/exports/knx-group-addresses.csv", w.user.Cookie)
+	want(t, resp, http.StatusOK, "")
+	if resp.Body.String() != got {
+		t.Errorf("copy:\n%s", resp.Body.String())
+	}
+	if err := w.api.DB.QueryRow(t.Context(), `SELECT count(*) FROM group_addresses a JOIN plans p ON p.id = a.need_plan_id
+		WHERE a.version_id = $1 AND p.version_id = $1`, copyID).Scan(&stored); err != nil || stored != 9 {
+		t.Errorf("copied %d %v", stored, err)
+	}
+
+	// Read-only projects refuse the assignment, still export.
+	if _, err := w.api.DB.Exec(t.Context(), `UPDATE projects SET status = 'completed' WHERE id = $1`, w.project); err != nil {
+		t.Fatal(err)
+	}
+	want(t, w.api.Post(w.url("/group-addresses/assign"), w.user.Cookie), http.StatusConflict, "project.read_only")
+	want(t, w.api.Get(w.url("/exports/knx-group-addresses.csv"), w.user.Cookie), http.StatusOK, "")
+	other := w.api.NewUser(w.api.NewTenant("Other"), auth.RoleUser)
+	want(t, w.api.Post(w.url("/group-addresses/assign"), other.Cookie), http.StatusNotFound, "")
 }
 
 func TestCommissioningLists(t *testing.T) {
@@ -314,8 +366,10 @@ func TestCommissioningLists(t *testing.T) {
 		!strings.Contains(rows[1][5], "Dimmer 1: Living room Ceiling spots 3 × 40 W LED") || rows[4][len(rows[4])-1] != "ja" {
 		t.Errorf("rows %q", rows)
 	}
-	// Zigbee: a sheet per gateway with the gateway and its devices.
-	resp = w.api.Get(w.url("/exports/zigbee-devices.xlsx"), w.user.Cookie)
+	// Wireless (EUI-64): a sheet per gateway with the gateway and its
+	// devices; the former path still answers.
+	want(t, w.api.Get(w.url("/exports/zigbee-devices.xlsx"), w.user.Cookie), http.StatusOK, "")
+	resp = w.api.Get(w.url("/exports/wireless-devices.xlsx"), w.user.Cookie)
 	want(t, resp, http.StatusOK, "")
 	f, err = excelize.OpenReader(bytes.NewReader(resp.Body.Bytes()))
 	if err != nil {

@@ -18,6 +18,7 @@ type Querier interface {
 	InsertFunctionTypeLoadTypes(ctx context.Context, arg InsertFunctionTypeLoadTypesParams) error
 	ListFunctionTypeLoadTypes(ctx context.Context) ([]FunctionTypeLoadType, error)
 	ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
+	// knx_objects NULL keeps the stored objects (D294).
 	UpdateFunctionType(ctx context.Context, arg UpdateFunctionTypeParams) (FunctionType, error)
 }
 

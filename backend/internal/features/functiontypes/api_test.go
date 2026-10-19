@@ -1,6 +1,7 @@
 package functiontypes_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -69,6 +70,13 @@ func TestValidation(t *testing.T) {
 	}{
 		"bad key":         {map[string]any{"key": "Dimmer!", "name": map[string]string{"en": "Dimmer"}}, "function_type.key_format"},
 		"no english name": {map[string]any{"key": "dimmer", "name": map[string]string{"de": "Dimmer"}}, "validation.required"},
+		"object key twice": {map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"}, "knxObjects": []any{
+			map[string]any{"key": "switch", "name": map[string]string{"en": "Switch"}, "dpst": "DPST-1-1"},
+			map[string]any{"key": "switch", "name": map[string]string{"en": "Switch 2"}, "dpst": "DPST-1-1"}}}, "function_type.knx_object_duplicate"},
+		"object without english name": {map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"}, "knxObjects": []any{
+			map[string]any{"key": "switch", "name": map[string]string{"de": "Schalten"}, "dpst": "DPST-1-1"}}}, "validation.required"},
+		"bad dpst": {map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"}, "knxObjects": []any{
+			map[string]any{"key": "switch", "name": map[string]string{"en": "Switch"}, "dpst": "DPT 1.001"}}}, "function_type.dpst_format"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -130,4 +138,29 @@ func TestNameIsTrimmed(t *testing.T) {
 		t.Fatalf("blank English: got %d: %s", resp.Code, resp.Body)
 	}
 	assertContains(t, resp.Body.String(), `"location":"body.name.en"`)
+}
+
+// KNX objects are stored, returned, and kept when an update leaves them out.
+func TestKNXObjects(t *testing.T) {
+	api := apptest.New(t)
+	objects := []any{map[string]any{"key": "switch", "name": map[string]string{"en": "Switch", "de": "Schalten"}, "dpst": "DPST-1-1"},
+		map[string]any{"key": "brightness", "name": map[string]string{"en": "Brightness"}, "dpst": "DPST-5-1"}}
+	resp := api.Post("/api/function-types", api.Admin.Cookie, map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"},
+		"knxObjects": objects})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+	assertContains(t, resp.Body.String(), `"knxObjects":[{"key":"switch","name":{"de":"Schalten","en":"Switch"},"dpst":"DPST-1-1"},{"key":"brightness"`)
+	var ft struct{ ID string }
+	if err := json.Unmarshal(resp.Body.Bytes(), &ft); err != nil {
+		t.Fatal(err)
+	}
+	resp = api.Put("/api/function-types/"+ft.ID, api.Admin.Cookie, map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"}})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("got %d: %s", resp.Code, resp.Body)
+	}
+	assertContains(t, resp.Body.String(), `{"key":"brightness","name":{"en":"Brightness"},"dpst":"DPST-5-1"}`)
+	resp = api.Put("/api/function-types/"+ft.ID, api.Admin.Cookie, map[string]any{"key": "dimmer", "name": map[string]string{"en": "Dimmer"},
+		"knxObjects": []any{}})
+	assertContains(t, resp.Body.String(), `"knxObjects":[]`)
 }

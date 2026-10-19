@@ -157,6 +157,8 @@
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "load_type_duplicate": "This load type is listed twice.",
+    "knx_object_duplicate": "The object key \"{{key}}\" is used twice.",
+    "dpst_format": "Enter the datapoint subtype like DPST-1-1.",
     "not_found": "This function type no longer exists."
   },
   "import": {
@@ -396,6 +398,7 @@
   },
   "export": {
     "too_many_group_addresses": "Too many floors, zones or functions for KNX group addresses (at most {{max}}).",
-    "unknown": "This export does not exist."
+    "unknown": "This export does not exist.",
+    "format_unknown": "This export format does not exist."
   }
 }

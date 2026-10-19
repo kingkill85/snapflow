@@ -155,25 +155,76 @@ describe('InstallationDocumentsSection', () => {
 })
 
 describe('ProgrammingExportsSection', () => {
-  it('links the exports of the systems the version has and disables the others with the reason', async () => {
+  it('offers the exports of the systems the version has and disables the others with the reason', async () => {
     server.use(http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses([item('knx', 1), item('none', 2)]))))
     renderWithProviders(<ProgrammingExportsSection versionId={versionId} />)
-    const csv = await screen.findByRole('link', { name: 'Download: KNX group addresses (CSV)' })
-    expect(csv).toHaveAttribute('href', `/api/versions/${versionId}/exports/knx-group-addresses.csv`)
-    expect(screen.getByRole('link', { name: 'Download: KNX device list (XLSX)' })).toHaveAttribute('href', `/api/versions/${versionId}/exports/knx-devices.xlsx`)
+    expect(await screen.findByRole('button', { name: 'Download: KNX group addresses (CSV)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Download: KNX device list (XLSX)' })).toBeEnabled()
     const hdl = screen.getByRole('button', { name: 'Download: HDL commissioning list (XLSX)' })
     expect(hdl).toBeDisabled()
     expect(hdl).toHaveAccessibleDescription('This version has no HDL devices.')
-    const zigbee = screen.getByRole('button', { name: 'Download: Zigbee device list (XLSX)' })
-    expect(zigbee).toBeDisabled()
-    expect(zigbee).toHaveAccessibleDescription('This version has no wireless devices.')
+    const wireless = screen.getByRole('button', { name: 'Download: Wireless device list (EUI-64) (XLSX)' })
+    expect(wireless).toBeDisabled()
+    expect(wireless).toHaveAccessibleDescription('This version has no wireless devices.')
   })
 
-  it('links the HDL and Zigbee lists when the version has such devices', async () => {
-    server.use(http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses([item('hdl', 1), item('ieee', 2)]))))
+  it('fetches an export as a file and saves it under the name the API sends', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:wireless')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const names: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.getAttribute('href') ?? '')
+      names.push(this.download)
+    })
+    server.use(
+      http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses([item('hdl', 1), item('ieee', 2)]))),
+      http.get(
+        '/api/versions/:versionId/exports/wireless-devices.xlsx',
+        () =>
+          new HttpResponse('xlsx', {
+            headers: { 'Content-Disposition': `attachment; filename="V1 Wireless.xlsx"; filename*=UTF-8''V1%20Funk-Ger%C3%A4te.xlsx` },
+          }),
+      ),
+    )
+    const user = userEvent.setup()
     renderWithProviders(<ProgrammingExportsSection versionId={versionId} />)
-    expect(await screen.findByRole('link', { name: 'Download: HDL commissioning list (XLSX)' })).toHaveAttribute('href', `/api/versions/${versionId}/exports/hdl-commissioning.xlsx`)
-    expect(screen.getByRole('link', { name: 'Download: Zigbee device list (XLSX)' })).toHaveAttribute('href', `/api/versions/${versionId}/exports/zigbee-devices.xlsx`)
+    await user.click(await screen.findByRole('button', { name: 'Download: Wireless device list (EUI-64) (XLSX)' }))
+    await waitFor(() => expect(clicked).toEqual(['blob:wireless']))
+    expect(names).toEqual(['V1 Funk-Geräte.xlsx'])
     expect(screen.getByRole('button', { name: 'Download: KNX group addresses (CSV)' })).toBeDisabled()
+  })
+
+  it('shows the translated API error of a failed export', async () => {
+    server.use(
+      http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses([item('knx', 1)]))),
+      http.get('/api/versions/:versionId/exports/knx-group-addresses.csv', () =>
+        problem(422, { code: 'export.too_many_group_addresses', detail: 'too many', params: { max: 31 } }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<ProgrammingExportsSection versionId={versionId} />)
+    await user.click(await screen.findByRole('button', { name: 'Download: KNX group addresses (CSV)' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many floors, zones or functions for KNX group addresses (at most 31).')
+    expect(clicked).toEqual([])
+  })
+
+  it('updates the group addresses and reports the result', async () => {
+    server.use(
+      http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses([item('knx', 1)]))),
+      http.post('/api/versions/:versionId/group-addresses/assign', () => HttpResponse.json({ added: 3, total: 12 })),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<ProgrammingExportsSection versionId={versionId} />)
+    await user.click(await screen.findByRole('button', { name: 'Update group addresses' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Group addresses updated: 3 new, 12 in total.')
+  })
+
+  it('has no update button on read-only versions', async () => {
+    server.use(
+      http.get('/api/versions/:versionId/addresses', () => HttpResponse.json({ ...addresses([item('knx', 1)]), can: { update: false } })),
+    )
+    renderWithProviders(<ProgrammingExportsSection versionId={versionId} />)
+    expect(await screen.findByRole('button', { name: 'Download: KNX group addresses (CSV)' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Update group addresses' })).not.toBeInTheDocument()
   })
 })

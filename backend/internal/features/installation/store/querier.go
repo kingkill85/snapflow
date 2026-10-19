@@ -11,16 +11,28 @@ import (
 )
 
 type Querier interface {
+	// CopyGroupAddressGroups copies the groups of a version into another with
+	// the plan ids mapped (a JSON object source id -> copy id); groups of
+	// removed plans keep their plan id, so their numbers stay reserved.
+	CopyGroupAddressGroups(ctx context.Context, arg CopyGroupAddressGroupsParams) error
+	// CopyGroupAddresses: as CopyGroupAddressGroups.
+	CopyGroupAddresses(ctx context.Context, arg CopyGroupAddressesParams) error
 	DeleteDocument(ctx context.Context, id uuid.UUID) (int64, error)
 	FilesOfVersions(ctx context.Context, versionIds []uuid.UUID) ([]uuid.UUID, error)
 	GetDocument(ctx context.Context, id uuid.UUID) (GeneratedDocument, error)
 	InsertDocument(ctx context.Context, arg InsertDocumentParams) (GeneratedDocument, error)
+	InsertGroupAddressGroup(ctx context.Context, arg InsertGroupAddressGroupParams) error
 	ListDocuments(ctx context.Context, versionID uuid.UUID) ([]GeneratedDocument, error)
+	ListGroupAddressGroups(ctx context.Context, versionID uuid.UUID) ([]GroupAddressGroup, error)
+	ListGroupAddresses(ctx context.Context, versionID uuid.UUID) ([]GroupAddress, error)
 	// Every query of this feature runs in database.InScope: row-level security
 	// limits it to the tenants the caller may see.
 	// NextSeq reserves the next sequence of a version and document kind.
 	NextSeq(ctx context.Context, arg NextSeqParams) (int32, error)
 	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	// UpsertGroupAddress inserts a new group address or renames an existing one
+	// (its number never changes).
+	UpsertGroupAddress(ctx context.Context, arg UpsertGroupAddressParams) error
 }
 
 var _ Querier = (*Queries)(nil)

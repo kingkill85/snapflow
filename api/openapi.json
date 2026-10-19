@@ -4231,6 +4231,13 @@
             ],
             "type": "string"
           },
+          "knxObjects": {
+            "description": "The KNX communication objects of a need of this function (one group address each)",
+            "items": {
+              "$ref": "#/components/schemas/KNXObject"
+            },
+            "type": "array"
+          },
           "loadTypeIds": {
             "description": "The load types a need of this function may have; empty = any",
             "items": {
@@ -4257,6 +4264,7 @@
           "allowsCircuit",
           "loadTypeIds",
           "isActive",
+          "knxObjects",
           "createdAt",
           "updatedAt"
         ],
@@ -4289,6 +4297,14 @@
             "maxLength": 64,
             "minLength": 1,
             "type": "string"
+          },
+          "knxObjects": {
+            "description": "KNX communication objects (keys unique); on update, left out keeps the stored ones (D294)",
+            "items": {
+              "$ref": "#/components/schemas/KNXObject"
+            },
+            "maxItems": 32,
+            "type": "array"
           },
           "loadTypeIds": {
             "description": "Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)",
@@ -4635,6 +4651,35 @@
           "downloadUrl",
           "createdAt",
           "can"
+        ],
+        "type": "object"
+      },
+      "GroupAddressSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/GroupAddressSummary.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "added": {
+            "description": "Group addresses assigned now",
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Group addresses in the export",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "total"
         ],
         "type": "object"
       },
@@ -6203,6 +6248,41 @@
           "productType",
           "category",
           "imageUrl"
+        ],
+        "type": "object"
+      },
+      "KNXObject": {
+        "additionalProperties": false,
+        "properties": {
+          "dpst": {
+            "description": "ETS datapoint subtype",
+            "examples": [
+              "DPST-1-1"
+            ],
+            "maxLength": 32,
+            "type": "string"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case, unique per function type",
+            "examples": [
+              "switch_status"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Object name per locale (part of the group address name); \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "dpst"
         ],
         "type": "object"
       },
@@ -18957,7 +19037,7 @@
     },
     "/api/versions/{versionId}/exports/hdl-commissioning.xlsx": {
       "get": {
-        "description": "One sheet per bus line or gateway (D423).",
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
         "operationId": "exportHdlCommissioning",
         "parameters": [
           {
@@ -19002,7 +19082,7 @@
     },
     "/api/versions/{versionId}/exports/knx-devices.xlsx": {
       "get": {
-        "description": "One sheet per bus line or gateway (D423).",
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
         "operationId": "exportKnxDevices",
         "parameters": [
           {
@@ -19047,7 +19127,7 @@
     },
     "/api/versions/{versionId}/exports/knx-group-addresses.csv": {
       "get": {
-        "description": "ETS 3-level group address CSV (D422): UTF-8 with BOM, comma separated, every field quoted.",
+        "description": "ETS 3-level group address CSV (D422): UTF-8 with BOM, CRLF, every field quoted; the stored group addresses (assigned now when none are stored yet).",
         "operationId": "exportKnxGroupAddresses",
         "parameters": [
           {
@@ -19056,6 +19136,20 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ETS layout: 1-1 (default, one name column, TAB separated) or 3-1 (main/middle/sub columns, comma separated)",
+            "explode": false,
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "description": "ETS layout: 1-1 (default, one name column, TAB separated) or 3-1 (main/middle/sub columns, comma separated)",
+              "enum": [
+                "1-1",
+                "3-1"
+              ],
               "type": "string"
             }
           }
@@ -19090,10 +19184,10 @@
         ]
       }
     },
-    "/api/versions/{versionId}/exports/zigbee-devices.xlsx": {
+    "/api/versions/{versionId}/exports/wireless-devices.xlsx": {
       "get": {
-        "description": "One sheet per bus line or gateway (D423).",
-        "operationId": "exportZigbeeDevices",
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
+        "operationId": "exportWirelessDevices",
         "parameters": [
           {
             "in": "path",
@@ -19129,7 +19223,50 @@
             "description": "Error"
           }
         },
-        "summary": "Export the Zigbee device list (XLSX)",
+        "summary": "Export the wireless device list (EUI-64, XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/group-addresses/assign": {
+      "post": {
+        "description": "Stored numbers never change (D422); needs projects.write, refused on completed or cancelled projects.",
+        "operationId": "assignGroupAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupAddressSummary"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Assign KNX group addresses to new needs and objects",
         "tags": [
           "installation"
         ]

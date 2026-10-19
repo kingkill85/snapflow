@@ -1,7 +1,8 @@
 package installation
 
-// Commissioning lists (3e, D423): one XLSX workbook per system kind, one
-// sheet per bus line (KNX, HDL) or gateway (Zigbee), a row per device.
+// Commissioning lists (3e, D423): one XLSX workbook per addressing scheme,
+// one sheet per bus line (KNX, HDL) or gateway (wireless, EUI-64), a row per
+// device; devices without a line or gateway on a last sheet of their own.
 
 import (
 	"context"
@@ -19,9 +20,11 @@ import (
 
 // List kinds.
 const (
-	ListHDL    = "hdl-commissioning"
+	ListHDL      = "hdl-commissioning"
+	ListWireless = "wireless-devices"
+	ListKNX      = "knx-devices"
+	// ListZigbee is the former path of ListWireless (alias).
 	ListZigbee = "zigbee-devices"
-	ListKNX    = "knx-devices"
 )
 
 // sheet is one sheet of a list.
@@ -82,31 +85,22 @@ func commissioning(d *data, kind string) []sheet {
 					if a.BusLineID == nil || *a.BusLineID != line.ID || a.PowerSupply {
 						continue
 					}
-					it := d.item(a.PlanID, a.ItemID)
-					note, existing := "", ""
-					if a.Address != nil {
-						note = a.Address.Note
-					}
-					if a.Existing {
-						existing = l.t("yes")
-					}
-					row := []any{d.itemName(it), d.productName(&a.VariantID), a.ModelNumber, d.location(it)}
-					if kind == ListHDL {
-						subnet, dev := "", ""
-						if a.Address != nil && a.Address.HDL != "" {
-							subnet, dev, _ = strings.Cut(a.Address.HDL, ".")
-						}
-						row = append(row, numberOrText(subnet), numberOrText(dev))
-					} else {
-						row = append(row, addressText(a))
-					}
-					row = append(row, d.channelLoads(a.PlanID, a.ItemID), note, existing)
-					sh.rows = append(sh.rows, row)
+					sh.rows = append(sh.rows, busRow(d, kind, a))
 				}
 				out = append(out, sh)
 			}
 		}
-	case ListZigbee:
+		// Bus devices of the scheme on no line.
+		without := sheet{name: l.t("sheetWithoutLine"), rows: [][]any{head}}
+		for _, a := range d.addresses.Items {
+			if a.Scheme == scheme && a.BusLineID == nil && !a.PowerSupply {
+				without.rows = append(without.rows, busRow(d, kind, a))
+			}
+		}
+		if len(without.rows) > 1 {
+			out = append(out, without)
+		}
+	case ListWireless:
 		head := []any{l.t("colDevice"), l.t("colProduct"), l.t("colModel"), l.t("colLocation"), l.t("colIEEE"), l.t("colChannels"),
 			l.t("colNote"), l.t("colExisting")}
 		for _, sys := range d.networks.WirelessSystems {
@@ -118,8 +112,9 @@ func commissioning(d *data, kind string) []sheet {
 				byGateway[[2]uuid.UUID{g.PlanID, g.ItemID}] = sh
 				order = append(order, sh)
 			}
+			without := &sheet{name: l.t("sheetWithoutGateway"), rows: [][]any{head}}
 			for _, a := range d.addresses.Items {
-				if a.SystemID != sys.ProductType.ID {
+				if a.SystemID != sys.ProductType.ID || a.Scheme != networks.SchemeIEEE {
 					continue
 				}
 				var sh *sheet
@@ -128,6 +123,8 @@ func commissioning(d *data, kind string) []sheet {
 					sh = byGateway[[2]uuid.UUID{a.PlanID, a.ItemID}]
 				case a.GatewayItemID != nil:
 					sh = byGateway[[2]uuid.UUID{*a.GatewayPlanID, *a.GatewayItemID}]
+				default:
+					sh = without
 				}
 				if sh == nil {
 					continue
@@ -143,12 +140,39 @@ func commissioning(d *data, kind string) []sheet {
 				sh.rows = append(sh.rows, []any{d.itemName(it), d.productName(&a.VariantID), a.ModelNumber, d.location(it), addressText(a),
 					d.channelLoads(a.PlanID, a.ItemID), note, existing})
 			}
+			if len(without.rows) > 1 {
+				order = append(order, without)
+			}
 			for _, sh := range order {
 				out = append(out, *sh)
 			}
 		}
 	}
 	return out
+}
+
+// busRow is a bus device's row of the KNX or HDL list.
+func busRow(d *data, kind string, a networks.AddressedItem) []any {
+	l := d.lang
+	it := d.item(a.PlanID, a.ItemID)
+	note, existing := "", ""
+	if a.Address != nil {
+		note = a.Address.Note
+	}
+	if a.Existing {
+		existing = l.t("yes")
+	}
+	row := []any{d.itemName(it), d.productName(&a.VariantID), a.ModelNumber, d.location(it)}
+	if kind == ListHDL {
+		subnet, dev := "", ""
+		if a.Address != nil && a.Address.HDL != "" {
+			subnet, dev, _ = strings.Cut(a.Address.HDL, ".")
+		}
+		row = append(row, numberOrText(subnet), numberOrText(dev))
+	} else {
+		row = append(row, addressText(a))
+	}
+	return append(row, d.channelLoads(a.PlanID, a.ItemID), note, existing)
 }
 
 func numberOrText(s string) any {
@@ -242,7 +266,10 @@ func (s *Service) CommissioningList(ctx context.Context, versionID uuid.UUID, ki
 	if err != nil {
 		return Export{}, err
 	}
-	if kind != ListHDL && kind != ListZigbee && kind != ListKNX {
+	if kind == ListZigbee {
+		kind = ListWireless
+	}
+	if kind != ListHDL && kind != ListWireless && kind != ListKNX {
 		return Export{}, apperr.New(http.StatusNotFound, "export.unknown", "no such export")
 	}
 	d, err := s.load(ctx, actor, versionID)

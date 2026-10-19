@@ -15,7 +15,6 @@ import (
 	"image"
 	"image/png"
 	"io"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
@@ -41,6 +39,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
+	"github.com/kingkill85/snapflow/backend/internal/platform/generation"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
@@ -50,16 +49,13 @@ const (
 	KindLabels = "channel_labels"
 )
 
-// Limits (as proposals, D268).
+// Limits (as proposals, D268; the generation limiter is shared with them).
 const (
-	defaultGenerations = 2
-	generationTimeout  = 2 * time.Minute
-	maxLogoPixels      = 800
-	maxImageBytes      = 32 << 20
-	maxPlanPixels      = 2400
+	generationTimeout = 2 * time.Minute
+	maxLogoPixels     = 800
+	maxImageBytes     = 32 << 20
+	maxPlanPixels     = 2400
 )
-
-var generationWait = 5 * time.Second
 
 // DB is the database the service runs on; *pgxpool.Pool implements it.
 type DB interface {
@@ -82,7 +78,7 @@ type Service struct {
 	users         *users.Service
 	docx          document.Exporter
 	now           func() time.Time
-	generating    *semaphore.Weighted
+	generating    *generation.Limiter
 }
 
 // Deps are the services the feature reads through.
@@ -102,28 +98,22 @@ type Deps struct {
 }
 
 func NewService(db DB, d Deps) *Service {
-	return &Service{db: db, q: store.New(db), projects: d.Projects, plans: d.Plans, wiring: d.Wiring, networks: d.Networks,
+	s := &Service{db: db, q: store.New(db), projects: d.Projects, plans: d.Plans, wiring: d.Wiring, networks: d.Networks,
 		products: d.Products, capabilities: d.Capabilities, functionTypes: d.FunctionTypes, tenants: d.Tenants, files: d.Files,
-		users: d.Users, docx: d.DOCX, now: time.Now, generating: semaphore.NewWeighted(defaultGenerations)}
+		users: d.Users, docx: d.DOCX, now: time.Now, generating: generation.New(generation.Default)}
+	// A version copy keeps the group addresses (D422).
+	if d.Plans != nil {
+		d.Plans.OnCopyPlans(s.copyPlans)
+	}
+	return s
 }
 
-// SetConcurrency sets how many generations run at once.
-func (s *Service) SetConcurrency(n int) { s.generating = semaphore.NewWeighted(int64(max(n, 1))) }
+// UseLimiter sets the generation limiter (at wiring time; the instance the
+// proposals use, D268).
+func (s *Service) UseLimiter(l *generation.Limiter) { s.generating = l }
 
 func (s *Service) inScope(ctx context.Context, actor auth.Actor, opts pgx.TxOptions, fn func(tx pgx.Tx, q *store.Queries) error) error {
 	return database.InScope(ctx, s.db, actor, opts, func(tx pgx.Tx) error { return fn(tx, s.q.WithTx(tx)) })
-}
-
-func (s *Service) acquire(ctx context.Context) error {
-	wait, cancel := context.WithTimeout(ctx, generationWait)
-	defer cancel()
-	if err := s.generating.Acquire(wait, 1); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return apperr.New(http.StatusServiceUnavailable, "server.busy", "server busy, try again shortly")
-	}
-	return nil
 }
 
 // ---------------------------------------------------------------- data
@@ -483,10 +473,11 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Document
 		return GeneratedDocument{}, apperr.Invalid("body.kind", "document.kind_unknown", "unknown document kind").
 			With("kinds", KindManual+", "+KindLabels)
 	}
-	if err := s.acquire(ctx); err != nil {
+	release, err := s.generating.Acquire(ctx)
+	if err != nil {
 		return GeneratedDocument{}, err
 	}
-	defer s.generating.Release(1)
+	defer release()
 	ctx, cancel := context.WithTimeout(ctx, generationTimeout)
 	defer cancel()
 	d, err := s.load(ctx, actor, versionID)

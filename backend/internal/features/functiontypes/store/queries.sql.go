@@ -13,8 +13,8 @@ import (
 )
 
 const createFunctionType = `-- name: CreateFunctionType :one
-INSERT INTO function_types (key, name, allows_circuit, is_active) VALUES ($1, $2, $3, $4)
-RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active
+INSERT INTO function_types (key, name, allows_circuit, is_active, knx_objects) VALUES ($1, $2, $3, $4, $5::jsonb)
+RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active, knx_objects
 `
 
 type CreateFunctionTypeParams struct {
@@ -22,6 +22,7 @@ type CreateFunctionTypeParams struct {
 	Name          i18n.Text
 	AllowsCircuit bool
 	IsActive      bool
+	KnxObjects    []byte
 }
 
 func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionTypeParams) (FunctionType, error) {
@@ -30,6 +31,7 @@ func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionType
 		arg.Name,
 		arg.AllowsCircuit,
 		arg.IsActive,
+		arg.KnxObjects,
 	)
 	var i FunctionType
 	err := row.Scan(
@@ -40,6 +42,7 @@ func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionType
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
 		&i.IsActive,
+		&i.KnxObjects,
 	)
 	return i, err
 }
@@ -66,7 +69,7 @@ func (q *Queries) DeleteFunctionTypeLoadTypes(ctx context.Context, functionTypeI
 }
 
 const getFunctionType = `-- name: GetFunctionType :one
-SELECT id, key, name, created_at, updated_at, allows_circuit, is_active FROM function_types WHERE id = $1
+SELECT id, key, name, created_at, updated_at, allows_circuit, is_active, knx_objects FROM function_types WHERE id = $1
 `
 
 func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionType, error) {
@@ -80,6 +83,7 @@ func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionTy
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
 		&i.IsActive,
+		&i.KnxObjects,
 	)
 	return i, err
 }
@@ -124,7 +128,7 @@ func (q *Queries) ListFunctionTypeLoadTypes(ctx context.Context) ([]FunctionType
 }
 
 const listFunctionTypes = `-- name: ListFunctionTypes :many
-SELECT id, key, name, created_at, updated_at, allows_circuit, is_active FROM function_types ORDER BY key
+SELECT id, key, name, created_at, updated_at, allows_circuit, is_active, knx_objects FROM function_types ORDER BY key
 `
 
 func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error) {
@@ -144,6 +148,7 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 			&i.UpdatedAt,
 			&i.AllowsCircuit,
 			&i.IsActive,
+			&i.KnxObjects,
 		); err != nil {
 			return nil, err
 		}
@@ -156,9 +161,10 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 }
 
 const updateFunctionType = `-- name: UpdateFunctionType :one
-UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5, updated_at = now()
+UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5,
+    knx_objects = COALESCE($6::jsonb, knx_objects), updated_at = now()
 WHERE id = $1
-RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active
+RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active, knx_objects
 `
 
 type UpdateFunctionTypeParams struct {
@@ -167,8 +173,10 @@ type UpdateFunctionTypeParams struct {
 	Name          i18n.Text
 	AllowsCircuit bool
 	IsActive      bool
+	KnxObjects    []byte
 }
 
+// knx_objects NULL keeps the stored objects (D294).
 func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionTypeParams) (FunctionType, error) {
 	row := q.db.QueryRow(ctx, updateFunctionType,
 		arg.ID,
@@ -176,6 +184,7 @@ func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionType
 		arg.Name,
 		arg.AllowsCircuit,
 		arg.IsActive,
+		arg.KnxObjects,
 	)
 	var i FunctionType
 	err := row.Scan(
@@ -186,6 +195,7 @@ func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionType
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
 		&i.IsActive,
+		&i.KnxObjects,
 	)
 	return i, err
 }

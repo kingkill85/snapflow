@@ -148,6 +148,7 @@ type FunctionType struct {
 	UpdatedAt     time.Time
 	AllowsCircuit bool
 	IsActive      bool
+	KnxObjects    []byte
 }
 
 type FunctionTypeLoadType struct {
@@ -175,6 +176,28 @@ type GeneratedDocumentCounter struct {
 	Kind      string
 	TenantID  uuid.UUID
 	LastSeq   int32
+}
+
+type GroupAddress struct {
+	TenantID   uuid.UUID
+	VersionID  uuid.UUID
+	NeedPlanID uuid.UUID
+	NeedID     uuid.UUID
+	ObjectKey  string
+	Main       int16
+	Middle     int16
+	Sub        int16
+	Name       string
+	UpdatedAt  time.Time
+}
+
+type GroupAddressGroup struct {
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	PlanID    uuid.UUID
+	ZoneID    uuid.UUID
+	Main      int16
+	Middle    int16
 }
 
 type ImportChange struct {

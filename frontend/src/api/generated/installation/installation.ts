@@ -26,7 +26,9 @@ import type {
 import type {
   DocumentInput,
   Error,
-  GeneratedDocument
+  ExportKnxGroupAddressesParams,
+  GeneratedDocument,
+  GroupAddressSummary
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -399,7 +401,7 @@ export const useGenerateDocument = <TError = ErrorType<Error>,
       return useMutation(getGenerateDocumentMutationOptions(options), queryClient);
     }
     /**
- * One sheet per bus line or gateway (D423).
+ * One sheet per bus line or gateway, devices without one on a last sheet (D423).
  * @summary Export the HDL commissioning list (XLSX)
  */
 export const exportHdlCommissioning = (
@@ -493,7 +495,7 @@ export function useExportHdlCommissioning<TData = Awaited<ReturnType<typeof expo
 
 
 /**
- * One sheet per bus line or gateway (D423).
+ * One sheet per bus line or gateway, devices without one on a last sheet (D423).
  * @summary Export the KNX device list (XLSX)
  */
 export const exportKnxDevices = (
@@ -587,17 +589,19 @@ export function useExportKnxDevices<TData = Awaited<ReturnType<typeof exportKnxD
 
 
 /**
- * ETS 3-level group address CSV (D422): UTF-8 with BOM, comma separated, every field quoted.
+ * ETS 3-level group address CSV (D422): UTF-8 with BOM, CRLF, every field quoted; the stored group addresses (assigned now when none are stored yet).
  * @summary Export the KNX group addresses (ETS CSV import)
  */
 export const exportKnxGroupAddresses = (
     versionId: string,
+    params?: ExportKnxGroupAddressesParams,
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<Blob>(
       {url: `/api/versions/${versionId}/exports/knx-group-addresses.csv`, method: 'GET',
+        params,
         responseType: 'blob', signal
     },
       );
@@ -606,23 +610,25 @@ export const exportKnxGroupAddresses = (
 
 
 
-export const getExportKnxGroupAddressesQueryKey = (versionId: string,) => {
+export const getExportKnxGroupAddressesQueryKey = (versionId: string,
+    params?: ExportKnxGroupAddressesParams,) => {
     return [
-    `/api/versions/${versionId}/exports/knx-group-addresses.csv`
+    `/api/versions/${versionId}/exports/knx-group-addresses.csv`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExportKnxGroupAddressesQueryOptions = <TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
+export const getExportKnxGroupAddressesQueryOptions = <TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(versionId: string,
+    params?: ExportKnxGroupAddressesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportKnxGroupAddressesQueryKey(versionId);
+  const queryKey =  queryOptions?.queryKey ?? getExportKnxGroupAddressesQueryKey(versionId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportKnxGroupAddresses>>> = ({ signal }) => exportKnxGroupAddresses(versionId, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportKnxGroupAddresses>>> = ({ signal }) => exportKnxGroupAddresses(versionId,params, signal);
 
 
 
@@ -636,7 +642,8 @@ export type ExportKnxGroupAddressesQueryError = ErrorType<Error>
 
 
 export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(
- versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>> & Pick<
+ versionId: string,
+    params: undefined |  ExportKnxGroupAddressesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof exportKnxGroupAddresses>>,
           TError,
@@ -646,7 +653,8 @@ export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exp
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>> & Pick<
+ versionId: string,
+    params?: ExportKnxGroupAddressesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof exportKnxGroupAddresses>>,
           TError,
@@ -656,7 +664,8 @@ export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exp
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
+ versionId: string,
+    params?: ExportKnxGroupAddressesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -664,11 +673,12 @@ export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exp
  */
 
 export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
+ versionId: string,
+    params?: ExportKnxGroupAddressesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportKnxGroupAddresses>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getExportKnxGroupAddressesQueryOptions(versionId,options)
+  const queryOptions = getExportKnxGroupAddressesQueryOptions(versionId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -681,17 +691,17 @@ export function useExportKnxGroupAddresses<TData = Awaited<ReturnType<typeof exp
 
 
 /**
- * One sheet per bus line or gateway (D423).
- * @summary Export the Zigbee device list (XLSX)
+ * One sheet per bus line or gateway, devices without one on a last sheet (D423).
+ * @summary Export the wireless device list (EUI-64, XLSX)
  */
-export const exportZigbeeDevices = (
+export const exportWirelessDevices = (
     versionId: string,
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<Blob>(
-      {url: `/api/versions/${versionId}/exports/zigbee-devices.xlsx`, method: 'GET',
+      {url: `/api/versions/${versionId}/exports/wireless-devices.xlsx`, method: 'GET',
         responseType: 'blob', signal
     },
       );
@@ -700,69 +710,69 @@ export const exportZigbeeDevices = (
 
 
 
-export const getExportZigbeeDevicesQueryKey = (versionId: string,) => {
+export const getExportWirelessDevicesQueryKey = (versionId: string,) => {
     return [
-    `/api/versions/${versionId}/exports/zigbee-devices.xlsx`
+    `/api/versions/${versionId}/exports/wireless-devices.xlsx`
     ] as const;
     }
 
 
-export const getExportZigbeeDevicesQueryOptions = <TData = Awaited<ReturnType<typeof exportZigbeeDevices>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData>>, }
+export const getExportWirelessDevicesQueryOptions = <TData = Awaited<ReturnType<typeof exportWirelessDevices>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportZigbeeDevicesQueryKey(versionId);
+  const queryKey =  queryOptions?.queryKey ?? getExportWirelessDevicesQueryKey(versionId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportZigbeeDevices>>> = ({ signal }) => exportZigbeeDevices(versionId, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportWirelessDevices>>> = ({ signal }) => exportWirelessDevices(versionId, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type ExportZigbeeDevicesQueryResult = NonNullable<Awaited<ReturnType<typeof exportZigbeeDevices>>>
-export type ExportZigbeeDevicesQueryError = ErrorType<Error>
+export type ExportWirelessDevicesQueryResult = NonNullable<Awaited<ReturnType<typeof exportWirelessDevices>>>
+export type ExportWirelessDevicesQueryError = ErrorType<Error>
 
 
-export function useExportZigbeeDevices<TData = Awaited<ReturnType<typeof exportZigbeeDevices>>, TError = ErrorType<Error>>(
- versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData>> & Pick<
+export function useExportWirelessDevices<TData = Awaited<ReturnType<typeof exportWirelessDevices>>, TError = ErrorType<Error>>(
+ versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof exportZigbeeDevices>>,
+          Awaited<ReturnType<typeof exportWirelessDevices>>,
           TError,
-          Awaited<ReturnType<typeof exportZigbeeDevices>>
+          Awaited<ReturnType<typeof exportWirelessDevices>>
         > , 'initialData'
       >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useExportZigbeeDevices<TData = Awaited<ReturnType<typeof exportZigbeeDevices>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData>> & Pick<
+export function useExportWirelessDevices<TData = Awaited<ReturnType<typeof exportWirelessDevices>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof exportZigbeeDevices>>,
+          Awaited<ReturnType<typeof exportWirelessDevices>>,
           TError,
-          Awaited<ReturnType<typeof exportZigbeeDevices>>
+          Awaited<ReturnType<typeof exportWirelessDevices>>
         > , 'initialData'
       >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useExportZigbeeDevices<TData = Awaited<ReturnType<typeof exportZigbeeDevices>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData>>, }
+export function useExportWirelessDevices<TData = Awaited<ReturnType<typeof exportWirelessDevices>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Export the Zigbee device list (XLSX)
+ * @summary Export the wireless device list (EUI-64, XLSX)
  */
 
-export function useExportZigbeeDevices<TData = Awaited<ReturnType<typeof exportZigbeeDevices>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportZigbeeDevices>>, TError, TData>>, }
+export function useExportWirelessDevices<TData = Awaited<ReturnType<typeof exportWirelessDevices>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportWirelessDevices>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getExportZigbeeDevicesQueryOptions(versionId,options)
+  const queryOptions = getExportWirelessDevicesQueryOptions(versionId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -774,3 +784,69 @@ export function useExportZigbeeDevices<TData = Awaited<ReturnType<typeof exportZ
 
 
 
+/**
+ * Stored numbers never change (D422); needs projects.write, refused on completed or cancelled projects.
+ * @summary Assign KNX group addresses to new needs and objects
+ */
+export const assignGroupAddresses = (
+    versionId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<GroupAddressSummary>(
+      {url: `/api/versions/${versionId}/group-addresses/assign`, method: 'POST', signal
+    },
+      );
+    }
+
+
+
+
+export const getAssignGroupAddressesMutationKey = () => ['assignGroupAddresses'] as const;
+
+export const getAssignGroupAddressesMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignGroupAddresses>>, TError,AssignGroupAddressesMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof assignGroupAddresses>>, TError,AssignGroupAddressesMutationVariables, TContext> => {
+
+const mutationKey = getAssignGroupAddressesMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignGroupAddresses>>, AssignGroupAddressesMutationVariables> = (props) => {
+          const {versionId} = props ?? {};
+
+          return  assignGroupAddresses(versionId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignGroupAddressesMutationResult = NonNullable<Awaited<ReturnType<typeof assignGroupAddresses>>>
+
+    export type AssignGroupAddressesMutationError = ErrorType<Error>
+    export type AssignGroupAddressesMutationVariables = {versionId: string}
+
+    /**
+ * @summary Assign KNX group addresses to new needs and objects
+ */
+export const useAssignGroupAddresses = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignGroupAddresses>>, TError,AssignGroupAddressesMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof assignGroupAddresses>>,
+        TError,
+        AssignGroupAddressesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAssignGroupAddressesMutationOptions(options), queryClient);
+    }

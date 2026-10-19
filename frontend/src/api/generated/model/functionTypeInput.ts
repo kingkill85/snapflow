@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FunctionTypeInputName } from './functionTypeInputName';
+import type { KNXObject } from './kNXObject';
 
 export interface FunctionTypeInput {
   /** A URL to the JSON Schema for this object. */
@@ -18,6 +19,11 @@ export interface FunctionTypeInput {
      * @maxLength 64
      */
   key: string;
+  /**
+     * KNX communication objects (keys unique); on update, left out keeps the stored ones (D294)
+     * @maxItems 32
+     */
+  knxObjects?: KNXObject[];
   /**
      * Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)
      * @maxItems 200
