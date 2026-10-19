@@ -30,20 +30,18 @@ test('exchange rates: no rate on create, fetch online, set by hand, proposal wit
   await expect(page.getByText('$10.00').first()).toBeVisible()
   await expect(page.getByText('€9.24')).toHaveCount(0)
 
-  // Proposals are refused until a rate exists.
+  // Proposals wait for a rate: Create is disabled, the notice links to the Pricing tab.
   await page.getByRole('tab', { name: 'Proposals' }).click()
   await expect(page.getByText(/has no exchange rate for EUR yet/).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Create proposal' }).click()
-  const create = page.getByRole('dialog', { name: 'Create proposal' })
-  await create.getByRole('button', { name: 'Create' }).click()
-  await expect(create.getByRole('alert')).toContainText('Fetch or set it on the BOM or Pricing tab first')
-  await create.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByRole('button', { name: 'Create proposal' })).toBeDisabled()
+  await page.getByRole('link', { name: 'Set the rate on the Pricing tab' }).click()
+  await expect(page.getByRole('tab', { name: 'Pricing' })).toHaveAttribute('aria-selected', 'true')
 
   // Update rate: the online rate, converted amounts appear.
-  await page.getByRole('tab', { name: 'Bill of materials' }).click()
   await bar.getByRole('button', { name: 'Update rate' }).click()
   await expect(bar).toContainText('1 USD = 0.9237 EUR')
   await expect(bar).toContainText('online,')
+  await page.getByRole('tab', { name: 'Bill of materials' }).click()
   await expect(page.getByText('€9.24').first()).toBeVisible()
 
   // Set rate by hand on the Pricing tab.
@@ -60,6 +58,7 @@ test('exchange rates: no rate on create, fetch online, set by hand, proposal wit
   // Now a proposal works; its footnote names the rate and its date.
   await page.getByRole('tab', { name: 'Proposals' }).click()
   await page.getByRole('button', { name: 'Create proposal' }).click()
+  const create = page.getByRole('dialog', { name: 'Create proposal' })
   const [download] = await Promise.all([page.waitForEvent('download'), create.getByRole('button', { name: 'Create' }).click()])
   await expect(create).toBeHidden()
   const doc = readZip(readFileSync(await download.path()))
