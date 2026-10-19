@@ -17,6 +17,7 @@ const dimmer: FunctionType = {
   name: { en: 'Dimmer', de: 'Dimmer' },
   allowsCircuit: false,
   loadTypeIds: [],
+  isActive: true,
   createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-18T10:00:00Z',
 }

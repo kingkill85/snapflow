@@ -34,6 +34,7 @@ export const plan = (n: number, over: Partial<Plan> = {}): Plan => ({
   image: { url: `/api/plans/${pid(500 + n)}/images/${pid(600 + n)}`, width: 1000, height: 800 },
   zoneCount: 0,
   placementCount: 0,
+  needCount: 0,
   createdAt: at,
   updatedAt: at,
   contentUpdatedAt: at,
@@ -48,6 +49,8 @@ export const content = (over: Partial<PlanContent> = {}): PlanContent => ({
   scale: null,
   zones: [],
   placements: [],
+  needs: [],
+  needWarnings: [],
   warnings: [],
   ...over,
 })

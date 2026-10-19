@@ -49,8 +49,8 @@ const orderLock int64 = 0x5f_72_74_6f_72_64
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// Line is one line of a template: n needs of a function type.
-type Line struct {
+// RoomTemplateLine is one line of a template: n needs of a function type.
+type RoomTemplateLine struct {
 	FunctionTypeID uuid.UUID  `json:"functionTypeId"`
 	Quantity       int32      `json:"quantity" doc:"1-100"`
 	PowerW         *float64   `json:"powerW" nullable:"true" doc:"Power per unit in W, 0-100000; null for unknown"`
@@ -60,24 +60,24 @@ type Line struct {
 
 // RoomTemplate is a template of a room's needs.
 type RoomTemplate struct {
-	ID             uuid.UUID    `json:"id"`
-	Key            string       `json:"key" example:"living_comfort"`
-	Name           i18n.Text    `json:"name"`
-	EquipmentLevel i18n.Text    `json:"equipmentLevel" doc:"Optional equipment level (\"Basic\", \"Comfort\"); {} for none"`
-	SortOrder      int32        `json:"sortOrder"`
-	IsActive       bool         `json:"isActive"`
-	Lines          []Line       `json:"lines" doc:"In order"`
-	CreatedAt      time.Time    `json:"createdAt"`
-	UpdatedAt      time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can            auth.Actions `json:"can"`
+	ID             uuid.UUID          `json:"id"`
+	Key            string             `json:"key" example:"living_comfort"`
+	Name           i18n.Text          `json:"name"`
+	EquipmentLevel i18n.Text          `json:"equipmentLevel" doc:"Optional equipment level (\"Basic\", \"Comfort\"); {} for none"`
+	SortOrder      int32              `json:"sortOrder"`
+	IsActive       bool               `json:"isActive"`
+	Lines          []RoomTemplateLine `json:"lines" doc:"In order"`
+	CreatedAt      time.Time          `json:"createdAt"`
+	UpdatedAt      time.Time          `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can            auth.Actions       `json:"can"`
 }
 
 type RoomTemplateInput struct {
-	Key            string     `json:"key" doc:"Lower snake case, 1-64 characters" example:"living_comfort"`
-	Name           i18n.Text  `json:"name" doc:"At most 100 characters; \"en\" is required"`
-	EquipmentLevel i18n.Text  `json:"equipmentLevel,omitempty" doc:"At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none"`
-	IsActive       bool       `json:"isActive"`
-	Lines          []Line     `json:"lines" maxItems:"100" doc:"At most 100"`
+	Key            string             `json:"key" doc:"Lower snake case, 1-64 characters" example:"living_comfort"`
+	Name           i18n.Text          `json:"name" doc:"At most 100 characters; \"en\" is required"`
+	EquipmentLevel i18n.Text          `json:"equipmentLevel,omitempty" doc:"At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none"`
+	IsActive       bool               `json:"isActive"`
+	Lines          []RoomTemplateLine `json:"lines" maxItems:"100" doc:"At most 100"`
 }
 
 type RoomTemplateUpdate struct {
@@ -323,7 +323,7 @@ func (s *Service) validate(ctx context.Context, in RoomTemplateInput) (RoomTempl
 		return in, err
 	}
 	if in.Lines == nil {
-		in.Lines = []Line{}
+		in.Lines = []RoomTemplateLine{}
 	}
 	for i := range in.Lines {
 		l := &in.Lines[i]
@@ -373,7 +373,7 @@ func levelOrNil(t i18n.Text) *i18n.Text {
 	return &t
 }
 
-func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []Line) error {
+func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []RoomTemplateLine) error {
 	if len(lines) == 0 {
 		return nil
 	}
@@ -400,14 +400,14 @@ func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []Li
 func templateOut(actor auth.Actor, r store.RoomTemplate, lines []store.RoomTemplateLine) RoomTemplate {
 	write := actor.Can(auth.PermCatalogWrite)
 	out := RoomTemplate{ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
-		Lines: make([]Line, len(lines)), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		Lines: make([]RoomTemplateLine, len(lines)), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Can: auth.Actions{Update: write, Delete: write}}
 	out.EquipmentLevel = i18n.Text{}
 	if r.EquipmentLevel != nil {
 		out.EquipmentLevel = *r.EquipmentLevel
 	}
 	for i, l := range lines {
-		out.Lines[i] = Line{FunctionTypeID: l.FunctionTypeID, Quantity: l.Quantity, PowerW: l.PowerW, LoadTypeID: l.LoadTypeID, Label: l.Label}
+		out.Lines[i] = RoomTemplateLine{FunctionTypeID: l.FunctionTypeID, Quantity: l.Quantity, PowerW: l.PowerW, LoadTypeID: l.LoadTypeID, Label: l.Label}
 	}
 	return out
 }

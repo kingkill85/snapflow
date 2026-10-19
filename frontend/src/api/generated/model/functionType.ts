@@ -13,6 +13,8 @@ export interface FunctionType {
   allowsCircuit: boolean;
   createdAt: string;
   id: string;
+  /** Inactive: kept on existing needs (with a warning), not chosen for new ones */
+  isActive: boolean;
   /** Stable identifier, lower snake case */
   key: string;
   /** The load types a need of this function may have; empty = any */

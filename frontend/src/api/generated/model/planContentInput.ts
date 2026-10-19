@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { PlanNeed } from './planNeed';
 import type { PlanPlacementInput } from './planPlacementInput';
 import type { PlanZone } from './planZone';
 
@@ -12,6 +13,8 @@ export interface PlanContentInput {
   readonly $schema?: string;
   /** contentUpdatedAt as last read; plan.stale otherwise */
   expectedContentUpdatedAt: string;
+  /** In order (the array order is stored); at most 2000. Left out keeps the stored needs (D294), dropping those of deleted zones */
+  needs?: PlanNeed[];
   /** In draw order (the array order is stored); at most 2000 */
   placements: PlanPlacementInput[];
   /**

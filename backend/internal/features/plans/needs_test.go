@@ -79,12 +79,25 @@ func TestNeeds(t *testing.T) {
 	// Validation.
 	bad := []any{
 		need(uuid.Nil, uuid.NewString(), &outer),
-		func() map[string]any { n := need(uuid.New(), f.Light, nil); n["quantity"] = 0; n["powerW"] = -1; return n }(),
+		func() map[string]any {
+			n := need(uuid.New(), f.Light, nil)
+			n["quantity"] = 0
+			n["powerW"] = -1
+			return n
+		}(),
 		func() map[string]any { n := need(uuid.New(), f.Blind, &outer); n["loadTypeId"] = f.LED; return n }(),
-		func() map[string]any { n := need(uuid.New(), f.Light, ptr(uuid.New())); n["label"] = string(make([]rune, 101)); return n }(),
+		func() map[string]any {
+			n := need(uuid.New(), f.Light, ptr(uuid.New()))
+			n["label"] = string(make([]rune, 101))
+			return n
+		}(),
 		func() map[string]any { n := symbol(uuid.New(), f.Light, 2000, 5); return n }(),
 		func() map[string]any { n := symbol(uuid.New(), f.Light, 5, 5); n["y"] = nil; return n }(),
-		func() map[string]any { n := need(uuid.New(), f.Light, &outer); n["loadTypeId"] = uuid.NewString(); return n }(),
+		func() map[string]any {
+			n := need(uuid.New(), f.Light, &outer)
+			n["loadTypeId"] = uuid.NewString()
+			return n
+		}(),
 	}
 	got := fields(t, saveNeeds(api, user.Cookie, getContent(t, api, user.Cookie, pl.ID), zones, bad))
 	want := []string{
