@@ -15,9 +15,12 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
+	"github.com/kingkill85/snapflow/backend/internal/features/proposals"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
+	"github.com/kingkill85/snapflow/backend/internal/platform/document"
+	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx"
 	// scaffold:imports
 )
 
@@ -55,6 +58,9 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users)
 	projectSvc.OnCopyVersion(planSvc.CopyVersion)
 	plans.Register(api, planSvc)
-	bom.Register(api, bom.NewService(deps.DB, projectSvc, planSvc, productSvc))
+	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
+	bom.Register(api, bomSvc)
+	proposals.Register(api, proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
+		document.NewRegistry(docx.Exporter{})))
 	// scaffold:features
 }

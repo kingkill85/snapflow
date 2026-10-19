@@ -128,7 +128,7 @@ func pricingOf(p store.UpsertPricingParams) Pricing {
 		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
 		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)), ServicesLabel: label,
 		ServicesLabelDefault: DefaultServicesLabel,
-		IntroText: textOrEmpty(p.IntroText), ClosingText: textOrEmpty(p.ClosingText),
+		IntroText:            textOrEmpty(p.IntroText), ClosingText: textOrEmpty(p.ClosingText),
 	}
 }
 

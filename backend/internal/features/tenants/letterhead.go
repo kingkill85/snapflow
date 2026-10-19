@@ -30,14 +30,14 @@ type Letterhead struct {
 	LogoURL     *string    `json:"logoUrl" nullable:"true" doc:"Download path of the logo; null for none"`
 }
 
-// LetterheadInput changes a letterhead (every field; empty clears).
+// LetterheadInput replaces a letterhead: a field left out or empty is cleared.
 type LetterheadInput struct {
-	CompanyName string     `json:"companyName" doc:"At most 200 characters"`
-	Address     string     `json:"address" doc:"At most 500 characters, may have several lines"`
-	Phone       string     `json:"phone" doc:"At most 50 characters"`
-	Email       string     `json:"email" doc:"A valid email address or empty"`
-	Website     string     `json:"website" doc:"At most 200 characters"`
-	LogoFileID  *uuid.UUID `json:"logoFileId" nullable:"true" doc:"An uploaded logo of this tenant, null for none"`
+	CompanyName string     `json:"companyName,omitempty" doc:"At most 200 characters"`
+	Address     string     `json:"address,omitempty" doc:"At most 500 characters, may have several lines"`
+	Phone       string     `json:"phone,omitempty" doc:"At most 50 characters"`
+	Email       string     `json:"email,omitempty" doc:"A valid email address or empty"`
+	Website     string     `json:"website,omitempty" doc:"At most 200 characters"`
+	LogoFileID  *uuid.UUID `json:"logoFileId,omitempty" nullable:"true" doc:"An uploaded logo of this tenant, null for none"`
 }
 
 // logoLimits: logos are small images (5 MB, 25 MP, stored at most 1600 px
