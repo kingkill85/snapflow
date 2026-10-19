@@ -30,7 +30,7 @@ type Plan struct {
 	Background image.Image
 	// Size is the pixel size the coordinates refer to when Background was
 	// scaled down already (zero: Background's own size).
-	Size image.Point
+	Size       image.Point
 	Zones      []Zone
 	Placements []Placement
 }

@@ -2,6 +2,7 @@ package proposals
 
 import (
 	"context"
+	"errors"
 	"image"
 	"net/http"
 	"strings"
@@ -154,7 +155,8 @@ func TestBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := s.acquire(context.Background())
-	if ae, ok := err.(*apperr.Error); !ok || ae.Status != http.StatusServiceUnavailable || ae.Code != "server.busy" {
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Status != http.StatusServiceUnavailable || ae.Code != "server.busy" {
 		t.Errorf("busy: %v", err)
 	}
 	s.generating.Release(1)
