@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Checks, OutputKind, PlanContent, Project, Wiring } from '@/api/generated/model'
+import type { Addresses, Checks, OutputKind, PlanContent, Project, Wiring } from '@/api/generated/model'
 import { problem, villa } from '@/features/projects/test-fixtures'
 import { renderRoutes } from '@/test/render'
 import { chooseOption } from '@/test/select'
@@ -48,7 +48,7 @@ vi.mock('./PlanCanvas', () => ({
 const project: Project = { ...villa, id: projectId, productTypeIds: [zigbeeId] }
 const lock = { userId: 'me', name: 'Admin', expiresAt: '2026-10-18T10:02:00Z', mine: true }
 
-type Serve = { project?: Project; content?: PlanContent; lockHeld?: boolean; wiring?: Wiring; checks?: Checks }
+type Serve = { project?: Project; content?: PlanContent; lockHeld?: boolean; wiring?: Wiring; checks?: Checks; addresses?: Addresses }
 
 const emptyWiring: Wiring = { items: [], needs: [], connections: [], can: { update: true } }
 const emptyChecks: Checks = {
@@ -62,7 +62,9 @@ const emptyChecks: Checks = {
 }
 
 /** The editor's endpoints; returns what was saved and how the lock was taken. */
-function serve({ project: p = project, content: c = content(), lockHeld = false, wiring = emptyWiring, checks = emptyChecks }: Serve = {}) {
+const noAddresses: Addresses = { versionId, items: [], lines: [], can: { update: true } }
+
+function serve({ project: p = project, content: c = content(), lockHeld = false, wiring = emptyWiring, checks = emptyChecks, addresses = noAddresses }: Serve = {}) {
   const saved: unknown[] = []
   const deleted: string[] = []
   const locks: string[] = []
@@ -77,6 +79,8 @@ function serve({ project: p = project, content: c = content(), lockHeld = false,
     http.get('/api/room-templates', () => HttpResponse.json({ items: [roomTemplate(1)] })),
     http.get('/api/versions/:v/wiring', () => HttpResponse.json(wiring)),
     http.get('/api/versions/:v/checks', () => HttpResponse.json(checks)),
+    http.get('/api/versions/:v/addresses', () => HttpResponse.json(addresses)),
+    http.get('/api/versions/:v/bus-lines', () => HttpResponse.json([])),
     http.get('/api/output-kinds', () => HttpResponse.json({ items: [outputKind] })),
     http.delete('/api/versions/:v/connections/:id', ({ params }) => {
       deleted.push(String(params.id))
@@ -193,6 +197,27 @@ describe('PlanEditorPage', () => {
     await user.click(within(inspector).getByRole('switch', { name: /Existing/ }))
     await waitFor(() => expect(saved).toHaveLength(1))
     expect(saved[0]).toMatchObject({ placements: [{ label: 'L', existing: true }] })
+  })
+
+  it.each([
+    [1, 'HDL 1.12'],
+    [2, 'No address yet'],
+  ])('shows the address of selected device %i read-only (D427)', async (n, text) => {
+    const device = { planId: plan(1).id, planKind: 'floorplan' as const, planName: 'Ground floor', label: '', productName: { en: 'Wall switch' }, variantName: {}, modelNumber: 'WS', variantId: catalog[0].id, systemId: zigbeeId, existing: false, gateway: false, powerSupply: false }
+    const addresses: Addresses = {
+      versionId,
+      items: [
+        { ...device, itemId: placement(1).id, scheme: 'hdl', address: { hdl: '1.12', pinned: true } },
+        { ...device, itemId: placement(2).id, scheme: 'ieee' },
+      ],
+      lines: [],
+      can: { update: true },
+    }
+    serve({ content: content({ placements: [placement(1, { variantId: catalog[0].id }), placement(2, { variantId: catalog[0].id, x: 400 })] }), addresses })
+    open(undefined, `?select=${placement(n).id}`)
+    const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
+    expect(await within(inspector).findByText(text)).toBeInTheDocument()
+    expect(within(inspector).queryByText(/automatic/)).not.toBeInTheDocument()
   })
 
   it('is read-only while someone else holds the lock, and takes it over', async () => {

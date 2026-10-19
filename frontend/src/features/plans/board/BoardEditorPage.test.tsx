@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import type { BoardContent, Checks, Project, Wiring } from '@/api/generated/model'
+import type { AddressedItem, BoardContent, Checks, Project, Wiring } from '@/api/generated/model'
 import { problem, villa } from '@/features/projects/test-fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
@@ -36,6 +36,23 @@ const content = (over: Partial<BoardContent> = {}): BoardContent => ({
   ...over,
 })
 
+const addressedItem: AddressedItem = {
+  planId: '',
+  itemId: '',
+  planKind: 'board',
+  planName: 'Main board',
+  label: 'D1',
+  productName: { en: 'Power supply' },
+  variantName: { en: 'PS' },
+  modelNumber: 'PS-1',
+  variantId: pid(1),
+  systemId: pid(96),
+  scheme: 'knx',
+  existing: false,
+  gateway: false,
+  powerSupply: false,
+}
+
 const emptyWiring: Wiring = { items: [], needs: [], connections: [], can: { update: true } }
 const emptyChecks: Checks = {
   versionId,
@@ -52,6 +69,8 @@ function serve(c = content(), p: Project = project, wiring: Wiring = emptyWiring
   server.use(
     http.get('/api/versions/:v/wiring', () => HttpResponse.json(wiring)),
     http.get('/api/versions/:v/checks', () => HttpResponse.json(checks)),
+    http.get('/api/versions/:v/addresses', () => HttpResponse.json({ versionId, items: [], lines: [], can: { update: true } })),
+    http.get('/api/versions/:v/bus-lines', () => HttpResponse.json([])),
     http.get('/api/function-types', () => HttpResponse.json({ items: [] })),
     http.get('/api/plans/:id', () => HttpResponse.json(board)),
     http.get('/api/plans/:id/board', () => HttpResponse.json(c)),
@@ -230,6 +249,16 @@ describe('BoardEditorPage', () => {
         candidates++
         return HttpResponse.json({ items: [], reason: 'complete' })
       }),
+      // The module's KNX address on its line (read-only, D427).
+      http.get('/api/versions/:v/addresses', () =>
+        HttpResponse.json({
+          versionId,
+          items: [{ ...addressedItem, planId: board.id, itemId: m, busLineId: pid(95), address: { knx: '1.1.5', pinned: false } }],
+          lines: [{ busLineId: pid(95), scheme: 'knx', prefix: '1.1', default: true, invalid: false }],
+          can: { update: true },
+        }),
+      ),
+      http.get('/api/versions/:v/bus-lines', () => HttpResponse.json([{ id: pid(95), versionId, productTypeId: pid(96), name: 'KNX 1', address: '', position: 1, devicesMax: null, createdAt: '', updatedAt: '' }])),
     )
     const user = userEvent.setup()
     const { router } = open(`?select=${m}`)
@@ -242,6 +271,8 @@ describe('BoardEditorPage', () => {
     const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
     const channels = await within(inspector).findByRole('region', { name: 'Channels' })
     expect(within(channels).getByText('Relay output: 0 of 2 free')).toBeInTheDocument()
+    expect(await within(inspector).findByText('KNX 1.1.5 · Line KNX 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('(automatic)')).toBeInTheDocument()
     // A channel with an error from the checks is marked, with the finding's text.
     const relay1 = within(channels).getByTestId(`channel-${relayKind}-1`)
     expect(within(relay1).getByText('1 error')).toBeInTheDocument()

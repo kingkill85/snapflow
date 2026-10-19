@@ -314,5 +314,17 @@
   "connections": {
     "unsaved": "Verbindungen nach dem nächsten Speichern",
     "label": "Verbindungen von {{name}}"
+  },
+  "address": {
+    "label": "Adresse",
+    "scheme": {
+      "knx": "KNX",
+      "hdl": "HDL",
+      "ieee": "IEEE"
+    },
+    "line": "Linie {{name}}",
+    "automatic": "automatisch",
+    "none": "Noch keine Adresse",
+    "noneOnLine": "Noch keine Adresse · Linie {{name}}"
   }
 }

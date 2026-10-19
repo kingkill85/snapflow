@@ -31,7 +31,7 @@ test('exchange rates: no rate on create, fetch online, set by hand, proposal wit
   await expect(page.getByText('€9.24')).toHaveCount(0)
 
   // Proposals wait for a rate: Create is disabled, the notice links to the Pricing tab.
-  await page.getByRole('tab', { name: 'Proposals' }).click()
+  await page.getByRole('tab', { name: 'Documents' }).click()
   await expect(page.getByText(/has no exchange rate for EUR yet/).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Create proposal' })).toBeDisabled()
   await page.getByRole('link', { name: 'Set the rate on the Pricing tab' }).click()
@@ -56,7 +56,7 @@ test('exchange rates: no rate on create, fetch online, set by hand, proposal wit
   await expect(page.getByText('€9.50').first()).toBeVisible()
 
   // Now a proposal works; its footnote names the rate and its date.
-  await page.getByRole('tab', { name: 'Proposals' }).click()
+  await page.getByRole('tab', { name: 'Documents' }).click()
   await page.getByRole('button', { name: 'Create proposal' }).click()
   const create = page.getByRole('dialog', { name: 'Create proposal' })
   const [download] = await Promise.all([page.waitForEvent('download'), create.getByRole('button', { name: 'Create' }).click()])

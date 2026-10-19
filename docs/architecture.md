@@ -156,6 +156,7 @@ What the installer gets (step 3e, `features/installation`, D419–D424), built o
 - **Manual** (D421): cover with letterhead, overview (lines, gateways, open findings), per board the drawing (`planimage.RenderBoard`), module list, channel table and free channels, per floorplan the plan with numbered need symbols (`planimage.Symbol`) and device labels with addresses, then per zone devices and needs with their connections; existing devices marked, no prices. **Labels** (D424): strips per board row at 17.5 mm per TE with cut lines.
 - **Exports** (no records): `GET …/exports/knx-group-addresses.csv` (generated group addresses, ETS 3/1 CSV, D422), `GET …/exports/{hdl-commissioning,zigbee-devices,knx-devices}.xlsx` (excelize, a sheet per line or gateway, D423).
 - LibreOffice converts manuals and labels in the `documents` CI job (`make test-documents`).
+- **Frontend** (D425–D428): the version tab **Documents** (`?tab=documents`, `?tab=proposals` still opens it) holds the proposals section unchanged, "Installation documents" (generate, list, download, delete) and "Programming exports" (download links, disabled with the reason when the version has no device of the system); addresses are edited and assigned in the Networks tab; the board and floorplan inspectors show a read-only address line.
 
 ## Extension points
 

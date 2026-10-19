@@ -368,7 +368,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         for (const lang of ['en', 'de'] as const) {
           await page.goto('/profile')
           await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
-          for (const tab of ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'proposals']) {
+          for (const tab of ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'documents']) {
             await page.goto(`/projects/${project.id}?tab=${tab}`)
             const tabs = page.getByRole('tablist').first()
             const selected = tabs.getByRole('tab', { selected: true })

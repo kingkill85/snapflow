@@ -17,6 +17,7 @@ import { NeedsTab } from '@/features/needs'
 import { ChecksTab } from '@/features/checks'
 import { NetworksTab } from '@/features/networks'
 import { PlansSection } from '@/features/plans'
+import { InstallationDocumentsSection, ProgrammingExportsSection } from '@/features/installation'
 import { ProposalsTab } from '@/features/proposals'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, Tabs, TextLink } from '@/components/ui'
 
@@ -209,15 +210,18 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
   )
 }
 
-const versionTabs = ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'proposals'] as const
+const versionTabs = ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'documents'] as const
 type VersionTab = (typeof versionTabs)[number]
 
-/** Plans / Needs / Networks / Checks / Bill of materials / Pricing / Proposals of a version; the tab is in the URL (?tab=bom, D236). */
+/** Old tab names still in links and bookmarks: the Proposals tab became Documents (D425). */
+const tabAliases: Record<string, VersionTab> = { proposals: 'documents' }
+
+/** Plans / Needs / Networks / Checks / Bill of materials / Pricing / Documents of a version; the tab is in the URL (?tab=bom, D236). */
 function VersionTabs({ project, version, canWrite }: { project: Project; version: ProjectVersion; canWrite: boolean }) {
   const { t } = useTranslation('bom')
   const [params, setParams] = useSearchParams()
   const param = params.get('tab')
-  const tab: VersionTab = versionTabs.find((k) => k === param) ?? 'plans'
+  const tab: VersionTab = versionTabs.find((k) => k === param) ?? (param ? tabAliases[param] : undefined) ?? 'plans'
   const select = (next: VersionTab) =>
     setParams(
       (p) => {
@@ -257,7 +261,18 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
           ),
         },
         // Generating needs projects.write but no active project (D259): update or reopen says so.
-        { key: 'proposals', label: t('tabs.proposals'), content: <ProposalsTab key={version.id} versionId={version.id} canGenerate={project.can.update || project.can.reopen} /> },
+        // Proposals, installation documents and programming exports in one tab (D425).
+        {
+          key: 'documents',
+          label: t('tabs.documents'),
+          content: (
+            <div key={version.id} className="space-y-6">
+              <ProposalsTab versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
+              <InstallationDocumentsSection versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
+              <ProgrammingExportsSection versionId={version.id} />
+            </div>
+          ),
+        },
       ]}
     />
   )

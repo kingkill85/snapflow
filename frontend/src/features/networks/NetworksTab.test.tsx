@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import type { Checks, Networks } from '@/api/generated/model'
+import type { Addresses, Checks, Networks } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { NetworksTab } from './NetworksTab'
-import { emptyNetworks, firstFloor, gatewayFirst, gatewayGround, knx, lineOne, lineTwo, networks, readOnlyNetworks, versionId } from './test-fixtures'
+import { actuator, addresses, doorSensor, emptyNetworks, firstFloor, gatewayFirst, gatewayGround, knx, lineOne, lineTwo, networks, readOnlyNetworks, versionId } from './test-fixtures'
 
 const noChecks: Checks = {
   versionId,
@@ -20,8 +20,9 @@ const noChecks: Checks = {
   findings: [],
 }
 
-function serve(data: Networks, checks: Checks = noChecks) {
+function serve(data: Networks, checks: Checks = noChecks, addr: Addresses = { ...addresses, can: { update: data.can.update } }) {
   server.use(
+    http.get('/api/versions/:versionId/addresses', () => HttpResponse.json(addr)),
     http.get('/api/versions/:versionId/networks', () => HttpResponse.json(data)),
     http.get('/api/versions/:versionId/checks', () => HttpResponse.json(checks)),
   )
@@ -207,5 +208,108 @@ describe('NetworksTab', () => {
     expect(within(gateway).getByText('OK')).toBeInTheDocument()
     expect(within(gateway).getByText('reserve 10 %')).toBeInTheDocument()
     await waitFor(() => expect(scrolled).toContain(`line-${lineOne.id}`))
+  })
+
+  describe('addresses', () => {
+    it('shows addresses with by-hand and automatic markers and line prefixes', async () => {
+      serve(networks)
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      const bus = await screen.findByRole('region', { name: 'KNX' })
+      const [supplyRow, actuatorRow] = rows(within(bus).getByRole('table', { name: 'KNX 1' }))
+      expect(await within(actuatorRow).findByText('1.1.1')).toBeInTheDocument()
+      expect(actuatorRow).toHaveTextContent('Automatic')
+      expect(within(supplyRow).queryByRole('button', { name: /Edit address/ })).not.toBeInTheDocument()
+      expect(rows(within(bus).getByRole('table', { name: 'KNX 2' }))[0]).toHaveTextContent('1.2.7By hand')
+      expect(within(bus).getByText('Device addresses 1.1.x')).toBeInTheDocument()
+      expect(within(bus).getByText('Device addresses 1.2.x (default, no line address entered)')).toBeInTheDocument()
+      const wireless = screen.getByRole('region', { name: 'Zigbee' })
+      expect(within(wireless).getByText('00124B001CA1B2C3')).toBeInTheDocument()
+      expect(document.getElementById(`device-${actuator.itemId}`)).toBeInTheDocument()
+    })
+
+    it('saves an edited address and shows the error of a refused one', async () => {
+      const user = userEvent.setup()
+      serve(networks)
+      const bodies: unknown[] = []
+      let refuse = true
+      server.use(
+        http.put('/api/versions/:versionId/addresses', async ({ request }) => {
+          bodies.push(await request.json())
+          if (refuse) return HttpResponse.json({ status: 422, code: 'address.taken', params: { address: '1.2.7' } }, { status: 422 })
+          return HttpResponse.json(addresses)
+        }),
+      )
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      await user.click(await screen.findByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
+      const input = screen.getByRole('textbox', { name: 'Address of Switch actuator 8-fold · Kitchen, Ground floor' })
+      await user.clear(input)
+      await user.type(input, '1.2.7{Enter}')
+      expect(await screen.findByText('Another device already has the address 1.2.7.')).toBeInTheDocument()
+      refuse = false
+      await user.clear(input)
+      await user.type(input, '1.1.9')
+      await user.click(screen.getByRole('button', { name: 'Save address' }))
+      await waitFor(() => expect(screen.queryByRole('textbox', { name: /Address of/ })).not.toBeInTheDocument())
+      expect(bodies).toEqual([
+        { addresses: [{ planId: actuator.planId, itemId: actuator.itemId, knx: '1.2.7' }] },
+        { addresses: [{ planId: actuator.planId, itemId: actuator.itemId, knx: '1.1.9' }] },
+      ])
+    })
+
+    it('clears an address by saving it empty (IEEE of a wireless device)', async () => {
+      const user = userEvent.setup()
+      serve(networks)
+      const bodies: unknown[] = []
+      server.use(
+        http.put('/api/versions/:versionId/addresses', async ({ request }) => {
+          bodies.push(await request.json())
+          return HttpResponse.json(addresses)
+        }),
+      )
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      await user.click(await screen.findByRole('button', { name: 'Edit address of Door sensor · Front door, Ground floor' }))
+      await user.type(screen.getByRole('textbox', { name: /Address of Door sensor/ }), '00:12:4b:00:1c:a1:b2:c4{Enter}')
+      await waitFor(() => expect(bodies).toEqual([{ addresses: [{ planId: doorSensor.planId, itemId: doorSensor.itemId, ieee: '00:12:4b:00:1c:a1:b2:c4' }] }]))
+    })
+
+    it('assigns all lines or one line and clears automatic addresses', async () => {
+      const user = userEvent.setup()
+      serve(networks)
+      const assigns: unknown[] = []
+      let cleared = ''
+      server.use(
+        http.post('/api/versions/:versionId/addresses/assign', async ({ request }) => {
+          assigns.push(await request.json())
+          return HttpResponse.json({ ...addresses, assigned: 2, unassigned: 1 })
+        }),
+        http.delete('/api/versions/:versionId/addresses', ({ request }) => {
+          cleared = new URL(request.url).search
+          return HttpResponse.json(addresses)
+        }),
+      )
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      await user.click(await screen.findByRole('button', { name: 'Assign addresses on KNX 2' }))
+      await user.click(screen.getAllByRole('button', { name: 'Assign addresses' })[0])
+      await waitFor(() => expect(assigns).toEqual([{ busLineIds: [lineTwo.id] }, {}]))
+      expect(await screen.findByText(/2 devices got an automatic address. 1 device is still without address/)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Clear automatic' }))
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Clear' }))
+      await waitFor(() => expect(cleared).toBe('?auto=true'))
+    })
+
+    it('warns about an unreadable line address', async () => {
+      serve(networks, noChecks, { ...addresses, lines: [{ ...addresses.lines[0], prefix: undefined, invalid: true }, addresses.lines[1]] })
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      expect(await screen.findByText('The line address “1.1” cannot be read: no automatic addresses on this line until it is corrected.')).toBeInTheDocument()
+    })
+
+    it('hides address controls when read only', async () => {
+      serve({ ...networks, can: { update: false } })
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      expect(await screen.findByText('1.1.1')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Assign addresses|Clear automatic|Edit address/ })).not.toBeInTheDocument()
+    })
   })
 })

@@ -167,6 +167,29 @@ describe('ChecksTab', () => {
     expect(links[2]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks`)
   })
 
+  it('links address findings to the device or line in the Networks tab', async () => {
+    const sensor = '00000000-0000-4000-8000-000000000099'
+    serveChecks({
+      checks: {
+        ...checks,
+        findings: [
+          { severity: 'error', code: 'address_duplicate', refs: { targetPlanId: floorId, itemId: sensor }, params: { label: 'PIR 1', address: '1.1.5', count: 2 } },
+          { severity: 'warning', code: 'address_outside_line', refs: { targetPlanId: floorId, itemId: sensor, busLineId: lineId }, params: { label: 'PIR 1', address: '1.2.5', line: 'KNX 1', prefix: '1.1' } },
+          { severity: 'info', code: 'address_missing', refs: { busLineId: lineId }, params: { name: 'KNX 1', count: 3 } },
+        ],
+      },
+    })
+    render()
+    const findings = await screen.findByRole('region', { name: 'Findings' })
+    expect(within(findings).getAllByText('Networks').length).toBeGreaterThan(0)
+    expect(within(findings).getByText('KNX 1: 3 devices without address')).toBeInTheDocument()
+    const links = within(findings).getAllByRole('link')
+    const tab = `/projects/${projectId}/versions/${versionId}?tab=networks`
+    expect(links[0]).toHaveAttribute('href', `${tab}#device-${sensor}`)
+    expect(links[1]).toHaveAttribute('href', `${tab}#device-${sensor}`)
+    expect(links[2]).toHaveAttribute('href', `${tab}#line-${lineId}`)
+  })
+
   it('auto-connects with a preview, re-previews on 409 and undoes the batch', async () => {
     serveChecks()
     let previews = 0

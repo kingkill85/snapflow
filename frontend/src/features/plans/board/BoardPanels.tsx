@@ -11,6 +11,7 @@ import { useDescribeCapabilities } from '@/features/products/describe-capabiliti
 import { useLocalized } from '@/i18n/localized'
 
 import type { PaletteProduct } from '../editor/catalog'
+import { AddressLine } from '../editor/AddressLine'
 import { Addons, ItemInstanceValues, ProductPicker, Warnings } from '../editor/Inspector'
 import { type BoardDocument, type BoardModuleDoc, enclosureSize, fitToEnclosure, type ModulePatch, newId, rowUsed, slotIn } from './board'
 import type { BoardEditorAction } from './board-state'
@@ -233,6 +234,8 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
         {variant && <p className="text-sm text-muted">{variant.modelNumber}</p>}
         <p className="text-sm text-muted">{t('board.position', { width: te(widthOf(m)), offset: te(m.offsetTe) })}</p>
       </div>
+      {/* Version data like the channels: shown with the wiring view (absent in isolated tests), D427. */}
+      {wiring && <AddressLine versionId={versionId} planId={planId} itemId={m.id} />}
       {editable && <ProductPicker products={products} current={variant?.productId} onPick={(product) => updateWidth({ variantId: product.defaultVariant.id, addonVariantIds: [], instanceValues: variant?.categoryId === product.defaultVariant.categoryId ? m.instanceValues : {} })} />}
       {(errors.get(m.id) ?? []).length > 0 && (
         <ul role="alert" className="space-y-1 rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">

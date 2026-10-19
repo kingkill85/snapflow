@@ -172,6 +172,7 @@ type Area = (typeof areas)[number]
 export function areaOf(code: string): Area {
   if (code === 'need_unconnected' || code === 'units_exceeded') return 'needs'
   if (code.startsWith('board_')) return 'boards'
+  if (code.startsWith('address_')) return 'networks'
   if (code.startsWith('bus_') || code.startsWith('network_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
   return 'connections'
 }

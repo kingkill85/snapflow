@@ -1,11 +1,19 @@
-import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eraser, Hash, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 
 import type { AssignmentInput, BusLineNetwork, Checks, BusMember, BusSystem, Gateway, Networks, WirelessDevice, WirelessSystem } from '@/api/generated/model'
 import { useGetChecks } from '@/api/generated/wiring/wiring'
-import { useDeleteBusLine, useGetNetworks, useReorderBusLines, useSetNetworkAssignments } from '@/api/generated/networks/networks'
+import {
+  useAssignAddresses,
+  useClearAutomaticAddresses,
+  useDeleteBusLine,
+  useGetAddresses,
+  useGetNetworks,
+  useReorderBusLines,
+  useSetNetworkAssignments,
+} from '@/api/generated/networks/networks'
 import {
   Badge,
   Button,
@@ -25,6 +33,8 @@ import {
 import { StatusChip } from '@/features/checks'
 import { useLocalized } from '@/i18n/localized'
 
+import { AddressCell } from './AddressCell'
+import { AddressesContext, useLinePrefix } from './addresses-context'
 import { LineDialog } from './LineDialog'
 import { useRefreshNetworks } from './refresh'
 
@@ -80,6 +90,11 @@ export function NetworksTab({ versionId }: { versionId: string }) {
   const assign = useSetNetworkAssignments()
   const reorder = useReorderBusLines()
   const checks = useGetChecks(versionId, { query: everyVisit })
+  const addresses = useGetAddresses(versionId, { query: everyVisit })
+  const assignAddresses = useAssignAddresses()
+  const clearAddresses = useClearAutomaticAddresses()
+  const [assigned, setAssigned] = useState<{ assigned: number; unassigned: number } | null>(null)
+  const [clearing, setClearing] = useState(false)
   // Links from the Checks tab (#line-<id>, #gateway-<itemId>): scroll there once the content is shown.
   const { hash } = useLocation()
   const loaded = query.isSuccess
@@ -122,30 +137,96 @@ export function NetworksTab({ versionId }: { versionId: string }) {
     }
   }
 
+  /** Automatic addresses for every line (no ids) or one line; pinned ones stay (D419). */
+  const runAssign = async (busLineIds?: string[]) => {
+    clearAddresses.reset()
+    setAssigned(null)
+    try {
+      const result = await assignAddresses.mutateAsync({ versionId, data: busLineIds ? { busLineIds } : {} })
+      setAssigned({ assigned: result.assigned, unassigned: result.unassigned })
+    } catch {
+      return // shown by ErrorMessage via assignAddresses.error
+    } finally {
+      await refresh()
+    }
+  }
+  const confirmClear = async () => {
+    try {
+      await clearAddresses.mutateAsync({ versionId, params: { auto: true } })
+    } catch {
+      return // shown in the dialog
+    }
+    setAssigned(null)
+    setClearing(false)
+    await refresh()
+  }
+
   if (data.busSystems.length === 0 && data.wirelessSystems.length === 0) return <EmptyState title={t('overview.empty')} />
 
+  const canAddress = !!addresses.data?.can.update
+  const addressBusy = assignAddresses.isPending || clearAddresses.isPending
   const actions: Actions | null = canUpdate
     ? { setAssignment: (a) => void setAssignment(a), move: (l, by) => void move(l, by), busy: assign.isPending || reorder.isPending }
     : null
+  const assignLine = canAddress && data.busSystems.length > 0 ? (lineId: string) => void runAssign([lineId]) : null
 
   return (
     <ChecksContext.Provider value={checks.data}>
+    <AddressesContext.Provider value={{ versionId, data: addresses.data }}>
       <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">{t('overview.title')}</h2>
-        <p className="text-sm text-muted">{t('overview.description')}</p>
-        {!canUpdate && <p className="text-sm text-muted">{t('overview.readOnly')}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-semibold">{t('overview.title')}</h2>
+          <p className="text-sm text-muted">{t('overview.description')}</p>
+          {!canUpdate && <p className="text-sm text-muted">{t('overview.readOnly')}</p>}
+        </div>
+        {canAddress && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" disabled={addressBusy} onClick={() => void runAssign()}>
+              <Hash aria-hidden /> {t('address.assignAll')}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={addressBusy}
+              onClick={() => {
+                clearAddresses.reset()
+                setClearing(true)
+              }}
+            >
+              <Eraser aria-hidden /> {t('address.clearAuto')}
+            </Button>
+          </div>
+        )}
       </div>
       {assign.error && <ErrorMessage error={assign.error} />}
       {reorder.error && <ErrorMessage error={reorder.error} />}
+      {addresses.error && <ErrorMessage error={addresses.error} />}
+      {assignAddresses.error && <ErrorMessage error={assignAddresses.error} />}
+      {assigned && (
+        <Notice tone={assigned.unassigned > 0 ? 'warning' : 'success'}>
+          {t('address.assigned', { count: assigned.assigned })}
+          {assigned.unassigned > 0 && <> {t('address.unassigned', { count: assigned.unassigned })}</>}
+        </Notice>
+      )}
 
       {data.busSystems.map((system) => (
-        <BusSystemSection key={system.productType.id} versionId={versionId} system={system} actions={actions} />
+        <BusSystemSection key={system.productType.id} versionId={versionId} system={system} actions={actions} assignLine={assignLine} assignBusy={addressBusy} />
       ))}
       {data.wirelessSystems.map((system) => (
         <WirelessSystemSection key={system.productType.id} system={system} actions={actions} />
       ))}
       </div>
+      <ConfirmDialog
+        open={clearing}
+        onOpenChange={setClearing}
+        title={t('address.clearTitle')}
+        message={t('address.clearMessage')}
+        confirmLabel={t('address.clearConfirm')}
+        pending={clearAddresses.isPending}
+        onConfirm={() => void confirmClear()}
+        error={<ErrorMessage error={clearAddresses.error} />}
+      />
+    </AddressesContext.Provider>
     </ChecksContext.Provider>
   )
 }
@@ -167,7 +248,20 @@ function SystemHeader({ system }: { system: Networks['busSystems'][number]['prod
   )
 }
 
-function BusSystemSection({ versionId, system, actions }: { versionId: string; system: BusSystem; actions: Actions | null }) {
+function BusSystemSection({
+  versionId,
+  system,
+  actions,
+  assignLine,
+  assignBusy,
+}: {
+  versionId: string
+  system: BusSystem
+  actions: Actions | null
+  /** Assigns automatic addresses on one line; null without addresses.update. */
+  assignLine: ((lineId: string) => void) | null
+  assignBusy: boolean
+}) {
   const { t } = useTranslation('networks')
   const { t: tCommon } = useTranslation()
   const localize = useLocalized()
@@ -210,6 +304,8 @@ function BusSystemSection({ versionId, system, actions }: { versionId: string; s
               first={index === 0}
               last={index === system.lines.length - 1}
               actions={actions}
+              onAssign={assignLine ? () => assignLine(line.id) : null}
+              assignBusy={assignBusy}
               onEdit={() => setDialog({ item: line })}
               onDelete={() => {
                 remove.reset()
@@ -254,22 +350,28 @@ type LineBlockProps = {
   first: boolean
   last: boolean
   actions: Actions | null
+  onAssign: (() => void) | null
+  assignBusy: boolean
   onEdit: () => void
   onDelete: () => void
 }
 
 /** One bus line: name, address, informational totals, controls and its members. */
-function LineBlock({ line, lines, first, last, actions, onEdit, onDelete }: LineBlockProps) {
+function LineBlock({ line, lines, first, last, actions, onAssign, assignBusy, onEdit, onDelete }: LineBlockProps) {
   const { t } = useTranslation('networks')
   const { t: tCommon } = useTranslation()
   const pinned = line.members.some((m) => m.pinned)
   const check = useContext(ChecksContext)?.busLines.find((b) => b.busLineId === line.id)
+  const prefix = useLinePrefix(line.id)
   return (
     <div className="scroll-mt-20 space-y-2" id={`line-${line.id}`} data-testid={`bus-line-${line.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-line pb-2">
         <div className="min-w-0 space-y-0.5">
           <h3 className="font-medium break-words">{line.name}</h3>
           {line.address && <p className="text-xs text-muted">{t('bus.address', { address: line.address })}</p>}
+          {prefix?.prefix && (
+            <p className="text-xs text-muted">{prefix.default ? t('address.prefixDefault', { prefix: prefix.prefix }) : t('address.prefix', { prefix: prefix.prefix })}</p>
+          )}
           <p className="text-sm text-muted tabular-nums">
             {line.devicesMax == null ? t('bus.devices', { count: line.deviceCount }) : t('bus.devicesOfMax', { count: line.deviceCount, max: line.devicesMax })} · {t('bus.current', { used: line.busCurrentUsedMa, supplied: line.busCurrentSuppliedMa })}
             {line.unknownCurrentCount > 0 && <> · {t('bus.unknownCurrent', { count: line.unknownCurrentCount })}</>}
@@ -284,23 +386,31 @@ function LineBlock({ line, lines, first, last, actions, onEdit, onDelete }: Line
             />
           )}
         </div>
-        {actions && (
+        {(actions || onAssign) && (
           <div className="flex flex-wrap items-center gap-2">
-            <IconButton label={t('bus.moveUp', { name: line.name })} icon={<ArrowUp />} disabled={first || actions.busy} onClick={() => actions.move(line, -1)} />
-            <IconButton label={t('bus.moveDown', { name: line.name })} icon={<ArrowDown />} disabled={last || actions.busy} onClick={() => actions.move(line, 1)} />
-            <RowAction icon={<Pencil aria-hidden />} label={tCommon('action.edit')} aria-label={t('bus.editLine', { name: line.name })} onClick={onEdit} />
-            <RowAction
-              icon={<Trash2 aria-hidden />}
-              variant="danger-quiet"
-              label={tCommon('action.delete')}
-              aria-label={t('bus.deleteLine', { name: line.name })}
-              title={pinned ? t('bus.deleteBlocked') : tCommon('action.delete')}
-              disabled={pinned}
-              onClick={onDelete}
-            />
+            {onAssign && (
+              <RowAction icon={<Hash aria-hidden />} label={t('address.assign')} aria-label={t('address.assignLine', { name: line.name })} disabled={assignBusy} onClick={onAssign} />
+            )}
+            {actions && (
+              <>
+                <IconButton label={t('bus.moveUp', { name: line.name })} icon={<ArrowUp />} disabled={first || actions.busy} onClick={() => actions.move(line, -1)} />
+                <IconButton label={t('bus.moveDown', { name: line.name })} icon={<ArrowDown />} disabled={last || actions.busy} onClick={() => actions.move(line, 1)} />
+                <RowAction icon={<Pencil aria-hidden />} label={tCommon('action.edit')} aria-label={t('bus.editLine', { name: line.name })} onClick={onEdit} />
+                <RowAction
+                  icon={<Trash2 aria-hidden />}
+                  variant="danger-quiet"
+                  label={tCommon('action.delete')}
+                  aria-label={t('bus.deleteLine', { name: line.name })}
+                  title={pinned ? t('bus.deleteBlocked') : tCommon('action.delete')}
+                  disabled={pinned}
+                  onClick={onDelete}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
+      {prefix?.invalid && <Notice tone="warning">{t('address.lineInvalid', { address: line.address })}</Notice>}
       <MemberTable label={line.name} members={line.members} lines={lines} actions={actions} lineId={line.id} />
     </div>
   )
@@ -343,6 +453,7 @@ function MemberTable({
   ]
   if (lineId !== undefined) {
     columns.push({ header: t('columns.assignment'), cell: (m) => <AssignmentBadge pinned={m.pinned} /> })
+    columns.push({ header: t('columns.address'), cell: (m) => <AddressCell device={m} name={names.full(m)} /> })
   }
   if (actions && lineId !== undefined) {
     columns.push({
@@ -437,7 +548,10 @@ function DeviceTable({
     { header: t('columns.label'), cell: (d) => d.label },
     { header: t('columns.places'), cell: (d) => <span className="tabular-nums">{places(d)}</span> },
   ]
-  if (gateway) columns.push({ header: t('columns.assignment'), cell: (d) => <AssignmentBadge pinned={d.pinned} /> })
+  if (gateway) {
+    columns.push({ header: t('columns.assignment'), cell: (d) => <AssignmentBadge pinned={d.pinned} /> })
+    columns.push({ header: t('columns.address'), cell: (d) => <AddressCell device={d} name={names.full(d)} /> })
+  }
   if (actions && gateway) {
     const value = gatewayKey(gateway)
     columns.push({

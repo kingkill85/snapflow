@@ -1,0 +1,42 @@
+{
+  "documents": {
+    "title": "Installation documents",
+    "description": "The installation manual and the channel labels for the installer, built from the plans, boards, connections and networks of this version. Prices never appear.",
+    "manual": "Installation manual (DOCX)",
+    "labels": "Channel labels (DOCX)",
+    "empty": "No installation documents yet.",
+    "emptyHint": "No installation documents yet. Generate the installation manual or the channel labels above.",
+    "created": "{{number}} created; the download has started. If it does not start:",
+    "deletedUser": "Deleted user",
+    "download": "Download",
+    "deleteTitle": "Delete document",
+    "deleteMessage": "Delete document “{{number}}” and its file? Its number is not used again.",
+    "kind": {
+      "installation_manual": "Installation manual",
+      "channel_labels": "Channel labels"
+    },
+    "column": {
+      "number": "Number",
+      "kind": "Document",
+      "createdAt": "Created",
+      "language": "Language",
+      "createdBy": "Created by"
+    }
+  },
+  "exports": {
+    "title": "Programming exports",
+    "description": "Data for programming the systems, from the current state of this version: group addresses for ETS and commissioning lists with device addresses.",
+    "knxGroupAddresses": "KNX group addresses (CSV)",
+    "knxGroupAddressesHint": "ETS group address import, three levels: floor / room / function.",
+    "hdlCommissioning": "HDL commissioning list (XLSX)",
+    "hdlCommissioningHint": "One sheet per bus line: devices, subnet and device ID, channels with their loads.",
+    "zigbeeDevices": "Zigbee device list (XLSX)",
+    "zigbeeDevicesHint": "One sheet per gateway: devices, IEEE addresses, channels with their loads.",
+    "knxDevices": "KNX device list (XLSX)",
+    "knxDevicesHint": "One sheet per bus line: devices, individual addresses, channels with their loads.",
+    "noKnx": "This version has no KNX devices.",
+    "noHdl": "This version has no HDL devices.",
+    "noWireless": "This version has no wireless devices.",
+    "download": "Download"
+  }
+}

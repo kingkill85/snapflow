@@ -1,4 +1,4 @@
-import type { BusMember, Gateway, Networks, WirelessDevice } from '@/api/generated/model'
+import type { AddressedItem, Addresses, BusMember, Gateway, Networks, WirelessDevice } from '@/api/generated/model'
 
 export const versionId = '00000000-0000-4000-8000-000000000301'
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -109,3 +109,38 @@ export const readOnlyNetworks: Networks = {
 }
 
 export const emptyNetworks: Networks = { versionId, busSystems: [], wirelessSystems: [], can: { update: true } }
+
+const addressed = (m: BusMember | WirelessDevice, extra: Partial<AddressedItem>): AddressedItem => ({
+  planId: m.planId,
+  itemId: m.itemId,
+  planKind: m.planKind,
+  planName: m.planName,
+  productName: m.productName,
+  variantName: m.variantName,
+  modelNumber: m.modelNumber,
+  variantId: m.variantId,
+  label: m.label,
+  existing: m.existing,
+  systemId: knx.id,
+  scheme: 'knx',
+  gateway: false,
+  powerSupply: false,
+  ...extra,
+})
+
+/** Addresses (3e): the actuator automatic, the sensor pinned, the door sensor without IEEE, the bulb with one. */
+export const addresses: Addresses = {
+  versionId,
+  items: [
+    addressed(supply, { busLineId: knx1, powerSupply: true }),
+    addressed(actuator, { busLineId: knx1, address: { knx: '1.1.1', pinned: false } }),
+    addressed(pinnedSensor, { busLineId: knx2, address: { knx: '1.2.7', pinned: true } }),
+    addressed(doorSensor, { systemId: zigbee.id, scheme: 'ieee' }),
+    addressed(pinnedBulb, { systemId: zigbee.id, scheme: 'ieee', address: { ieee: '00124B001CA1B2C3', pinned: true } }),
+  ],
+  lines: [
+    { busLineId: knx1, scheme: 'knx', prefix: '1.1', default: false, invalid: false },
+    { busLineId: knx2, scheme: 'knx', prefix: '1.2', default: true, invalid: false },
+  ],
+  can: { update: true },
+}
