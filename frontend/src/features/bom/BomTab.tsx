@@ -57,8 +57,9 @@ export function BomTab({
   const [zone, setZone] = useState(all);
   const [changesOpen, setChangesOpen] = useState(false);
 
-  if (query.isPending) return <Loading />;
   if (query.isError) return <ErrorMessage error={query.error} />;
+  // Not from a cached copy (D44): the manual-line dialogs send the lines' updatedAt.
+  if (query.isPending || !query.isFetchedAfterMount) return <Loading />;
   const bom = query.data;
   const planRef = bom.plans.find((p) => p.id === plan);
   const filter: Filter | undefined = planRef
@@ -143,6 +144,7 @@ export function BomTab({
       <ManualLinesSection
         versionId={versionId}
         lines={bom.manualLines}
+        currency={bom.totals.currency}
         canWrite={canWrite}
         productTypeIds={productTypeIds}
       />
@@ -306,6 +308,9 @@ function BomTable({
       {value}
     </span>
   );
+  // Per plan and manual: an empty cell for 0, so the real quantities stand out
+  // (and the phone card leaves the line out, D250); the total stays a number.
+  const part = (value: number) => (value === 0 ? null : quantity(value));
   if (filter) {
     const plan = bom.plans.find((p) => p.id === filter.planId);
     const zoneName =
@@ -329,14 +334,14 @@ function BomTable({
         key: `plan-${p.id}`,
         header: p.name,
         className: "text-right",
-        cell: (l) => quantity(l.quantities.plans[p.id] ?? 0),
+        cell: (l) => part(l.quantities.plans[p.id] ?? 0),
       });
     }
     columns.push(
       {
         header: t("bom.columns.manual"),
         className: "text-right",
-        cell: (l) => quantity(l.quantities.manual),
+        cell: (l) => part(l.quantities.manual),
       },
       {
         header: t("bom.columns.quantity"),

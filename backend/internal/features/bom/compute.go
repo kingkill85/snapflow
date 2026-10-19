@@ -9,6 +9,7 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
+	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 )
 
@@ -223,11 +224,22 @@ type currency struct {
 	rate money.Amount
 }
 
-func (st *state) currency() *currency {
-	if st.ref.Currency == "" || st.ref.Currency == "USD" {
+func (st *state) currency() *currency { return currencyOf(st.ref) }
+
+// currencyOf is the conversion of a version's amounts (nil for USD).
+func currencyOf(ref projects.VersionRef) *currency {
+	if ref.Currency == "" || ref.Currency == "USD" {
 		return nil
 	}
-	return &currency{code: st.ref.Currency, rate: money.MustParse(st.ref.ExchangeRate)}
+	return &currency{code: ref.Currency, rate: money.MustParse(ref.ExchangeRate)}
+}
+
+// convertLine is a line's unit price and total in the project currency (nil for USD).
+func (c *currency) convertLine(unit, total money.Amount) *NullableConvertedLine {
+	if c == nil {
+		return nil
+	}
+	return &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *c.convert(unit), Total: *c.convert(total)}}
 }
 
 func (c *currency) convert(usd money.Amount) *string {
@@ -290,9 +302,7 @@ func (st *state) bom() BOM {
 			UnitPrice: money.USD(unit), Quantity: a.total, Quantities: a.qty, Total: money.USD(total),
 			Status: &NullableLineStatus{LineStatus: status}, AddOnOf: a.addOnOf,
 		}
-		if cur != nil {
-			line.Converted = &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}}
-		}
+		line.Converted = cur.convertLine(unit, total)
 		out.Lines = append(out.Lines, line)
 
 		if group == nil || group.ProductType.ID != it.ProductTypeID {
@@ -328,9 +338,7 @@ func (st *state) bom() BOM {
 			Quantity: int64(m.Quantity), Total: money.USD(total), AddOnOf: []uuid.UUID{},
 			Quantities: LineQuantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}, Manual: int64(m.Quantity)},
 		}
-		if cur != nil {
-			line.Converted = &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}}
-		}
+		line.Converted = cur.convertLine(unit, total)
 		out.Lines = append(out.Lines, line)
 		if free == nil {
 			free = &BOMGroup{Kind: "freeText", Categories: []BOMCategoryGroup{}, Lines: []string{}}

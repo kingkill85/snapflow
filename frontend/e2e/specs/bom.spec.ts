@@ -52,7 +52,7 @@ test('bom: quantities per plan and zone, manual lines, pricing, update from cata
 
   // Quantities per plan; the existing placement is left out.
   const sensorRow = bomRow(page, sensorName)
-  await expect(sensorRow.getByRole('cell')).toHaveText(['', /White/, '3', '1', '0', '4', '$10.00', '$40.00'])
+  await expect(sensorRow.getByRole('cell')).toHaveText(['', /White/, '3', '1', '', '4', '$10.00', '$40.00'])
 
   // Filter by plan, then zone.
   await choose(page, 'Plan', 'Ground floor')
@@ -70,7 +70,7 @@ test('bom: quantities per plan and zone, manual lines, pricing, update from cata
   await add.getByRole('button', { name: new RegExp(hubName) }).click()
   await add.getByRole('button', { name: 'Create' }).click()
   await expect(add).toBeHidden()
-  await expect(bomRow(page, hubName).getByRole('cell')).toHaveText(['', new RegExp(hubName), '0', '0', '1', '1', '$20.00', '$20.00'])
+  await expect(bomRow(page, hubName).getByRole('cell')).toHaveText(['', new RegExp(hubName), '', '', '1', '1', '$20.00', '$20.00'])
 
   await page.getByRole('button', { name: 'Add free-text line' }).click()
   const free = page.getByRole('dialog', { name: 'Add free-text line' })
@@ -133,17 +133,20 @@ test('bom: a project in another currency shows converted amounts', async ({ page
 
   // EUR: every amount converted on its own from its USD value (D228).
   await page.goto(`/projects/${projects.EUR.id}?tab=bom`)
-  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '0', '3', '$10.00€9.20', '$30.00€27.60'])
+  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '', '3', '$10.00€9.20', '$30.00€27.60'])
   await expect(bomRow(page, 'Cabling')).toContainText('$12.34€11.35')
   const totals = page.getByRole('region', { name: 'Totals', exact: true })
   // Subtotal 42.34, discount 4.23, services 100, grand total 138.11.
   await expect(totals.getByTestId('total-subtotal')).toHaveText(/\$42\.34\s*€38\.95/)
-  await expect(totals.getByTestId('total-discount')).toHaveText(/-\$4\.23\s*-€3\.89/)
+  await expect(totals.getByTestId('total-discount')).toHaveText(/\u2212\$4\.23\s*\u2212€3\.89/)
   await expect(grandTotal(page)).toHaveText(/\$138\.11\s*€127\.06/)
   await expect(totals).toContainText('1 USD = 0.92 EUR')
+  // Manual lines carry the API's converted amounts too.
+  const manual = page.getByRole('table', { name: 'Manual lines' }).getByRole('row').filter({ hasText: 'Cabling' })
+  await expect(manual).toContainText('$12.34€11.35')
 
   // JPY has no minor unit.
   await page.goto(`/projects/${projects.JPY.id}?tab=bom`)
-  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '0', '3', '$10.00¥1,514', '$30.00¥4,541'])
+  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '', '3', '$10.00¥1,514', '$30.00¥4,541'])
   await expect(grandTotal(page)).toHaveText(/\$138\.11\s*¥20,906/)
 })

@@ -185,12 +185,14 @@ type ManualLine struct {
 	Kind      LineKind   `json:"kind" enum:"catalog,freeText"`
 	VariantID *uuid.UUID `json:"variantId" nullable:"true"`
 	// Snapshot of a catalog line (null for free text).
-	Snapshot  *NullableItemSnapshot `json:"snapshot" doc:"Null for free text"`
-	Name      string                `json:"name" doc:"Free text only"`
-	UnitPrice string                `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
-	Quantity  int32                 `json:"quantity"`
-	Note      string                `json:"note"`
-	UpdatedAt time.Time             `json:"updatedAt"`
+	Snapshot  *NullableItemSnapshot  `json:"snapshot" doc:"Null for free text"`
+	Name      string                 `json:"name" doc:"Free text only"`
+	UnitPrice string                 `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
+	Quantity  int32                  `json:"quantity"`
+	Total     string                 `json:"total" doc:"USD: unit price × quantity, rounded"`
+	Converted *NullableConvertedLine `json:"converted" doc:"In the project currency; null for USD projects"`
+	Note      string                 `json:"note"`
+	UpdatedAt time.Time              `json:"updatedAt"`
 }
 
 // ManualLineInput creates or changes a manual line: either variantId (a

@@ -12,12 +12,14 @@ import { ManualLineDialog, type ManualLineKindChoice } from './ManualLineDialog'
 type Props = {
   versionId: string
   lines: ManualLine[]
+  /** The project currency of the converted amounts. */
+  currency: string
   canWrite: boolean
   productTypeIds: string[]
 }
 
 /** The version's manual lines in their order: add (catalog product or free text), edit, reorder, delete. */
-export function ManualLinesSection({ versionId, lines, canWrite, productTypeIds }: Props) {
+export function ManualLinesSection({ versionId, lines, currency, canWrite, productTypeIds }: Props) {
   const { t } = useTranslation('bom')
   const { t: tCommon } = useTranslation()
   const money = useFormatMoney()
@@ -29,6 +31,13 @@ export function ManualLinesSection({ versionId, lines, canWrite, productTypeIds 
   const [editing, setEditing] = useState<string | null | undefined>(undefined)
   const [newKind, setNewKind] = useState<ManualLineKindChoice>('catalog')
   const [deleting, setDeleting] = useState<ManualLine | null>(null)
+  // USD and, for another project currency, the API's converted amount below it (like the BOM lines, D239).
+  const amount = (value: string, converted: string | undefined) => (
+    <span className="block text-right whitespace-nowrap tabular-nums max-md:text-left">
+      {money(value)}
+      {converted != null && <span className="block text-xs text-muted">{money(converted, currency)}</span>}
+    </span>
+  )
   const editItem = typeof editing === 'string' ? (lines.find((l) => l.id === editing) ?? null) : null
 
   const add = (kind: ManualLineKindChoice) => {
@@ -91,8 +100,9 @@ export function ManualLinesSection({ versionId, lines, canWrite, productTypeIds 
               </span>
             ),
           },
-          { header: t('manual.columns.unitPrice'), className: 'text-right', cell: (l) => <span className="whitespace-nowrap tabular-nums">{money(l.unitPrice)}</span> },
-          { header: t('manual.columns.quantity'), className: 'text-right', cell: (l) => <span className="tabular-nums">{l.quantity}</span> },
+          { header: t('manual.columns.quantity'), className: 'text-right', cell: (l) => <span className="block text-right tabular-nums max-md:text-left">{l.quantity}</span> },
+          { header: t('manual.columns.unitPrice'), className: 'text-right', cell: (l) => amount(l.unitPrice, l.converted?.unitPrice) },
+          { header: t('manual.columns.total'), className: 'text-right', cell: (l) => amount(l.total, l.converted?.total) },
           { header: t('manual.columns.note'), cell: (l) => (l.note ? <span className="whitespace-pre-line text-muted">{l.note}</span> : null) },
         ]}
         actions={

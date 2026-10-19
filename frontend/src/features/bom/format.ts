@@ -9,15 +9,29 @@ import { useLocalized } from '@/i18n/localized'
 export const usd = 'USD'
 
 /**
+ * How an amount's sign is shown: `auto` as it is, `signed` with "+" or "−"
+ * (a change), `negated` as a deduction (the discount, sent positive).
+ */
+export type MoneySign = 'auto' | 'signed' | 'negated'
+
+/**
  * Formats an API amount (decimal string) for the UI language, e.g. "$1,234.50"
  * or "1.234,50 €". Display only: the API has done every calculation (rule 1);
- * the decimal string goes to Intl as it is, so every digit is exact.
+ * the decimal string goes to Intl as it is, so every digit is exact. Negative
+ * amounts get a real minus sign (U+2212, as wide as "+" and the digits) instead
+ * of Intl's hyphen, which looks detached in tabular figures.
  */
 export function useFormatMoney() {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
-  return (value: string, currency: string = usd, signed = false) =>
-    new Intl.NumberFormat(language, { style: 'currency', currency, signDisplay: signed ? 'exceptZero' : 'auto' }).format(value as Intl.StringNumericLiteral)
+  return (value: string, currency: string = usd, sign: MoneySign = 'auto') => {
+    const format = new Intl.NumberFormat(language, { style: 'currency', currency, signDisplay: sign === 'auto' ? 'auto' : 'exceptZero' })
+    const v = sign === 'negated' ? (value.startsWith('-') ? value.slice(1) : `-${value}`) : value
+    return format
+      .formatToParts(v as Intl.StringNumericLiteral)
+      .map((p) => (p.type === 'minusSign' ? '\u2212' : p.value))
+      .join('')
+  }
 }
 
 /** The rate as the API sends it, with the UI language's digits (e.g. "0,92"). */

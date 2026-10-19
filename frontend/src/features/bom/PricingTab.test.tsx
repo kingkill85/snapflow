@@ -1,8 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
+import { getGetPricingQueryKey } from '@/api/generated/bom/bom'
 import type { Pricing } from '@/api/generated/model'
 import { problem } from '@/features/projects/test-fixtures'
 import { chooseOption } from '@/test/select'
@@ -70,6 +71,31 @@ describe('PricingTab', () => {
       servicesLabel: { en: 'Programming', de: 'Programmierung' },
       expectedUpdatedAt: bom.pricing.updatedAt,
     })
+  })
+
+  it('starts from the fresh pricing, not a cached copy (D44)', async () => {
+    serve()
+    let saved: { expectedUpdatedAt?: string } | undefined
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved = (await request.json()) as typeof saved
+        return HttpResponse.json(bom)
+      }),
+    )
+    const user = userEvent.setup()
+    // The fresh copy arrives a moment later: the form must wait for it.
+    server.use(
+      http.get('/api/versions/:versionId/pricing', async () => {
+        await delay(150)
+        return HttpResponse.json(bom.pricing)
+      }),
+    )
+    // A previous visit left an older pricing in the cache.
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />, {
+      prepare: (client) => client.setQueryData(getGetPricingQueryKey(versionId), { ...bom.pricing, updatedAt: '2026-10-18T09:00:00Z' }),
+    })
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved?.expectedUpdatedAt).toBe(bom.pricing.updatedAt))
   })
 
   it('keeps the default services label the default', async () => {

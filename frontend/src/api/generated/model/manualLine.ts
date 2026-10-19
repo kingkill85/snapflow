@@ -5,11 +5,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ManualLineKind } from './manualLineKind';
+import type { NullableConvertedLine } from './nullableConvertedLine';
 import type { NullableItemSnapshot } from './nullableItemSnapshot';
 
 export interface ManualLine {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** In the project currency; null for USD projects */
+  converted: NullableConvertedLine | null;
   id: string;
   kind: ManualLineKind;
   /** Free text only */
@@ -18,6 +21,8 @@ export interface ManualLine {
   quantity: number;
   /** Null for free text */
   snapshot: NullableItemSnapshot | null;
+  /** USD: unit price × quantity, rounded */
+  total: string;
   /** USD; a catalog line's comes from its snapshot */
   unitPrice: string;
   updatedAt: string;

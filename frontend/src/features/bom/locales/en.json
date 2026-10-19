@@ -74,6 +74,7 @@
       "item": "Item",
       "unitPrice": "Unit price",
       "quantity": "Qty",
+      "total": "Total",
       "note": "Note"
     }
   },

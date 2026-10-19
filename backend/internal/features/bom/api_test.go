@@ -198,6 +198,10 @@ func TestBOM(t *testing.T) {
 	resp = api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"name": "Cable", "unitPrice": "4.50", "quantity": 3, "note": "10 m"})
 	wantCode(t, resp, http.StatusCreated, "")
 	cable := decode[bom.ManualLine](t, resp)
+	// Manual lines carry their total and, for another currency, the converted amounts (like BOM lines).
+	if cable.Total != "13.50" || cable.Converted == nil || cable.Converted.UnitPrice != "4.05" || cable.Converted.Total != "12.15" {
+		t.Errorf("free-text manual line amounts: %+v %+v", cable, cable.Converted)
+	}
 
 	got := getBOM(t, api, admin, v)
 	main := line(t, got, c.Main)
@@ -663,8 +667,15 @@ func TestCurrencyDecimals(t *testing.T) {
 		{"KWD", "0.3075", "6.150", "18.450", "23.063"},
 	} {
 		v := newProject(t, api, admin, map[string]any{"name": "House " + tc.currency, "productTypeIds": []string{c.TypeID}, "currency": tc.currency, "exchangeRate": tc.rate}).Versions[0].ID
-		wantCode(t, api.Post("/api/versions/"+v.String()+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 3}), http.StatusCreated, "")
+		resp := api.Post("/api/versions/"+v.String()+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 3})
+		wantCode(t, resp, http.StatusCreated, "")
+		if ml := decode[bom.ManualLine](t, resp); ml.Total != "60.00" || ml.Converted == nil || ml.Converted.UnitPrice != tc.unit || ml.Converted.Total != tc.total {
+			t.Errorf("%s manual line: %+v %+v", tc.currency, ml, ml.Converted)
+		}
 		got := getBOM(t, api, admin, v)
+		if ml := got.ManualLines[0]; ml.Converted == nil || ml.Converted.Total != tc.total {
+			t.Errorf("%s manual line in the BOM: %+v", tc.currency, ml.Converted)
+		}
 		m := line(t, got, c.Main)
 		if m.Converted == nil || m.Converted.UnitPrice != tc.unit || m.Converted.Total != tc.total {
 			t.Errorf("%s line: %+v", tc.currency, m.Converted)

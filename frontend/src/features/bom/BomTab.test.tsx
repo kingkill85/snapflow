@@ -1,8 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
+import { getGetBomQueryKey } from '@/api/generated/bom/bom'
 import type { Bom } from '@/api/generated/model'
 import { problem } from '@/features/projects/test-fixtures'
 import { chooseOption } from '@/test/select'
@@ -51,10 +52,13 @@ describe('BomTab', () => {
     expect(rows[8]).toContain('Cabling')
     const cells = within(row('Battery')).getAllByRole('cell').map((c) => c.textContent)
     expect(cells.slice(2)).toEqual(['3', '1', '2', '6', '$2.50', '$15.00'])
+    // Per plan and manual, 0 is an empty cell; the total quantity stays a number.
+    const free = within(row('Cabling')).getAllByRole('cell').map((c) => c.textContent)
+    expect(free.slice(2)).toEqual(['', '', '1', '1', '$100.00', '$100.00'])
 
     const totals = screen.getByRole('region', { name: 'Totals' })
     expect(within(totals).getByTestId('total-subtotal')).toHaveTextContent('$255.00')
-    expect(within(totals).getByTestId('total-discount')).toHaveTextContent('-$25.50')
+    expect(within(totals).getByTestId('total-discount')).toHaveTextContent('\u2212$25.50')
     expect(within(totals).getByTestId('total-services')).toHaveTextContent('Programming$50.00')
     expect(within(totals).getByTestId('total-grandTotal')).toHaveTextContent('$279.50')
   })
@@ -91,6 +95,11 @@ describe('BomTab', () => {
     expect(within(row('Motion sensor')).getByText('€22.50')).toBeInTheDocument()
     expect(screen.getByTestId('total-grandTotal')).toHaveTextContent('$279.50€251.55')
     expect(screen.getByText('Exchange rate: 1 USD = 0.9 EUR')).toBeInTheDocument()
+    expect(screen.getByTestId('total-discount')).toHaveTextContent('\u2212$25.50\u2212€22.95')
+    // Manual lines show the API's converted amounts like the BOM lines.
+    const manual = screen.getByRole('table', { name: 'Manual lines' })
+    const cabling = within(manual).getByText('Cabling').closest('tr')!
+    expect(within(cabling).getAllByRole('cell').map((c) => c.textContent).slice(1, 4)).toEqual(['1', '$100.00€90.00', '$100.00€90.00'])
   })
 
   it('marks statuses and updates from the catalog', async () => {
@@ -276,6 +285,34 @@ describe('Manual lines', () => {
     expect(body).toEqual({ name: 'Cabling', unitPrice: '100.00', quantity: 2, note: 'Cat 7', expectedUpdatedAt: manualCabling.updatedAt })
   })
 
+  it('edits a line with the fresh updatedAt, not a cached one (D44)', async () => {
+    serve()
+    let body: { expectedUpdatedAt?: string } | undefined
+    server.use(
+      http.put('/api/versions/:versionId/manual-lines/:id', async ({ request }) => {
+        body = (await request.json()) as typeof body
+        return HttpResponse.json(manualCabling)
+      }),
+    )
+    const user = userEvent.setup()
+    // The fresh copy arrives a moment later: the form must wait for it.
+    server.use(
+      http.get('/api/versions/:versionId/bom', async () => {
+        await delay(150)
+        return HttpResponse.json(bom)
+      }),
+    )
+    // A previous visit left the line with an older updatedAt in the cache.
+    const cached = { ...bom, manualLines: bom.manualLines.map((l) => ({ ...l, updatedAt: '2026-10-18T09:00:00Z' })) }
+    renderWithProviders(<BomTab projectId={projectId} versionId={versionId} canWrite productTypeIds={[]} />, {
+      prepare: (client) => client.setQueryData(getGetBomQueryKey(versionId), cached),
+    })
+    await user.click(await screen.findByRole('button', { name: 'Edit Cabling' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit line' })
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(body?.expectedUpdatedAt).toBe(manualCabling.updatedAt))
+  })
+
   it('reorders and deletes lines', async () => {
     serve()
     let order: unknown
@@ -342,6 +379,7 @@ describe('Manual catalog line', () => {
     await user.type(within(dialog).getByRole('searchbox', { name: 'Search' }), 'moti')
     expect(within(dialog).queryByRole('button', { name: /Door/ })).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: /Motion/ }))
+    expect(within(dialog).getByRole('combobox', { name: 'Variant' })).toHaveTextContent('White ($10.00)')
     await chooseOption(user, within(dialog).getByRole('combobox', { name: 'Variant' }), /Black/)
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(posted).toEqual({ variantId: 'v2', quantity: 1, note: '' }))
@@ -379,6 +417,9 @@ describe('Manual catalog line', () => {
     await user.click(await screen.findByRole('button', { name: 'Add product' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add product' })
     await user.click(await within(dialog).findByRole('button', { name: /Door/ }))
+    // A single variant: no select, but its name and price.
+    expect(within(dialog).queryByRole('combobox', { name: 'Variant' })).not.toBeInTheDocument()
+    expect(within(dialog).getByTestId('chosen-variant')).toHaveTextContent('VariantStd ($10.00)')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
     expect(await within(dialog).findByText('This product is not available (inactive) and cannot be added.')).toBeInTheDocument()
   })

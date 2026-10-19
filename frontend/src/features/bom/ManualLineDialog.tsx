@@ -189,6 +189,11 @@ function ProductPicker({ productTypeIds, value, onChange, control, error }: Pick
   const products = paletteProducts(variants.data, productTypeIds)
   const groups = groupPalette(products, search, localize)
   const chosen = products.find((p) => p.variants.some((v) => v.id === value))
+  // The catalog price of the variant (USD, as the API sends it); a variant without a name shows only its price.
+  const variantLabel = (v: { name: Record<string, string>; price: string }) => {
+    const name = localize(v.name)
+    return name ? `${name} (${money(v.price)})` : money(v.price)
+  }
 
   return (
     <div className="space-y-3">
@@ -230,13 +235,20 @@ function ProductPicker({ productTypeIds, value, onChange, control, error }: Pick
         </p>
       )}
       {!chosen && !error && <p className="text-xs text-muted">{t('manual.chooseProduct')}</p>}
+      {/* One variant: no choice, but its name and price as the select would show them. */}
+      {chosen && chosen.variants.length === 1 && (
+        <p className="text-sm" data-testid="chosen-variant">
+          <span className="block text-xs font-medium text-muted">{t('manual.variant')}</span>
+          {variantLabel(chosen.variants[0])}
+        </p>
+      )}
       {chosen && chosen.variants.length > 1 && (
         <FormSelectField
           control={control}
           name="variantId"
           label={t('manual.variant')}
           error={error}
-          options={chosen.variants.map((v) => ({ value: v.id, label: `${localize(v.name)} (${money(v.price)})` }))}
+          options={chosen.variants.map((v) => ({ value: v.id, label: variantLabel(v) }))}
         />
       )}
     </div>

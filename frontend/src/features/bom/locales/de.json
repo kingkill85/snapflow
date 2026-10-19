@@ -74,6 +74,7 @@
       "item": "Position",
       "unitPrice": "Einzelpreis",
       "quantity": "Menge",
+      "total": "Gesamt",
       "note": "Notiz"
     }
   },

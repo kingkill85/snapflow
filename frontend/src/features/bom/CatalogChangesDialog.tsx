@@ -94,7 +94,7 @@ export function CatalogChangesDialog({ open, onOpenChange, versionId }: Props) {
           <>
             <p className="text-sm">
               {t('changes.totals', { before: money(query.data.grandTotal), after: money(query.data.grandTotalAfter) })}{' '}
-              <span className="text-muted">({money(query.data.effect, undefined, true)})</span>
+              <span className="text-muted">({money(query.data.effect, undefined, 'signed')})</span>
             </p>
             {applicable.length > 1 && (
               <CheckboxField
@@ -113,7 +113,7 @@ export function CatalogChangesDialog({ open, onOpenChange, versionId }: Props) {
                       checked={selected.has(item.variantId)}
                       disabled={!item.canApply}
                       onChange={(e) => toggle(item.variantId, e.target.checked)}
-                      hint={item.canApply ? t('changes.effect', { amount: money(item.effect, undefined, true) }) : undefined}
+                      hint={item.canApply ? t('changes.effect', { amount: money(item.effect, undefined, 'signed') }) : undefined}
                     />
                     {item.deleted && <Badge variant="danger">{t('changes.notApplicable')}</Badge>}
                     {!item.deleted && !item.available && <Badge variant="warning">{t('changes.unavailable')}</Badge>}

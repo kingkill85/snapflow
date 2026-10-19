@@ -88,6 +88,8 @@ export const manualCabling: ManualLine = {
   name: 'Cabling',
   unitPrice: '100.00',
   quantity: 1,
+  total: '100.00',
+  converted: null,
   note: 'Cat 7',
   updatedAt: '2026-10-19T10:00:00Z',
 }
@@ -99,6 +101,8 @@ export const manualBattery: ManualLine = {
   name: '',
   unitPrice: '2.50',
   quantity: 2,
+  total: '5.00',
+  converted: null,
   note: '',
   updatedAt: '2026-10-19T10:00:00Z',
 }
@@ -140,6 +144,7 @@ export const bom: Bom = {
 export const bomEur: Bom = {
   ...bom,
   lines: bom.lines.map((l) => (l.key === motion.key ? { ...l, converted: { unitPrice: '22.50', total: '90.00' } } : l)),
+  manualLines: bom.manualLines.map((l) => (l.id === manualCabling.id ? { ...l, converted: { unitPrice: '90.00', total: '90.00' } } : l)),
   totals: { ...bom.totals, currency: 'EUR', rate: '0.9', converted: { subtotal: '229.50', discount: '22.95', services: '45.00', grandTotal: '251.55' } },
 }
 

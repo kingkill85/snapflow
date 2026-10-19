@@ -2647,6 +2647,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "converted": {
+            "$ref": "#/components/schemas/NullableConvertedLine",
+            "description": "In the project currency; null for USD projects"
+          },
           "id": {
             "type": "string"
           },
@@ -2672,6 +2676,10 @@
             "$ref": "#/components/schemas/NullableItemSnapshot",
             "description": "Null for free text"
           },
+          "total": {
+            "description": "USD: unit price × quantity, rounded",
+            "type": "string"
+          },
           "unitPrice": {
             "description": "USD; a catalog line's comes from its snapshot",
             "type": "string"
@@ -2695,6 +2703,8 @@
           "name",
           "unitPrice",
           "quantity",
+          "total",
+          "converted",
           "note",
           "updatedAt"
         ],

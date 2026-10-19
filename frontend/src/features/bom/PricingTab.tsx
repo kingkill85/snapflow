@@ -103,8 +103,9 @@ type Props = {
  */
 export function PricingTab({ versionId, canWrite }: Props) {
   const query = useGetPricing(versionId, { query: fresh })
-  if (query.isPending) return <Loading />
   if (query.isError) return <ErrorMessage error={query.error} />
+  // Never start the form from a cached copy (D44): its updatedAt may be old, and the first save would be stale.
+  if (query.isPending || !query.isFetchedAfterMount) return <Loading />
   return <PricingForm versionId={versionId} canWrite={canWrite} pricing={query.data} refetch={() => void query.refetch()} />
 }
 
