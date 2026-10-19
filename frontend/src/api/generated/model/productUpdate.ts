@@ -6,7 +6,6 @@
  */
 import type { ProductUpdateAttributes } from './productUpdateAttributes';
 import type { ProductUpdateDescription } from './productUpdateDescription';
-import type { ProductUpdateMounting } from './productUpdateMounting';
 import type { ProductUpdateName } from './productUpdateName';
 
 export interface ProductUpdate {
@@ -23,8 +22,8 @@ export interface ProductUpdate {
   isActive: boolean;
   /** Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   modelNumber: string;
-  /** Override of the category's mounting; leave out for the category's */
-  mounting?: ProductUpdateMounting;
+  /** Override of the category's mounting: floorplan, board or both; empty for the category's. On update, left out keeps the stored override (D294) */
+  mounting?: string;
   /** At most 200 characters; "en" is required */
   name: ProductUpdateName;
   /** The system or product line; must be active (product.type_inactive), except the type the product already has */

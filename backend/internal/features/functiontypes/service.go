@@ -36,8 +36,8 @@ type FunctionType struct {
 type FunctionTypeInput struct {
 	Key           string      `json:"key" minLength:"1" maxLength:"64" example:"dimmer"`
 	Name          i18n.Text   `json:"name" doc:"Display name per locale; \"en\" is required"`
-	AllowsCircuit bool        `json:"allowsCircuit,omitempty" doc:"Several needs may share one channel (default false)"`
-	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any"`
+	AllowsCircuit *bool       `json:"allowsCircuit,omitempty" doc:"Several needs may share one channel (default false); on update, left out keeps the stored value (D294)"`
+	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)"`
 }
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -120,7 +120,7 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 	var row store.FunctionType
 	err := s.inTx(ctx, func(q *store.Queries) error {
 		var err error
-		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name, AllowsCircuit: in.AllowsCircuit})
+		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name, AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit})
 		if err != nil {
 			return err
 		}
@@ -144,8 +144,17 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	var row store.FunctionType
 	err := s.inTx(ctx, func(q *store.Queries) error {
 		var err error
-		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name, AllowsCircuit: in.AllowsCircuit})
-		if err != nil {
+		// Left-out flags keep the stored values (D294).
+		allowsCircuit := in.AllowsCircuit
+		if allowsCircuit == nil {
+			current, err := q.GetFunctionType(ctx, id)
+			if err != nil {
+				return err
+			}
+			allowsCircuit = &current.AllowsCircuit
+		}
+		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name, AllowsCircuit: *allowsCircuit})
+		if err != nil || in.LoadTypeIDs == nil {
 			return err
 		}
 		if err := q.DeleteFunctionTypeLoadTypes(ctx, id); err != nil {
@@ -155,6 +164,13 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	})
 	if err != nil {
 		return FunctionType{}, mapErr(err, in.Key)
+	}
+	if in.LoadTypeIDs == nil {
+		loads, err := s.loadTypes(ctx)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		return fromRow(row, loads[id]), nil
 	}
 	return fromRow(row, in.LoadTypeIDs), nil
 }

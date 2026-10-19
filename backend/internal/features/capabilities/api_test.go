@@ -146,10 +146,16 @@ func TestFunctionTypeExtension(t *testing.T) {
 	if !got.AllowsCircuit || len(got.LoadTypeIDs) != 1 || got.LoadTypeIDs[0] != led.ID {
 		t.Errorf("read %+v", got)
 	}
+	// Left out keeps the stored values (D294); false and [] clear them.
 	upd := decode[functiontypes.FunctionType](t, api.Put("/api/function-types/"+ft.ID.String(), api.Admin.Cookie,
-		map[string]any{"key": "dimmer", "name": name("Dimmer")}))
+		map[string]any{"key": "dimmer", "name": name("Dimmer 2")}))
+	if !upd.AllowsCircuit || len(upd.LoadTypeIDs) != 1 || upd.Name["en"] != "Dimmer 2" {
+		t.Errorf("updated without flags %+v", upd)
+	}
+	upd = decode[functiontypes.FunctionType](t, api.Put("/api/function-types/"+ft.ID.String(), api.Admin.Cookie,
+		map[string]any{"key": "dimmer", "name": name("Dimmer"), "allowsCircuit": false, "loadTypeIds": []any{}}))
 	if upd.AllowsCircuit || len(upd.LoadTypeIDs) != 0 {
-		t.Errorf("updated %+v", upd)
+		t.Errorf("cleared %+v", upd)
 	}
 	p := assertError(t, api.Put("/api/function-types/"+ft.ID.String(), api.Admin.Cookie,
 		map[string]any{"key": "dimmer", "name": name("Dimmer"), "loadTypeIds": []any{ft.ID}}), http.StatusUnprocessableEntity, "validation.failed")
@@ -299,8 +305,19 @@ func TestProductTypeSettings(t *testing.T) {
 	if got.ReservePercent != 25 || *got.DefaultBusCurrentMa != 10 || *got.BusDevicesMax != 64 {
 		t.Errorf("updated %+v", got)
 	}
+	// Left out keeps the stored settings (D294); 0 clears the optional ones.
+	got = decode[producttypes.ProductType](t, api.Put("/api/product-types/"+pt.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "knx", "name": name("KNX 2"), "isActive": true, "expectedUpdatedAt": got.UpdatedAt}))
+	if got.ReservePercent != 25 || got.DefaultBusCurrentMa == nil || *got.DefaultBusCurrentMa != 10 || got.BusDevicesMax == nil || *got.BusDevicesMax != 64 {
+		t.Errorf("kept %+v", got)
+	}
+	got = decode[producttypes.ProductType](t, api.Put("/api/product-types/"+pt.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "knx", "name": name("KNX"), "isActive": true, "defaultBusCurrentMa": 0, "busDevicesMax": 0, "expectedUpdatedAt": got.UpdatedAt}))
+	if got.ReservePercent != 25 || got.DefaultBusCurrentMa != nil || got.BusDevicesMax != nil {
+		t.Errorf("cleared %+v", got)
+	}
 	p := assertError(t, api.Post("/api/product-types", api.Admin.Cookie, map[string]any{"key": "hdl", "name": name("HDL"), "isActive": true,
-		"reservePercent": 95, "defaultBusCurrentMa": 0}), http.StatusUnprocessableEntity, "validation.failed")
+		"reservePercent": 95, "defaultBusCurrentMa": -1}), http.StatusUnprocessableEntity, "validation.failed")
 	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.defaultBusCurrentMa validation.range", "body.reservePercent validation.range"}) {
 		t.Errorf("fields %v", got)
 	}
@@ -378,6 +395,13 @@ func TestCategoryFieldLinks(t *testing.T) {
 		"body.attributes[1].fieldKey attribute.field_not_found"}) {
 		t.Errorf("fields %v", got)
 	}
+	// Left out on update keeps the stored mounting (D294).
+	kept := decode[categories.Category](t, api.Put("/api/categories/"+w.category.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "actuators", "name": name("Actuators 2"), "isActive": true, "attributes": w.category.Attributes,
+		"instanceAttributes": []any{}, "expectedUpdatedAt": w.category.UpdatedAt}))
+	if kept.Mounting != "board" || kept.Name["en"] != "Actuators 2" {
+		t.Errorf("kept mounting %q %v", kept.Mounting, kept.Name)
+	}
 	// Default mounting.
 	c := create[categories.Category](t, api, "/api/categories", map[string]any{"key": "plain", "name": name("Plain"), "isActive": true,
 		"attributes": []any{}, "instanceAttributes": []any{}})
@@ -447,6 +471,18 @@ func TestCapabilities(t *testing.T) {
 	}
 	assertError(t, api.Post("/api/products", api.Admin.Cookie, map[string]any{"productTypeId": w.knx.ID, "categoryId": w.category.ID,
 		"modelNumber": "X", "name": name("X"), "mounting": "roof"}), http.StatusUnprocessableEntity, "validation.failed")
+	// Left out on update keeps the override (D294); empty clears it.
+	zb := map[string]any{"productTypeId": w.zigbee.ID, "categoryId": w.category.ID, "modelNumber": "ZB-1", "name": name("ZB 1"),
+		"isActive": true, "attributes": map[string]any{"place": 1, "bus_ma": 12}, "expectedUpdatedAt": z.UpdatedAt}
+	z = decode[products.Product](t, api.Put("/api/products/"+z.ID.String(), api.Admin.Cookie, zb))
+	if z.Mounting != "floorplan" || z.Name["en"] != "ZB 1" {
+		t.Errorf("kept override %q", z.Mounting)
+	}
+	zb["mounting"], zb["expectedUpdatedAt"] = "", z.UpdatedAt
+	z = decode[products.Product](t, api.Put("/api/products/"+z.ID.String(), api.Admin.Cookie, zb))
+	if z.Mounting != "" || z.Capabilities.Mounting != "board" {
+		t.Errorf("cleared override %q %q", z.Mounting, z.Capabilities.Mounting)
+	}
 	// A variant adds its own values (motor type is per variant).
 	resp := api.Post("/api/products/"+p.ID.String()+"/variants", api.Admin.Cookie, map[string]any{"name": name("AC"), "price": "10",
 		"isActive": true, "attributes": map[string]any{"motor": "ac"}})

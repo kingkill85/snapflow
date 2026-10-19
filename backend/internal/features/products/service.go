@@ -237,7 +237,7 @@ func (s *Service) createProduct(ctx context.Context, in ProductInput, known Know
 		var err error
 		row, err = q.CreateProduct(ctx, store.CreateProductParams{
 			ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
-			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: strPtr(in.Mounting),
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: mountingPtr(in.Mounting),
 		})
 		return err
 	})
@@ -275,6 +275,10 @@ func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpd
 	if !current.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
 		return store.Product{}, errProductStale()
 	}
+	if in.Mounting == nil {
+		// Left out keeps the stored override (D294).
+		in.Mounting = current.Mounting
+	}
 	if !raw {
 		in.ProductInput, err = s.validateProduct(ctx, in.ProductInput, &current, known)
 		if err != nil {
@@ -286,7 +290,7 @@ func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpd
 		var err error
 		row, err = q.UpdateProduct(ctx, store.UpdateProductParams{
 			ID: id, ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
-			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: strPtr(in.Mounting),
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: mountingPtr(in.Mounting),
 			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
@@ -1185,6 +1189,14 @@ func textPtr(t i18n.Text) *i18n.Text {
 		return nil
 	}
 	return &t
+}
+
+// mountingPtr is the stored form of a mounting override: nil for none.
+func mountingPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	return strPtr(*s)
 }
 
 func strPtr(s string) *string {

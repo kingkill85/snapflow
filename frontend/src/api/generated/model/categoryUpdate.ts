@@ -24,7 +24,7 @@ export interface CategoryUpdate {
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;
-  /** Default floorplan */
+  /** Default floorplan; on update, left out keeps the stored value (D294) */
   mounting?: CategoryUpdateMounting;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: CategoryUpdateName;

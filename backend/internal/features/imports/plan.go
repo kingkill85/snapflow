@@ -751,7 +751,7 @@ func (p *planner) planProduct(g *group) {
 	if g.existing != nil {
 		after.Name, after.Description = cloneText(g.existing.Name), cloneText(g.existing.Description)
 		after.Attributes = cloneValues(g.existing.Attributes)
-		after.Mounting = g.existing.Mounting
+		after.Mounting = &g.existing.Mounting
 		existing = &products.Existing{ProductTypeID: g.existing.ProductTypeID, CategoryID: g.existing.CategoryID, Attributes: g.existing.Attributes}
 	}
 	for locale, i := range p.idx.pname {
@@ -763,7 +763,7 @@ func (p *planner) planProduct(g *group) {
 	if i := p.idx.mounting; i >= 0 {
 		value := p.cell(first.row, i)
 		if m, ok := mountingValue(value); ok {
-			after.Mounting = m
+			after.Mounting = &m
 		} else {
 			p.issue("error", first, i, "import.mounting_unknown", map[string]any{"value": products.CollapseSpace(value)})
 		}
@@ -1437,7 +1437,7 @@ func (p *planner) productChanges(before *products.CatalogProduct, after products
 	textChanges(add, "name", b.Name, after.Name)
 	textChanges(add, "description", b.Description, after.Description)
 	valueChanges(add, b.Attributes, after.Attributes)
-	add("mounting", nilIfEmpty(b.Mounting), nilIfEmpty(after.Mounting))
+	add("mounting", nilIfEmpty(b.Mounting), nilIfEmpty(deref(after.Mounting)))
 	if before == nil || !before.IsActive {
 		add("isActive", activeBefore(before != nil, b.IsActive), true)
 	}
@@ -1534,4 +1534,11 @@ func cloneValues(v attrschema.Values) attrschema.Values {
 		out[k] = x
 	}
 	return out
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

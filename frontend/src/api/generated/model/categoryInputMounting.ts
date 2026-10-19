@@ -6,7 +6,7 @@
  */
 
 /**
- * Default floorplan
+ * Default floorplan; on update, left out keeps the stored value (D294)
  */
 export type CategoryInputMounting = typeof CategoryInputMounting[keyof typeof CategoryInputMounting];
 

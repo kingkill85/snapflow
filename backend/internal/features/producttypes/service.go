@@ -51,9 +51,9 @@ type ProductTypeInput struct {
 	Abbreviation        string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
 	Color               string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
 	IsActive            bool      `json:"isActive"`
-	DefaultBusCurrentMa *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; leave out for none"`
-	ReservePercent      *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20"`
-	BusDevicesMax       *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; leave out for none"`
+	DefaultBusCurrentMa *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	ReservePercent      *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20; on update, left out keeps the stored value (D294)"`
+	BusDevicesMax       *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -170,6 +170,25 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
 		return ProductType{}, err
+	}
+	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil {
+		// Left-out settings keep the stored values (D294).
+		current, err := s.q.GetProductType(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ProductType{}, apperr.NotFound("product_type.not_found")
+		}
+		if err != nil {
+			return ProductType{}, err
+		}
+		if in.DefaultBusCurrentMa == nil {
+			in.DefaultBusCurrentMa = orZero(current.DefaultBusCurrentMa)
+		}
+		if in.ReservePercent == nil {
+			in.ReservePercent = &current.ReservePercent
+		}
+		if in.BusDevicesMax == nil {
+			in.BusDevicesMax = orZero(current.BusDevicesMax)
+		}
 	}
 	in.ProductTypeInput, err = validate(in.ProductTypeInput)
 	if err != nil {
@@ -305,6 +324,8 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 			errs = append(errs, apperr.Field(loc, "validation.range", "out of range").With("min", lo).With("max", hi))
 		}
 	}
+	// 0 means none (stored as NULL).
+	in.DefaultBusCurrentMa, in.BusDevicesMax = noneIfZero(in.DefaultBusCurrentMa), noneIfZero(in.BusDevicesMax)
 	rangeErr("body.defaultBusCurrentMa", in.DefaultBusCurrentMa, 1, 100000)
 	rangeErr("body.reservePercent", in.ReservePercent, 0, 90)
 	rangeErr("body.busDevicesMax", in.BusDevicesMax, 1, 100000)
@@ -365,4 +386,20 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 		pt.Color = *r.Color
 	}
 	return pt
+}
+
+// orZero is v, or 0 (none) when nil.
+func orZero(v *int32) *int32 {
+	if v == nil {
+		return ptr(int32(0))
+	}
+	return v
+}
+
+// noneIfZero is nil for 0 (none), else v.
+func noneIfZero(v *int32) *int32 {
+	if v != nil && *v == 0 {
+		return nil
+	}
+	return v
 }

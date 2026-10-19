@@ -156,7 +156,7 @@ type ProductInput struct {
 	Description   i18n.Text         `json:"description,omitempty" doc:"At most 5000 characters; if set, \"en\" is required"`
 	Attributes    attrschema.Values `json:"attributes,omitempty" doc:"Product-scope values by key; stale values are kept only if they are sent back"`
 	IsActive      bool              `json:"isActive"`
-	Mounting      string            `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"Override of the category's mounting; leave out for the category's"`
+	Mounting      *string           `json:"mounting,omitempty" doc:"Override of the category's mounting: floorplan, board or both; empty for the category's. On update, left out keeps the stored override (D294)"`
 }
 
 type ProductUpdate struct {

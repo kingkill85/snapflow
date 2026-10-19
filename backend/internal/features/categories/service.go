@@ -53,7 +53,7 @@ type CategoryInput struct {
 	IsActive           bool                      `json:"isActive"`
 	Attributes         attrschema.Schema         `json:"attributes" doc:"At most 200"`
 	InstanceAttributes attrschema.InstanceSchema `json:"instanceAttributes" doc:"At most 200"`
-	Mounting           string                    `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"Default floorplan"`
+	Mounting           string                    `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"Default floorplan; on update, left out keeps the stored value (D294)"`
 }
 
 // CategoryUpdate is the body of an update: the input plus the version it
@@ -176,6 +176,17 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
 		return Category{}, err
+	}
+	if in.Mounting == "" {
+		// Left out keeps the stored mounting (D294).
+		current, err := s.q.GetCategory(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Category{}, apperr.NotFound("category.not_found")
+		}
+		if err != nil {
+			return Category{}, err
+		}
+		in.Mounting = current.Mounting
 	}
 	in.CategoryInput, err = s.validate(ctx, in.CategoryInput)
 	if err != nil {

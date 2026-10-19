@@ -11,11 +11,11 @@ export interface ProductTypeUpdate {
   readonly $schema?: string;
   /** Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none */
   abbreviation?: string;
-  /** 1-100000; leave out for none */
+  /** 1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
   busDevicesMax?: number;
   /** Badge colour, #rrggbb (stored lower case); empty for none */
   color?: string;
-  /** 1-100000 mA; leave out for none */
+  /** 1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
   defaultBusCurrentMa?: number;
   /** updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale */
   expectedUpdatedAt: string;
@@ -24,6 +24,6 @@ export interface ProductTypeUpdate {
   key: string;
   /** Display name per locale (at most 100 characters); "en" is required */
   name: ProductTypeUpdateName;
-  /** 0-90; default 20 */
+  /** 0-90; default 20; on update, left out keeps the stored value (D294) */
   reservePercent?: number;
 }

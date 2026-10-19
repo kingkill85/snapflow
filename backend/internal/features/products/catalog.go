@@ -130,7 +130,7 @@ func normalizeProduct(pt *producttypes.ProductType, c *categories.Category, in P
 		// An inactive type takes no new products; a product keeps its own.
 		errs = append(errs, apperr.Field(at(prefix, "productTypeId"), "product.type_inactive", "the product type is inactive"))
 	}
-	if in.Mounting != "" && !capabilities.ValidMounting(in.Mounting) {
+	if in.Mounting != nil && *in.Mounting != "" && !capabilities.ValidMounting(*in.Mounting) {
 		errs = append(errs, apperr.Field(at(prefix, "mounting"), "validation.invalid", "mounting must be floorplan, board or both"))
 	}
 	if c == nil {
@@ -330,7 +330,7 @@ func (s *Service) RestoreProduct(ctx context.Context, p CatalogProduct, expected
 	row, err := s.updateProduct(ctx, p.ID, ProductUpdate{
 		ProductInput: ProductInput{
 			ProductTypeID: p.ProductTypeID, CategoryID: p.CategoryID, ModelNumber: p.ModelNumber, Name: p.Name, Description: p.Description,
-			Attributes: p.Attributes, IsActive: p.IsActive, Mounting: p.Mounting,
+			Attributes: p.Attributes, IsActive: p.IsActive, Mounting: &p.Mounting,
 		},
 		ExpectedUpdatedAt: expectedUpdatedAt,
 	}, true, Known{})
