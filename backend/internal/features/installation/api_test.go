@@ -70,6 +70,7 @@ type world struct {
 	zone, spots, blinds uuid.UUID
 	dimmer, psu, sensor uuid.UUID
 	existing            uuid.UUID
+	gateway, bulb       uuid.UUID
 	dimKind             uuid.UUID
 }
 
@@ -105,6 +106,7 @@ func setup(t *testing.T, lang string) world {
 		{"key": "width_te", "type": "number", "meaning": "rail_width_te"},
 		{"key": "bus_ma", "type": "number", "meaning": "bus_current_used_ma"},
 		{"key": "bus_supply_ma", "type": "number", "meaning": "bus_current_supplied_ma"},
+		{"key": "places", "type": "integer", "meaning": "wireless_places_supplied"},
 	}
 	attrs := []any{}
 	for _, f := range fields {
@@ -116,8 +118,11 @@ func setup(t *testing.T, lang string) world {
 		"attributes": attrs, "instanceAttributes": []any{}})
 	floorCat := post("/api/categories", map[string]any{"key": "sensors", "name": text("Sensors", "Sensoren"), "isActive": true, "mounting": "floorplan",
 		"attributes": attrs, "instanceAttributes": []any{}})
+	zigbee := post("/api/product-types", map[string]any{"key": "zigbee", "name": text("Zigbee", "Zigbee"), "abbreviation": "ZB",
+		"isActive": true, "topology": "wireless", "defaultWirelessPlacesUsed": 1})
+	system := knx
 	product := func(cat uuid.UUID, model, name string, values map[string]any) uuid.UUID {
-		p := post("/api/products", map[string]any{"productTypeId": knx, "categoryId": cat, "modelNumber": model, "name": text(name, name),
+		p := post("/api/products", map[string]any{"productTypeId": system, "categoryId": cat, "modelNumber": model, "name": text(name, name),
 			"isActive": true, "attributes": values})
 		return post("/api/products/"+p.String()+"/variants", map[string]any{"name": text(name, name), "price": "123.45", "isActive": true})
 	}
@@ -125,10 +130,13 @@ func setup(t *testing.T, lang string) world {
 	blindV := product(boardCat, "JAL-2", "Blind actuator", map[string]any{"blind_ch": 2, "width_te": 2, "bus_ma": 8})
 	psuV := product(boardCat, "PSU-640", "Power supply", map[string]any{"width_te": 4, "bus_supply_ma": 640})
 	sensorV := product(floorCat, "PIR-1", "Presence sensor", map[string]any{"bus_ma": 5})
+	system = zigbee
+	gatewayV := product(floorCat, "ZGW", "Zigbee gateway", map[string]any{"places": 50})
+	bulbV := product(floorCat, "ZB-BULB", "Zigbee bulb", map[string]any{})
 
 	tenant := api.NewTenant("Acme")
 	w.user = api.NewUser(tenant, auth.RoleUser)
-	resp := api.Post("/api/projects", w.user.Cookie, map[string]any{"name": "Villa Sommer", "language": lang, "productTypeIds": []any{knx},
+	resp := api.Post("/api/projects", w.user.Cookie, map[string]any{"name": "Villa Sommer", "language": lang, "productTypeIds": []any{knx, zigbee},
 		"customer": map[string]any{"name": "Anna Kunde", "company": "Kunde GmbH"}})
 	want(t, resp, http.StatusCreated, "")
 	pr := decode[struct {
@@ -156,6 +164,7 @@ func setup(t *testing.T, lang string) world {
 	// Floorplan: zone, needs (spots with a symbol), a sensor, an existing one.
 	w.floor = w.floorplan(t)
 	w.zone, w.spots, w.blinds, w.sensor, w.existing = uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	w.gateway, w.bulb = uuid.New(), uuid.New()
 	want(t, api.Post("/api/plans/"+w.floor.String()+"/lock", w.user.Cookie), http.StatusOK, "")
 	c := decode[plans.PlanContent](t, api.Get("/api/plans/"+w.floor.String()+"/content", w.user.Cookie))
 	place := func(id, variant uuid.UUID, x float64, label string, existing bool) map[string]any {
@@ -167,7 +176,8 @@ func setup(t *testing.T, lang string) world {
 		"expectedContentUpdatedAt": c.ContentUpdatedAt, "scale": nil,
 		"zones": []any{map[string]any{"id": w.zone, "name": "Living room", "color": "#22aa66", "opacity": 0.25,
 			"points": [][2]float64{{0, 0}, {600, 0}, {600, 400}, {0, 400}}}},
-		"placements": []any{place(w.sensor, sensorV, 100, "PIR living", false), place(w.existing, sensorV, 200, "Old PIR", true)},
+		"placements": []any{place(w.sensor, sensorV, 100, "PIR living", false), place(w.existing, sensorV, 200, "Old PIR", true),
+			place(w.gateway, gatewayV, 500, "Hub", false), place(w.bulb, bulbV, 650, "Reading lamp", false)},
 		"needs": []any{
 			map[string]any{"id": w.spots, "zoneId": w.zone, "functionTypeId": dimming, "quantity": 3, "powerW": "40", "loadTypeId": led,
 				"label": "Ceiling spots", "note": "", "x": x, "y": y},
@@ -182,6 +192,8 @@ func setup(t *testing.T, lang string) world {
 	want(t, api.Post(w.url("/auto-connect/apply"), w.user.Cookie, map[string]any{"scope": "all", "expectedChecksum": checksum}), http.StatusOK, "")
 	want(t, api.Get(w.url("/networks"), w.user.Cookie), http.StatusOK, "")
 	want(t, api.Post(w.url("/addresses/assign"), w.user.Cookie, map[string]any{}), http.StatusOK, "")
+	want(t, api.Put(w.url("/addresses"), w.user.Cookie, map[string]any{"addresses": []any{
+		map[string]any{"planId": w.floor, "itemId": w.bulb, "ieee": "00:12:4b:00:1c:a1:b2:c3", "note": "behind the sofa"}}}), http.StatusOK, "")
 	return w
 }
 
@@ -302,8 +314,19 @@ func TestCommissioningLists(t *testing.T) {
 		!strings.Contains(rows[1][5], "Dimmer 1: Living room Ceiling spots 3 × 40 W LED") || rows[4][len(rows[4])-1] != "ja" {
 		t.Errorf("rows %q", rows)
 	}
-	// HDL and Zigbee lists are valid workbooks without devices here.
-	for _, kind := range []string{"hdl-commissioning", "zigbee-devices"} {
+	// Zigbee: a sheet per gateway with the gateway and its devices.
+	resp = w.api.Get(w.url("/exports/zigbee-devices.xlsx"), w.user.Cookie)
+	want(t, resp, http.StatusOK, "")
+	f, err = excelize.OpenReader(bytes.NewReader(resp.Body.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, _ = f.GetRows("Hub")
+	if len(rows) != 3 || rows[2][0] != "Reading lamp" || rows[2][4] != "00124B001CA1B2C3" || rows[2][6] != "behind the sofa" {
+		t.Errorf("zigbee rows %q (sheets %v)", rows, f.GetSheetList())
+	}
+	// HDL: a valid workbook without devices here.
+	for _, kind := range []string{"hdl-commissioning"} {
 		resp := w.api.Get(w.url("/exports/"+kind+".xlsx"), w.user.Cookie)
 		want(t, resp, http.StatusOK, "")
 		if _, err := excelize.OpenReader(bytes.NewReader(resp.Body.Bytes())); err != nil {
@@ -333,7 +356,8 @@ func TestDocuments(t *testing.T) {
 	parts := unzip(t, data)
 	body := plain(parts["word/document.xml"])
 	for _, s := range []string{"Installation manual", "Overview", "Bus lines", "KNX 1", "Main board", "D2", "Lights", "Dimmer 1",
-		"Ceiling spots", "3 × 40 W LED", "1.1.1", "existing", "Living room", "Free channels", "Kunde GmbH", "Cables and terminals"} {
+		"Ceiling spots", "3 × 40 W LED", "1.1.1", "existing", "Living room", "Free channels", "Kunde GmbH", "Cables and terminals",
+		"Gateways", "Hub", "00124B001CA1B2C3", "Reading lamp"} {
 		if !strings.Contains(body, s) {
 			t.Errorf("manual lacks %q", s)
 		}

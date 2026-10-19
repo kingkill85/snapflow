@@ -384,7 +384,7 @@ func boardBlocks(d *data, p plans.Plan) []document.Block {
 	out = append(out, document.Heading{Level: 3, Text: l.t("modules")}, t)
 
 	// Channel table and free channels.
-	ct := document.Table{Columns: cols(0.6, 1.4, 1.1, 2.6, 1.4, 0.7), Rows: []document.Row{headerRow(l.t("colPos"), l.t("colChannel"),
+	ct := document.Table{Columns: cols(0.6, 1.4, 1.1, 2.3, 1.4, 1.0), Rows: []document.Row{headerRow(l.t("colPos"), l.t("colChannel"),
 		l.t("colZone"), l.t("colNeed"), l.t("colLoad"), l.t("colCircuit"))}}
 	var free []string
 	for _, info := range d.wiring.Items {
@@ -414,7 +414,7 @@ func boardBlocks(d *data, p plans.Plan) []document.Block {
 				if n == nil {
 					continue
 				}
-				ct.Rows = append(ct.Rows, bodyRow(it.position, chText, n.ZoneName, d.needName(n)+" ("+d.functionName(n.FunctionTypeID)+")",
+				ct.Rows = append(ct.Rows, bodyRow(it.position, chText, n.ZoneName, d.needWithFunction(n),
 					d.loadText(n, c.Units), circuit))
 			}
 		}
@@ -482,7 +482,7 @@ func zoneBlocks(d *data, pg planPage) []document.Block {
 		}
 		out = append(out, document.Heading{Level: 3, Text: z.name})
 		if len(devs) > 0 {
-			t := document.Table{Columns: cols(1.6, 2.4, 1.2, 1.4), Rows: []document.Row{headerRow(l.t("colDevice"), l.t("colProduct"),
+			t := document.Table{Columns: cols(1.5, 2.3, 1.5, 1.2), Rows: []document.Row{headerRow(l.t("colDevice"), l.t("colProduct"),
 				l.t("colAddress"), l.t("colNetwork"))}}
 			for _, pl := range devs {
 				product := d.productName(pl.VariantID)
@@ -517,7 +517,7 @@ func zoneBlocks(d *data, pg planPage) []document.Block {
 					}
 					connected += missing
 				}
-				t.Rows = append(t.Rows, bodyRow(pg.numbers[n.NeedID], d.needName(&n)+" ("+d.functionName(n.FunctionTypeID)+")",
+				t.Rows = append(t.Rows, bodyRow(pg.numbers[n.NeedID], d.needWithFunction(&n),
 					d.loadText(&n, n.Quantity), connected))
 			}
 			out = append(out, t)

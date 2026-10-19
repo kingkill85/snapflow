@@ -89,6 +89,14 @@ func (d *data) needName(n *wiring.NeedInfo) string {
 	return d.functionName(n.FunctionTypeID)
 }
 
+// needWithFunction: "<label> (<function>)", or the function alone.
+func (d *data) needWithFunction(n *wiring.NeedInfo) string {
+	if n.Label == "" {
+		return d.functionName(n.FunctionTypeID)
+	}
+	return n.Label + " (" + d.functionName(n.FunctionTypeID) + ")"
+}
+
 // loadText: "3 × 60 W LED" (power and load type when known).
 func (d *data) loadText(n *wiring.NeedInfo, units int32) string {
 	s := strconv.Itoa(int(units))
