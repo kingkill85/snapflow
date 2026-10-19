@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338, review fixes D339–D351. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
 
 ## Files
 
@@ -23,13 +23,17 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D21
 | `editor/use-shortcuts.ts` | Keyboard shortcuts (plain keys only off controls, `isCanvasKeyTarget`, D212) |
 | `editor/placements.ts` | New placements, duplicates, `clampMove` / `clampGeometry` (edits stay inside the image, D213), `changeProduct` (D216) |
 | `editor/needs.ts`, `editor/need-catalog.ts`, `editor/NeedsSection.tsx` | Needs (3b): new needs and symbol copies, plain-words text, live zone of a symbol and counts per zone, applying a room template, symbol pictograms; the need catalog hook (function types, load types, active room templates); the zone inspector's Needs section, the need fields and the inspector of one load symbol |
+| `editor/copies.ts` | `copyItems`: the one path of Ctrl+D, paste and alt-drag (placements and load symbols as one batch step; symbols whose function type or load type is no longer usable are skipped with a notice; refused as a whole above 2000 needs, D347–D348) |
 | `src/canvas/` | Shared canvas base for all plan kinds: stage, viewport, image layer, geometry, theme (D198) |
 
 ## Document model
 
 `PlanDocument = { scale, zones, placements, needs }` is exactly what `PUT /api/plans/{id}/content` takes
 (`toContentInput` adds `expectedContentUpdatedAt` and drops the placements' server-computed `zoneId`; needs are
-always sent, D331). A need without position belongs to its `zoneId`; one with `x`/`y` is a load symbol (`isSymbol`),
+always sent, D331; `restoredNeedIds` lists the document needs whose ids the editor has received from the server in
+this session, so a need brought back by undo keeps an inactive function type, D343). Power per unit is the API's
+decimal string with 2 places; `parsePower` / `formatWatts` / `useNeedText` in `features/needs/format.ts` are the
+only parser and formatters (editor, overview, save-error list via `itemName`, D349). A need without position belongs to its `zoneId`; one with `x`/`y` is a load symbol (`isSymbol`),
 whose zone the backend computes (`needZoneId` computes it live the same way). Array order is
 draw order. Documents are immutable; `applyDocumentAction(doc, action)` returns a new document, or the
 same object when nothing changes. Ids are client uuids (`newId()`).

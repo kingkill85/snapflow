@@ -146,7 +146,7 @@ for (const width of [1280, 1440, 1920]) {
             name: { en: unique('Living room with open kitchen and dining area'), de: unique('Wohnzimmer mit offener Küche und Essbereich') },
             equipmentLevel: { en: 'Comfort plus', de: 'Komfort plus' },
             isActive: true,
-            lines: [{ functionTypeId: lighting.id, quantity: 4, powerW: 7.5, loadTypeId: null, label: 'Ceiling' }],
+            lines: [{ functionTypeId: lighting.id, quantity: 4, powerW: '7.5', loadTypeId: null, label: 'Ceiling' }],
           },
         })
         expect(roomTemplate.status()).toBe(201)
@@ -303,7 +303,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
             equipmentLevel: { en: 'Comfort' },
             isActive: true,
             lines: [
-              { functionTypeId: lighting.id, quantity: 4, powerW: 7.5, loadTypeId: null, label: 'Ceiling' },
+              { functionTypeId: lighting.id, quantity: 4, powerW: '7.5', loadTypeId: null, label: 'Ceiling' },
               { functionTypeId: lighting.id, quantity: 2, powerW: null, loadTypeId: null, label: 'Wall' },
             ],
           },
@@ -399,7 +399,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           zones: [{ id: living, name: 'Living room with a long zone name', color: '#22aa55', opacity: 0.3, points: [[0, 0], [600, 0], [600, 800], [0, 800]] }],
           placements: [],
           needs: [
-            { zoneId: living, functionTypeId: dimmer.id, quantity: 12, powerW: 7.5, label: 'Ceiling, along the window front', note: 'Warm white, dimmable to 1 %' },
+            { zoneId: living, functionTypeId: dimmer.id, quantity: 12, powerW: '7.5', label: 'Ceiling, along the window front', note: 'Warm white, dimmable to 1 %' },
             { functionTypeId: blind.id, quantity: 2, x: 100, y: 100, label: 'Terrace door' },
             { functionTypeId: blind.id, quantity: 1, x: 900, y: 700 },
           ],

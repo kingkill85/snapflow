@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import type { FunctionType, RoomTemplate } from '@/api/generated/model'
-import { loadType, problem } from '@/features/capabilities/test-fixtures'
+import { loadType } from '@/features/capabilities/test-fixtures'
 import { userMe } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { chooseOption, optionTexts } from '@/test/select'
@@ -39,7 +39,7 @@ const template = (over: Partial<RoomTemplate>): RoomTemplate => ({
   equipmentLevel: { en: 'Comfort' },
   sortOrder: 1,
   isActive: true,
-  lines: [{ functionTypeId: dimmer.id, quantity: 3, powerW: 7.5, loadTypeId: led.id, label: 'Ceiling' }],
+  lines: [{ functionTypeId: dimmer.id, quantity: 3, powerW: '7.50', loadTypeId: led.id, label: 'Ceiling', warnings: [] }],
   can: { update: true, delete: true },
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -112,7 +112,7 @@ describe('RoomTemplatesPage', () => {
       key: 'living_comfort',
       name: { en: 'Living room' },
       equipmentLevel: { en: 'Comfort' },
-      lines: [{ functionTypeId: dimmer.id, quantity: 3, powerW: 7.5, loadTypeId: led.id, label: 'Ceiling' }],
+      lines: [{ functionTypeId: dimmer.id, quantity: 3, powerW: '7.50', loadTypeId: led.id, label: 'Ceiling' }],
       isActive: true,
     })
     expect(await screen.findByText('Living room')).toBeInTheDocument()
@@ -132,26 +132,30 @@ describe('RoomTemplatesPage', () => {
     expect(within(line).getByRole('combobox', { name: 'Load type' })).toHaveTextContent('None')
   })
 
-  it('flags lines with inactive references and sends expectedUpdatedAt', async () => {
+  it('keeps a stored line with an inactive function type, flagged as skipped, and sends expectedUpdatedAt', async () => {
     let sent: unknown
-    const stored = template({ lines: [{ functionTypeId: oldType.id, quantity: 2, powerW: null, loadTypeId: null, label: '' }] })
+    const stored = template({ lines: [{ functionTypeId: oldType.id, quantity: 2, powerW: null, loadTypeId: null, label: '', warnings: ['function_type_inactive'] }] })
     server.use(
       ...catalog(),
       http.get('/api/room-templates', () => HttpResponse.json({ items: [stored] })),
       http.put('/api/room-templates/:id', async ({ request }) => {
         sent = await request.json()
-        return problem(422, { code: 'validation.failed', fields: [{ location: 'body.lines[0].functionTypeId', code: 'need.function_type_inactive' }] })
+        return HttpResponse.json(stored)
       }),
     )
     const user = userEvent.setup()
     renderWithProviders(<RoomTemplatesPage />)
 
+    // The list says which lines the editor skips.
+    expect(await screen.findByText('1 line skipped')).toBeInTheDocument()
     await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText(/inactive function type or load type/i)).toBeInTheDocument()
+    expect(await within(dialog).findByText('Inactive function type: this line is skipped when the template is applied.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Choose an active one/)).not.toBeInTheDocument()
     expect(within(dialog).getByRole('combobox', { name: /function type/i })).toHaveTextContent('Old switching (inactive)')
-    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
 
+    // A new line with the same inactive function type would be kept too; one with another would not be offered.
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(sent).toMatchObject({ expectedUpdatedAt: stored.updatedAt, lines: [{ functionTypeId: oldType.id, quantity: 2, powerW: null, loadTypeId: null }] }))
   })
 
@@ -167,11 +171,12 @@ describe('RoomTemplatesPage', () => {
     const quantity = within(line).getByLabelText(/quantity/i)
     await user.clear(quantity)
     await user.type(quantity, '0')
-    await user.type(within(line).getByLabelText(/power per unit/i), 'abc')
+    // A third decimal is refused like the backend refuses it.
+    await user.type(within(line).getByLabelText(/power per unit/i), '7.555')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(await within(line).findByText(/between 1 and 100/i)).toBeInTheDocument()
-    expect(within(line).getByText(/between 0 and 100,?000/i)).toBeInTheDocument()
+    expect(within(line).getByText('Enter a power of 0 to 100,000 W with at most 2 decimals.')).toBeInTheDocument()
   })
 
   it('moves a template down', async () => {

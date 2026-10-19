@@ -1,13 +1,11 @@
 import { useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import type { FunctionType, PlanNeed } from '@/api/generated/model'
 import { useListFunctionTypes } from '@/api/generated/function-types/function-types'
 import { useListLoadTypes } from '@/api/generated/load-types/load-types'
 import { useListRoomTemplates } from '@/api/generated/room-templates/room-templates'
+import { useNeedText as useNeedLineText } from '@/features/needs'
 import { useLocalized } from '@/i18n/localized'
-
-import { needText } from './needs'
 
 /** Function types, load types (with inactive ones, to name what is stored) and the active room templates. */
 export function useNeedCatalog() {
@@ -29,12 +27,24 @@ export function useNeedCatalog() {
 
 export type NeedCatalog = ReturnType<typeof useNeedCatalog>
 
-/** A need's row text in plain words, with the UI language's numbers. */
-export function useNeedText(catalog: NeedCatalog) {
-  const { t, i18n } = useTranslation('plans')
-  const localize = useLocalized()
-  const format = useMemo(() => new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 2 }), [i18n.resolvedLanguage])
-  return (need: PlanNeed) => needText(need, catalog.functionTypeById, catalog.loadTypeById, localize, (n) => format.format(n), t('needs.unknown'))
+/** Function types and load types by id, for naming needs. */
+export type NeedNames = Pick<NeedCatalog, 'functionTypeById' | 'loadTypeById'>
+
+/**
+ * A need of the document in plain words, "3 × Dimmable light · 7.5 W · LED ·
+ * Ceiling": the shared need text of `features/needs` (rows, symbol
+ * inspector, save errors).
+ */
+export function useNeedText(catalog: NeedNames) {
+  const text = useNeedLineText()
+  return (need: Pick<PlanNeed, 'quantity' | 'functionTypeId' | 'powerW' | 'loadTypeId' | 'label'>) =>
+    text({
+      quantity: need.quantity,
+      functionTypeName: catalog.functionTypeById.get(need.functionTypeId)?.name,
+      powerW: need.powerW,
+      loadTypeName: need.loadTypeId ? catalog.loadTypeById.get(need.loadTypeId)?.name : null,
+      label: need.label,
+    })
 }
 
 /** Active function types, plus the need's own one when it is inactive (flagged). */

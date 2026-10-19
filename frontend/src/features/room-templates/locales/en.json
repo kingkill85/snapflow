@@ -35,6 +35,14 @@
     "labelHint": "e.g. Ceiling, Window",
     "choose": "Choose …",
     "inactiveOption": "{{name}} (inactive)",
-    "inactiveReference": "Uses an inactive function type or load type. Choose an active one before saving."
-  }
+    "inactiveReference": "Uses an inactive function type or load type. Choose an active one before saving.",
+    "warning": {
+      "function_type_inactive": "Inactive function type: this line is skipped when the template is applied.",
+      "load_type_inactive": "Inactive load type: this line is skipped when the template is applied.",
+      "load_type_not_allowed": "The function type no longer allows this load type: this line is skipped when the template is applied."
+    }
+  },
+  "skipped_one": "{{count}} line skipped",
+  "skipped_other": "{{count}} lines skipped",
+  "skippedHint": "Lines with an inactive function type or load type are skipped when the template is applied."
 }

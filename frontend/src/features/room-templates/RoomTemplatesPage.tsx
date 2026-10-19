@@ -11,7 +11,7 @@ import {
   useReorderRoomTemplates,
 } from '@/api/generated/room-templates/room-templates'
 import { useCan } from '@/app/session'
-import { type Column } from '@/components/ui'
+import { Badge, type Column } from '@/components/ui'
 import { ActiveBadge } from '@/features/capabilities/ActiveBadge'
 import { CatalogListPage } from '@/features/capabilities/CatalogListPage'
 import { useReorder } from '@/features/capabilities/use-reorder'
@@ -43,7 +43,23 @@ export function RoomTemplatesPage() {
   const columns: Column<RoomTemplate>[] = [
     { header: t('field.name'), mobile: 'title', cell: (p) => localized(p.name) },
     { header: t('field.equipmentLevel'), cell: (p) => localized(p.equipmentLevel) },
-    { header: t('field.lines'), className: 'whitespace-nowrap', cell: (p) => t('lineCount', { count: p.lines.length }) },
+    {
+      header: t('field.lines'),
+      cell: (p) => {
+        // Lines the editor skips when applying (the API's line warnings).
+        const skipped = p.lines.filter((l) => l.warnings.length > 0).length
+        return (
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="whitespace-nowrap">{t('lineCount', { count: p.lines.length })}</span>
+            {skipped > 0 && (
+              <Badge variant="warning" title={t('skippedHint')}>
+                {t('skipped', { count: skipped })}
+              </Badge>
+            )}
+          </span>
+        )
+      },
+    },
     { header: t('field.status'), cell: (p) => <ActiveBadge active={p.isActive} /> },
   ]
 

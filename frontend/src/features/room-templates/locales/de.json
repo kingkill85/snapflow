@@ -35,6 +35,14 @@
     "labelHint": "z. B. Decke, Fenster",
     "choose": "Auswählen …",
     "inactiveOption": "{{name}} (inaktiv)",
-    "inactiveReference": "Verwendet einen inaktiven Funktionstyp oder eine inaktive Lastart. Vor dem Speichern eine aktive auswählen."
-  }
+    "inactiveReference": "Verwendet einen inaktiven Funktionstyp oder eine inaktive Lastart. Vor dem Speichern eine aktive auswählen.",
+    "warning": {
+      "function_type_inactive": "Inaktiver Funktionstyp: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
+      "load_type_inactive": "Inaktive Lastart: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
+      "load_type_not_allowed": "Der Funktionstyp erlaubt diese Lastart nicht mehr: Diese Zeile wird beim Anwenden der Vorlage übersprungen."
+    }
+  },
+  "skipped_one": "{{count}} Zeile übersprungen",
+  "skipped_other": "{{count}} Zeilen übersprungen",
+  "skippedHint": "Zeilen mit inaktivem Funktionstyp oder inaktiver Lastart werden beim Anwenden der Vorlage übersprungen."
 }

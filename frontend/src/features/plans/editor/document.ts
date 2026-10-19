@@ -1,4 +1,4 @@
-import type { PlanContent, PlanNeed, PlanPlacement, PlanZone } from '@/api/generated/model'
+import type { PlanContent, PlanContentInput, PlanNeed, PlanPlacement, PlanZone } from '@/api/generated/model'
 import { normalizeAngle } from '@/canvas'
 
 /**
@@ -29,14 +29,21 @@ export const documentOf = (content: PlanContent): PlanDocument => ({
 /** A need drawn as a load symbol (it has a position). */
 export const isSymbol = (n: PlanNeed): n is PlanNeed & { x: number; y: number } => n.x !== null && n.y !== null
 
-/** The body of a content save. */
-export const toContentInput = (doc: PlanDocument, expectedContentUpdatedAt: string) => ({
+/**
+ * The body of a content save. `serverNeedIds` are the need ids the editor
+ * has received from the server in this session (load and save responses):
+ * those still in the document go as `restoredNeedIds`, so a need that undo
+ * brings back after it was deleted and saved keeps an inactive function or
+ * load type like a stored one (D343).
+ */
+export const toContentInput = (doc: PlanDocument, expectedContentUpdatedAt: string, serverNeedIds: ReadonlySet<string> = new Set()): PlanContentInput => ({
   expectedContentUpdatedAt,
   scale: doc.scale,
   zones: doc.zones,
   placements: doc.placements.map(({ zoneId: _zoneId, ...p }) => p),
   // Always sent (D326: a left-out list would keep the stored needs).
   needs: doc.needs,
+  restoredNeedIds: doc.needs.filter((n) => serverNeedIds.has(n.id)).map((n) => n.id),
 })
 
 export type PlacementPatch = Partial<Omit<PlanPlacement, 'id' | 'zoneId'>>

@@ -18,8 +18,10 @@
     }
   },
   "line": {
-    "quantity": "{{count}} ×",
-    "power": "{{power}} W"
+    "quantity": "{{count}} × {{name}}",
+    "count": "{{count}} ×",
+    "power": "{{power}} W",
+    "unknown": "Unbekannter Funktionstyp"
   },
   "totals_one": "{{count}} Stück",
   "totals_other": "{{count}} Stück",

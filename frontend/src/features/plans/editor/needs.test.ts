@@ -6,9 +6,10 @@ import { functionTypes, loadTypes, needCatalog, pid, placement, roomTemplate } f
 import { applyDocumentAction, type PlanDocument, toContentInput } from './document'
 import { editorReducer, initEditor } from './editor-state'
 import { allVisible, visibleIds } from './layers'
-import { allowedLoadTypes, applyTemplate, functionTypePatch, needCounts, needText, needZoneId, newNeed, symbolIcon, symbolLetter } from './needs'
+import { allowedLoadTypes, applyTemplate, functionTypePatch, maxNeeds, needCounts, needZoneId, newNeed, symbolIcon, symbolLetter, usableForNewNeed } from './needs'
 import { clampMove } from './placements'
-import { saveErrorsByItem, selectionFor } from './save-errors'
+import { copyItems } from './copies'
+import { itemName, saveErrorsByItem, selectionFor } from './save-errors'
 import { ApiError } from '@/api/client'
 
 const zone = (n: number, x0: number): PlanZone => ({
@@ -55,9 +56,10 @@ describe('needs in the plan document', () => {
     expect(clampMove(d, [pid(1301)], -100, 0, { width: 1000, height: 800 })).toEqual({ dx: -50, dy: 0 })
   })
 
-  it('always sends the needs', () => {
-    expect(toContentInput(doc([]), 'at')).toHaveProperty('needs', [])
+  it('always sends the needs, and as restored those the server sent before', () => {
+    expect(toContentInput(doc([]), 'at')).toMatchObject({ needs: [], restoredNeedIds: [] })
     expect(toContentInput(doc([need(1)]), 'at').needs).toHaveLength(1)
+    expect(toContentInput(doc([need(1), need(2)]), 'at', new Set([pid(1302), pid(1309)])).restoredNeedIds).toEqual([pid(1302)])
   })
 
   it('applies a template as one undo step and selects symbols like other items', () => {
@@ -65,7 +67,7 @@ describe('needs in the plan document', () => {
     const { needs, skipped } = applyTemplate(roomTemplate(1), zones[0].id, needCatalog.functionTypeById, needCatalog.loadTypeById)
     expect(skipped).toBe(1)
     expect(needs).toEqual([
-      expect.objectContaining({ zoneId: zones[0].id, functionTypeId: functionTypes[0].id, quantity: 3, powerW: 7.5, loadTypeId: loadTypes[0].id, label: 'Ceiling', x: null }),
+      expect.objectContaining({ zoneId: zones[0].id, functionTypeId: functionTypes[0].id, quantity: 3, powerW: '7.50', loadTypeId: loadTypes[0].id, label: 'Ceiling', x: null }),
       expect.objectContaining({ functionTypeId: functionTypes[1].id, quantity: 2 }),
     ])
     state = editorReducer(state, { type: 'change', action: { type: 'addNeeds', needs } })
@@ -98,14 +100,6 @@ describe('needs in the plan document', () => {
 })
 
 describe('need helpers', () => {
-  const localize = (t: Record<string, string> | undefined) => t?.en ?? ''
-  it('says a need in plain words', () => {
-    const text = (n: PlanNeed) => needText(n, needCatalog.functionTypeById, needCatalog.loadTypeById, localize, String, 'Unknown')
-    expect(text(need(1, { quantity: 3, powerW: 60, loadTypeId: loadTypes[0].id, label: 'Ceiling' }))).toBe('3 × Dimmable light · 60 W · LED · Ceiling')
-    expect(text(need(1))).toBe('Dimmable light')
-    expect(text(need(1, { functionTypeId: 'gone' }))).toBe('Unknown')
-  })
-
   it('filters load types by the function type and drops a load type the new function does not allow', () => {
     expect(allowedLoadTypes(functionTypes[0], loadTypes).map((l) => l.id)).toEqual([loadTypes[0].id])
     expect(allowedLoadTypes(functionTypes[1], loadTypes)).toHaveLength(2)
@@ -145,5 +139,60 @@ describe('need helpers', () => {
     const d = doc([need(1), symbol(2, 10, 10)])
     expect(visibleIds(d, allVisible(), new Map())).toEqual([zones[0].id, zones[1].id, placement(1).id, pid(1302)])
     expect(visibleIds(d, { ...allVisible(), needsHidden: true }, new Map())).not.toContain(pid(1302))
+  })
+})
+
+describe('copies of placements and symbols (Ctrl+D, paste, alt-drag)', () => {
+  const image = { width: 1000, height: 800 }
+  const usable = (n: PlanNeed) => usableForNewNeed(n, needCatalog.functionTypeById, needCatalog.loadTypeById)
+
+  it('copies placements and symbols as one undo step, skipping symbols with an inactive function type', () => {
+    const inactive = need(2, { x: 200, y: 200, zoneId: null, functionTypeId: functionTypes[2].id })
+    const d = doc([symbol(1, 990, 100), inactive, need(3)])
+    const result = copyItems(d, { placements: d.placements, needs: d.needs }, 20, 20, image, usable)
+    expect(result.skipped).toBe(1)
+    expect(result.overLimit).toBe(false)
+    // Only symbols are copied (not needs without position), kept inside the image, with new ids.
+    expect(result.needs).toEqual([expect.objectContaining({ x: 1000, y: 120, zoneId: null, functionTypeId: functionTypes[0].id })])
+    expect(result.needs[0].id).not.toBe(pid(1301))
+    expect(result.placements).toHaveLength(1)
+    expect(result.action?.type).toBe('batch')
+
+    let state = initEditor(d)
+    state = editorReducer(state, { type: 'change', action: result.action! })
+    expect(state.history.present.needs).toHaveLength(4)
+    expect(state.history.present.placements).toHaveLength(2)
+    state = editorReducer(state, { type: 'undo' })
+    expect(state.history.present).toBe(d)
+  })
+
+  it('copies only symbols without a batch, and nothing when every symbol is skipped', () => {
+    const d = doc([symbol(1, 100, 100)])
+    expect(copyItems(d, { placements: [], needs: d.needs }, 20, 20, image, usable).action?.type).toBe('addNeeds')
+    const onlyInactive = copyItems(d, { placements: [], needs: [need(2, { x: 1, y: 1, functionTypeId: functionTypes[2].id })] }, 20, 20, image, usable)
+    expect(onlyInactive).toMatchObject({ action: null, skipped: 1 })
+  })
+
+  it('refuses copies that would exceed the needs per plan', () => {
+    const full = doc(Array.from({ length: maxNeeds }, (_, i) => need(i, { id: `n${i}` })))
+    const result = copyItems(full, { placements: full.placements, needs: [symbol(1, 10, 10)] }, 20, 20, image, usable)
+    expect(result).toMatchObject({ action: null, overLimit: true })
+  })
+
+  it('stops a nudge of symbols at the image edge', () => {
+    const d = doc([symbol(1, 995, 795)])
+    expect(clampMove(d, [pid(1301)], 10, 10, image)).toEqual({ dx: 5, dy: 5 })
+    expect(clampMove(d, [pid(1301)], -10, 0, image)).toEqual({ dx: -10, dy: 0 })
+  })
+})
+
+describe('save error names', () => {
+  it('names a need with the need text, a placement by label and a zone by name', () => {
+    const d = { ...doc([need(1, { quantity: 2, label: 'Ceiling' })]), placements: [placement(1, { label: 'Hall switch' })] }
+    const names = { need: (n: PlanNeed) => `${n.quantity} × ${n.label}`, placement: (p: { label: string }) => p.label || undefined }
+    expect(itemName(pid(1301), d, names)).toBe('2 × Ceiling')
+    expect(itemName(d.placements[0].id, d, names)).toBe('Hall switch')
+    expect(itemName(zones[0].id, d, names)).toBe('Zone 1')
+    expect(itemName('gone', d, names)).toBeUndefined()
   })
 })

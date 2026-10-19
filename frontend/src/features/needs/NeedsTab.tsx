@@ -6,7 +6,7 @@ import { useGetVersionNeeds } from '@/api/generated/plans/plans'
 import { Badge, type Column, DataTable, EmptyState, ErrorMessage, Loading, Section } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { useFormatWatts, useNeedText, useNeedTotalsText } from './format'
+import { hasPower, useFormatWatts, useNeedText, useNeedTotalsText } from './format'
 
 /** Needs change in the plan editor: fetched on every visit. */
 const everyVisit = { staleTime: 0, refetchOnMount: 'always' } as const
@@ -131,7 +131,7 @@ function TotalsTable<T extends FunctionTypeTotal | LoadTypeTotal>({
     {
       header: t('overview.columns.power'),
       className: 'w-px text-right',
-      cell: (r) => (totalsOf(r).powerW > 0 ? number(t('line.power', { power: watts(totalsOf(r).powerW) })) : null),
+      cell: (r) => (hasPower(totalsOf(r).powerW) ? number(t('line.power', { power: watts(totalsOf(r).powerW) })) : null),
     },
   ]
   return <DataTable label={label} rows={rows} columns={columns} rowKey={rowKey} empty={null} />

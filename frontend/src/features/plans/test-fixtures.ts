@@ -124,9 +124,9 @@ export const roomTemplate = (n: number, over: Partial<RoomTemplate> = {}): RoomT
   sortOrder: n,
   isActive: true,
   lines: [
-    { functionTypeId: functionTypes[0].id, quantity: 3, powerW: 7.5, loadTypeId: loadTypes[0].id, label: 'Ceiling' },
-    { functionTypeId: functionTypes[1].id, quantity: 2, powerW: null, loadTypeId: null, label: '' },
-    { functionTypeId: functionTypes[2].id, quantity: 1, powerW: null, loadTypeId: null, label: '' },
+    { functionTypeId: functionTypes[0].id, quantity: 3, powerW: '7.50', loadTypeId: loadTypes[0].id, label: 'Ceiling', warnings: [] },
+    { functionTypeId: functionTypes[1].id, quantity: 2, powerW: null, loadTypeId: null, label: '', warnings: [] },
+    { functionTypeId: functionTypes[2].id, quantity: 1, powerW: null, loadTypeId: null, label: '', warnings: ['function_type_inactive'] },
   ],
   can: { update: true, delete: true },
   createdAt: at,

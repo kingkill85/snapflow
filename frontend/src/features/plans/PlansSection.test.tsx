@@ -30,7 +30,7 @@ describe('PlansSection', () => {
     const cards = within(list).getAllByRole('listitem')
     expect(cards).toHaveLength(2)
     expect(within(cards[0]).getByRole('link', { name: 'Ground floor' })).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${plan(1).id}`)
-    expect(within(cards[0]).getByText('Products: 12 · Zones: 3 · Needs: 7')).toBeInTheDocument()
+    expect(within(cards[0]).getByText('Products: 12 · Zones: 3 · Needs: 7 units')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Being edited by Bea')).toBeInTheDocument()
     expect(within(cards[0]).getByRole('button', { name: 'Move Ground floor left' })).toBeDisabled()
     expect(within(cards[1]).getByRole('button', { name: 'Move Floor 2 right' })).toBeDisabled()

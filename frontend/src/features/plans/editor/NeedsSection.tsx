@@ -3,14 +3,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { LoadType, NeedWarning, PlanNeed, PlanZone, RoomTemplate } from '@/api/generated/model'
-import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
-import { Button, Field, IconButton, Notice, SelectField, TextareaField } from '@/components/ui'
+import { useDecimalSeparator } from '@/catalog/decimal'
+import { Button, errorKey, Field, IconButton, Notice, SelectField, TextareaField, useFieldError } from '@/components/ui'
+import { formatWatts, maxPowerW, parsePower } from '@/features/needs'
 import { useLocalized } from '@/i18n/localized'
 
 import { isSymbol, type NeedPatch } from './document'
 import type { EditorAction } from './editor-state'
 import { functionTypeOptions, type NeedCatalog, useNeedText } from './need-catalog'
-import { allowedLoadTypes, applyTemplate, functionTypePatch, needZoneId, newNeed } from './needs'
+import { allowedLoadTypes, applyTemplate, functionTypePatch, maxNeeds, needZoneId, newNeed } from './needs'
 
 type SectionProps = {
   zoneId: string
@@ -29,12 +30,15 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
   const localize = useLocalized()
   const text = useNeedText(catalog)
   const [open, setOpen] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string[] | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'warning'; lines: string[] } | null>(null)
   const needs = all.filter((n) => !isSymbol(n) && n.zoneId === zoneId)
   const symbols = all.filter((n) => isSymbol(n) && needZoneId(n, zones) === zoneId)
   const active = catalog.functionTypes.filter((f) => f.isActive)
 
+  // A plan holds at most maxNeeds needs: refused here instead of a failing save.
+  const limitNotice = () => setNotice({ tone: 'warning', lines: [t('needs.limit', { max: maxNeeds })] })
   const add = (functionTypeId: string) => {
+    if (all.length + 1 > maxNeeds) return limitNotice()
     const need = newNeed(functionTypeId, zoneId)
     dispatch({ type: 'change', action: { type: 'addNeeds', needs: [need] } })
     setOpen(need.id)
@@ -49,13 +53,14 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
   }
   const apply = (template: RoomTemplate) => {
     const result = applyTemplate(template, zoneId, catalog.functionTypeById, catalog.loadTypeById)
+    if (all.length + result.needs.length > maxNeeds) return limitNotice()
     // All lines in one undo step.
     if (result.needs.length > 0) dispatch({ type: 'change', action: { type: 'addNeeds', needs: result.needs } })
     const name = localize(template.name)
-    setNotice([
-      t('needs.applied', { count: result.needs.length, name }),
-      ...(result.skipped > 0 ? [t('needs.skipped', { count: result.skipped })] : []),
-    ])
+    setNotice({
+      tone: result.skipped > 0 ? 'warning' : 'success',
+      lines: [t('needs.applied', { count: result.needs.length, name }), ...(result.skipped > 0 ? [t('needs.skipped', { count: result.skipped })] : [])],
+    })
   }
 
   return (
@@ -80,7 +85,13 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
                     <>
                       <IconButton label={t('needs.moveUp', { name })} icon={<ArrowUp />} disabled={i === 0} onClick={() => move(i, -1)} />
                       <IconButton label={t('needs.moveDown', { name })} icon={<ArrowDown />} disabled={i === needs.length - 1} onClick={() => move(i, 1)} />
-                      <IconButton label={t('needs.edit', { name })} icon={<Pencil />} aria-expanded={open === n.id} onClick={() => setOpen(open === n.id ? null : n.id)} />
+                      <IconButton
+                        variant="secondary"
+                        label={t('needs.edit', { name })}
+                        icon={<Pencil />}
+                        aria-expanded={open === n.id}
+                        onClick={() => setOpen(open === n.id ? null : n.id)}
+                      />
                       <IconButton
                         variant="danger-quiet"
                         label={t('needs.delete', { name })}
@@ -106,8 +117,8 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
       )}
       {symbols.length > 0 && <p className="text-xs text-muted">{t('needs.symbolsHint', { count: symbols.length })}</p>}
       {notice && (
-        <Notice tone={notice.length > 1 ? 'warning' : 'success'}>
-          {notice.map((line) => (
+        <Notice tone={notice.tone}>
+          {notice.lines.map((line) => (
             <span key={line} className="block">
               {line}
             </span>
@@ -234,30 +245,33 @@ function QuantityField({ value, disabled, onCommit }: { value: number; disabled:
   )
 }
 
-/** Power per unit in W: the UI language's decimal separator (D144), empty = unknown. */
-function PowerField({ value, disabled, onCommit }: { value: number | null; disabled: boolean; onCommit: (n: number | null) => void }) {
+/**
+ * Power per unit in W: the UI language's decimal separator (D144), empty =
+ * unknown; written as the API's decimal string with 2 decimals ("7.50"),
+ * refused like the backend refuses it (more than 2 decimals, above 100000).
+ */
+function PowerField({ value, disabled, onCommit }: { value: string | null; disabled: boolean; onCommit: (watts: string | null) => void }) {
   const { t } = useTranslation('plans')
+  const fieldError = useFieldError()
   const separator = useDecimalSeparator()
-  const shown = value === null ? '' : formatDecimal(value, separator)
+  const shown = value === null ? '' : formatWatts(value, separator)
   const [draft, setDraft] = useState<string | null>(null)
-  const parsed = draft === null || draft.trim() === '' ? undefined : parseDecimal(draft)
-  const invalid = draft !== null && draft.trim() !== '' && (parsed === undefined || Number(parsed) < 0 || Number(parsed) > 100000)
+  const invalid = draft !== null && parsePower(draft) === undefined
   return (
     <Field
       label={t('needs.power')}
+      hint={t('needs.powerHint')}
       inputMode="decimal"
       suffix="W"
       value={draft ?? shown}
       disabled={disabled}
-      error={invalid ? t('needs.invalidPower') : undefined}
+      error={invalid ? fieldError(errorKey('need.power_invalid', { max: maxPowerW })) : undefined}
       onFocus={() => setDraft(shown)}
       onBlur={() => setDraft(null)}
       onChange={(e) => {
-        const v = e.target.value
-        setDraft(v)
-        if (v.trim() === '') return onCommit(null)
-        const p = parseDecimal(v)
-        if (p !== undefined && Number(p) >= 0 && Number(p) <= 100000) onCommit(Number(p))
+        setDraft(e.target.value)
+        const watts = parsePower(e.target.value)
+        if (watts !== undefined) onCommit(watts)
       }}
     />
   )

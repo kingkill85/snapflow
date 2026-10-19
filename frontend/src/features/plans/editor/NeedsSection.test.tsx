@@ -72,7 +72,7 @@ const needsOf = () => JSON.parse(screen.getByTestId('needs').textContent ?? '[]'
 describe('zone needs section', () => {
   it('lists needs in plain words with errors and warnings at the row; reorders and deletes', async () => {
     const user = userEvent.setup()
-    const needs = [need(1, { quantity: 3, powerW: 60, loadTypeId: loadTypes[0].id, label: 'Ceiling', note: 'Over the table' }), need(2, { functionTypeId: functionTypes[1].id, label: 'Window' })]
+    const needs = [need(1, { quantity: 3, powerW: '60.00', loadTypeId: loadTypes[0].id, label: 'Ceiling', note: 'Over the table' }), need(2, { functionTypeId: functionTypes[1].id, label: 'Window' })]
     renderWithProviders(
       <Harness
         needs={needs}
@@ -88,12 +88,12 @@ describe('zone needs section', () => {
     expect(within(first).getByRole('alert')).toHaveTextContent('Must be between 1 and 100.')
     expect(within(section).getByText('The function type is inactive in the catalog.')).toBeInTheDocument()
 
-    await user.click(within(section).getByRole('button', { name: 'Move Blind · Window up' }))
+    await user.click(within(section).getByRole('button', { name: 'Move 1 × Blind · Window up' }))
     expect(needsOf()).toEqual([
       ['Window', 1],
       ['Ceiling', 3],
     ])
-    await user.click(within(section).getByRole('button', { name: 'Delete Blind · Window' }))
+    await user.click(within(section).getByRole('button', { name: 'Delete 1 × Blind · Window' }))
     expect(needsOf()).toEqual([['Ceiling', 3]])
     await user.click(screen.getByRole('button', { name: 'undo' }))
     await user.click(screen.getByRole('button', { name: 'undo' }))
@@ -154,7 +154,7 @@ describe('zone needs section', () => {
     const user = userEvent.setup()
     const symbol = need(5, { x: 100, y: 100, zoneId: null, label: 'Hall' })
     renderWithProviders(<Harness needs={[symbol]} selection={[symbol.id]} spy={vi.fn()} />)
-    expect(screen.getByText('Dimmable light · Hall')).toBeInTheDocument()
+    expect(screen.getByText('1 × Dimmable light · Hall')).toBeInTheDocument()
     expect(screen.getByText('Zone: Living')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     expect(needsOf()).toEqual([])

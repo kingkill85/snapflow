@@ -151,7 +151,8 @@
     "zoneRect": "Drag a rectangle on the plan.",
     "zonePolygon": "Click the corners. Double-click, Enter or a click on the first corner closes the zone; Esc cancels.",
     "calibrate": "Click two points whose real distance you know; Esc cancels.",
-    "placeNeed": "Click on the plan to place the need symbol; Esc cancels."
+    "placeNeed": "Click on the plan to place the need symbol; Esc cancels.",
+    "placeNeedChoose": "Choose the function type of the symbol, then click on the plan; Esc cancels."
   },
   "layers": {
     "hint": "Hidden items are not shown, selectable or exported. This view is not saved.",
@@ -204,15 +205,23 @@
     "count_other": "{{count}} needs",
     "inactive": "{{name}} (inactive)",
     "unknown": "Unknown function type",
-    "invalidPower": "Enter a power from 0 to 100000 W.",
     "placeFunction": "Function type of the next symbol",
     "noFunctionTypes": "There are no active function types in the catalog.",
     "zoneOfSymbol": "Zone",
-    "noZone": "Outside every zone"
+    "noZone": "Outside every zone",
+    "limit": "A plan can have at most {{max}} needs: nothing was added."
   },
   "needWarning": {
     "need_function_type_inactive": "The function type is inactive in the catalog.",
     "need_outside_zones": "The symbol lies outside every zone.",
     "need_load_type_not_allowed": "The function type no longer allows this load type."
+  },
+  "needUnits_one": "{{count}} unit",
+  "needUnits_other": "{{count}} units",
+  "notice": {
+    "copySkipped_one": "{{count}} need symbol was not copied: its function type or load type is inactive.",
+    "copySkipped_other": "{{count}} need symbols were not copied: their function type or load type is inactive.",
+    "zoneNeeds_one": "{{count}} need was removed with its zone (Undo brings it back).",
+    "zoneNeeds_other": "{{count}} needs were removed with their zone (Undo brings them back)."
   }
 }

@@ -32,8 +32,9 @@ import { isSymbol, type PlanDocument } from './document'
 import type { EditorAction } from './editor-state'
 import { chromeName } from './export'
 import { type Layers, placementVisible, visibleSymbols, zoneVisible } from './layers'
-import { duplicateSymbols, type SymbolIcon } from './needs'
-import { clampMove, duplicatePlacements, resizeChanges } from './placements'
+import { type SymbolIcon } from './needs'
+import type { CopyItems } from './use-shortcuts'
+import { clampMove, resizeChanges } from './placements'
 import {
   canClose,
   clampToImage,
@@ -104,6 +105,8 @@ type Props = {
   needWarningIds: Set<string>
   /** The "Place need" tool: a click puts a symbol here. */
   onPlaceNeed: (point: Point) => void
+  /** Alt-drag: copies of the dragged placements and symbols (one step). */
+  onCopy: CopyItems
   /** Resizing a placement resizes every placement of its product. */
   resizeAll: boolean
   activeVertex: ActiveVertex | null
@@ -150,6 +153,7 @@ export function PlanCanvas({
   symbolLooks,
   needWarningIds,
   onPlaceNeed,
+  onCopy,
   resizeAll,
   activeVertex,
   onActiveVertex,
@@ -391,14 +395,7 @@ export function PlanCanvas({
         // Rounded to whole pixels, still inside the image.
         const { dx, dy } = clampMove(document, done.ids, Math.round(done.dx), Math.round(done.dy), plan.image)
         if (done.copy) {
-          const copies = duplicatePlacements(document.placements.filter((p) => done.ids.includes(p.id)), dx, dy, plan.image)
-          const needCopies = duplicateSymbols(document.needs.filter((n) => done.ids.includes(n.id)), dx, dy, plan.image)
-          if (copies.length + needCopies.length > 0)
-            dispatch({
-              type: 'change',
-              action: { type: 'batch', actions: [{ type: 'addPlacements', placements: copies }, { type: 'addNeeds', needs: needCopies }] },
-              select: [...copies.map((c) => c.id), ...needCopies.map((c) => c.id)],
-            })
+          onCopy({ placements: document.placements.filter((p) => done.ids.includes(p.id)), needs: document.needs.filter((n) => done.ids.includes(n.id)) }, dx, dy)
         } else {
           dispatch({ type: 'change', action: { type: 'moveBy', ids: done.ids, dx, dy } })
         }
@@ -420,7 +417,8 @@ export function PlanCanvas({
         const hits = [
           ...zones.filter((z) => rectsIntersect(band, zoneBounds(z))).map((z) => z.id),
           ...placements.filter((p) => rectsIntersect(band, boundsOf(boxCorners(p)))).map((p) => p.id),
-          ...symbols.filter((n) => rectsIntersect(band, { x: n.x, y: n.y, width: 0, height: 0 })).map((n) => n.id),
+          // A symbol by its drawn circle (screen-sized).
+          ...symbols.filter((n) => rectsIntersect(band, symbolBounds(n, k))).map((n) => n.id),
         ]
         dispatch(done.add ? { type: 'select', ids: [...new Set([...selection, ...hits])] } : { type: 'select', ids: hits })
         return
@@ -797,8 +795,14 @@ function Handles({ placement: p, k, color, surface }: { placement: PlanPlacement
   )
 }
 
-/** Radius of a load symbol in screen px. */
+/** Radius of a load symbol in screen px: its drawn circle is what selects and moves it. */
 const symbolRadius = 11
+
+/** The drawn circle of a load symbol as a box in image px (`k` = one screen px). */
+const symbolBounds = (n: { x: number; y: number }, k: number) => {
+  const r = symbolRadius * k
+  return { x: n.x - r, y: n.y - r, width: 2 * r, height: 2 * r }
+}
 
 /**
  * A load symbol (3b): a small round icon with a pictogram for common
@@ -806,10 +810,12 @@ const symbolRadius = 11
  * first letter, the quantity and label below. Screen-sized like labels.
  */
 function NeedNode({ need: n, look, selected, warning, error, k, theme }: { need: PlanNeed; look: SymbolLook | undefined; selected: boolean; warning: boolean; error: boolean; k: number; theme: PlanColors }) {
+  const { t } = useTranslation('needs')
   const r = symbolRadius * k
   const ink = error ? theme.danger : theme.ink
   const d = r * 0.5
-  const caption = [n.quantity > 1 ? `${n.quantity} ×` : '', n.label].filter(Boolean).join(' ')
+  // The pictogram names the function: the caption adds a quantity above 1 and the label.
+  const caption = [n.quantity > 1 ? t('line.count', { count: n.quantity }) : '', n.label].filter(Boolean).join(' ')
   return (
     <Group name="need" id={n.id} x={n.x ?? 0} y={n.y ?? 0}>
       <Circle radius={r} fill={theme.surface} stroke={ink} strokeWidth={(selected || error ? 2.5 : 1.5) * k} />

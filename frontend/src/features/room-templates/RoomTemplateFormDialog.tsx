@@ -11,7 +11,7 @@ import { useListFunctionTypes } from '@/api/generated/function-types/function-ty
 import { useListLoadTypes } from '@/api/generated/load-types/load-types'
 import type { RoomTemplate, RoomTemplateInput, RoomTemplateLine } from '@/api/generated/model'
 import { getListRoomTemplatesQueryKey, useCreateRoomTemplate, useUpdateRoomTemplate } from '@/api/generated/room-templates/room-templates'
-import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
+import { useDecimalSeparator } from '@/catalog/decimal'
 import {
   apiFields,
   Button,
@@ -34,8 +34,10 @@ import {
   useRepeaterFocus,
 } from '@/components/ui'
 import { StaleReload } from '@/features/capabilities/StaleReload'
+import { formatWatts, maxPowerW, parsePower } from '@/features/needs'
 import { useLocalized } from '@/i18n/localized'
 
+import { lineState } from './line-state'
 import { functionTypeOptions, loadTypeOptions } from './options'
 
 const maxLines = 100
@@ -45,11 +47,8 @@ const lineSchema = z.object({
   quantity: z
     .string()
     .refine((q) => /^\d+$/.test(q.trim()) && Number(q) >= 1 && Number(q) <= 100, errorKey('validation.range', { min: 1, max: 100 })),
-  powerW: z.string().refine((p) => {
-    if (p.trim() === '') return true
-    const v = parseDecimal(p)
-    return v !== undefined && Number(v) >= 0 && Number(v) <= 100000
-  }, errorKey('validation.range', { min: 0, max: 100000 })),
+  // The backend's rule: 0-100000 W with at most 2 decimals, empty = unknown.
+  powerW: z.string().refine((p) => parsePower(p) !== undefined, errorKey('need.power_invalid', { max: maxPowerW })),
   loadTypeId: z.string(),
   label: z.string().max(100, errorKey('validation.too_long', { max: 100 })),
 })
@@ -85,7 +84,7 @@ const emptyLine = (): LineValues => ({ functionTypeId: '', quantity: '1', powerW
 const toLineValues = (l: RoomTemplateLine, separator: ',' | '.'): LineValues => ({
   functionTypeId: l.functionTypeId,
   quantity: String(l.quantity),
-  powerW: l.powerW === null ? '' : formatDecimal(l.powerW, separator),
+  powerW: l.powerW === null ? '' : formatWatts(l.powerW, separator),
   loadTypeId: l.loadTypeId ?? '',
   label: l.label,
 })
@@ -106,7 +105,7 @@ const toInput = (v: FormValues): RoomTemplateInput => ({
   lines: v.lines.map((l) => ({
     functionTypeId: l.functionTypeId,
     quantity: Number(l.quantity),
-    powerW: l.powerW.trim() === '' ? null : Number(parseDecimal(l.powerW)),
+    powerW: parsePower(l.powerW) ?? null,
     loadTypeId: l.loadTypeId === '' ? null : l.loadTypeId,
     label: l.label.trim(),
   })),
@@ -218,8 +217,7 @@ export function RoomTemplateFormDialog({ open, onOpenChange, item, onSaved }: Pr
         {lines.fields.map((row, i) => {
           const v = values[i] ?? row
           const ft = fts.find((f) => f.id === v.functionTypeId)
-          const lt = lts.find((l) => l.id === v.loadTypeId)
-          const flagged = (ft !== undefined && !ft.isActive) || (lt !== undefined && !lt.isActive)
+                    const state = lineState(v, item?.lines ?? [], fts, lts)
           const title = t('line.title', { n: i + 1 })
           const lineErrors = errors.lines?.[i]
           return (
@@ -229,7 +227,7 @@ export function RoomTemplateFormDialog({ open, onOpenChange, item, onSaved }: Pr
               compact
               title={title}
               subtitle={ft ? localized(ft.name) : undefined}
-              invalid={!!lineErrors || flagged}
+              invalid={!!lineErrors || state.blocked}
               controls={
                 <RepeaterControls
                   index={i}
@@ -246,7 +244,15 @@ export function RoomTemplateFormDialog({ open, onOpenChange, item, onSaved }: Pr
                 />
               }
             >
-              {flagged && <p className="text-sm text-danger">{t('line.inactiveReference')}</p>}
+              {state.blocked ? (
+                <p className="text-sm text-danger">{t('line.inactiveReference')}</p>
+              ) : (
+                state.warnings.map((w) => (
+                  <p key={w} className="text-sm text-warning">
+                    {t(`line.warning.${w}`)}
+                  </p>
+                ))
+              )}
               <div className="grid items-start gap-3 sm:grid-cols-2">
                 <Controller
                   control={form.control}

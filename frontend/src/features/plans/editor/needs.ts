@@ -1,11 +1,11 @@
 import type { FunctionType, LoadType, PlanNeed, PlanZone, RoomTemplate } from '@/api/generated/model'
 import { clamp, type Point, type Size } from '@/canvas'
-import type { LocalizedText } from '@/i18n/localized'
 
 import { isSymbol, newId } from './document'
 import { zoneAt } from './zones'
 
-type Localize = (text: LocalizedText | undefined) => string
+/** At most this many needs per plan (the backend's MaxNeeds, validation.too_many). */
+export const maxNeeds = 2000
 
 /** A new need of a zone (no position), or a load symbol at a point (kept inside the image). */
 export function newNeed(functionTypeId: string, zoneId: string | null, at?: Point, image?: Size): PlanNeed {
@@ -23,15 +23,42 @@ export function newNeed(functionTypeId: string, zoneId: string | null, at?: Poin
   }
 }
 
-/** Copies of load symbols with new ids, moved by (dx, dy) and kept inside the image (duplicate, paste). */
-export function duplicateSymbols(needs: PlanNeed[], dx: number, dy: number, image?: Size): PlanNeed[] {
-  return needs.filter(isSymbol).map((n) => ({
-    ...n,
-    id: newId(),
-    x: image ? clamp(n.x + dx, 0, image.width) : n.x + dx,
-    y: image ? clamp(n.y + dy, 0, image.height) : n.y + dy,
-    zoneId: null,
-  }))
+/**
+ * Copies of load symbols with new ids, moved by (dx, dy) and kept inside the
+ * image (duplicate, paste, alt-drag). Pass `functionTypes` to leave out
+ * symbols whose function type is inactive or gone (a new need must have an
+ * active one); the caller reports them.
+ */
+export function duplicateSymbols(needs: PlanNeed[], dx: number, dy: number, image?: Size, keep: (n: PlanNeed) => boolean = () => true): PlanNeed[] {
+  return needs
+    .filter(isSymbol)
+    .filter(keep)
+    .map((n) => ({
+      ...n,
+      id: newId(),
+      x: image ? clamp(n.x + dx, 0, image.width) : n.x + dx,
+      y: image ? clamp(n.y + dy, 0, image.height) : n.y + dy,
+      zoneId: null,
+    }))
+}
+
+/**
+ * Whether a new need with these references would be accepted: an active
+ * function type, no load type or an active one the function type allows
+ * (the backend's rule for new needs; stored and restored ones may keep
+ * inactive references, D343). Template lines and copies that fail it are
+ * skipped and reported.
+ */
+export function usableForNewNeed(
+  need: Pick<PlanNeed, 'functionTypeId' | 'loadTypeId'>,
+  functionTypes: Map<string, FunctionType>,
+  loadTypes: Map<string, LoadType>,
+): boolean {
+  const ft = functionTypes.get(need.functionTypeId)
+  if (!ft?.isActive) return false
+  if (need.loadTypeId === null) return true
+  const lt = loadTypes.get(need.loadTypeId)
+  return lt?.isActive === true && (ft.loadTypeIds.length === 0 || ft.loadTypeIds.includes(need.loadTypeId))
 }
 
 /** The load types a need of this function type may have: its list, or every load type when it lists none. */
@@ -45,28 +72,6 @@ export function allowedLoadTypes(functionType: FunctionType | undefined, loadTyp
 export function functionTypePatch(need: Pick<PlanNeed, 'loadTypeId'>, functionType: FunctionType | undefined) {
   const keep = need.loadTypeId === null || !functionType || functionType.loadTypeIds.length === 0 || functionType.loadTypeIds.includes(need.loadTypeId)
   return { functionTypeId: functionType?.id ?? '', ...(keep ? {} : { loadTypeId: null }) }
-}
-
-/**
- * A need in plain words: "3 × Dimmable light · 60 W · LED · Ceiling"
- * (quantity only above 1, power, load type and label only when set).
- */
-export function needText(
-  need: Pick<PlanNeed, 'quantity' | 'functionTypeId' | 'powerW' | 'loadTypeId' | 'label'>,
-  functionTypes: Map<string, FunctionType>,
-  loadTypes: Map<string, LoadType>,
-  localize: Localize,
-  formatNumber: (n: number) => string,
-  unknown: string,
-): string {
-  const ft = functionTypes.get(need.functionTypeId)
-  const name = ft ? localize(ft.name) : unknown
-  const parts = [need.quantity > 1 ? `${need.quantity} × ${name}` : name]
-  if (need.powerW !== null) parts.push(`${formatNumber(need.powerW)} W`)
-  const lt = need.loadTypeId ? loadTypes.get(need.loadTypeId) : undefined
-  if (lt) parts.push(localize(lt.name))
-  if (need.label) parts.push(need.label)
-  return parts.join(' · ')
 }
 
 /**
@@ -100,14 +105,11 @@ export function applyTemplate(template: RoomTemplate, zoneId: string, functionTy
   const needs: PlanNeed[] = []
   let skipped = 0
   for (const line of template.lines) {
-    const ft = functionTypes.get(line.functionTypeId)
-    const lt = line.loadTypeId ? loadTypes.get(line.loadTypeId) : undefined
-    const loadOk = line.loadTypeId === null || (lt?.isActive === true && (ft?.loadTypeIds.length === 0 || ft?.loadTypeIds.includes(line.loadTypeId)))
-    if (!ft?.isActive || !loadOk) {
+    if (!usableForNewNeed(line, functionTypes, loadTypes)) {
       skipped++
       continue
     }
-    needs.push({ ...newNeed(ft.id, zoneId), quantity: line.quantity, powerW: line.powerW, loadTypeId: line.loadTypeId, label: line.label })
+    needs.push({ ...newNeed(line.functionTypeId, zoneId), quantity: line.quantity, powerW: line.powerW, loadTypeId: line.loadTypeId, label: line.label })
   }
   return { needs, skipped }
 }

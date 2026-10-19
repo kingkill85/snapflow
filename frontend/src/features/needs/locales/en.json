@@ -18,8 +18,10 @@
     }
   },
   "line": {
-    "quantity": "{{count}} ×",
-    "power": "{{power}} W"
+    "quantity": "{{count}} × {{name}}",
+    "count": "{{count}} ×",
+    "power": "{{power}} W",
+    "unknown": "Unknown function type"
   },
   "totals_one": "{{count}} unit",
   "totals_other": "{{count}} units",

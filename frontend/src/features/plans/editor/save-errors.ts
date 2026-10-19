@@ -1,5 +1,5 @@
 import { ApiError } from '@/api/client'
-import type { FieldError } from '@/api/generated/model'
+import type { FieldError, PlanNeed, PlanPlacement } from '@/api/generated/model'
 
 import type { PlanDocument } from './document'
 
@@ -37,4 +37,25 @@ export function selectionFor(id: string, doc: PlanDocument): string {
   const need = doc.needs.find((n) => n.id === id)
   if (need && (need.x === null || need.y === null) && need.zoneId) return need.zoneId
   return id
+}
+
+/** How the save-error list names items. */
+export type ItemNames = {
+  /** A need in plain words (the shared need text). */
+  need: (need: PlanNeed) => string
+  /** A placement's label or product name; undefined when it has neither. */
+  placement: (placement: PlanPlacement) => string | undefined
+}
+
+/**
+ * The name of an item with a save error: a need (row or load symbol) in
+ * plain words, a placement by label or product, a zone by name; undefined
+ * when there is none (the list then numbers it).
+ */
+export function itemName(id: string, doc: PlanDocument, names: ItemNames): string | undefined {
+  const need = doc.needs.find((n) => n.id === id)
+  if (need) return names.need(need)
+  const placement = doc.placements.find((p) => p.id === id)
+  if (placement) return names.placement(placement)
+  return doc.zones.find((z) => z.id === id)?.name || undefined
 }

@@ -174,6 +174,7 @@
     "load_type_inactive": "Diese Lastart ist nicht mehr aktiv. Wählen Sie eine andere.",
     "load_type_not_allowed": "Diese Lastart passt nicht zum Funktionstyp.",
     "position_partial": "Geben Sie beide Koordinaten der Position an oder keine.",
+    "power_invalid": "Geben Sie eine Leistung von 0 bis {{max}} W mit höchstens 2 Nachkommastellen ein.",
     "zone_not_found": "Diese Zone existiert nicht mehr."
   },
   "network": {

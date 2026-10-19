@@ -153,7 +153,7 @@ async function seed(api: Api, lang: Lang) {
       equipmentLevel: { en: 'Comfort', de: 'Komfort' },
       isActive: true,
       lines: [
-        { functionTypeId: dimmable.id, quantity: 4, powerW: 7.5, loadTypeId: led.id, label: 'Ceiling' },
+        { functionTypeId: dimmable.id, quantity: 4, powerW: '7.5', loadTypeId: led.id, label: 'Ceiling' },
         { functionTypeId: blindFn.id, quantity: 2, powerW: null, loadTypeId: null, label: '' },
       ],
     },
@@ -180,7 +180,7 @@ async function seed(api: Api, lang: Lang) {
   }
   const bath = content.zones[2].id
   content.needs = [
-    need(dimmable.id, { zoneId: bath, quantity: 3, powerW: 7.5, loadTypeId: led.id, label: 'Ceiling spots over the bathtub and the double washbasin', note: 'Warm white, IP44' }),
+    need(dimmable.id, { zoneId: bath, quantity: 3, powerW: '7.5', loadTypeId: led.id, label: 'Ceiling spots over the bathtub and the double washbasin', note: 'Warm white, IP44' }),
     need(blindFn.id, { zoneId: bath, quantity: 1, label: 'Window' }),
     need(heating.id, { zoneId: bath, quantity: 1 }),
     need(dimmable.id, { x: 300, y: 250, quantity: 2, label: 'Pendant' }),

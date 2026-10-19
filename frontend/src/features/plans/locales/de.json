@@ -151,7 +151,8 @@
     "zoneRect": "Ziehen Sie ein Rechteck auf dem Plan auf.",
     "zonePolygon": "Klicken Sie die Ecken an. Doppelklick, Enter oder ein Klick auf die erste Ecke schließt die Zone; Esc bricht ab.",
     "calibrate": "Klicken Sie zwei Punkte an, deren echten Abstand Sie kennen; Esc bricht ab.",
-    "placeNeed": "Klicken Sie auf den Plan, um das Bedarfssymbol zu setzen; Esc bricht ab."
+    "placeNeed": "Klicken Sie auf den Plan, um das Bedarfssymbol zu setzen; Esc bricht ab.",
+    "placeNeedChoose": "Wählen Sie den Funktionstyp des Symbols und klicken Sie dann auf den Plan; Esc bricht ab."
   },
   "layers": {
     "hint": "Ausgeblendetes wird nicht angezeigt, ist nicht auswählbar und wird nicht exportiert. Diese Ansicht wird nicht gespeichert.",
@@ -204,15 +205,23 @@
     "count_other": "Bedarf: {{count}} Stück",
     "inactive": "{{name}} (inaktiv)",
     "unknown": "Unbekannter Funktionstyp",
-    "invalidPower": "Geben Sie eine Leistung von 0 bis 100000 W ein.",
     "placeFunction": "Funktionstyp des nächsten Symbols",
     "noFunctionTypes": "Im Katalog gibt es keine aktiven Funktionstypen.",
     "zoneOfSymbol": "Zone",
-    "noZone": "Außerhalb aller Zonen"
+    "noZone": "Außerhalb aller Zonen",
+    "limit": "Ein Plan kann höchstens {{max}} Bedarfe haben: Es wurde nichts hinzugefügt."
   },
   "needWarning": {
     "need_function_type_inactive": "Der Funktionstyp ist im Katalog inaktiv.",
     "need_outside_zones": "Das Symbol liegt außerhalb aller Zonen.",
     "need_load_type_not_allowed": "Der Funktionstyp erlaubt diese Lastart nicht mehr."
+  },
+  "needUnits_one": "{{count}} Stück",
+  "needUnits_other": "{{count}} Stück",
+  "notice": {
+    "copySkipped_one": "{{count}} Bedarfssymbol wurde nicht kopiert: Funktionstyp oder Lastart ist inaktiv.",
+    "copySkipped_other": "{{count}} Bedarfssymbole wurden nicht kopiert: Funktionstyp oder Lastart ist inaktiv.",
+    "zoneNeeds_one": "{{count}} Bedarf wurde mit seiner Zone entfernt (Rückgängig stellt ihn wieder her).",
+    "zoneNeeds_other": "{{count}} Bedarfe wurden mit ihrer Zone entfernt (Rückgängig stellt sie wieder her)."
   }
 }

@@ -74,7 +74,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   await page.getByRole('option', { name: blind }).click()
   await needs.getByLabel('Label').fill('Window')
   await needs.getByRole('button', { name: 'Done' }).click()
-  await expect(needs.getByRole('listitem', { name: `${blind} · Window` })).toBeVisible()
+  await expect(needs.getByRole('listitem', { name: `1 × ${blind} · Window` })).toBeVisible()
   await saved(page)
 
   // A load symbol in the kitchen.
@@ -93,7 +93,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   const symbol = content.needs.find((n) => n.x !== null)!
   expect(symbol).toMatchObject({ functionTypeId: lightType.id, zoneId: kitchen.id })
   expect(content.needs.filter((n) => n.zoneId === living.id).map((n) => [n.functionTypeId, n.quantity, n.powerW, n.label])).toEqual([
-    [lightType.id, 3, 7.5, 'Ceiling'],
+    [lightType.id, 3, '7.50', 'Ceiling'],
     [blindType.id, 1, null, 'Window'],
   ])
 

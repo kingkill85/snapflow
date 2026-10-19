@@ -18,30 +18,30 @@ export const needsSummary: VersionNeeds = {
           zoneId: id(20),
           name: 'Living room',
           needs: [
-            { id: id(30), functionType: dimmable, loadType: led, quantity: 3, powerW: 7.5, label: 'Ceiling', note: 'Warm white', symbol: false },
+            { id: id(30), functionType: dimmable, loadType: led, quantity: 3, powerW: '7.50', label: 'Ceiling', note: 'Warm white', symbol: false },
             { id: id(31), functionType: blind, loadType: null, quantity: 1, powerW: null, label: '', note: '', symbol: true },
           ],
-          totals: { quantity: 4, powerW: 22.5 },
+          totals: { quantity: 4, powerW: '22.50' },
         },
         {
           zoneId: null,
           name: '',
           needs: [{ id: id(32), functionType: blind, loadType: null, quantity: 2, powerW: null, label: 'Terrace', note: '', symbol: true }],
-          totals: { quantity: 2, powerW: 0 },
+          totals: { quantity: 2, powerW: '0.00' },
         },
       ],
-      totals: { quantity: 6, powerW: 22.5 },
+      totals: { quantity: 6, powerW: '22.50' },
     },
   ],
   functionTypes: [
-    { functionType: blind, totals: { quantity: 3, powerW: 0 } },
-    { functionType: dimmable, totals: { quantity: 3, powerW: 22.5 } },
+    { functionType: blind, totals: { quantity: 3, powerW: '0.00' } },
+    { functionType: dimmable, totals: { quantity: 3, powerW: '22.50' } },
   ],
   loadTypes: [
-    { loadType: led, totals: { quantity: 3, powerW: 22.5 } },
-    { loadType: null, totals: { quantity: 3, powerW: 0 } },
+    { loadType: led, totals: { quantity: 3, powerW: '22.50' } },
+    { loadType: null, totals: { quantity: 3, powerW: '0.00' } },
   ],
-  totals: { quantity: 6, powerW: 22.5 },
+  totals: { quantity: 6, powerW: '22.50' },
 }
 
-export const emptyNeeds: VersionNeeds = { plans: [], functionTypes: [], loadTypes: [], totals: { quantity: 0, powerW: 0 } }
+export const emptyNeeds: VersionNeeds = { plans: [], functionTypes: [], loadTypes: [], totals: { quantity: 0, powerW: '0.00' } }

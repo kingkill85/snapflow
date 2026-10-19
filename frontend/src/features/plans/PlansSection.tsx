@@ -86,7 +86,7 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
                 </span>
                 <span className="block px-3 pt-2 font-medium group-hover:underline">{plan.name}</span>
               </Link>
-              <p className="px-3 text-sm text-muted">{t('counts', { products: plan.placementCount, zones: plan.zoneCount, needs: plan.needCount })}</p>
+              <p className="px-3 text-sm text-muted">{t('counts', { products: plan.placementCount, zones: plan.zoneCount, needs: t('needUnits', { count: plan.needCount }) })}</p>
               {plan.lock && !plan.lock.mine && <p className="px-3 text-sm text-warning">{t('lockedBy', { name: plan.lock.name })}</p>}
               {canWrite && plan.can.update && (
                 <div className="mt-auto flex flex-wrap items-center gap-1 p-3 pt-2">

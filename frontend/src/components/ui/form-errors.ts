@@ -70,6 +70,7 @@ export const errorParamNames = {
   'import.undo_conflict': ['count'],
   'import_profile.name_taken': ['name'],
   'load_type.key_taken': ['key'],
+  'need.power_invalid': ['max'],
   'output_kind.key_taken': ['key'],
   'plan.locked': ['name', 'expiresAt'],
   'plan.name_taken': ['name'],

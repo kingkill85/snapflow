@@ -92,7 +92,7 @@ export type PlanContent = {
     zoneId: string | null
     functionTypeId: string
     quantity: number
-    powerW: number | null
+    powerW: string | null
     loadTypeId: string | null
     label: string
     note: string
