@@ -59,6 +59,9 @@ export function PlanEditorPage() {
       </Page>
     )
   }
+  // Never start from cached data (D44): a cached content from an earlier visit carries an old
+  // contentUpdatedAt, so the first save would fail as stale.
+  if (!plan.isFetchedAfterMount || !content.isFetchedAfterMount || !project.isFetchedAfterMount) return <Loading />
   if (!plan.data || !content.data || !project.data || !catalog.data) return <Loading />
   return <PlanEditor key={plan.data.id} plan={plan.data} content={content.data} project={project.data} variants={catalog.data} />
 }
