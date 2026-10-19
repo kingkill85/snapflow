@@ -11,6 +11,47 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearAutoAddresses = `-- name: ClearAutoAddresses :execrows
+UPDATE device_addresses SET knx_area = NULL, knx_line = NULL, knx_device = NULL, hdl_subnet = NULL, hdl_device = NULL,
+    ieee = NULL, updated_at = now()
+WHERE version_id = $1 AND NOT pinned AND (knx_device IS NOT NULL OR hdl_device IS NOT NULL OR ieee IS NOT NULL)
+`
+
+func (q *Queries) ClearAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearAutoAddresses, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const copyAddresses = `-- name: CopyAddresses :exec
+INSERT INTO device_addresses (tenant_id, version_id, plan_id, item_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned)
+SELECT $1::uuid, $2::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.knx_area, a.knx_line,
+    a.knx_device, a.hdl_subnet, a.hdl_device, a.ieee, a.note, a.pinned
+FROM device_addresses a, (SELECT $3::jsonb AS map) m
+WHERE a.version_id = $4::uuid AND m.map ? a.plan_id::text
+`
+
+type CopyAddressesParams struct {
+	TenantID uuid.UUID
+	TargetID uuid.UUID
+	PlanMap  []byte
+	SourceID uuid.UUID
+}
+
+// CopyAddresses copies the addresses of a version into another with the
+// plan ids mapped (a JSON object source id -> copy id).
+func (q *Queries) CopyAddresses(ctx context.Context, arg CopyAddressesParams) error {
+	_, err := q.db.Exec(ctx, copyAddresses,
+		arg.TenantID,
+		arg.TargetID,
+		arg.PlanMap,
+		arg.SourceID,
+	)
+	return err
+}
+
 const copyAssignments = `-- name: CopyAssignments :exec
 INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
 SELECT $1::uuid, $2::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.bus_line_id,
@@ -99,6 +140,21 @@ func (q *Queries) CreateBusLine(ctx context.Context, arg CreateBusLineParams) (B
 	return i, err
 }
 
+const deleteAddress = `-- name: DeleteAddress :exec
+DELETE FROM device_addresses WHERE version_id = $1 AND plan_id = $2 AND item_id = $3
+`
+
+type DeleteAddressParams struct {
+	VersionID uuid.UUID
+	PlanID    uuid.UUID
+	ItemID    uuid.UUID
+}
+
+func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) error {
+	_, err := q.db.Exec(ctx, deleteAddress, arg.VersionID, arg.PlanID, arg.ItemID)
+	return err
+}
+
 const deleteAssignment = `-- name: DeleteAssignment :exec
 DELETE FROM network_assignments WHERE plan_id = $1 AND item_id = $2
 `
@@ -111,6 +167,20 @@ type DeleteAssignmentParams struct {
 func (q *Queries) DeleteAssignment(ctx context.Context, arg DeleteAssignmentParams) error {
 	_, err := q.db.Exec(ctx, deleteAssignment, arg.PlanID, arg.ItemID)
 	return err
+}
+
+const deleteAutoAddresses = `-- name: DeleteAutoAddresses :execrows
+DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned AND note = ''
+`
+
+// DeleteAutoAddresses removes the automatic rows without a note;
+// ClearAutoAddresses keeps the note of the others.
+func (q *Queries) DeleteAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAutoAddresses, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteBusLine = `-- name: DeleteBusLine :execrows
@@ -155,6 +225,46 @@ func (q *Queries) GetBusLine(ctx context.Context, arg GetBusLineParams) (BusLine
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listAddresses = `-- name: ListAddresses :many
+
+SELECT plan_id, item_id, tenant_id, version_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned, updated_at FROM device_addresses WHERE version_id = $1 ORDER BY plan_id, item_id
+`
+
+// ---------------------------------------------------------------- addresses
+func (q *Queries) ListAddresses(ctx context.Context, versionID uuid.UUID) ([]DeviceAddress, error) {
+	rows, err := q.db.Query(ctx, listAddresses, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DeviceAddress{}
+	for rows.Next() {
+		var i DeviceAddress
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ItemID,
+			&i.TenantID,
+			&i.VersionID,
+			&i.KnxArea,
+			&i.KnxLine,
+			&i.KnxDevice,
+			&i.HdlSubnet,
+			&i.HdlDevice,
+			&i.Ieee,
+			&i.Note,
+			&i.Pinned,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAssignments = `-- name: ListAssignments :many
@@ -332,6 +442,47 @@ func (q *Queries) UpdateBusLine(ctx context.Context, arg UpdateBusLineParams) (B
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const upsertAddress = `-- name: UpsertAddress :exec
+INSERT INTO device_addresses (tenant_id, version_id, plan_id, item_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+ON CONFLICT (plan_id, item_id) DO UPDATE SET knx_area = EXCLUDED.knx_area, knx_line = EXCLUDED.knx_line,
+    knx_device = EXCLUDED.knx_device, hdl_subnet = EXCLUDED.hdl_subnet, hdl_device = EXCLUDED.hdl_device,
+    ieee = EXCLUDED.ieee, note = EXCLUDED.note, pinned = EXCLUDED.pinned, updated_at = now()
+`
+
+type UpsertAddressParams struct {
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	PlanID    uuid.UUID
+	ItemID    uuid.UUID
+	KnxArea   *int16
+	KnxLine   *int16
+	KnxDevice *int16
+	HdlSubnet *int16
+	HdlDevice *int16
+	Ieee      *string
+	Note      string
+	Pinned    bool
+}
+
+func (q *Queries) UpsertAddress(ctx context.Context, arg UpsertAddressParams) error {
+	_, err := q.db.Exec(ctx, upsertAddress,
+		arg.TenantID,
+		arg.VersionID,
+		arg.PlanID,
+		arg.ItemID,
+		arg.KnxArea,
+		arg.KnxLine,
+		arg.KnxDevice,
+		arg.HdlSubnet,
+		arg.HdlDevice,
+		arg.Ieee,
+		arg.Note,
+		arg.Pinned,
+	)
+	return err
 }
 
 const upsertAssignment = `-- name: UpsertAssignment :exec

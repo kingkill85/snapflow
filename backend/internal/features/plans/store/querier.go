@@ -94,6 +94,9 @@ type Querier interface {
 	WiringPlans(ctx context.Context, versionID uuid.UUID) ([]WiringPlansRow, error)
 	WiringRows(ctx context.Context, versionID uuid.UUID) ([]WiringRowsRow, error)
 	WiringZones(ctx context.Context, versionID uuid.UUID) ([]WiringZonesRow, error)
+	// ZoneNames: every zone of a version's floorplans with its short name
+	// (channel labels, 3e).
+	ZoneNames(ctx context.Context, versionID uuid.UUID) ([]ZoneNamesRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

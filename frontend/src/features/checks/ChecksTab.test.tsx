@@ -122,7 +122,12 @@ describe('ChecksTab', () => {
     server.use(
       http.post('/api/versions/:versionId/connections/candidates', () =>
         HttpResponse.json({
-          items: [refused(dimmer, dimmerKind, 2, 'channel_overload_w', { loadW: 250, limitW: 200, utilisationPercent: 125 }), refused(relay, relayKind, 1, 'channel_conflict', { baseChannel: 1 })],
+          items: [
+            refused(dimmer, dimmerKind, 2, 'channel_overload_w', { loadW: 250, limitW: 200, utilisationPercent: 125 }),
+            refused(relay, relayKind, 1, 'channel_conflict', { baseChannel: 1 }),
+            refused(relay, relayKind, 2, 'channel_overload_a', { currentA: 17.39, voltage: 230, limitA: 16, utilisationPercent: 109 }),
+            refused(relay, relayKind, 3, 'channel_overload_a', { currentA: 17.39, voltage: 230, limitA: 16, utilisationPercent: 109 }),
+          ],
           reason: 'limits_exceeded',
         } satisfies Candidates),
       ),
@@ -131,9 +136,11 @@ describe('ChecksTab', () => {
     const section = await screen.findByRole('region', { name: 'Unconnected needs' })
     await userEvent.click(within(section).getByRole('button', { name: 'Connect 1 × Light…' }))
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('No free channel fits (power, current or motor type)')).toBeInTheDocument()
-    expect(within(dialog).getByText('2 not possible:')).toBeInTheDocument()
-    expect(within(dialog).getByText(/D1 · Dimmer output 2 \(Main board\): 250 W connected, at most 200 W \(125 % of the limit\)/)).toBeInTheDocument()
+    expect(await within(dialog).findByText('Too large for every available channel (power, current or motor type)')).toBeInTheDocument()
+    expect(within(dialog).getByText('4 not possible:')).toBeInTheDocument()
+    expect(within(dialog).getByText('D1 · Dimmer output 2 (Main board): would draw 250 W (at most 200 W)')).toBeInTheDocument()
+    // Identical refusals are one line.
+    expect(within(dialog).getByText('2 channels: would draw 17.39 A at 230 V (at most 16 A)')).toBeInTheDocument()
     expect(within(dialog).getByText(/^Switch actuator · Relay output 1 \(Main board\) uses output 1, which another channel uses too$/)).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /^Connect to / })).not.toBeInTheDocument()
   })
@@ -158,6 +165,29 @@ describe('ChecksTab', () => {
     const links = within(findings).getAllByRole('link')
     expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${sensor}`)
     expect(links[2]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks`)
+  })
+
+  it('links address findings to the device or line in the Networks tab', async () => {
+    const sensor = '00000000-0000-4000-8000-000000000099'
+    serveChecks({
+      checks: {
+        ...checks,
+        findings: [
+          { severity: 'error', code: 'address_duplicate', refs: { targetPlanId: floorId, itemId: sensor }, params: { label: 'PIR 1', address: '1.1.5', count: 2 } },
+          { severity: 'warning', code: 'address_outside_line', refs: { targetPlanId: floorId, itemId: sensor, busLineId: lineId }, params: { label: 'PIR 1', address: '1.2.5', line: 'KNX 1', prefix: '1.1' } },
+          { severity: 'info', code: 'address_missing', refs: { busLineId: lineId }, params: { name: 'KNX 1', count: 3 } },
+        ],
+      },
+    })
+    render()
+    const findings = await screen.findByRole('region', { name: 'Findings' })
+    expect(within(findings).getAllByText('Networks').length).toBeGreaterThan(0)
+    expect(within(findings).getByText('KNX 1: 3 devices without address')).toBeInTheDocument()
+    const links = within(findings).getAllByRole('link')
+    const tab = `/projects/${projectId}/versions/${versionId}?tab=networks`
+    expect(links[0]).toHaveAttribute('href', `${tab}#device-${sensor}`)
+    expect(links[1]).toHaveAttribute('href', `${tab}#device-${sensor}`)
+    expect(links[2]).toHaveAttribute('href', `${tab}#line-${lineId}`)
   })
 
   it('auto-connects with a preview, re-previews on 409 and undoes the batch', async () => {

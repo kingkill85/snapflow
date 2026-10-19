@@ -271,6 +271,16 @@ func TestZoneMembership(t *testing.T) {
 
 	// Moving a zone re-assigns on the next save.
 	saved := decode[plans.PlanContent](t, resp)
+
+	// A short name is stored (3e, D433) and read back.
+	short := zone(room, rect(50, 50, 400, 400)...)
+	short["shortName"] = " Room "
+	resp = save(api, user.Cookie, saved, []any{short}, nil)
+	wantCode(t, resp, http.StatusOK, "")
+	saved = decode[plans.PlanContent](t, resp)
+	if got := getContent(t, api, user.Cookie, pl.ID).Zones; len(got) != 1 || got[0].ShortName != "Room" {
+		t.Errorf("short name after save: %+v", got)
+	}
 	resp = save(api, user.Cookie, saved, []any{zone(room, rect(500, 500, 700, 700)...)}, []any{placement(inHouse, c.Main, 600, 600)})
 	wantCode(t, resp, http.StatusOK, "")
 	if z := decode[plans.PlanContent](t, resp).Placements[0].ZoneID; z == nil || *z != room {

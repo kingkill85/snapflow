@@ -118,6 +118,218 @@
         ],
         "type": "object"
       },
+      "AddressInput": {
+        "additionalProperties": false,
+        "properties": {
+          "hdl": {
+            "description": "subnet.device (1-254 each); only for HDL items",
+            "type": "string"
+          },
+          "ieee": {
+            "description": "16 hex digits (separators : - and spaces ignored); only for wireless items",
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "knx": {
+            "description": "area.line.device (0-15.0-15.0-255, dots only); only for KNX items",
+            "type": "string"
+          },
+          "note": {
+            "description": "At most 200 characters",
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "itemId"
+        ],
+        "type": "object"
+      },
+      "AddressedItem": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/DeviceAddress",
+            "description": "Absent: no address"
+          },
+          "busLineId": {
+            "type": "string"
+          },
+          "existing": {
+            "type": "boolean"
+          },
+          "gateway": {
+            "type": "boolean"
+          },
+          "gatewayItemId": {
+            "type": "string"
+          },
+          "gatewayPlanId": {
+            "description": "A wireless device's gateway",
+            "type": "string"
+          },
+          "itemId": {
+            "description": "The placement or module id",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "powerSupply": {
+            "description": "Power supplies get no address (D419)",
+            "type": "boolean"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "scheme": {
+            "enum": [
+              "knx",
+              "hdl",
+              "ieee",
+              "none"
+            ],
+            "type": "string"
+          },
+          "systemId": {
+            "description": "The item's product type",
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
+          }
+        },
+        "required": [
+          "systemId",
+          "scheme",
+          "gateway",
+          "powerSupply",
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "variantId",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "Addresses": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Addresses.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/AddressesActions"
+          },
+          "items": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/AddressedItem"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "description": "In line order",
+            "items": {
+              "$ref": "#/components/schemas/LinePrefix"
+            },
+            "type": "array"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "items",
+          "lines",
+          "can"
+        ],
+        "type": "object"
+      },
+      "AddressesActions": {
+        "additionalProperties": false,
+        "properties": {
+          "update": {
+            "description": "Edit, assign and clear addresses (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update"
+        ],
+        "type": "object"
+      },
+      "AddressesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AddressesInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/AddressInput"
+            },
+            "maxItems": 2000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "addresses"
+        ],
+        "type": "object"
+      },
       "ApplyInput": {
         "additionalProperties": false,
         "properties": {
@@ -173,6 +385,82 @@
         "required": [
           "updated",
           "skipped"
+        ],
+        "type": "object"
+      },
+      "AssignInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AssignInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "busLineIds": {
+            "description": "Empty or absent: every line",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "AssignResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AssignResult.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "assigned": {
+            "description": "Items that got an automatic address",
+            "format": "int64",
+            "type": "integer"
+          },
+          "can": {
+            "$ref": "#/components/schemas/AddressesActions"
+          },
+          "items": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/AddressedItem"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "description": "In line order",
+            "items": {
+              "$ref": "#/components/schemas/LinePrefix"
+            },
+            "type": "array"
+          },
+          "unassigned": {
+            "description": "Items left without address (line full or its address field malformed)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assigned",
+          "unassigned",
+          "versionId",
+          "items",
+          "lines",
+          "can"
         ],
         "type": "object"
       },
@@ -1788,6 +2076,10 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -3483,6 +3775,34 @@
         ],
         "type": "object"
       },
+      "DeviceAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "hdl": {
+            "description": "HDL Buspro subnet.device id, e.g. 1.12",
+            "type": "string"
+          },
+          "ieee": {
+            "description": "Zigbee IEEE address, 16 hex digits upper case",
+            "type": "string"
+          },
+          "knx": {
+            "description": "KNX individual address area.line.device, e.g. 1.1.5",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "pinned": {
+            "description": "Set by hand; auto-assign never changes it",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pinned"
+        ],
+        "type": "object"
+      },
       "DisconnectInput": {
         "additionalProperties": false,
         "properties": {
@@ -3517,6 +3837,44 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "DocumentActions": {
+        "additionalProperties": false,
+        "properties": {
+          "delete": {
+            "description": "projects.delete",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "delete"
+        ],
+        "type": "object"
+      },
+      "DocumentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/DocumentInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "installation_manual",
+              "channel_labels"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
         "type": "object"
       },
       "Error": {
@@ -3873,6 +4231,13 @@
             ],
             "type": "string"
           },
+          "knxObjects": {
+            "description": "The KNX communication objects of a need of this function (one group address each)",
+            "items": {
+              "$ref": "#/components/schemas/KNXObject"
+            },
+            "type": "array"
+          },
           "loadTypeIds": {
             "description": "The load types a need of this function may have; empty = any",
             "items": {
@@ -3899,6 +4264,7 @@
           "allowsCircuit",
           "loadTypeIds",
           "isActive",
+          "knxObjects",
           "createdAt",
           "updatedAt"
         ],
@@ -3931,6 +4297,14 @@
             "maxLength": 64,
             "minLength": 1,
             "type": "string"
+          },
+          "knxObjects": {
+            "description": "KNX communication objects (keys unique); on update, left out keeps the stored ones (D294)",
+            "items": {
+              "$ref": "#/components/schemas/KNXObject"
+            },
+            "maxItems": 32,
+            "type": "array"
           },
           "loadTypeIds": {
             "description": "Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)",
@@ -4056,6 +4430,10 @@
             "description": "Sum of the known places its devices use",
             "format": "double",
             "type": "number"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -4185,6 +4563,123 @@
         },
         "required": [
           "exporter"
+        ],
+        "type": "object"
+      },
+      "GeneratedDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/GeneratedDocument.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/DocumentActions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "description": "GET it to download the file",
+            "type": "string"
+          },
+          "exporter": {
+            "examples": [
+              "docx"
+            ],
+            "type": "string"
+          },
+          "fileName": {
+            "examples": [
+              "2026-0007-V2-IM01 Villa Sommer.docx"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "installation_manual",
+              "channel_labels"
+            ],
+            "type": "string"
+          },
+          "language": {
+            "description": "The project's language when it was generated",
+            "examples": [
+              "de"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "description": "\u003cproject number\u003e-\u003cversion name\u003e-\u003cIM|LB\u003e\u003csequence per version and kind\u003e",
+            "examples": [
+              "2026-0007-V2-IM01"
+            ],
+            "type": "string"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "kind",
+          "number",
+          "sequence",
+          "exporter",
+          "language",
+          "fileName",
+          "downloadUrl",
+          "createdAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "GroupAddressSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/GroupAddressSummary.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "added": {
+            "description": "Group addresses assigned now",
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Group addresses in the export",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "total"
         ],
         "type": "object"
       },
@@ -5756,6 +6251,41 @@
         ],
         "type": "object"
       },
+      "KNXObject": {
+        "additionalProperties": false,
+        "properties": {
+          "dpst": {
+            "description": "ETS datapoint subtype",
+            "examples": [
+              "DPST-1-1"
+            ],
+            "maxLength": 32,
+            "type": "string"
+          },
+          "key": {
+            "description": "Stable identifier, lower snake case, unique per function type",
+            "examples": [
+              "switch_status"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Object name per locale (part of the group address name); \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "dpst"
+        ],
+        "type": "object"
+      },
       "Letterhead": {
         "additionalProperties": false,
         "properties": {
@@ -5870,6 +6400,46 @@
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "LinePrefix": {
+        "additionalProperties": false,
+        "properties": {
+          "busLineId": {
+            "type": "string"
+          },
+          "default": {
+            "description": "The line's address field is empty: the prefix is the default (KNX 1.1-1.15, HDL 1-254: the first one no other line of the scheme uses)",
+            "type": "boolean"
+          },
+          "invalid": {
+            "description": "The line's address field cannot be parsed (no automatic addresses)",
+            "type": "boolean"
+          },
+          "noPrefix": {
+            "description": "The line has no address field and no default prefix is free: no automatic addresses",
+            "type": "boolean"
+          },
+          "prefix": {
+            "description": "KNX area.line or HDL subnet the line's devices get; empty for scheme none, a malformed address or no free default",
+            "type": "string"
+          },
+          "scheme": {
+            "enum": [
+              "knx",
+              "hdl",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "busLineId",
+          "scheme",
+          "default",
+          "invalid",
+          "noPrefix"
         ],
         "type": "object"
       },
@@ -6439,6 +7009,10 @@
             "type": "string"
           },
           "label": {
+            "type": "string"
+          },
+          "loadTypeId": {
+            "description": "Absent for none",
             "type": "string"
           },
           "needId": {
@@ -8012,6 +8586,10 @@
               "type": "array"
             },
             "type": "array"
+          },
+          "shortName": {
+            "description": "0-12 characters; the zone's name on channel labels (empty: derived from the name)",
+            "type": "string"
           }
         },
         "required": [
@@ -8655,6 +9233,16 @@
             ],
             "type": "string"
           },
+          "addressing": {
+            "description": "Device addresses: KNX individual address or HDL Buspro subnet.device (bus topology), EUI-64 / Zigbee IEEE (wireless topology), or none",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
+            ],
+            "type": "string"
+          },
           "busDevicesMax": {
             "description": "Default maximum devices per bus line; empty = not checked",
             "format": "int32",
@@ -8744,6 +9332,7 @@
           "reservePercent",
           "topology",
           "nominalVoltage",
+          "addressing",
           "createdAt",
           "updatedAt",
           "can"
@@ -8766,6 +9355,16 @@
             "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
             "examples": [
               "ZB"
+            ],
+            "type": "string"
+          },
+          "addressing": {
+            "description": "knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294)",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
             ],
             "type": "string"
           },
@@ -8936,6 +9535,16 @@
             "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
             "examples": [
               "ZB"
+            ],
+            "type": "string"
+          },
+          "addressing": {
+            "description": "knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294)",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
             ],
             "type": "string"
           },
@@ -11312,6 +11921,10 @@
           },
           "wirelessPlacesUsedDefault": {
             "type": "boolean"
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device; absent for none and for modules",
+            "type": "string"
           }
         },
         "required": [
@@ -12249,6 +12862,86 @@
         "summary": "List the currencies a project may use",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/documents/{id}": {
+      "delete": {
+        "description": "Needs projects.delete; also on completed or cancelled projects.",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a generated document",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/documents/{id}/file": {
+      "get": {
+        "operationId": "downloadDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Download a generated document's file",
+        "tags": [
+          "installation"
         ]
       }
     },
@@ -17136,6 +17829,205 @@
         ]
       }
     },
+    "/api/versions/{versionId}/addresses": {
+      "delete": {
+        "description": "Needs auto=true; addresses set by hand stay.",
+        "operationId": "clearAutomaticAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Must be true: removes the automatic addresses (addresses set by hand stay)",
+            "explode": false,
+            "in": "query",
+            "name": "auto",
+            "required": true,
+            "schema": {
+              "description": "Must be true: removes the automatic addresses (addresses set by hand stay)",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove the automatic addresses",
+        "tags": [
+          "networks"
+        ]
+      },
+      "get": {
+        "description": "Every bus and wireless item with its addressing scheme, line or gateway and address; the line prefixes.",
+        "operationId": "getAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the device addresses of a version",
+        "tags": [
+          "networks"
+        ]
+      },
+      "put": {
+        "description": "Addresses set here are pinned (auto-assign keeps them). Every field empty clears an item's address. Unique per version (422 address.taken).",
+        "operationId": "setAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Addresses"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set or clear device addresses",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/addresses/assign": {
+      "post": {
+        "description": "KNX and HDL devices of the lines in scope, deterministic (D419); pinned addresses never change.",
+        "operationId": "assignAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Assign addresses automatically",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
     "/api/versions/{versionId}/auto-connect/apply": {
       "post": {
         "description": "Makes the previewed connections as one batch; 409 auto_connect.changed when anything changed since the preview.",
@@ -18083,6 +18975,340 @@
         "summary": "Change the units of a connection or move it to another channel",
         "tags": [
           "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/documents": {
+      "get": {
+        "description": "Installation manuals and channel labels, newest first (proposals have their own list).",
+        "operationId": "listDocuments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GeneratedDocument"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the generated installation documents of a version",
+        "tags": [
+          "installation"
+        ]
+      },
+      "post": {
+        "description": "DOCX in the project's language; needs projects.write, also on completed projects (like proposals).",
+        "operationId": "generateDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedDocument"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Generate an installation manual or the channel labels",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/hdl-commissioning.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
+        "operationId": "exportHdlCommissioning",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the HDL commissioning list (XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/knx-devices.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
+        "operationId": "exportKnxDevices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the KNX device list (XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/knx-group-addresses.csv": {
+      "get": {
+        "description": "ETS 3-level group address CSV (D422): UTF-8 with BOM, CRLF, every field quoted; the stored group addresses (assigned now when none are stored yet).",
+        "operationId": "exportKnxGroupAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ETS layout: 1-1 (default, one name column, TAB separated) or 3-1 (main/middle/sub columns, comma separated)",
+            "explode": false,
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "description": "ETS layout: 1-1 (default, one name column, TAB separated) or 3-1 (main/middle/sub columns, comma separated)",
+              "enum": [
+                "1-1",
+                "3-1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The CSV file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the KNX group addresses (ETS CSV import)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/exports/wireless-devices.xlsx": {
+      "get": {
+        "description": "One sheet per bus line or gateway, devices without one on a last sheet (D423).",
+        "operationId": "exportWirelessDevices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The XLSX file"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export the wireless device list (EUI-64, XLSX)",
+        "tags": [
+          "installation"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/group-addresses/assign": {
+      "post": {
+        "description": "Stored numbers never change (D422); needs projects.write, refused on completed or cancelled projects.",
+        "operationId": "assignGroupAddresses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupAddressSummary"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Assign KNX group addresses to new needs and objects",
+        "tags": [
+          "installation"
         ]
       }
     },

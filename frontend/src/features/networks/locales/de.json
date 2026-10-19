@@ -13,7 +13,8 @@
     "places": "Plätze",
     "assignment": "Zuordnung",
     "line": "Linie",
-    "gateway": "Gateway"
+    "gateway": "Gateway",
+    "address": "Adresse"
   },
   "device": {
     "existing": "Bestand"
@@ -56,7 +57,7 @@
     "editTitle": "Linie bearbeiten",
     "name": "Name",
     "address": "Adresse",
-    "addressHint": "Optional, z. B. KNX-Bereich/Linie oder HDL-Subnetz für die Programmierung",
+    "addressHint": "Optional, z. B. KNX-Bereich.Linie (1.1) oder HDL-Subnetz (1–254) für die Programmierung; leer nimmt einen freien Standard",
     "devicesMax": "Max. Geräte",
     "devicesMaxHint": "Optional; leer bedeutet die Grenze des Systems"
   },
@@ -79,5 +80,34 @@
     "places": "Plätze",
     "reserve": "Reserve {{reserve}} %",
     "label": "Prüfungen"
+  },
+  "address": {
+    "none": "—",
+    "pinned": "Von Hand",
+    "automatic": "Automatisch",
+    "label": "Adresse von {{device}}",
+    "edit": "Adresse von {{device}} bearbeiten",
+    "save": "Adresse speichern",
+    "cancel": "Abbrechen",
+    "placeholder": {
+      "knx": "z. B. 1.1.5",
+      "hdl": "z. B. 1.12",
+      "ieee": "z. B. 00:12:4B:00:1C:A1:B2:C3"
+    },
+    "assignAll": "Adressen vergeben",
+    "assign": "Adressen vergeben",
+    "assignLine": "Adressen auf {{name}} vergeben",
+    "clearAuto": "Automatische löschen",
+    "clearTitle": "Automatische Adressen löschen?",
+    "clearMessage": "Alle automatischen Adressen dieser Version werden entfernt. Von Hand eingetragene Adressen bleiben.",
+    "clearConfirm": "Löschen",
+    "assigned_one": "{{count}} Gerät hat eine automatische Adresse erhalten.",
+    "assigned_other": "{{count}} Geräte haben eine automatische Adresse erhalten.",
+    "unassigned_one": "{{count}} Gerät ist noch ohne Adresse (Linie voll oder ihre Adresse nicht lesbar oder fehlt).",
+    "unassigned_other": "{{count}} Geräte sind noch ohne Adresse (Linie voll oder ihre Adresse nicht lesbar oder fehlt).",
+    "prefix": "Geräteadressen {{prefix}}.x",
+    "prefixDefault": "Geräteadressen {{prefix}}.x (Standard, keine Linienadresse eingetragen)",
+    "lineInvalid": "Die Linienadresse „{{address}}“ ist nicht lesbar: keine automatischen Adressen auf dieser Linie, bis sie korrigiert ist.",
+    "lineNoPrefix": "Keine Standard-Linienadresse ist frei (alle nutzen andere Linien): Linienadresse eintragen, um Geräteadressen zu vergeben."
   }
 }

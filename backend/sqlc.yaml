@@ -64,6 +64,11 @@ overrides:
         go_type:
           type: int32
           pointer: true
+      - db_type: pg_catalog.int2
+        nullable: true
+        go_type:
+          type: int16
+          pointer: true
       # Money (numeric) is a decimal string in Go, never a float.
       - db_type: pg_catalog.numeric
         go_type: string
@@ -295,4 +300,11 @@ sql:
       go:
         <<: *go
         out: internal/features/wiring/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/installation/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/installation/store
   # scaffold:sqlc

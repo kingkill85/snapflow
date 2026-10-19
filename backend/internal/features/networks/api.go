@@ -158,3 +158,85 @@ func Register(api huma.API, svc *Service) {
 		return &networksOutput{Body: out}, nil
 	})
 }
+
+type addressesOutput struct{ Body Addresses }
+
+type assignOutput struct{ Body AssignResult }
+
+type setAddressesInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Body      AddressesInput
+}
+
+type assignAddressesInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Body      AssignInput
+}
+
+type clearAddressesInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Auto      bool      `query:"auto" required:"true" doc:"Must be true: removes the automatic addresses (addresses set by hand stay)"`
+}
+
+// RegisterAddresses adds the device address endpoints (step 3e).
+func RegisterAddresses(api huma.API, svc *Service) {
+	huma.Register(api, huma.Operation{
+		OperationID: "getAddresses",
+		Method:      http.MethodGet,
+		Path:        "/api/versions/{versionId}/addresses",
+		Summary:     "Get the device addresses of a version",
+		Description: "Every bus and wireless item with its addressing scheme, line or gateway and address; the line prefixes.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *versionParam) (*addressesOutput, error) {
+		out, err := svc.GetAddresses(ctx, in.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		return &addressesOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "setAddresses",
+		Method:      http.MethodPut,
+		Path:        "/api/versions/{versionId}/addresses",
+		Summary:     "Set or clear device addresses",
+		Description: "Addresses set here are pinned (auto-assign keeps them). Every field empty clears an item's address. Unique per version (422 address.taken).",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *setAddressesInput) (*addressesOutput, error) {
+		out, err := svc.SetAddresses(ctx, in.VersionID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &addressesOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "assignAddresses",
+		Method:      http.MethodPost,
+		Path:        "/api/versions/{versionId}/addresses/assign",
+		Summary:     "Assign addresses automatically",
+		Description: "KNX and HDL devices of the lines in scope, deterministic (D419); pinned addresses never change.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *assignAddressesInput) (*assignOutput, error) {
+		out, err := svc.Assign(ctx, in.VersionID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &assignOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "clearAutomaticAddresses",
+		Method:      http.MethodDelete,
+		Path:        "/api/versions/{versionId}/addresses",
+		Summary:     "Remove the automatic addresses",
+		Description: "Needs auto=true; addresses set by hand stay.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *clearAddressesInput) (*addressesOutput, error) {
+		out, err := svc.ClearAutomatic(ctx, in.VersionID, in.Auto)
+		if err != nil {
+			return nil, err
+		}
+		return &addressesOutput{Body: out}, nil
+	})
+}

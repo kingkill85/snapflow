@@ -30,6 +30,8 @@ type DocumentPlan struct {
 	ContentType string
 	Zones       []PlanZone
 	Placements  []PlanPlacement
+	// Needs with their symbol positions (installation manual, 3e).
+	Needs []PlanNeed
 }
 
 // DocumentPlans returns the floorplans of a version in their order with
@@ -60,7 +62,12 @@ func (s *Service) DocumentPlans(ctx context.Context, versionID uuid.UUID) ([]Doc
 			if err != nil {
 				return err
 			}
-			out = append(out, DocumentPlan{ID: r.ID, Name: r.Name, Width: *r.ImageWidth, Height: *r.ImageHeight, Zones: zones, Placements: placements})
+			needs, err := readNeeds(ctx, q, r.ID)
+			if err != nil {
+				return err
+			}
+			out = append(out, DocumentPlan{ID: r.ID, Name: r.Name, Width: *r.ImageWidth, Height: *r.ImageHeight, Zones: zones, Placements: placements,
+				Needs: needs})
 			fileIDs = append(fileIDs, *r.ImageFileID)
 		}
 		return nil

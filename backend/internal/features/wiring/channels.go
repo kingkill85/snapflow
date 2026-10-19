@@ -56,6 +56,7 @@ type NeedInfo struct {
 	Quantity        int32      `json:"quantity"`
 	ConnectedUnits  int32      `json:"connectedUnits" doc:"Σ units of its connections (may exceed the quantity: a finding)"`
 	PowerW          *string    `json:"powerW" nullable:"true" doc:"Per unit, decimal string"`
+	LoadTypeID      *uuid.UUID `json:"loadTypeId,omitempty" doc:"Absent for none"`
 }
 
 // Wiring is the wiring view of a version.
@@ -166,7 +167,7 @@ func (s *Service) Wiring(ctx context.Context, versionID uuid.UUID) (Wiring, erro
 		for _, wn := range p.Needs {
 			n := st.needs[NeedKey{p.ID, wn.ID}]
 			info := NeedInfo{PlanID: p.ID, PlanName: p.Name, NeedID: wn.ID, Label: n.Label, FunctionTypeID: n.FunctionTypeID,
-				FunctionTypeKey: st.cat.FunctionKey[n.FunctionTypeID], Quantity: n.Quantity, PowerW: wn.PowerW}
+				FunctionTypeKey: st.cat.FunctionKey[n.FunctionTypeID], Quantity: n.Quantity, PowerW: wn.PowerW, LoadTypeID: wn.LoadTypeID}
 			zi := len(p.Zones)
 			if n.ZoneID != nil {
 				if v, ok := zoneIdx[*n.ZoneID]; ok {
@@ -318,25 +319,43 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 			return out, nil
 		}
 	}
-	reasonOf(&out)
+	reasonOf(st, &out)
 	return out, nil
 }
 
-// reasonOf sets the reason when no candidate fits (as auto-connect, D391).
-func reasonOf(out *Candidates) {
+// reasonOf sets the reason when no candidate fits (as auto-connect, D391):
+// limits_exceeded when a free channel refuses or no channel would take one
+// unit even when empty (D418), else no_free_channel.
+func reasonOf(st *state, out *Candidates) {
 	if len(out.Items) == 0 {
 		out.Reason = ReasonNoChannelServes
 		return
 	}
-	free := false
+	free, fitsEmpty := false, false
 	for _, c := range out.Items {
 		if c.Problem == nil {
 			return
 		}
 		free = free || c.Free
+		if !fitsEmpty {
+			ch := st.keyOf(ItemKey{c.TargetPlanID, c.TargetItemID}, c.OutputKindID, c.ChannelNo)
+			fitsEmpty = st.fitsEmpty(st.needs[NeedKey{c.NeedPlanID, c.NeedID}], ch)
+		}
 	}
 	out.Reason = ReasonNoFreeChannel
-	if free {
+	if free || !fitsEmpty {
 		out.Reason = ReasonLimitsExceeded
 	}
+}
+
+// fitsEmpty reports whether one unit of n would be valid on ch if nothing
+// else were connected to ch's item.
+func (s *state) fitsEmpty(n *Need, ch ChannelKey) bool {
+	if n == nil {
+		return false
+	}
+	e := newState(s.cat, s.needs, s.items)
+	c := &Conn{ID: uuid.New(), Need: n.Key, Units: 1, Channel: ch}
+	e.add(c)
+	return firstError(e.problemsFor(c), c.ID) == nil
 }

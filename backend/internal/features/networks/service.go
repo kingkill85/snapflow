@@ -114,6 +114,9 @@ func (s *Service) CreateBusLine(ctx context.Context, versionID uuid.UUID, in Bus
 	if !t.IsActive {
 		return BusLine{}, apperr.Invalid("body.productTypeId", "bus_line.product_type_inactive", "the product type is inactive")
 	}
+	if err := validateLineAddress(t, address); err != nil {
+		return BusLine{}, err
+	}
 	var row store.BusLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
@@ -149,6 +152,35 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 	name, address, err := validateLine(in.Name, in.Address, in.DevicesMax)
 	if err != nil {
 		return BusLine{}, err
+	}
+	if address != "" {
+		// The line's system decides the address format; read before the
+		// write transaction (the catalog outside it, D243). The system of a
+		// line never changes.
+		var cur store.BusLine
+		err := s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
+			if _, err := s.projects.ReadVersion(ctx, tx, versionID); err != nil {
+				return err
+			}
+			var err error
+			cur, err = q.GetBusLine(ctx, store.GetBusLineParams{VersionID: versionID, ID: id})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errLineNotFound()
+			}
+			return err
+		})
+		if err != nil {
+			return BusLine{}, err
+		}
+		if address != cur.Address {
+			t, err := s.types.Get(ctx, cur.ProductTypeID)
+			if err != nil {
+				return BusLine{}, err
+			}
+			if err := validateLineAddress(t, address); err != nil {
+				return BusLine{}, err
+			}
+		}
 	}
 	var row store.BusLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
@@ -257,6 +289,10 @@ type state struct {
 	// types are all product types (also inactive), by id: names, badges
 	// and order of systems that have lines but no members.
 	types map[uuid.UUID]producttypes.ProductType
+	// addresses are the stored device addresses (3e), by (plan, item).
+	addresses map[[2]uuid.UUID]store.DeviceAddress
+	// loaded are the variant ids the catalog was loaded for.
+	loaded map[uuid.UUID]bool
 }
 
 func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUID) (state, error) {
@@ -282,6 +318,10 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 	}
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	ids = slices.Compact(ids)
+	st.loaded = make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		st.loaded[id] = true
+	}
 	if st.variants, err = s.products.BOMVariants(ctx, ids); err != nil {
 		return st, err
 	}
@@ -318,6 +358,14 @@ func (st *state) read(ctx context.Context, s *Service, tx pgx.Tx, q *store.Queri
 	for _, a := range rows {
 		st.assignments[[2]uuid.UUID{a.PlanID, a.ItemID}] = a
 	}
+	addrs, err := q.ListAddresses(ctx, st.ref.ID)
+	if err != nil {
+		return err
+	}
+	st.addresses = make(map[[2]uuid.UUID]store.DeviceAddress, len(addrs))
+	for _, a := range addrs {
+		st.addresses[[2]uuid.UUID{a.PlanID, a.ItemID}] = a
+	}
 	return nil
 }
 
@@ -348,7 +396,7 @@ func (st *state) items() []item {
 			out = append(out, item{
 				ref: ItemRef{
 					PlanID: p.ID, PlanName: p.Name, PlanKind: p.Kind, ItemID: it.ID, Label: it.Label, VariantID: *it.VariantID,
-					ProductName: v.ProductName, VariantName: v.VariantName, ModelNumber: v.ModelNumber, Existing: it.Existing,
+					ProductName: v.ProductName, VariantName: v.VariantName, ModelNumber: v.ModelNumber, Existing: it.Existing, ZoneID: it.ZoneID,
 				},
 				planPos: pi, system: v.ProductType.ID, topo: v.ProductType.Topology, caps: c,
 				gateway: v.ProductType.Topology == TopologyWireless && c.WirelessPlacesSupplied != nil && *c.WirelessPlacesSupplied > 0,
@@ -811,7 +859,10 @@ func (s *Service) copyPlans(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUI
 	if err != nil {
 		return err
 	}
-	return q.CopyAssignments(ctx, store.CopyAssignmentsParams{TenantID: target.TenantID, TargetID: target.ID, SourceID: source.ID, PlanMap: data})
+	if err := q.CopyAssignments(ctx, store.CopyAssignmentsParams{TenantID: target.TenantID, TargetID: target.ID, SourceID: source.ID, PlanMap: data}); err != nil {
+		return err
+	}
+	return copyAddresses(ctx, q, data, target.TenantID, source.ID, target.ID)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -872,6 +923,11 @@ func mapNameErr(err error, name string) error {
 		return apperr.Conflict("bus_line.name_taken", "the system already has a line of this name").With("name", name)
 	}
 	return err
+}
+
+func isFKViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 func errLineNotFound() *apperr.Error { return apperr.NotFound("bus_line.not_found") }

@@ -41,12 +41,14 @@ type ProductType struct {
 	ReservePercent      int32  `json:"reservePercent" doc:"Capacity kept in reserve: amber above 100 − reserve %, red when exceeded"`
 	BusDevicesMax       *int32 `json:"busDevicesMax,omitempty" doc:"Default maximum devices per bus line; empty = not checked"`
 	// Topology selects the defaults capabilities fall back to (D304).
-	Topology                  string       `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
-	DefaultWirelessPlacesUsed *int32       `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
-	NominalVoltage            int32        `json:"nominalVoltage" doc:"Nominal voltage (V) of the system's devices: converts the W of needs into A for limits in A (3d)"`
-	CreatedAt                 time.Time    `json:"createdAt"`
-	UpdatedAt                 time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can                       auth.Actions `json:"can"`
+	Topology                  string `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
+	DefaultWirelessPlacesUsed *int32 `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
+	NominalVoltage            int32  `json:"nominalVoltage" doc:"Nominal voltage (V) of the system's devices: converts the W of needs into A for limits in A (3d)"`
+	// Addressing is the scheme of the system's device addresses (3e).
+	Addressing string       `json:"addressing" enum:"knx_individual,hdl,eui64,none" doc:"Device addresses: KNX individual address or HDL Buspro subnet.device (bus topology), EUI-64 / Zigbee IEEE (wireless topology), or none"`
+	CreatedAt  time.Time    `json:"createdAt"`
+	UpdatedAt  time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can        auth.Actions `json:"can"`
 }
 
 type ProductTypeInput struct {
@@ -61,6 +63,7 @@ type ProductTypeInput struct {
 	Topology                  string    `json:"topology,omitempty" enum:"bus,wireless,none" doc:"Default none; on update, left out keeps the stored value (D294)"`
 	DefaultWirelessPlacesUsed *int32    `json:"defaultWirelessPlacesUsed,omitempty" doc:"1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
 	NominalVoltage            *int32    `json:"nominalVoltage,omitempty" doc:"1-1000 V; default 230; on update, left out keeps the stored value (D294)"`
+	Addressing                string    `json:"addressing,omitempty" enum:"knx_individual,hdl,eui64,none" doc:"knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294)"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -148,6 +151,9 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 	if err != nil {
 		return ProductType{}, err
 	}
+	if in.Addressing == "" {
+		in.Addressing = DefaultAddressing(in.Key, in.Topology)
+	}
 	in, err = validate(in)
 	if err != nil {
 		return ProductType{}, err
@@ -161,7 +167,7 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 			Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
 			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
 			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
-			NominalVoltage: *in.NominalVoltage,
+			NominalVoltage: *in.NominalVoltage, Addressing: in.Addressing,
 		})
 		return err
 	})
@@ -179,7 +185,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 	if err != nil {
 		return ProductType{}, err
 	}
-	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil || in.Topology == "" || in.DefaultWirelessPlacesUsed == nil || in.NominalVoltage == nil {
+	if in.DefaultBusCurrentMa == nil || in.ReservePercent == nil || in.BusDevicesMax == nil || in.Topology == "" || in.DefaultWirelessPlacesUsed == nil || in.NominalVoltage == nil || in.Addressing == "" {
 		// Left-out settings keep the stored values (D294).
 		current, err := s.q.GetProductType(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -206,6 +212,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 		if in.NominalVoltage == nil {
 			in.NominalVoltage = &current.NominalVoltage
 		}
+		if in.Addressing == "" {
+			in.Addressing = current.Addressing
+		}
 	}
 	in.ProductTypeInput, err = validate(in.ProductTypeInput)
 	if err != nil {
@@ -218,7 +227,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 			ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
 			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
 			BusDevicesMax: in.BusDevicesMax, Topology: in.Topology, DefaultWirelessPlacesUsed: in.DefaultWirelessPlacesUsed,
-			NominalVoltage: *in.NominalVoltage, ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+			NominalVoltage: *in.NominalVoltage, Addressing: in.Addressing, ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
 	})
@@ -359,10 +368,49 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	default:
 		errs = append(errs, apperr.Field("body.topology", "validation.invalid", "topology must be bus, wireless or none"))
 	}
+	switch in.Addressing {
+	case "":
+		in.Addressing = AddressingNone
+	case AddressingKNX, AddressingHDL:
+		if in.Topology != "bus" {
+			errs = append(errs, apperr.Field("body.addressing", "product_type.addressing_topology", "this addressing needs topology bus").With("topology", "bus"))
+		}
+	case AddressingEUI64:
+		if in.Topology != "wireless" {
+			errs = append(errs, apperr.Field("body.addressing", "product_type.addressing_topology", "this addressing needs topology wireless").With("topology", "wireless"))
+		}
+	case AddressingNone:
+	default:
+		errs = append(errs, apperr.Field("body.addressing", "validation.invalid", "addressing must be knx_individual, hdl, eui64 or none"))
+	}
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
+}
+
+// Addressing schemes of a system's device addresses (3e).
+const (
+	AddressingKNX   = "knx_individual"
+	AddressingHDL   = "hdl"
+	AddressingEUI64 = "eui64"
+	AddressingNone  = "none"
+)
+
+// DefaultAddressing is the addressing of a new product type that does not
+// set one: the rule it replaced (migration 00022) — a bus system with a key
+// knx… has KNX individual addresses, hdl… HDL Buspro, every wireless system
+// EUI-64, others none.
+func DefaultAddressing(key, topology string) string {
+	switch {
+	case topology == "bus" && strings.HasPrefix(key, "knx"):
+		return AddressingKNX
+	case topology == "bus" && strings.HasPrefix(key, "hdl"):
+		return AddressingHDL
+	case topology == "wireless":
+		return AddressingEUI64
+	}
+	return AddressingNone
 }
 
 // DefaultReservePercent is the reserve of a product type unless set (spec 3a, Q9).
@@ -412,7 +460,8 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		DefaultBusCurrentMa: r.DefaultBusCurrentMa, ReservePercent: r.ReservePercent, BusDevicesMax: r.BusDevicesMax,
 		Topology: r.Topology, DefaultWirelessPlacesUsed: r.DefaultWirelessPlacesUsed, NominalVoltage: r.NominalVoltage,
-		Can: auth.Actions{Update: write, Delete: write},
+		Addressing: r.Addressing,
+		Can:        auth.Actions{Update: write, Delete: write},
 	}
 	if r.Abbreviation != nil {
 		pt.Abbreviation = *r.Abbreviation

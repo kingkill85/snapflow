@@ -15,9 +15,9 @@ import (
 
 const createProductType = `-- name: CreateProductType :one
 INSERT INTO product_types (key, name, abbreviation, color, is_active, default_bus_current_ma, reserve_percent, bus_devices_max,
-    topology, default_wireless_places_used, nominal_voltage, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
-RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage
+    topology, default_wireless_places_used, nominal_voltage, addressing, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage, addressing
 `
 
 type CreateProductTypeParams struct {
@@ -32,6 +32,7 @@ type CreateProductTypeParams struct {
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
 	NominalVoltage            int32
+	Addressing                string
 }
 
 // New types go to the end of the order (under LockProductTypeOrder, so two
@@ -49,6 +50,7 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 		arg.Topology,
 		arg.DefaultWirelessPlacesUsed,
 		arg.NominalVoltage,
+		arg.Addressing,
 	)
 	var i ProductType
 	err := row.Scan(
@@ -67,6 +69,7 @@ func (q *Queries) CreateProductType(ctx context.Context, arg CreateProductTypePa
 		&i.Topology,
 		&i.DefaultWirelessPlacesUsed,
 		&i.NominalVoltage,
+		&i.Addressing,
 	)
 	return i, err
 }
@@ -84,7 +87,7 @@ func (q *Queries) DeleteProductType(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const getProductType = `-- name: GetProductType :one
-SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage FROM product_types WHERE id = $1
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage, addressing FROM product_types WHERE id = $1
 `
 
 func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType, error) {
@@ -106,12 +109,13 @@ func (q *Queries) GetProductType(ctx context.Context, id uuid.UUID) (ProductType
 		&i.Topology,
 		&i.DefaultWirelessPlacesUsed,
 		&i.NominalVoltage,
+		&i.Addressing,
 	)
 	return i, err
 }
 
 const listProductTypes = `-- name: ListProductTypes :many
-SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage FROM product_types
+SELECT id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage, addressing FROM product_types
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -141,6 +145,7 @@ func (q *Queries) ListProductTypes(ctx context.Context, includeInactive bool) ([
 			&i.Topology,
 			&i.DefaultWirelessPlacesUsed,
 			&i.NominalVoltage,
+			&i.Addressing,
 		); err != nil {
 			return nil, err
 		}
@@ -217,10 +222,10 @@ const updateProductType = `-- name: UpdateProductType :one
 UPDATE product_types
 SET key = $2, name = $3, abbreviation = $4, color = $5, is_active = $6,
     default_bus_current_ma = $7, reserve_percent = $8, bus_devices_max = $9,
-    topology = $10, default_wireless_places_used = $11, nominal_voltage = $12,
+    topology = $10, default_wireless_places_used = $11, nominal_voltage = $12, addressing = $13,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $13
-RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage
+WHERE id = $1 AND updated_at = $14
+RETURNING id, key, name, color, sort_order, is_active, created_at, updated_at, abbreviation, default_bus_current_ma, reserve_percent, bus_devices_max, topology, default_wireless_places_used, nominal_voltage, addressing
 `
 
 type UpdateProductTypeParams struct {
@@ -236,6 +241,7 @@ type UpdateProductTypeParams struct {
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
 	NominalVoltage            int32
+	Addressing                string
 	ExpectedUpdatedAt         time.Time
 }
 
@@ -256,6 +262,7 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		arg.Topology,
 		arg.DefaultWirelessPlacesUsed,
 		arg.NominalVoltage,
+		arg.Addressing,
 		arg.ExpectedUpdatedAt,
 	)
 	var i ProductType
@@ -275,6 +282,7 @@ func (q *Queries) UpdateProductType(ctx context.Context, arg UpdateProductTypePa
 		&i.Topology,
 		&i.DefaultWirelessPlacesUsed,
 		&i.NominalVoltage,
+		&i.Addressing,
 	)
 	return i, err
 }

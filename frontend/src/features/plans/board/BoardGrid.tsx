@@ -252,6 +252,8 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
   const localize = useLocalized()
   const name = variant ? localize(variant.productName) : t('inspector.deleted')
   const usage = channels && channels.total > 0 ? channels : undefined
+  // Below ~3 TE the width and the channel use do not fit on one line.
+  const narrow = width * pxPerTe < 72
   const label = [name, m.label, t('board.moduleWidth', { width: te(width) }), usage ? t('board.channelUseLabel', usage) : '', m.existing ? t('existing.badge') : '', warned ? t('board.hasWarnings') : ''].filter(Boolean).join(', ')
   return (
     <div
@@ -283,10 +285,16 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
       {/* Two lines (hyphenated by the document language) before the ellipsis; the full name is in the tooltip. */}
       <span className="line-clamp-2 font-medium break-words hyphens-auto">{name}</span>
       {m.label && <span className="truncate text-muted">{m.label}</span>}
-      <span className="mt-auto flex items-center gap-0.5 truncate text-muted tabular-nums">
+      {/* Narrow modules show the channel use on a line of its own, without the unit (the tooltip has the full text). */}
+      {usage && narrow && (
+        <span data-testid="channel-use" className={cn('mt-auto truncate tabular-nums', usage.used >= usage.total ? 'text-warning' : 'text-success')}>
+          {t('board.channelUseShort', usage)}
+        </span>
+      )}
+      <span className={cn('flex items-center gap-0.5 truncate text-muted tabular-nums', !(usage && narrow) && 'mt-auto')}>
         {warned && <TriangleAlert aria-hidden="true" className="size-3 shrink-0 text-warning" />}
         {t('board.moduleWidth', { width: te(width) })}
-        {usage && width * pxPerTe >= 40 && (
+        {usage && !narrow && (
           <span data-testid="channel-use" className={cn('ml-1', usage.used >= usage.total ? 'text-warning' : 'text-success')}>
             {t('board.channelUse', usage)}
           </span>

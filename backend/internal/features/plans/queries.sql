@@ -79,10 +79,10 @@ DELETE FROM plan_placements WHERE plan_id = $1;
 -- InsertZones inserts the zones of a JSON array (one statement for up to
 -- 200 zones).
 -- name: InsertZones :exec
-INSERT INTO plan_zones (tenant_id, plan_id, id, name, color, opacity, points, position)
-SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.name, r.color, r.opacity, r.points, r.position
+INSERT INTO plan_zones (tenant_id, plan_id, id, name, short_name, color, opacity, points, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.name, coalesce(r."shortName", ''), r.color, r.opacity, r.points, r.position
 FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
-    AS r (id uuid, name text, color text, opacity double precision, points jsonb, position integer);
+    AS r (id uuid, name text, "shortName" text, color text, opacity double precision, points jsonb, position integer);
 
 -- InsertPlacements inserts the placements of a JSON array (one statement for
 -- up to 2000 placements).
@@ -245,7 +245,7 @@ ORDER BY r.position;
 -- NetworkPlacements returns the placements of a version (networks
 -- feature, through NetworkItems).
 -- name: NetworkPlacements :many
-SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing, pp.zone_id
 FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
 WHERE p.version_id = $1
 ORDER BY pp.plan_id, pp.position;
@@ -287,3 +287,11 @@ SELECT m.plan_id, m.id, m.row_id, m.offset_te::float8 AS offset_te, m.variant_id
 FROM board_modules m JOIN plans p ON p.id = m.plan_id
 WHERE p.version_id = $1
 ORDER BY m.plan_id, m.position;
+
+-- ZoneNames: every zone of a version's floorplans with its short name
+-- (channel labels, 3e).
+-- name: ZoneNames :many
+SELECT z.plan_id, z.id, z.name, z.short_name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY p.position, z.plan_id, z.position;

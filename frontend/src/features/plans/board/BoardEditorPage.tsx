@@ -472,6 +472,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
           versionId={plan.versionId}
           planId={plan.id}
           wiring={wiring}
+          findings={checks.data?.findings}
         />
       ),
     },

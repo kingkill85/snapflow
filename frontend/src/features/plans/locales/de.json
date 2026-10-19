@@ -61,6 +61,8 @@
     "newName": "Zone",
     "zone": "Zone",
     "name": "Name",
+    "shortName": "Kurzname",
+    "shortNameHint": "Bis zu 12 Zeichen, für die Kanalbeschriftung. Leer: aus dem Namen abgeleitet.",
     "palette": "Farbe",
     "useColor": "Farbe {{color}} verwenden",
     "color": "Eigene Farbe",
@@ -300,8 +302,12 @@
     "connectNeedTo": "Bedarf mit {{channel}} verbinden",
     "connUnits_one": "{{count}} Einheit",
     "connUnits_other": "{{count}} Einheiten",
+    "channelError_one": "{{count}} Fehler",
+    "channelError_other": "{{count}} Fehler",
+    "channelErrors": "Fehler von {{channel}}",
     "channelFree": "Frei",
     "channelUse": "{{used}}/{{total}} K.",
+    "channelUseShort": "{{used}}/{{total}}",
     "channelUseLabel": "{{used}} von {{total}} Kanälen belegt",
     "channelTotals": "Freie Kanäle: {{list}}",
     "connPower": "{{power}} W",
@@ -310,5 +316,17 @@
   "connections": {
     "unsaved": "Verbindungen nach dem nächsten Speichern",
     "label": "Verbindungen von {{name}}"
+  },
+  "address": {
+    "label": "Adresse",
+    "scheme": {
+      "knx": "KNX",
+      "hdl": "HDL",
+      "ieee": "IEEE"
+    },
+    "line": "Linie {{name}}",
+    "automatic": "automatisch",
+    "none": "Noch keine Adresse",
+    "noneOnLine": "Noch keine Adresse · Linie {{name}}"
   }
 }

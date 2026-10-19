@@ -40,6 +40,8 @@ import networksDe from '@/features/networks/locales/de.json'
 import networksEn from '@/features/networks/locales/en.json'
 import checksDe from '@/features/checks/locales/de.json'
 import checksEn from '@/features/checks/locales/en.json'
+import installationDe from '@/features/installation/locales/de.json'
+import installationEn from '@/features/installation/locales/en.json'
 // scaffold:imports
 
 // One namespace per feature. `make feature` adds imports and entries here.
@@ -67,6 +69,7 @@ export const resources = {
     roomTemplates: roomTemplatesEn,
     networks: networksEn,
     checks: checksEn,
+    installation: installationEn,
     // scaffold:i18n-en
   },
   de: {
@@ -91,6 +94,7 @@ export const resources = {
     roomTemplates: roomTemplatesDe,
     networks: networksDe,
     checks: checksDe,
+    installation: installationDe,
     // scaffold:i18n-de
   },
 } as const

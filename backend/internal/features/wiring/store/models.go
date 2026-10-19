@@ -107,6 +107,22 @@ type Connection struct {
 	CreatedAt           time.Time
 }
 
+type DeviceAddress struct {
+	PlanID    uuid.UUID
+	ItemID    uuid.UUID
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	KnxArea   *int16
+	KnxLine   *int16
+	KnxDevice *int16
+	HdlSubnet *int16
+	HdlDevice *int16
+	Ieee      *string
+	Note      string
+	Pinned    bool
+	UpdatedAt time.Time
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -132,11 +148,56 @@ type FunctionType struct {
 	UpdatedAt     time.Time
 	AllowsCircuit bool
 	IsActive      bool
+	KnxObjects    []byte
 }
 
 type FunctionTypeLoadType struct {
 	FunctionTypeID uuid.UUID
 	LoadTypeID     uuid.UUID
+}
+
+type GeneratedDocument struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	Kind      string
+	Seq       int32
+	Number    string
+	Exporter  string
+	Language  string
+	FileID    uuid.UUID
+	FileName  string
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+}
+
+type GeneratedDocumentCounter struct {
+	VersionID uuid.UUID
+	Kind      string
+	TenantID  uuid.UUID
+	LastSeq   int32
+}
+
+type GroupAddress struct {
+	TenantID   uuid.UUID
+	VersionID  uuid.UUID
+	NeedPlanID uuid.UUID
+	NeedID     uuid.UUID
+	ObjectKey  string
+	Main       int16
+	Middle     int16
+	Sub        int16
+	Name       string
+	UpdatedAt  time.Time
+}
+
+type GroupAddressGroup struct {
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	PlanID    uuid.UUID
+	ZoneID    uuid.UUID
+	Main      int16
+	Middle    int16
 }
 
 type ImportChange struct {
@@ -305,14 +366,15 @@ type PlanPlacement struct {
 }
 
 type PlanZone struct {
-	PlanID   uuid.UUID
-	ID       uuid.UUID
-	TenantID uuid.UUID
-	Name     string
-	Color    string
-	Opacity  float64
-	Points   []byte
-	Position int32
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Name      string
+	Color     string
+	Opacity   float64
+	Points    []byte
+	Position  int32
+	ShortName string
 }
 
 type Product struct {
@@ -345,6 +407,7 @@ type ProductType struct {
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
 	NominalVoltage            int32
+	Addressing                string
 }
 
 type ProductVariant struct {

@@ -28,7 +28,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	_ "golang.org/x/image/webp" // catalog images may be WebP
-	"golang.org/x/sync/semaphore"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
@@ -41,6 +40,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
+	"github.com/kingkill85/snapflow/backend/internal/platform/generation"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 	"github.com/kingkill85/snapflow/backend/internal/platform/planimage"
@@ -58,16 +58,10 @@ const maxPlacementPixels = 256
 // is about 530 px).
 const maxLogoPixels = 800
 
-// Generation limits (D268): at most defaultGenerations runs at once (a run
-// holds decoded plans and documents in memory); another waits at most
-// generationWait for a slot, then gets 503 server.busy. A run is cancelled
-// after generationTimeout.
-const (
-	defaultGenerations = 2
-	generationTimeout  = 2 * time.Minute
-)
-
-var generationWait = 5 * time.Second // a variable for tests
+// Generation limits (D268): the shared generation.Limiter bounds the runs
+// at once (a run holds decoded plans and documents in memory); a run is
+// cancelled after generationTimeout.
+const generationTimeout = 2 * time.Minute
 
 // maxImageBytes bounds a catalog image or logo read for a document.
 const maxImageBytes = 32 << 20
@@ -89,31 +83,20 @@ type Service struct {
 	users     *users.Service
 	exporters *document.Registry
 	now       func() time.Time
-	// generating holds a slot per running generation.
-	generating *semaphore.Weighted
+	// generating holds a slot per running generation (shared with the
+	// installation documents).
+	generating *generation.Limiter
 }
 
 func NewService(db DB, projectSvc *projects.Service, bomSvc *bom.Service, planSvc *plans.Service, tenantSvc *tenants.Service,
 	fileSvc *files.Service, userSvc *users.Service, exporters *document.Registry) *Service {
 	return &Service{db: db, q: store.New(db), projects: projectSvc, bom: bomSvc, plans: planSvc, tenants: tenantSvc,
-		files: fileSvc, users: userSvc, exporters: exporters, now: time.Now, generating: semaphore.NewWeighted(defaultGenerations)}
+		files: fileSvc, users: userSvc, exporters: exporters, now: time.Now, generating: generation.New(generation.Default)}
 }
 
-// SetConcurrency sets how many generations run at once (at wiring time).
-func (s *Service) SetConcurrency(n int) { s.generating = semaphore.NewWeighted(int64(max(n, 1))) }
-
-// acquire takes a generation slot, waiting at most generationWait.
-func (s *Service) acquire(ctx context.Context) error {
-	wait, cancel := context.WithTimeout(ctx, generationWait)
-	defer cancel()
-	if err := s.generating.Acquire(wait, 1); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return apperr.New(http.StatusServiceUnavailable, "server.busy", "server busy, try again shortly")
-	}
-	return nil
-}
+// UseLimiter sets the generation limiter (at wiring time; one instance
+// shared with the installation documents).
+func (s *Service) UseLimiter(l *generation.Limiter) { s.generating = l }
 
 func (s *Service) inScope(ctx context.Context, actor auth.Actor, opts pgx.TxOptions, fn func(tx pgx.Tx, q *store.Queries) error) error {
 	return database.InScope(ctx, s.db, actor, opts, func(tx pgx.Tx) error { return fn(tx, s.q.WithTx(tx)) })
@@ -386,10 +369,11 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	if !ok {
 		return nil, apperr.Invalid("body.exporter", "proposal.exporter_unknown", "unknown exporter").With("exporters", strings.Join(s.exporters.Keys(), ", "))
 	}
-	if err := s.acquire(ctx); err != nil {
+	release, err := s.generating.Acquire(ctx)
+	if err != nil {
 		return nil, err
 	}
-	defer s.generating.Release(1)
+	defer release()
 	ctx, cancel := context.WithTimeout(ctx, generationTimeout)
 	defer cancel()
 	r, err := s.read(ctx, actor, versionID, in)

@@ -13,7 +13,8 @@
     "places": "Places",
     "assignment": "Assignment",
     "line": "Line",
-    "gateway": "Gateway"
+    "gateway": "Gateway",
+    "address": "Address"
   },
   "device": {
     "existing": "Existing"
@@ -56,7 +57,7 @@
     "editTitle": "Edit line",
     "name": "Name",
     "address": "Address",
-    "addressHint": "Optional, e.g. the KNX area/line or HDL subnet for programming",
+    "addressHint": "Optional, e.g. the KNX area.line (1.1) or HDL subnet (1–254) for programming; empty uses a free default",
     "devicesMax": "Max. devices",
     "devicesMaxHint": "Optional; empty uses the system's limit"
   },
@@ -79,5 +80,34 @@
     "places": "Places",
     "reserve": "reserve {{reserve}} %",
     "label": "Checks"
+  },
+  "address": {
+    "none": "—",
+    "pinned": "By hand",
+    "automatic": "Automatic",
+    "label": "Address of {{device}}",
+    "edit": "Edit address of {{device}}",
+    "save": "Save address",
+    "cancel": "Cancel",
+    "placeholder": {
+      "knx": "e.g. 1.1.5",
+      "hdl": "e.g. 1.12",
+      "ieee": "e.g. 00:12:4B:00:1C:A1:B2:C3"
+    },
+    "assignAll": "Assign addresses",
+    "assign": "Assign addresses",
+    "assignLine": "Assign addresses on {{name}}",
+    "clearAuto": "Clear automatic",
+    "clearTitle": "Clear automatic addresses?",
+    "clearMessage": "Every automatic address of this version is removed. Addresses entered by hand stay.",
+    "clearConfirm": "Clear",
+    "assigned_one": "{{count}} device got an automatic address.",
+    "assigned_other": "{{count}} devices got an automatic address.",
+    "unassigned_one": "{{count}} device is still without address (line full, or its address cannot be read or is missing).",
+    "unassigned_other": "{{count}} devices are still without address (line full, or its address cannot be read or is missing).",
+    "prefix": "Device addresses {{prefix}}.x",
+    "prefixDefault": "Device addresses {{prefix}}.x (default, no line address entered)",
+    "lineInvalid": "The line address “{{address}}” cannot be read: no automatic addresses on this line until it is corrected.",
+    "lineNoPrefix": "No default line address is free (every one is used by other lines): enter an address for this line to assign device addresses."
   }
 }

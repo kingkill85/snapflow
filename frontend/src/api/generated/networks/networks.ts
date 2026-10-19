@@ -24,11 +24,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  Addresses,
+  AddressesInput,
+  AssignInput,
+  AssignResult,
   AssignmentsInput,
   BusLine,
   BusLineInput,
   BusLineOrder,
   BusLineUpdate,
+  ClearAutomaticAddressesParams,
   Error,
   Networks
 } from '../model';
@@ -82,6 +87,305 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
+ * Needs auto=true; addresses set by hand stay.
+ * @summary Remove the automatic addresses
+ */
+export const clearAutomaticAddresses = (
+    versionId: string,
+    params: ClearAutomaticAddressesParams,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Addresses>(
+      {url: `/api/versions/${versionId}/addresses`, method: 'DELETE',
+        params, signal
+    },
+      );
+    }
+
+
+
+
+export const getClearAutomaticAddressesMutationKey = () => ['clearAutomaticAddresses'] as const;
+
+export const getClearAutomaticAddressesMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearAutomaticAddresses>>, TError,ClearAutomaticAddressesMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof clearAutomaticAddresses>>, TError,ClearAutomaticAddressesMutationVariables, TContext> => {
+
+const mutationKey = getClearAutomaticAddressesMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearAutomaticAddresses>>, ClearAutomaticAddressesMutationVariables> = (props) => {
+          const {versionId,params} = props ?? {};
+
+          return  clearAutomaticAddresses(versionId,params,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearAutomaticAddressesMutationResult = NonNullable<Awaited<ReturnType<typeof clearAutomaticAddresses>>>
+
+    export type ClearAutomaticAddressesMutationError = ErrorType<Error>
+    export type ClearAutomaticAddressesMutationVariables = {versionId: string;params: ClearAutomaticAddressesParams}
+
+    /**
+ * @summary Remove the automatic addresses
+ */
+export const useClearAutomaticAddresses = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearAutomaticAddresses>>, TError,ClearAutomaticAddressesMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof clearAutomaticAddresses>>,
+        TError,
+        ClearAutomaticAddressesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getClearAutomaticAddressesMutationOptions(options), queryClient);
+    }
+    /**
+ * Every bus and wireless item with its addressing scheme, line or gateway and address; the line prefixes.
+ * @summary Get the device addresses of a version
+ */
+export const getAddresses = (
+    versionId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Addresses>(
+      {url: `/api/versions/${versionId}/addresses`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetAddressesQueryKey = (versionId: string,) => {
+    return [
+    `/api/versions/${versionId}/addresses`
+    ] as const;
+    }
+
+
+export const getGetAddressesQueryOptions = <TData = Awaited<ReturnType<typeof getAddresses>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAddressesQueryKey(versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAddresses>>> = ({ signal }) => getAddresses(versionId, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAddressesQueryResult = NonNullable<Awaited<ReturnType<typeof getAddresses>>>
+export type GetAddressesQueryError = ErrorType<Error>
+
+
+export function useGetAddresses<TData = Awaited<ReturnType<typeof getAddresses>>, TError = ErrorType<Error>>(
+ versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAddresses>>,
+          TError,
+          Awaited<ReturnType<typeof getAddresses>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAddresses<TData = Awaited<ReturnType<typeof getAddresses>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAddresses>>,
+          TError,
+          Awaited<ReturnType<typeof getAddresses>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAddresses<TData = Awaited<ReturnType<typeof getAddresses>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the device addresses of a version
+ */
+
+export function useGetAddresses<TData = Awaited<ReturnType<typeof getAddresses>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAddresses>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAddressesQueryOptions(versionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Addresses set here are pinned (auto-assign keeps them). Every field empty clears an item's address. Unique per version (422 address.taken).
+ * @summary Set or clear device addresses
+ */
+export const setAddresses = (
+    versionId: string,
+    addressesInput: BodyType<NonReadonly<AddressesInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Addresses>(
+      {url: `/api/versions/${versionId}/addresses`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: addressesInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getSetAddressesMutationKey = () => ['setAddresses'] as const;
+
+export const getSetAddressesMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAddresses>>, TError,SetAddressesMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof setAddresses>>, TError,SetAddressesMutationVariables, TContext> => {
+
+const mutationKey = getSetAddressesMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setAddresses>>, SetAddressesMutationVariables> = (props) => {
+          const {versionId,data} = props ?? {};
+
+          return  setAddresses(versionId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetAddressesMutationResult = NonNullable<Awaited<ReturnType<typeof setAddresses>>>
+    export type SetAddressesMutationBody = BodyType<NonReadonly<AddressesInput>>
+    export type SetAddressesMutationError = ErrorType<Error>
+    export type SetAddressesMutationVariables = {versionId: string;data: BodyType<NonReadonly<AddressesInput>>}
+
+    /**
+ * @summary Set or clear device addresses
+ */
+export const useSetAddresses = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAddresses>>, TError,SetAddressesMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setAddresses>>,
+        TError,
+        SetAddressesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetAddressesMutationOptions(options), queryClient);
+    }
+    /**
+ * KNX and HDL devices of the lines in scope, deterministic (D419); pinned addresses never change.
+ * @summary Assign addresses automatically
+ */
+export const assignAddresses = (
+    versionId: string,
+    assignInput: BodyType<NonReadonly<AssignInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<AssignResult>(
+      {url: `/api/versions/${versionId}/addresses/assign`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: assignInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getAssignAddressesMutationKey = () => ['assignAddresses'] as const;
+
+export const getAssignAddressesMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignAddresses>>, TError,AssignAddressesMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof assignAddresses>>, TError,AssignAddressesMutationVariables, TContext> => {
+
+const mutationKey = getAssignAddressesMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignAddresses>>, AssignAddressesMutationVariables> = (props) => {
+          const {versionId,data} = props ?? {};
+
+          return  assignAddresses(versionId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignAddressesMutationResult = NonNullable<Awaited<ReturnType<typeof assignAddresses>>>
+    export type AssignAddressesMutationBody = BodyType<NonReadonly<AssignInput>>
+    export type AssignAddressesMutationError = ErrorType<Error>
+    export type AssignAddressesMutationVariables = {versionId: string;data: BodyType<NonReadonly<AssignInput>>}
+
+    /**
+ * @summary Assign addresses automatically
+ */
+export const useAssignAddresses = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignAddresses>>, TError,AssignAddressesMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof assignAddresses>>,
+        TError,
+        AssignAddressesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAssignAddressesMutationOptions(options), queryClient);
+    }
+    /**
  * @summary List the bus lines of a version
  */
 export const listBusLines = (

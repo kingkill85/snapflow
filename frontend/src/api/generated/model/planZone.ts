@@ -20,4 +20,6 @@ export interface PlanZone {
      * @items.maxItems 2
      */
   points: number[][];
+  /** 0-12 characters; the zone's name on channel labels (empty: derived from the name) */
+  shortName?: string;
 }

@@ -185,6 +185,8 @@ type NetworkItem struct {
 	VariantID *uuid.UUID
 	Label     string
 	Existing  bool
+	// ZoneID of a placement (null for none and for modules).
+	ZoneID *uuid.UUID
 }
 
 // NetworkItems returns the plans of a version in their order with their
@@ -216,7 +218,7 @@ func (s *Service) NetworkItems(ctx context.Context, tx pgx.Tx, versionID uuid.UU
 	}
 	for _, p := range placements {
 		if i, ok := index[p.PlanID]; ok {
-			out[i].Items = append(out[i].Items, NetworkItem{ID: p.ID, VariantID: p.VariantID, Label: p.Label, Existing: p.Existing})
+			out[i].Items = append(out[i].Items, NetworkItem{ID: p.ID, VariantID: p.VariantID, Label: p.Label, Existing: p.Existing, ZoneID: p.ZoneID})
 		}
 	}
 	for _, m := range modules {

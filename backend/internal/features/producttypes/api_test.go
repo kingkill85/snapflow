@@ -540,3 +540,41 @@ func TestConcurrentSortOrder(t *testing.T) {
 		t.Errorf("%d types, want %d", len(all), n+5)
 	}
 }
+
+// Addressing (3e): left out on create it follows key and topology; it must
+// fit the topology; left out on update it is kept.
+func TestAddressing(t *testing.T) {
+	api := apptest.New(t)
+	type withAddressing struct {
+		productType
+		Topology   string `json:"topology"`
+		Addressing string `json:"addressing"`
+	}
+	mk := func(key, topology, addressing string) map[string]any {
+		b := body(key)
+		b["topology"] = topology
+		if addressing != "" {
+			b["addressing"] = addressing
+		}
+		return b
+	}
+	for _, c := range []struct{ key, topology, want string }{
+		{"knx", "bus", "knx_individual"}, {"hdl_buspro", "bus", "hdl"}, {"zigbee", "wireless", "eui64"}, {"knx_old", "none", "none"}, {"dali", "bus", "none"},
+	} {
+		resp := api.Post("/api/product-types", api.Admin.Cookie, mk(c.key, c.topology, ""))
+		if got := decode[withAddressing](t, resp); resp.Code != http.StatusCreated || got.Addressing != c.want {
+			t.Errorf("%s: %d %q", c.key, resp.Code, got.Addressing)
+		}
+	}
+	assertFields(t, api.Post("/api/product-types", api.Admin.Cookie, mk("x1", "wireless", "knx_individual")), "body.addressing product_type.addressing_topology")
+	assertFields(t, api.Post("/api/product-types", api.Admin.Cookie, mk("x2", "bus", "eui64")), "body.addressing product_type.addressing_topology")
+	resp := api.Post("/api/product-types", api.Admin.Cookie, mk("x3", "bus", "hdl"))
+	pt := decode[withAddressing](t, resp)
+	if resp.Code != http.StatusCreated || pt.Addressing != "hdl" {
+		t.Fatalf("explicit: %d %s", resp.Code, resp.Body)
+	}
+	resp = api.Put("/api/product-types/"+pt.ID, api.Admin.Cookie, updateBody(pt.productType, body("x3")))
+	if got := decode[withAddressing](t, resp); resp.Code != http.StatusOK || got.Addressing != "hdl" || got.Topology != "bus" {
+		t.Errorf("kept: %d %s", resp.Code, resp.Body)
+	}
+}

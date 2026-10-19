@@ -13,6 +13,7 @@ import type { Size } from '@/canvas'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
+import { AddressLine } from './AddressLine'
 import { groupPalette, type PaletteProduct } from './catalog'
 import type { PlacementPatch, ZonePatch } from './document'
 import type { EditorAction } from './editor-state'
@@ -20,6 +21,7 @@ import { needZoneId } from './needs'
 import type { NeedCatalog } from './need-catalog'
 import { NeedInspector, ZoneNeeds } from './NeedsSection'
 import type { ActiveVertex } from './PlanCanvas'
+import { usePlanWiring } from './plan-wiring'
 import { changeProduct, clampGeometry, resizeChanges } from './placements'
 import { minZonePoints, removeVertex, zoneColors } from './zones'
 
@@ -160,6 +162,14 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
       <p className="text-xs font-medium text-muted">{t('zones.zone')}</p>
       <ErrorList messages={errors.get(z.id) ?? []} />
       <Field label={t('zones.name')} required value={z.name} maxLength={100} disabled={!editable} onChange={(e) => update({ name: e.target.value }, 'name')} />
+      <Field
+        label={t('zones.shortName')}
+        hint={t('zones.shortNameHint')}
+        value={z.shortName ?? ''}
+        maxLength={12}
+        disabled={!editable}
+        onChange={(e) => update({ shortName: e.target.value }, 'shortName')}
+      />
       <div className="space-y-1.5">
         <p className="text-sm font-medium">{t('zones.palette')}</p>
         <div className="flex flex-wrap gap-1.5">
@@ -213,6 +223,8 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
 function PlacementInspector({ placement: p, allPlacements, variants, allVariants, products, image, warnings, errors, editable, dispatch, resizeAll, onResizeAll }: Props & { placement: PlanPlacement }) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
+  // The editor's version context (absent in isolated tests): the device's address, read-only (D427).
+  const planWiring = usePlanWiring()
 
   const variant = p.variantId ? variants.get(p.variantId) : undefined
   const siblings = variant ? allVariants.filter((v) => v.productId === variant.productId && (v.available || v.id === variant.id)) : []
@@ -232,6 +244,7 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
         <p className="font-medium">{variant ? localize(variant.productName) : t('inspector.deleted')}</p>
         {variant && <p className="text-sm text-muted">{variant.modelNumber}</p>}
       </div>
+      {planWiring && <AddressLine versionId={planWiring.versionId} planId={planWiring.planId} itemId={p.id} />}
       {editable && (
         <ProductPicker
           products={products}

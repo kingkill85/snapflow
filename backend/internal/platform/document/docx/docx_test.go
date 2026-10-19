@@ -299,3 +299,28 @@ func TestNoBreakHyphens(t *testing.T) {
 		t.Errorf("hyphens: %s", doc)
 	}
 }
+
+// Labels (3e): a fixed width in mm, a fixed row height, dashed cut lines
+// and a run size.
+func TestFixedTables(t *testing.T) {
+	doc := document.Document{Sections: []document.Section{{Orientation: document.Landscape, Blocks: []document.Block{
+		document.Table{CutLines: true, WidthMM: 70, RowHeightMM: 15, Columns: []document.Column{{Weight: 2}, {Weight: 2}},
+			Rows: []document.Row{{Cells: []document.Cell{{Runs: []document.Run{{Text: "D1", SizePt: 7}}}, document.TextCell("D2")}}}},
+		document.Table{WidthMM: 999, Columns: []document.Column{{Weight: 1}}, Rows: []document.Row{{Cells: []document.Cell{document.TextCell("wide")}}}},
+	}}}}
+	parts := unzip(t, render(t, doc))
+	body := string(parts["word/document.xml"])
+	wellFormed(t, "word/document.xml", parts["word/document.xml"])
+	for _, s := range []string{
+		`<w:tblW w:w="3969" w:type="dxa"/>`,         // 70 mm
+		`<w:gridCol w:w="1984"/>`,                   // half of it
+		`<w:trHeight w:val="850" w:hRule="exact"/>`, // 15 mm
+		`<w:top w:val="dashed" w:sz="4" w:space="0" w:color="000000"/>`,
+		`<w:sz w:val="14"/>`,                 // 7 pt
+		`<w:tblW w:w="14570" w:type="dxa"/>`, // cut to the landscape text width
+	} {
+		if !strings.Contains(body, s) {
+			t.Errorf("missing %s", s)
+		}
+	}
+}

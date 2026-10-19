@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FunctionTypeName } from './functionTypeName';
+import type { KNXObject } from './kNXObject';
 
 export interface FunctionType {
   /** A URL to the JSON Schema for this object. */
@@ -17,6 +18,8 @@ export interface FunctionType {
   isActive: boolean;
   /** Stable identifier, lower snake case */
   key: string;
+  /** The KNX communication objects of a need of this function (one group address each) */
+  knxObjects: KNXObject[];
   /** The load types a need of this function may have; empty = any */
   loadTypeIds: string[];
   /** Display name per locale */

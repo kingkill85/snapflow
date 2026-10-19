@@ -577,10 +577,10 @@ func (q *Queries) InsertPlacements(ctx context.Context, arg InsertPlacementsPara
 }
 
 const insertZones = `-- name: InsertZones :exec
-INSERT INTO plan_zones (tenant_id, plan_id, id, name, color, opacity, points, position)
-SELECT $1::uuid, $2::uuid, r.id, r.name, r.color, r.opacity, r.points, r.position
+INSERT INTO plan_zones (tenant_id, plan_id, id, name, short_name, color, opacity, points, position)
+SELECT $1::uuid, $2::uuid, r.id, r.name, coalesce(r."shortName", ''), r.color, r.opacity, r.points, r.position
 FROM jsonb_to_recordset($3::jsonb)
-    AS r (id uuid, name text, color text, opacity double precision, points jsonb, position integer)
+    AS r (id uuid, name text, "shortName" text, color text, opacity double precision, points jsonb, position integer)
 `
 
 type InsertZonesParams struct {
@@ -838,7 +838,7 @@ func (q *Queries) ListPlans(ctx context.Context, versionID uuid.UUID) ([]ListPla
 }
 
 const listZones = `-- name: ListZones :many
-SELECT plan_id, id, tenant_id, name, color, opacity, points, position FROM plan_zones WHERE plan_id = $1 ORDER BY position
+SELECT plan_id, id, tenant_id, name, color, opacity, points, position, short_name FROM plan_zones WHERE plan_id = $1 ORDER BY position
 `
 
 func (q *Queries) ListZones(ctx context.Context, planID uuid.UUID) ([]PlanZone, error) {
@@ -859,6 +859,7 @@ func (q *Queries) ListZones(ctx context.Context, planID uuid.UUID) ([]PlanZone, 
 			&i.Opacity,
 			&i.Points,
 			&i.Position,
+			&i.ShortName,
 		); err != nil {
 			return nil, err
 		}
@@ -944,7 +945,7 @@ func (q *Queries) NetworkModules(ctx context.Context, versionID uuid.UUID) ([]Ne
 }
 
 const networkPlacements = `-- name: NetworkPlacements :many
-SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing, pp.zone_id
 FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
 WHERE p.version_id = $1
 ORDER BY pp.plan_id, pp.position
@@ -956,6 +957,7 @@ type NetworkPlacementsRow struct {
 	VariantID *uuid.UUID
 	Label     string
 	Existing  bool
+	ZoneID    *uuid.UUID
 }
 
 // NetworkPlacements returns the placements of a version (networks
@@ -975,6 +977,7 @@ func (q *Queries) NetworkPlacements(ctx context.Context, versionID uuid.UUID) ([
 			&i.VariantID,
 			&i.Label,
 			&i.Existing,
+			&i.ZoneID,
 		); err != nil {
 			return nil, err
 		}
@@ -1525,6 +1528,47 @@ func (q *Queries) WiringZones(ctx context.Context, versionID uuid.UUID) ([]Wirin
 	for rows.Next() {
 		var i WiringZonesRow
 		if err := rows.Scan(&i.PlanID, &i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const zoneNames = `-- name: ZoneNames :many
+SELECT z.plan_id, z.id, z.name, z.short_name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY p.position, z.plan_id, z.position
+`
+
+type ZoneNamesRow struct {
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	Name      string
+	ShortName string
+}
+
+// ZoneNames: every zone of a version's floorplans with its short name
+// (channel labels, 3e).
+func (q *Queries) ZoneNames(ctx context.Context, versionID uuid.UUID) ([]ZoneNamesRow, error) {
+	rows, err := q.db.Query(ctx, zoneNames, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ZoneNamesRow{}
+	for rows.Next() {
+		var i ZoneNamesRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.Name,
+			&i.ShortName,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -16,6 +16,7 @@ const dimmer: FunctionType = {
   key: 'dimmer',
   name: { en: 'Dimmer', de: 'Dimmer' },
   allowsCircuit: false,
+  knxObjects: [],
   loadTypeIds: [],
   isActive: true,
   createdAt: '2026-10-18T10:00:00Z',
@@ -83,7 +84,7 @@ describe('FunctionTypesPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true })
+    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true, knxObjects: [] })
     expect(await screen.findByText('dimmer')).toBeInTheDocument()
   })
 
@@ -110,7 +111,7 @@ describe('FunctionTypesPage', () => {
     await user.type(key, 'dimming')
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
 
-    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true }))
+    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true, knxObjects: [] }))
   })
 
   it('shows the status and deactivates with the Active switch (the last field)', async () => {
@@ -208,5 +209,64 @@ describe('FunctionTypesPage', () => {
     expect(input).toHaveAttribute('lang', 'de')
     expect(input).toHaveAttribute('aria-invalid', 'true')
     expect(input).toHaveAccessibleDescription(/control characters/i)
+  })
+
+  it('edits the KNX objects: adds one with key, name and datapoint type, removes another', async () => {
+    const stored: FunctionType = {
+      ...dimmer,
+      knxObjects: [
+        { key: 'switch', name: { en: 'Switch', de: 'Schalten' }, dpst: 'DPST-1-1' },
+        { key: 'old', name: { en: 'Old' }, dpst: 'DPST-1-1' },
+      ],
+    }
+    let sent: { knxObjects?: unknown } | undefined
+    server.use(
+      loadTypes(),
+      http.get('/api/function-types', () => HttpResponse.json({ items: [stored] })),
+      http.put('/api/function-types/:id', async ({ request }) => {
+        sent = (await request.json()) as typeof sent
+        return HttpResponse.json(stored)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    const objects = within(dialog).getByRole('group', { name: 'KNX objects' })
+    await user.click(within(objects).getByRole('button', { name: /remove object 2/i }))
+    await user.click(within(objects).getByRole('button', { name: 'Add object' }))
+    const added = within(objects).getByRole('group', { name: 'Object 2' })
+    await user.type(within(added).getByLabelText('Key'), 'brightness')
+    await user.type(await translation(user, added, 'Name', 'en'), 'Brightness')
+    const dpst = within(added).getByLabelText('Datapoint type')
+    await user.clear(dpst)
+    await user.type(dpst, 'DPST-5-1')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() =>
+      expect(sent?.knxObjects).toEqual([
+        { key: 'switch', name: { en: 'Switch', de: 'Schalten' }, dpst: 'DPST-1-1' },
+        { key: 'brightness', name: { en: 'Brightness' }, dpst: 'DPST-5-1' },
+      ]),
+    )
+  })
+
+  it('validates the datapoint type of a KNX object', async () => {
+    server.use(loadTypes(), http.get('/api/function-types', () => HttpResponse.json({ items: [dimmer] })))
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    const objects = within(dialog).getByRole('group', { name: 'KNX objects' })
+    await user.click(within(objects).getByRole('button', { name: 'Add object' }))
+    const added = within(objects).getByRole('group', { name: 'Object 1' })
+    await user.type(within(added).getByLabelText('Key'), 'switch')
+    await user.type(await translation(user, added, 'Name', 'en'), 'Switch')
+    const dpst = within(added).getByLabelText('Datapoint type')
+    await user.clear(dpst)
+    await user.type(dpst, 'DPT 1.001')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    expect(await within(added).findByText('Enter the datapoint subtype like DPST-1-1.')).toBeInTheDocument()
   })
 })

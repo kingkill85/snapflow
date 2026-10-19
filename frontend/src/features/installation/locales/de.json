@@ -1,0 +1,44 @@
+{
+  "documents": {
+    "title": "Installationsunterlagen",
+    "description": "Installationshandbuch und Kanalbeschriftung für den Installateur, erstellt aus Plänen, Verteilern, Verbindungen und Netzwerken dieser Version. Preise erscheinen nie.",
+    "manual": "Installationshandbuch (DOCX)",
+    "labels": "Kanalbeschriftung (DOCX)",
+    "empty": "Noch keine Installationsunterlagen.",
+    "emptyHint": "Noch keine Installationsunterlagen. Erstellen Sie oben das Installationshandbuch oder die Kanalbeschriftung.",
+    "created": "{{number}} erstellt; der Download wurde gestartet. Falls er nicht startet:",
+    "deletedUser": "Gelöschter Benutzer",
+    "download": "Herunterladen",
+    "deleteTitle": "Dokument löschen",
+    "deleteMessage": "Dokument „{{number}}“ und seine Datei löschen? Die Nummer wird nicht erneut vergeben.",
+    "kind": {
+      "installation_manual": "Installationshandbuch",
+      "channel_labels": "Kanalbeschriftung"
+    },
+    "column": {
+      "number": "Nummer",
+      "kind": "Dokument",
+      "createdAt": "Erstellt",
+      "language": "Sprache",
+      "createdBy": "Erstellt von"
+    }
+  },
+  "exports": {
+    "title": "Programmierdaten",
+    "description": "Daten zum Programmieren der Systeme aus dem aktuellen Stand dieser Version: Gruppenadressen für die ETS und Inbetriebnahmelisten mit Geräteadressen.",
+    "knxGroupAddresses": "KNX-Gruppenadressen (CSV)",
+    "knxGroupAddressesHint": "Gruppenadressen-Import der ETS, dreistufig: Geschoss / Zone / Funktion. Vergebene Nummern bleiben; nach neuen Bedarfen aktualisieren.",
+    "updateGroupAddresses": "Gruppenadressen aktualisieren",
+    "groupAddressesUpdated": "Gruppenadressen aktualisiert: {{added}} neu, {{total}} insgesamt.",
+    "hdlCommissioning": "HDL-Inbetriebnahmeliste (XLSX)",
+    "hdlCommissioningHint": "Ein Blatt pro Buslinie: Geräte, Subnetz und Geräte-ID, Kanäle mit ihren Lasten.",
+    "wirelessDevices": "Funk-Geräteliste (EUI-64) (XLSX)",
+    "wirelessDevicesHint": "Ein Blatt pro Gateway (und eines für Geräte ohne Gateway): Geräte, EUI-64-Adressen, Kanäle mit ihren Lasten.",
+    "knxDevices": "KNX-Geräteliste (XLSX)",
+    "knxDevicesHint": "Ein Blatt pro Buslinie: Geräte, physikalische Adressen, Kanäle mit ihren Lasten.",
+    "noKnx": "Diese Version hat keine KNX-Geräte.",
+    "noHdl": "Diese Version hat keine HDL-Geräte.",
+    "noWireless": "Diese Version hat keine Funkgeräte.",
+    "download": "Herunterladen"
+  }
+}

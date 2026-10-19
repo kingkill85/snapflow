@@ -1,11 +1,11 @@
-import { Plug, Unplug } from 'lucide-react'
+import { Plug, TriangleAlert, Unplug } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { ChannelInfo } from '@/api/generated/model'
+import type { ChannelInfo, Finding } from '@/api/generated/model'
 import { useDeleteConnection } from '@/api/generated/wiring/wiring'
 import { Badge, Button, ErrorMessage, IconButton } from '@/components/ui'
-import { ConnectDialog, type ConnectTarget, itemKey, needKey, useRefreshWiring, type WiringModel } from '@/features/checks'
+import { ConnectDialog, type ConnectTarget, itemKey, needKey, useFindingText, useRefreshWiring, type WiringModel } from '@/features/checks'
 import { useFormatWatts } from '@/features/needs/format'
 
 type Props = {
@@ -15,6 +15,8 @@ type Props = {
   /** The module's variant has channels (else nothing is shown). */
   hasChannels: boolean
   wiring: WiringModel
+  /** The version's checks findings; errors on a channel or its connections mark the channel. */
+  findings?: Finding[]
 }
 
 /**
@@ -22,10 +24,11 @@ type Props = {
  * alternatives (D387), each with its connected needs (need, zone, units, power), Disconnect and "Connect a need".
  * Connections are version data: no plan lock needed, only `can.update`.
  */
-export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wiring }: Props) {
+export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wiring, findings = [] }: Props) {
   const { t } = useTranslation('plans')
   const { t: tChecks } = useTranslation('checks')
   const watts = useFormatWatts()
+  const findingText = useFindingText()
   const refresh = useRefreshWiring(versionId)
   const remove = useDeleteConnection()
   const [target, setTarget] = useState<ConnectTarget | null>(null)
@@ -40,6 +43,14 @@ export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wirin
     if (last?.kindId === c.outputKindId) last.channels.push(c)
     else groups.push({ kindId: c.outputKindId, channels: [c] })
   }
+  // Errors of a channel: findings about the channel itself or about one of its connections.
+  const errorsOf = (c: ChannelInfo) =>
+    findings.filter((f) => {
+      if (f.severity !== 'error') return false
+      const r = f.refs
+      if (r.targetPlanId === planId && r.itemId === moduleId && r.outputKindId === c.outputKindId && r.channelNo === c.channelNo) return true
+      return (r.connectionIds ?? []).some((id) => c.connectionIds.includes(id))
+    })
   const disconnect = async (id: string) => {
     try {
       await remove.mutateAsync({ versionId, id })
@@ -62,6 +73,7 @@ export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wirin
                 const ref = { targetPlanId: planId, targetItemId: moduleId, outputKindId: c.outputKindId, channelNo: c.channelNo }
                 const name = tChecks('channel.short', { kind: wiring.kindName(c.outputKindId), no: c.channelNo })
                 const base = wiring.kindByKey.get(c.baseKindKey)
+                const errors = errorsOf(c)
                 return (
                   <li key={c.channelNo} data-testid={`channel-${c.outputKindId}-${c.channelNo}`} className="space-y-1 px-2 py-1.5 text-sm">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -70,6 +82,12 @@ export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wirin
                         <span className="text-xs text-muted">
                           {tChecks('channel.alternative', { baseKind: base ? wiring.kindName(base.id) : c.baseKindKey, from: c.baseFrom, to: c.baseTo })}
                         </span>
+                      )}
+                      {errors.length > 0 && (
+                        <Badge variant="danger">
+                          <TriangleAlert aria-hidden />
+                          {t('board.channelError', { count: errors.length })}
+                        </Badge>
                       )}
                       {c.blocked && <Badge>{tChecks('channel.blocked')}</Badge>}
                       {!c.blocked && c.connectionIds.length === 0 && <Badge variant="success">{t('board.channelFree')}</Badge>}
@@ -81,6 +99,13 @@ export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wirin
                         </Button>
                       )}
                     </div>
+                    {errors.length > 0 && (
+                      <ul className="space-y-0.5 text-xs text-danger" aria-label={t('board.channelErrors', { channel: name })}>
+                        {errors.map((f, i) => (
+                          <li key={i}>{findingText(f, wiring.findingNames(f))}</li>
+                        ))}
+                      </ul>
+                    )}
                     {c.connectionIds.length > 0 && (
                       <ul className="space-y-1">
                         {c.connectionIds.map((id) => {

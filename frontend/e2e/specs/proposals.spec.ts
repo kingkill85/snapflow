@@ -47,8 +47,8 @@ test('proposals: generate combined and per product type, download DOCX, delete',
   const { project, zigbee, knx } = await seed(api)
   await page.setViewportSize({ width: 1400, height: 900 })
   await page.goto(`/projects/${project.id}`)
-  await page.getByRole('tab', { name: 'Proposals' }).click()
-  await expect(page).toHaveURL(/\?tab=proposals/)
+  await page.getByRole('tab', { name: 'Documents' }).click()
+  await expect(page).toHaveURL(/\?tab=documents/)
   await expect(page.getByText('No proposals yet. Create one from the bill of materials of this version.')).toBeVisible()
 
   // Combined: the preview shows the grand total, Create downloads the file.
@@ -118,7 +118,7 @@ test('proposals: introduction and closing text from the pricing tab', async ({ p
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Pricing saved.')).toBeVisible()
 
-  await page.getByRole('tab', { name: 'Proposals' }).click()
+  await page.getByRole('tab', { name: 'Documents' }).click()
   await page.getByRole('button', { name: 'Create proposal' }).click()
   await expect(dialog(page).getByTestId('preview-total')).toHaveText('$1,230.00')
   const [download] = await Promise.all([page.waitForEvent('download'), dialog(page).getByRole('button', { name: 'Create' }).click()])

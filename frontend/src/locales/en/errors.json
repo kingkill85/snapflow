@@ -4,6 +4,15 @@
     "self": "A variant cannot be its own add-on.",
     "variant_not_found": "This variant no longer exists."
   },
+  "address": {
+    "item_not_found": "This device is no longer a bus or wireless device of this version.",
+    "scheme_mismatch": "This device has no address of this kind.",
+    "knx_invalid": "Enter area.line.device with dots, e.g. 1.1.5 (0–15.0–15.0–255).",
+    "hdl_invalid": "Enter subnet.device ID, e.g. 1.12 (1–254 each).",
+    "ieee_invalid": "Enter 16 hexadecimal digits, e.g. 00:12:4B:00:1C:A1:B2:C3.",
+    "taken": "Another device already has the address {{address}}.",
+    "clear_auto_only": "Only automatic addresses can be cleared at once."
+  },
   "attribute": {
     "bound_negative": "Lengths and item counts cannot be negative.",
     "bound_range": "This limit must be between {{min}} and {{max}}.",
@@ -85,7 +94,9 @@
     "product_type_not_found": "This system no longer exists.",
     "product_type_inactive": "This system is inactive.",
     "product_type_not_in_project": "The project does not use this system. Add it to the project first.",
-    "devices_max_invalid": "Enter a number from 1 to {{max}} or leave it empty."
+    "devices_max_invalid": "Enter a number from 1 to {{max}} or leave it empty.",
+    "address_knx": "Enter the line as area.line with a dot, e.g. 1.1 (0–15 each), or leave it empty.",
+    "address_hdl": "Enter the subnet as a number from 1 to 254, or leave it empty."
   },
   "connection": {
     "not_found": "This connection no longer exists.",
@@ -146,6 +157,8 @@
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "load_type_duplicate": "This load type is listed twice.",
+    "knx_object_duplicate": "The object key \"{{key}}\" is used twice.",
+    "dpst_format": "Enter the datapoint subtype like DPST-1-1.",
     "not_found": "This function type no longer exists."
   },
   "import": {
@@ -281,7 +294,8 @@
     "key_taken": "The key \"{{key}}\" is already used.",
     "not_found": "This product type no longer exists.",
     "order_mismatch": "The product types have changed in the meantime. Please reload and try again.",
-    "stale": "Someone else changed this product type in the meantime. Reload it and make your changes again."
+    "stale": "Someone else changed this product type in the meantime. Reload it and make your changes again.",
+    "addressing_topology": "This addressing does not fit the topology: KNX and HDL need a bus, EUI-64 needs wireless."
   },
   "project": {
     "currency_format": "Enter a three-letter currency code such as EUR or USD.",
@@ -378,5 +392,14 @@
     "price_format": "Enter a price such as 27 or 27.50 (up to 10 digits and 2 decimals).",
     "sku_taken": "The SKU \"{{sku}}\" is already used.",
     "stale": "Someone else changed this variant in the meantime. Reload it and make your changes again."
+  },
+  "document": {
+    "not_found": "This document no longer exists.",
+    "kind_unknown": "This kind of document cannot be generated."
+  },
+  "export": {
+    "too_many_group_addresses": "Too many floors, zones or functions for KNX group addresses (at most {{max}}).",
+    "unknown": "This export does not exist.",
+    "format_unknown": "This export format does not exist."
   }
 }

@@ -5,11 +5,13 @@ SELECT * FROM function_types ORDER BY key;
 SELECT * FROM function_types WHERE id = $1;
 
 -- name: CreateFunctionType :one
-INSERT INTO function_types (key, name, allows_circuit, is_active) VALUES ($1, $2, $3, $4)
+INSERT INTO function_types (key, name, allows_circuit, is_active, knx_objects) VALUES ($1, $2, $3, $4, sqlc.arg(knx_objects)::jsonb)
 RETURNING *;
 
 -- name: UpdateFunctionType :one
-UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5, updated_at = now()
+-- knx_objects NULL keeps the stored objects (D294).
+UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5,
+    knx_objects = COALESCE(sqlc.narg(knx_objects)::jsonb, knx_objects), updated_at = now()
 WHERE id = $1
 RETURNING *;
 

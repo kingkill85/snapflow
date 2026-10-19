@@ -10,6 +10,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
+	"github.com/kingkill85/snapflow/backend/internal/features/installation"
 	"github.com/kingkill85/snapflow/backend/internal/features/networks"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
@@ -23,6 +24,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/wiring"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx"
+	"github.com/kingkill85/snapflow/backend/internal/platform/generation"
 	// scaffold:imports
 )
 
@@ -75,20 +77,31 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	plans.Register(api, planSvc)
 	networkSvc := networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes)
 	networks.Register(api, networkSvc)
-	wiring.Register(api, wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc))
+	networks.RegisterAddresses(api, networkSvc)
+	wiringSvc := wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc)
+	wiring.Register(api, wiringSvc)
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
 		document.NewRegistry(docx.Exporter{}))
+	// One generation limiter for proposals and installation documents (D268).
+	limiter := generation.New(generation.Default)
 	if deps.ProposalGenerations > 0 {
-		proposalSvc.SetConcurrency(deps.ProposalGenerations)
+		limiter = generation.New(deps.ProposalGenerations)
 	}
+	proposalSvc.UseLimiter(limiter)
 	projectSvc.OnDeleteVersions(proposalSvc.DeleteVersionFiles)
 	proposals.Register(api, proposalSvc)
+	installationSvc := installation.NewService(deps.DB, installation.Deps{Projects: projectSvc, Plans: planSvc, Wiring: wiringSvc,
+		Networks: networkSvc, Products: productSvc, Capabilities: capSvc, FunctionTypes: functionTypeSvc, Tenants: c.tenants,
+		Files: fileSvc, Users: c.users, DOCX: docx.Exporter{}})
+	installationSvc.UseLimiter(limiter)
+	projectSvc.OnDeleteVersions(installationSvc.DeleteVersionFiles)
+	installation.Register(api, installationSvc)
 	// Every feature with a file id column answers the files feature's
 	// reference check (D269).
 	for _, r := range []files.Referencer{productSvc.ReferencedFiles, planSvc.ReferencedFiles, bomSvc.ReferencedFiles,
-		c.tenants.ReferencedFiles, proposalSvc.ReferencedFiles, importSvc.ReferencedFiles} {
+		c.tenants.ReferencedFiles, proposalSvc.ReferencedFiles, importSvc.ReferencedFiles, installationSvc.ReferencedFiles} {
 		fileSvc.OnReferences(r)
 	}
 	// scaffold:features

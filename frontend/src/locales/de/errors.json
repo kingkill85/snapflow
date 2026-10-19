@@ -4,6 +4,15 @@
     "self": "Eine Variante kann nicht ihr eigenes Zubehör sein.",
     "variant_not_found": "Diese Variante existiert nicht mehr."
   },
+  "address": {
+    "item_not_found": "Dieses Gerät ist kein Bus- oder Funkgerät dieser Version mehr.",
+    "scheme_mismatch": "Dieses Gerät hat keine Adresse dieser Art.",
+    "knx_invalid": "Bereich.Linie.Gerät mit Punkten eingeben, z. B. 1.1.5 (0–15.0–15.0–255).",
+    "hdl_invalid": "Subnetz.Geräte-ID eingeben, z. B. 1.12 (je 1–254).",
+    "ieee_invalid": "16 Hexadezimalziffern eingeben, z. B. 00:12:4B:00:1C:A1:B2:C3.",
+    "taken": "Ein anderes Gerät hat bereits die Adresse {{address}}.",
+    "clear_auto_only": "Nur automatische Adressen können auf einmal entfernt werden."
+  },
   "attribute": {
     "bound_negative": "Längen und Anzahlen können nicht negativ sein.",
     "bound_range": "Diese Grenze muss zwischen {{min}} und {{max}} liegen.",
@@ -85,7 +94,9 @@
     "product_type_not_found": "Dieses System existiert nicht mehr.",
     "product_type_inactive": "Dieses System ist inaktiv.",
     "product_type_not_in_project": "Das Projekt verwendet dieses System nicht. Fügen Sie es zuerst dem Projekt hinzu.",
-    "devices_max_invalid": "Geben Sie eine Zahl von 1 bis {{max}} ein oder lassen Sie das Feld leer."
+    "devices_max_invalid": "Geben Sie eine Zahl von 1 bis {{max}} ein oder lassen Sie das Feld leer.",
+    "address_knx": "Linie als Bereich.Linie mit Punkt eingeben, z. B. 1.1 (je 0–15), oder leer lassen.",
+    "address_hdl": "Subnetz als Zahl von 1 bis 254 eingeben oder leer lassen."
   },
   "connection": {
     "not_found": "Diese Verbindung existiert nicht mehr.",
@@ -146,6 +157,8 @@
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
+    "knx_object_duplicate": "Der Objektschlüssel \"{{key}}\" ist doppelt vergeben.",
+    "dpst_format": "Datenpunkt-Subtyp wie DPST-1-1 eingeben.",
     "not_found": "Dieser Funktionstyp existiert nicht mehr."
   },
   "import": {
@@ -281,7 +294,8 @@
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "not_found": "Dieser Produkttyp existiert nicht mehr.",
     "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
-    "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor."
+    "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "addressing_topology": "Diese Adressierung passt nicht zur Topologie: KNX und HDL brauchen einen Bus, EUI-64 Funk."
   },
   "project": {
     "currency_format": "Geben Sie einen dreistelligen Währungscode wie EUR oder USD ein.",
@@ -378,5 +392,14 @@
     "price_format": "Geben Sie einen Preis wie 27,50 oder 27.50 ein (bis zu 10 Stellen und 2 Nachkommastellen).",
     "sku_taken": "Die SKU \"{{sku}}\" ist bereits vergeben.",
     "stale": "Jemand anderes hat diese Variante inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
+  "document": {
+    "not_found": "Dieses Dokument existiert nicht mehr.",
+    "kind_unknown": "Diese Dokumentart kann nicht erstellt werden."
+  },
+  "export": {
+    "too_many_group_addresses": "Zu viele Etagen, Zonen oder Funktionen für KNX-Gruppenadressen (höchstens {{max}}).",
+    "unknown": "Diesen Export gibt es nicht.",
+    "format_unknown": "Dieses Exportformat gibt es nicht."
   }
 }

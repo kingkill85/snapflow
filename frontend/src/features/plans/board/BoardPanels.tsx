@@ -2,7 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BoardWarning, Capabilities, VariantSearchItem } from '@/api/generated/model'
+import type { BoardWarning, Capabilities, Finding, VariantSearchItem } from '@/api/generated/model'
 import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, Field, IconButton, Notice, SelectField, SwitchField } from '@/components/ui'
@@ -11,6 +11,7 @@ import { useDescribeCapabilities } from '@/features/products/describe-capabiliti
 import { useLocalized } from '@/i18n/localized'
 
 import type { PaletteProduct } from '../editor/catalog'
+import { AddressLine } from '../editor/AddressLine'
 import { Addons, ItemInstanceValues, ProductPicker, Warnings } from '../editor/Inspector'
 import { type BoardDocument, type BoardModuleDoc, enclosureSize, fitToEnclosure, type ModulePatch, newId, rowUsed, slotIn } from './board'
 import type { BoardEditorAction } from './board-state'
@@ -165,6 +166,8 @@ type InspectorProps = {
   planId: string
   /** The version's wiring view (channels and connections); undefined in tests that do not need it. */
   wiring?: WiringModel
+  /** The version's checks findings (channel errors in the channel list). */
+  findings?: Finding[]
 }
 
 /** The Inspector tab of the board editor: one module (product, variant, row, add-ons, values, capabilities), or a count. */
@@ -186,7 +189,7 @@ export function ModuleInspector(props: InspectorProps) {
   return <OneModule key={modules[0].id} {...props} module={modules[0]} />
 }
 
-function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice, versionId, planId, wiring }: InspectorProps & { module: BoardModuleDoc }) {
+function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice, versionId, planId, wiring, findings }: InspectorProps & { module: BoardModuleDoc }) {
   const { t } = useTranslation('plans')
   const { t: tc } = useTranslation()
   const localize = useLocalized()
@@ -231,6 +234,8 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
         {variant && <p className="text-sm text-muted">{variant.modelNumber}</p>}
         <p className="text-sm text-muted">{t('board.position', { width: te(widthOf(m)), offset: te(m.offsetTe) })}</p>
       </div>
+      {/* Version data like the channels: shown with the wiring view (absent in isolated tests), D427. */}
+      {wiring && <AddressLine versionId={versionId} planId={planId} itemId={m.id} />}
       {editable && <ProductPicker products={products} current={variant?.productId} onPick={(product) => updateWidth({ variantId: product.defaultVariant.id, addonVariantIds: [], instanceValues: variant?.categoryId === product.defaultVariant.categoryId ? m.instanceValues : {} })} />}
       {(errors.get(m.id) ?? []).length > 0 && (
         <ul role="alert" className="space-y-1 rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -272,7 +277,7 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
           )}
         </section>
       )}
-      {wiring && <ModuleChannels versionId={versionId} planId={planId} moduleId={m.id} hasChannels={(capabilities?.channels.length ?? 0) > 0} wiring={wiring} />}
+      {wiring && <ModuleChannels versionId={versionId} planId={planId} moduleId={m.id} hasChannels={(capabilities?.channels.length ?? 0) > 0} wiring={wiring} findings={findings} />}
       <SwitchField label={t('inspector.existing')} hint={t('inspector.existingHint')} checked={m.existing} disabled={!editable} onChange={(e) => update({ existing: e.target.checked })} />
       <Button variant="danger-quiet" size="sm" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'remove', ids: [m.id] } })}>
         <Trash2 /> {tc('action.delete')}

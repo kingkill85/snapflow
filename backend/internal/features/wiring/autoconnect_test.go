@@ -352,3 +352,22 @@ func TestAutoConnectReasonOfLastUnit(t *testing.T) {
 		t.Fatalf("preview %+v", p)
 	}
 }
+
+// A need too large for every channel even when empty is limits_exceeded,
+// also when the channels are all taken (D418).
+func TestAutoConnectTooLargeWhenFull(t *testing.T) {
+	f := newFixture()
+	v := newVersion(f)
+	z := v.zone("Hall")
+	a := v.need(z, f.light, 4, "190", &f.led) // one dimmer channel each
+	b := v.need(z, f.light, 1, "500", &f.led) // above every dimmer channel
+	v.module(f.dimmerCaps())
+	p, _ := plan(v.snapshot(), AutoConnectScope{Scope: "all"})
+	reasons := map[uuid.UUID]string{}
+	for _, u := range p.Unconnectable {
+		reasons[u.NeedID] = u.Reason
+	}
+	if p.ConnectedUnits != 4 || len(p.Unconnectable) != 1 || reasons[b] != ReasonLimitsExceeded || reasons[a] != "" {
+		t.Fatalf("got %+v", p)
+	}
+}

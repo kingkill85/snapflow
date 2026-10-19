@@ -48,8 +48,8 @@ test('connections: checks, auto-connect, a hand move, a bus line near its limit,
   await editor.goto(`/projects/${s.project.id}/versions/${s.versionId}/boards/${s.board.id}`)
   await expect(editor.getByRole('button', { name: new RegExp(`^${s.blindAct.name}, J1, 4 TE, 2 of 2 channels used`) })).toBeVisible()
   await editor.getByRole('button', { name: new RegExp(`^${s.relay.name}, Q1, 4 TE`) }).click()
-  // The module badge counts used channels: the pair's blind output and its two relays.
-  const q1 = new RegExp(`^${s.relay.name}, Q1, 4 TE, 3 of 6 channels used`)
+  // The module badge counts used physical channels: the two relays of the pair's blind output.
+  const q1 = new RegExp(`^${s.relay.name}, Q1, 4 TE, 2 of 4 channels used`)
   await expect(editor.getByRole('button', { name: q1 })).toBeVisible()
   const channels = editor.getByRole('region', { name: 'Channels' })
   const door = `1 × ${s.blindName} · Door`

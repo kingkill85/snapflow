@@ -19,7 +19,8 @@ const rect = (x0: number, y0: number, x1: number, y1: number) => [
 
 type Id = { id: string }
 
-export async function wiringSeed(api: Api) {
+/** `systemKey`: the bus system's key prefix (`knx` → KNX addresses, `hdl` → HDL Buspro, D419). */
+export async function wiringSeed(api: Api, { systemKey = 'knx' }: { systemKey?: 'knx' | 'hdl' } = {}) {
   const post = async <T = Id,>(path: string, data: object) => {
     const res = await api.ctx.post(path, { data })
     expect(res.ok(), `${path}: ${await res.text()}`).toBe(true)
@@ -29,8 +30,19 @@ export async function wiringSeed(api: Api) {
   // Own function types and output kinds, so other specs' catalog data does not take part.
   const lightName = unique('Light')
   const blindName = unique('Blind')
-  const light = await post('/api/function-types', { key: uniqueKey('light'), name: text(lightName), allowsCircuit: true })
-  const blind = await post('/api/function-types', { key: uniqueKey('blind'), name: text(blindName) })
+  // KNX objects (catalog data, D422): the group addresses of a need.
+  const object = (key: string, en: string, dpst: string) => ({ key, name: { en }, dpst })
+  const light = await post('/api/function-types', {
+    key: uniqueKey('light'),
+    name: text(lightName),
+    allowsCircuit: true,
+    knxObjects: [object('switch', 'Switch', 'DPST-1-1'), object('switch_status', 'Switch status', 'DPST-1-1')],
+  })
+  const blind = await post('/api/function-types', {
+    key: uniqueKey('blind'),
+    name: text(blindName),
+    knxObjects: [object('up_down', 'Up/Down', 'DPST-1-8'), object('stop_step', 'Stop/Step', 'DPST-1-7')],
+  })
   const kind = (key: string, en: string, functionTypeIds: string[], alternatives: object[] = []) =>
     post('/api/output-kinds', { key: uniqueKey(key), name: text(unique(en)), isActive: true, functionTypeIds, alternatives })
   const dimmerKind = await kind('dim', 'Dimmer output', [light.id])
@@ -38,7 +50,7 @@ export async function wiringSeed(api: Api) {
   const blindKind = await kind('bli', 'Blind output', [blind.id], [{ outputKindId: relayKind.id, count: 2 }])
 
   const knxName = unique('KNX')
-  const knx = await post('/api/product-types', { key: uniqueKey('knx'), name: text(knxName), abbreviation: 'KNX', color: '#0a7d33', isActive: true, topology: 'bus' })
+  const knx = await post('/api/product-types', { key: uniqueKey(systemKey), name: text(knxName), abbreviation: 'KNX', color: '#0a7d33', isActive: true, topology: 'bus' })
   const field = async (key: string, type: string, meaning: string, outputKindId?: string) => {
     const k = uniqueKey(key)
     await post('/api/catalog-fields', { key: k, label: text(k), type, meaning, outputKindId })

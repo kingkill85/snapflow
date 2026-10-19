@@ -5,6 +5,7 @@ export * from './categories/categories';
 export * from './files/files';
 export * from './function-types/function-types';
 export * from './imports/imports';
+export * from './installation/installation';
 export * from './load-types/load-types';
 export * from './networks/networks';
 export * from './output-kinds/output-kinds';
