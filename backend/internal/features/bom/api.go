@@ -21,7 +21,7 @@ type lineParam struct {
 
 type bomOutput struct{ Body BOM }
 type pricingOutput struct{ Body Pricing }
-type totalsOutput struct{ Body Totals }
+type totalsOutput struct{ Body BOMTotals }
 type lineOutput struct{ Body ManualLine }
 type linesOutput struct{ Body []ManualLine }
 type changesOutput struct{ Body CatalogChanges }

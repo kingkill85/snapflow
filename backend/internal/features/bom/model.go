@@ -33,7 +33,7 @@ type SnapshotCategory struct {
 }
 
 // Snapshot is what a version keeps of a catalog variant (frozen values).
-type Snapshot struct {
+type ItemSnapshot struct {
 	ProductName i18n.Text           `json:"productName"`
 	VariantName i18n.Text           `json:"variantName"`
 	ModelNumber string              `json:"modelNumber"`
@@ -44,7 +44,7 @@ type Snapshot struct {
 }
 
 // Converted are amounts in the project currency.
-type Converted struct {
+type ConvertedLine struct {
 	UnitPrice string `json:"unitPrice"`
 	Total     string `json:"total"`
 }
@@ -58,7 +58,7 @@ type LineStatus struct {
 }
 
 // Quantities split a line's quantity by origin.
-type Quantities struct {
+type LineQuantities struct {
 	Plans   map[string]int64 `json:"plans" doc:"Per plan id"`
 	Zones   map[string]int64 `json:"zones" doc:"Per zone id"`
 	Unzoned map[string]int64 `json:"unzoned" doc:"Per plan id: placements outside every zone"`
@@ -66,25 +66,25 @@ type Quantities struct {
 }
 
 // Line is one line of the BOM.
-type Line struct {
+type BOMLine struct {
 	Key       string     `json:"key" doc:"Stable key: the variant id, or the manual line id of a free-text line"`
 	Kind      LineKind   `json:"kind" enum:"catalog,addOn,freeText"`
 	VariantID *uuid.UUID `json:"variantId" nullable:"true"`
 	ProductID *uuid.UUID `json:"productId" nullable:"true"`
 	// Snapshot is null for free-text lines.
-	Snapshot   *Snapshot   `json:"snapshot"`
-	Name       string      `json:"name" doc:"Free-text lines: the line's name; empty otherwise"`
-	UnitPrice  string      `json:"unitPrice" doc:"USD, decimal string"`
-	Quantity   int64       `json:"quantity"`
-	Quantities Quantities  `json:"quantities"`
-	Total      string      `json:"total" doc:"USD: unit price × quantity rounded half up to cents"`
-	Converted  *Converted  `json:"converted" doc:"In the project currency; null for USD projects"`
-	Status     *LineStatus `json:"status" doc:"Null for free-text lines"`
-	AddOnOf    []uuid.UUID `json:"addOnOf" doc:"The variants this line is an add-on of"`
+	Snapshot   *ItemSnapshot  `json:"snapshot"`
+	Name       string         `json:"name" doc:"Free-text lines: the line's name; empty otherwise"`
+	UnitPrice  string         `json:"unitPrice" doc:"USD, decimal string"`
+	Quantity   int64          `json:"quantity"`
+	Quantities LineQuantities `json:"quantities"`
+	Total      string         `json:"total" doc:"USD: unit price × quantity rounded half up to cents"`
+	Converted  *ConvertedLine `json:"converted" doc:"In the project currency; null for USD projects"`
+	Status     *LineStatus    `json:"status" doc:"Null for free-text lines"`
+	AddOnOf    []uuid.UUID    `json:"addOnOf" doc:"The variants this line is an add-on of"`
 }
 
 // Amounts are totals in one currency.
-type Amounts struct {
+type BOMAmounts struct {
 	Subtotal   string `json:"subtotal"`
 	Discount   string `json:"discount"`
 	Services   string `json:"services"`
@@ -94,15 +94,15 @@ type Amounts struct {
 // Totals are the version's totals in USD and, for other currencies,
 // converted (each amount converted from its USD value on its own, so the
 // converted grand total may differ from the sum of converted parts).
-type Totals struct {
-	Amounts
-	Currency  string   `json:"currency"`
-	Rate      string   `json:"rate"`
-	Converted *Amounts `json:"converted"`
+type BOMTotals struct {
+	BOMAmounts
+	Currency  string      `json:"currency"`
+	Rate      string      `json:"rate"`
+	Converted *BOMAmounts `json:"converted"`
 }
 
 // CategoryGroup is the lines of one category within a product type.
-type CategoryGroup struct {
+type BOMCategoryGroup struct {
 	Category  SnapshotCategory `json:"category"`
 	Subtotal  string           `json:"subtotal"`
 	Converted *string          `json:"converted" nullable:"true"`
@@ -110,44 +110,44 @@ type CategoryGroup struct {
 }
 
 // Group is the lines of one product type (or the free-text lines).
-type Group struct {
+type BOMGroup struct {
 	Kind        string               `json:"kind" enum:"productType,freeText"`
 	ProductType *SnapshotProductType `json:"productType"`
 	Subtotal    string               `json:"subtotal"`
 	Converted   *string              `json:"converted" nullable:"true"`
-	Categories  []CategoryGroup      `json:"categories" doc:"Empty for free text"`
+	Categories  []BOMCategoryGroup   `json:"categories" doc:"Empty for free text"`
 	Lines       []string             `json:"lines" doc:"Free text: the line keys; empty otherwise"`
 }
 
 // Warning is a placement the BOM cannot count.
-type Warning struct {
+type BOMWarning struct {
 	Code        string    `json:"code" enum:"placement_without_snapshot"`
 	PlanID      uuid.UUID `json:"planId"`
 	PlacementID uuid.UUID `json:"placementId"`
 }
 
 // PlanRef names a plan and its zones (for the quantity columns and filters).
-type PlanRef struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Zones []ZoneRef `json:"zones"`
+type BOMPlanRef struct {
+	ID    uuid.UUID    `json:"id"`
+	Name  string       `json:"name"`
+	Zones []BOMZoneRef `json:"zones"`
 }
 
 // ZoneRef names a zone.
-type ZoneRef struct {
+type BOMZoneRef struct {
 	ID   uuid.UUID `json:"id"`
 	Name string    `json:"name"`
 }
 
 // BOM is the bill of materials of a version.
 type BOM struct {
-	Plans       []PlanRef    `json:"plans" doc:"The version's plans in order"`
-	Lines       []Line       `json:"lines" doc:"In BOM order"`
-	Groups      []Group      `json:"groups"`
-	Totals      Totals       `json:"totals"`
+	Plans       []BOMPlanRef `json:"plans" doc:"The version's plans in order"`
+	Lines       []BOMLine    `json:"lines" doc:"In BOM order"`
+	Groups      []BOMGroup   `json:"groups"`
+	Totals      BOMTotals    `json:"totals"`
 	Pricing     Pricing      `json:"pricing"`
 	ManualLines []ManualLine `json:"manualLines"`
-	Warnings    []Warning    `json:"warnings"`
+	Warnings    []BOMWarning `json:"warnings"`
 }
 
 // Pricing are the version's pricing settings.
@@ -182,12 +182,12 @@ type ManualLine struct {
 	Kind      LineKind   `json:"kind" enum:"catalog,freeText"`
 	VariantID *uuid.UUID `json:"variantId" nullable:"true"`
 	// Snapshot of a catalog line (null for free text).
-	Snapshot  *Snapshot `json:"snapshot"`
-	Name      string    `json:"name" doc:"Free text only"`
-	UnitPrice string    `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
-	Quantity  int32     `json:"quantity"`
-	Note      string    `json:"note"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Snapshot  *ItemSnapshot `json:"snapshot"`
+	Name      string        `json:"name" doc:"Free text only"`
+	UnitPrice string        `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
+	Quantity  int32         `json:"quantity"`
+	Note      string        `json:"note"`
+	UpdatedAt time.Time     `json:"updatedAt"`
 }
 
 // ManualLineInput creates or changes a manual line: either variantId (a
@@ -226,9 +226,9 @@ type RequiredAddon struct {
 
 // CatalogChange is one used snapshot that differs from the catalog.
 type CatalogChange struct {
-	VariantID uuid.UUID `json:"variantId"`
-	ProductID uuid.UUID `json:"productId"`
-	Snapshot  Snapshot  `json:"snapshot"`
+	VariantID uuid.UUID    `json:"variantId"`
+	ProductID uuid.UUID    `json:"productId"`
+	Snapshot  ItemSnapshot `json:"snapshot"`
 	// Fields lists what changed.
 	Fields    []string      `json:"fields" doc:"unitPrice, productName, variantName, modelNumber, sku, image, requiredAddons"`
 	Before    ChangeValues  `json:"before"`

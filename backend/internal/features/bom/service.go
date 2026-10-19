@@ -241,12 +241,12 @@ func imageURL(id *uuid.UUID) *string {
 	return &u
 }
 
-func snapshotOf(it store.VersionItem) Snapshot {
+func snapshotOf(it store.VersionItem) ItemSnapshot {
 	sku := ""
 	if it.Sku != nil {
 		sku = *it.Sku
 	}
-	return Snapshot{
+	return ItemSnapshot{
 		ProductName: it.ProductName, VariantName: it.VariantName, ModelNumber: it.ModelNumber, SKU: sku,
 		ProductType: SnapshotProductType{
 			ID: it.ProductTypeID, Key: it.ProductTypeKey, Name: it.ProductTypeName,

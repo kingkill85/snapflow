@@ -153,7 +153,7 @@ func getBOM(t *testing.T, api *apptest.API, cookie string, versionID uuid.UUID) 
 	return decode[bom.BOM](t, resp)
 }
 
-func line(t *testing.T, b bom.BOM, key string) bom.Line {
+func line(t *testing.T, b bom.BOM, key string) bom.BOMLine {
 	t.Helper()
 	for _, l := range b.Lines {
 		if l.Key == key {
@@ -161,7 +161,7 @@ func line(t *testing.T, b bom.BOM, key string) bom.Line {
 		}
 	}
 	t.Fatalf("no line %s in %+v", key, b.Lines)
-	return bom.Line{}
+	return bom.BOMLine{}
 }
 
 func hasLine(b bom.BOM, key string) bool {
@@ -235,7 +235,7 @@ func TestBOM(t *testing.T) {
 	wantCode(t, resp, http.StatusUnprocessableEntity, "pricing.percent_range")
 	resp = api.Post("/api/versions/"+vs+"/pricing/preview", admin, map[string]any{"discountKind": "percent", "discountValue": "10", "servicesKind": "amount", "servicesValue": "100"})
 	wantCode(t, resp, http.StatusOK, "")
-	if tot := decode[bom.Totals](t, resp); tot.Discount != "14.10" || tot.Services != "100.00" || tot.GrandTotal != "226.90" {
+	if tot := decode[bom.BOMTotals](t, resp); tot.Discount != "14.10" || tot.Services != "100.00" || tot.GrandTotal != "226.90" {
 		t.Errorf("preview: %+v", tot)
 	}
 	if again := getBOM(t, api, admin, v); again.Pricing.UpdatedAt != nil || again.Totals.GrandTotal != "141.00" {

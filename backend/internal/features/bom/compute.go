@@ -15,23 +15,23 @@ import (
 // acc accumulates the quantities of one variant.
 type acc struct {
 	item    store.VersionItem
-	qty     Quantities
+	qty     LineQuantities
 	total   int64
 	direct  bool
 	addOnOf []uuid.UUID
 }
 
 func newAcc(it store.VersionItem) *acc {
-	return &acc{item: it, qty: Quantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}}, addOnOf: []uuid.UUID{}}
+	return &acc{item: it, qty: LineQuantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}}, addOnOf: []uuid.UUID{}}
 }
 
 // counts adds up the placements (not existing, D185) and manual lines per
 // variant: each placement is 1 × its variant, 1 × each required add-on of
 // its snapshot and 1 × each chosen add-on; a manual catalog line adds its
 // quantity of the variant and of each required add-on.
-func (st *state) counts() (map[uuid.UUID]*acc, []Warning) {
+func (st *state) counts() (map[uuid.UUID]*acc, []BOMWarning) {
 	lines := map[uuid.UUID]*acc{}
-	warnings := []Warning{}
+	warnings := []BOMWarning{}
 	get := func(id uuid.UUID) *acc {
 		a, ok := lines[id]
 		if !ok {
@@ -90,11 +90,11 @@ func (st *state) counts() (map[uuid.UUID]*acc, []Warning) {
 				continue
 			}
 			if pl.VariantID == nil {
-				warnings = append(warnings, Warning{Code: "placement_without_snapshot", PlanID: p.ID, PlacementID: pl.ID})
+				warnings = append(warnings, BOMWarning{Code: "placement_without_snapshot", PlanID: p.ID, PlacementID: pl.ID})
 				continue
 			}
 			if _, ok := st.items[*pl.VariantID]; !ok {
-				warnings = append(warnings, Warning{Code: "placement_without_snapshot", PlanID: p.ID, PlacementID: pl.ID})
+				warnings = append(warnings, BOMWarning{Code: "placement_without_snapshot", PlanID: p.ID, PlacementID: pl.ID})
 				continue
 			}
 			o := origin{plan: p.ID.String()}
@@ -210,16 +210,16 @@ func (st *state) bom() BOM {
 	}
 	slices.SortFunc(ordered, func(a, b *acc) int { return itemLess(a.item, b.item) })
 
-	out := BOM{Lines: []Line{}, Groups: []Group{}, Warnings: warnings, Plans: []PlanRef{}, ManualLines: st.manualLines()}
+	out := BOM{Lines: []BOMLine{}, Groups: []BOMGroup{}, Warnings: warnings, Plans: []BOMPlanRef{}, ManualLines: st.manualLines()}
 	for _, p := range st.plans {
-		ref := PlanRef{ID: p.ID, Name: p.Name, Zones: []ZoneRef{}}
+		ref := BOMPlanRef{ID: p.ID, Name: p.Name, Zones: []BOMZoneRef{}}
 		for _, z := range p.Zones {
-			ref.Zones = append(ref.Zones, ZoneRef{ID: z.ID, Name: z.Name})
+			ref.Zones = append(ref.Zones, BOMZoneRef{ID: z.ID, Name: z.Name})
 		}
 		out.Plans = append(out.Plans, ref)
 	}
 	subtotal := money.Zero
-	var group *Group
+	var group *BOMGroup
 	var groupSum, catSum money.Amount
 	closeCat := func() {
 		if group != nil && len(group.Categories) > 0 {
@@ -246,25 +246,25 @@ func (st *state) bom() BOM {
 		variantID, productID := it.VariantID, it.ProductID
 		snap := snapshotOf(it)
 		status := st.status(it)
-		line := Line{
+		line := BOMLine{
 			Key: it.VariantID.String(), Kind: kind, VariantID: &variantID, ProductID: &productID, Snapshot: &snap,
 			UnitPrice: money.USD(unit), Quantity: a.total, Quantities: a.qty, Total: money.USD(total),
 			Status: &status, AddOnOf: a.addOnOf,
 		}
 		if cur != nil {
-			line.Converted = &Converted{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
+			line.Converted = &ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
 		}
 		out.Lines = append(out.Lines, line)
 
 		if group == nil || group.ProductType.ID != it.ProductTypeID {
 			closeGroup()
 			pt := snap.ProductType
-			group = &Group{Kind: "productType", ProductType: &pt, Categories: []CategoryGroup{}, Lines: []string{}}
+			group = &BOMGroup{Kind: "productType", ProductType: &pt, Categories: []BOMCategoryGroup{}, Lines: []string{}}
 			groupSum = money.Zero
 		}
 		if n := len(group.Categories); n == 0 || group.Categories[n-1].Category.ID != it.CategoryID {
 			closeCat()
-			group.Categories = append(group.Categories, CategoryGroup{Category: snap.Category, Lines: []string{}})
+			group.Categories = append(group.Categories, BOMCategoryGroup{Category: snap.Category, Lines: []string{}})
 			catSum = money.Zero
 		}
 		c := &group.Categories[len(group.Categories)-1]
@@ -274,7 +274,7 @@ func (st *state) bom() BOM {
 	closeGroup()
 
 	// Free-text lines last, in their own group, in manual-line order.
-	var free *Group
+	var free *BOMGroup
 	freeSum := money.Zero
 	for _, m := range st.manual {
 		if m.VariantID != nil {
@@ -284,17 +284,17 @@ func (st *state) bom() BOM {
 		total := money.LineTotal(unit, int64(m.Quantity))
 		subtotal = subtotal.Add(total)
 		freeSum = freeSum.Add(total)
-		line := Line{
+		line := BOMLine{
 			Key: m.ID.String(), Kind: KindFreeText, Name: deref(m.Name), UnitPrice: money.USD(unit),
 			Quantity: int64(m.Quantity), Total: money.USD(total), AddOnOf: []uuid.UUID{},
-			Quantities: Quantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}, Manual: int64(m.Quantity)},
+			Quantities: LineQuantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}, Manual: int64(m.Quantity)},
 		}
 		if cur != nil {
-			line.Converted = &Converted{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
+			line.Converted = &ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
 		}
 		out.Lines = append(out.Lines, line)
 		if free == nil {
-			free = &Group{Kind: "freeText", Categories: []CategoryGroup{}, Lines: []string{}}
+			free = &BOMGroup{Kind: "freeText", Categories: []BOMCategoryGroup{}, Lines: []string{}}
 		}
 		free.Lines = append(free.Lines, line.Key)
 	}
@@ -330,10 +330,10 @@ func computeTotals(subtotal money.Amount, p Pricing) money.Totals {
 		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: price(p.ServicesValue)})
 }
 
-func (st *state) totals(subtotal money.Amount, p Pricing) Totals {
+func (st *state) totals(subtotal money.Amount, p Pricing) BOMTotals {
 	t := computeTotals(subtotal, p)
-	out := Totals{
-		Amounts: Amounts{
+	out := BOMTotals{
+		BOMAmounts: BOMAmounts{
 			Subtotal: money.USD(t.Subtotal), Discount: money.USD(t.Discount),
 			Services: money.USD(t.Services), GrandTotal: money.USD(t.GrandTotal),
 		},
@@ -343,7 +343,7 @@ func (st *state) totals(subtotal money.Amount, p Pricing) Totals {
 		out.Currency, out.Rate = st.ref.Currency, price(st.ref.ExchangeRate).String()
 	}
 	if cur := st.currency(); cur != nil {
-		out.Converted = &Amounts{
+		out.Converted = &BOMAmounts{
 			Subtotal: *cur.convert(t.Subtotal), Discount: *cur.convert(t.Discount),
 			Services: *cur.convert(t.Services), GrandTotal: *cur.convert(t.GrandTotal),
 		}

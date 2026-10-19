@@ -118,6 +118,64 @@
         ],
         "type": "object"
       },
+      "ApplyInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ApplyInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "all": {
+            "description": "Update every changed snapshot",
+            "type": "boolean"
+          },
+          "variantIds": {
+            "description": "The variants to update",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ApplyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ApplyResult.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "skipped": {
+            "description": "Deleted variants or unused/unchanged snapshots, left as they are",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "updated",
+          "skipped"
+        ],
+        "type": "object"
+      },
       "AttributeDefinition": {
         "additionalProperties": false,
         "properties": {
@@ -228,6 +286,453 @@
         "required": [
           "key",
           "label"
+        ],
+        "type": "object"
+      },
+      "BOM": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BOM.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/BOMGroup"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "description": "In BOM order",
+            "items": {
+              "$ref": "#/components/schemas/BOMLine"
+            },
+            "type": "array"
+          },
+          "manualLines": {
+            "items": {
+              "$ref": "#/components/schemas/ManualLine"
+            },
+            "type": "array"
+          },
+          "plans": {
+            "description": "The version's plans in order",
+            "items": {
+              "$ref": "#/components/schemas/BOMPlanRef"
+            },
+            "type": "array"
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/Pricing"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/BOMTotals"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/BOMWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "plans",
+          "lines",
+          "groups",
+          "totals",
+          "pricing",
+          "manualLines",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "BOMAmounts": {
+        "additionalProperties": false,
+        "properties": {
+          "discount": {
+            "type": "string"
+          },
+          "grandTotal": {
+            "type": "string"
+          },
+          "services": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subtotal",
+          "discount",
+          "services",
+          "grandTotal"
+        ],
+        "type": "object"
+      },
+      "BOMCategoryGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SnapshotCategory"
+          },
+          "converted": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "description": "Line keys in order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subtotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "subtotal",
+          "converted",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "BOMGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "categories": {
+            "description": "Empty for free text",
+            "items": {
+              "$ref": "#/components/schemas/BOMCategoryGroup"
+            },
+            "type": "array"
+          },
+          "converted": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "productType",
+              "freeText"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "Free text: the line keys; empty otherwise",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/SnapshotProductType"
+          },
+          "subtotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "productType",
+          "subtotal",
+          "converted",
+          "categories",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "BOMLine": {
+        "additionalProperties": false,
+        "properties": {
+          "addOnOf": {
+            "description": "The variants this line is an add-on of",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "converted": {
+            "$ref": "#/components/schemas/ConvertedLine",
+            "description": "In the project currency; null for USD projects"
+          },
+          "key": {
+            "description": "Stable key: the variant id, or the manual line id of a free-text line",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "catalog",
+              "addOn",
+              "freeText"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "Free-text lines: the line's name; empty otherwise",
+            "type": "string"
+          },
+          "productId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantities": {
+            "$ref": "#/components/schemas/LineQuantities"
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ItemSnapshot"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LineStatus",
+            "description": "Null for free-text lines"
+          },
+          "total": {
+            "description": "USD: unit price × quantity rounded half up to cents",
+            "type": "string"
+          },
+          "unitPrice": {
+            "description": "USD, decimal string",
+            "type": "string"
+          },
+          "variantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "variantId",
+          "productId",
+          "snapshot",
+          "name",
+          "unitPrice",
+          "quantity",
+          "quantities",
+          "total",
+          "converted",
+          "status",
+          "addOnOf"
+        ],
+        "type": "object"
+      },
+      "BOMPlanRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/BOMZoneRef"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "zones"
+        ],
+        "type": "object"
+      },
+      "BOMTotals": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/BOMTotals.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "converted": {
+            "$ref": "#/components/schemas/BOMAmounts"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "discount": {
+            "type": "string"
+          },
+          "grandTotal": {
+            "type": "string"
+          },
+          "rate": {
+            "type": "string"
+          },
+          "services": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "rate",
+          "converted",
+          "subtotal",
+          "discount",
+          "services",
+          "grandTotal"
+        ],
+        "type": "object"
+      },
+      "BOMWarning": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "placement_without_snapshot"
+            ],
+            "type": "string"
+          },
+          "placementId": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "planId",
+          "placementId"
+        ],
+        "type": "object"
+      },
+      "BOMZoneRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "CatalogChange": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/ChangeValues",
+            "description": "Null when the variant was deleted"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ChangeValues"
+          },
+          "canApply": {
+            "description": "False for deleted variants: their snapshot stays frozen",
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "effect": {
+            "description": "Change of the USD grand total when only this item is updated",
+            "type": "string"
+          },
+          "fields": {
+            "description": "unitPrice, productName, variantName, modelNumber, sku, image, requiredAddons",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ItemSnapshot"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "variantId",
+          "productId",
+          "snapshot",
+          "fields",
+          "before",
+          "after",
+          "deleted",
+          "available",
+          "canApply",
+          "effect"
+        ],
+        "type": "object"
+      },
+      "CatalogChanges": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CatalogChanges.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "effect": {
+            "description": "grandTotalAfter − grandTotal",
+            "type": "string"
+          },
+          "grandTotal": {
+            "description": "USD, as now",
+            "type": "string"
+          },
+          "grandTotalAfter": {
+            "description": "USD, after updating every item that can be updated",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogChange"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "grandTotal",
+          "grandTotalAfter",
+          "effect"
         ],
         "type": "object"
       },
@@ -517,6 +1022,70 @@
           "isActive",
           "attributes",
           "instanceAttributes"
+        ],
+        "type": "object"
+      },
+      "ChangeValues": {
+        "additionalProperties": false,
+        "properties": {
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "requiredAddons": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredAddon"
+            },
+            "type": "array"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "unitPrice",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "sku",
+          "imageUrl",
+          "requiredAddons"
+        ],
+        "type": "object"
+      },
+      "ConvertedLine": {
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "unitPrice",
+          "total"
         ],
         "type": "object"
       },
@@ -1989,6 +2558,121 @@
         ],
         "type": "object"
       },
+      "ItemSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SnapshotCategory"
+          },
+          "imageUrl": {
+            "description": "Image download path; null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/SnapshotProductType"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "productName",
+          "variantName",
+          "modelNumber",
+          "sku",
+          "productType",
+          "category",
+          "imageUrl"
+        ],
+        "type": "object"
+      },
+      "LineQuantities": {
+        "additionalProperties": false,
+        "properties": {
+          "manual": {
+            "description": "From manual lines",
+            "format": "int64",
+            "type": "integer"
+          },
+          "plans": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "Per plan id",
+            "type": "object"
+          },
+          "unzoned": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "Per plan id: placements outside every zone",
+            "type": "object"
+          },
+          "zones": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "Per zone id",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plans",
+          "zones",
+          "unzoned",
+          "manual"
+        ],
+        "type": "object"
+      },
+      "LineStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "description": "The variant can be offered (variant, product, product type and category active)",
+            "type": "boolean"
+          },
+          "deleted": {
+            "description": "The variant was deleted from the catalog; the snapshot stays frozen",
+            "type": "boolean"
+          },
+          "inactive": {
+            "description": "The variant exists but is not available",
+            "type": "boolean"
+          },
+          "outdated": {
+            "description": "The snapshot differs from the catalog (price, names, model number, SKU, image, required add-ons)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available",
+          "deleted",
+          "inactive",
+          "outdated"
+        ],
+        "type": "object"
+      },
       "LoginInput": {
         "additionalProperties": false,
         "properties": {
@@ -2013,6 +2697,159 @@
         "required": [
           "email",
           "password"
+        ],
+        "type": "object"
+      },
+      "ManualLine": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ManualLine.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "catalog",
+              "freeText"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "Free text only",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ItemSnapshot"
+          },
+          "unitPrice": {
+            "description": "USD; a catalog line's comes from its snapshot",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "variantId",
+          "snapshot",
+          "name",
+          "unitPrice",
+          "quantity",
+          "note",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ManualLineInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ManualLineInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Free-text line: 1-200 characters",
+            "type": "string"
+          },
+          "note": {
+            "description": "At most 500 characters",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "1-100000",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unitPrice": {
+            "description": "Free-text line: USD, \u003e= 0, at most 2 decimals",
+            "type": "string"
+          },
+          "variantId": {
+            "description": "Catalog line: the variant",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "ManualLineUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ManualLineUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "description": "Free-text line: 1-200 characters",
+            "type": "string"
+          },
+          "note": {
+            "description": "At most 500 characters",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "1-100000",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unitPrice": {
+            "description": "Free-text line: USD, \u003e= 0, at most 2 decimals",
+            "type": "string"
+          },
+          "variantId": {
+            "description": "Catalog line: the variant",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "quantity"
         ],
         "type": "object"
       },
@@ -2070,6 +2907,31 @@
           "tenantName",
           "permissions",
           "assignableRoles"
+        ],
+        "type": "object"
+      },
+      "OrderInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/OrderInputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every manual line of the version, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
         ],
         "type": "object"
       },
@@ -2650,6 +3512,176 @@
           "color",
           "opacity",
           "points"
+        ],
+        "type": "object"
+      },
+      "Pricing": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Pricing.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "discountKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "discountValue": {
+            "description": "Percent (0-100, 2 decimals) or USD amount",
+            "type": "string"
+          },
+          "servicesKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "servicesLabel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "servicesValue": {
+            "description": "Percent (0-100, 2 decimals) or USD amount",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "discountKind",
+          "discountValue",
+          "servicesKind",
+          "servicesValue",
+          "servicesLabel",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "PricingInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PricingInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "discountKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "discountValue": {
+            "description": "Percent 0-100 or USD amount, at most 2 decimals; ignored for none",
+            "type": "string"
+          },
+          "servicesKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "servicesLabel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 200 characters; empty for the default label",
+            "type": "object"
+          },
+          "servicesValue": {
+            "description": "Percent 0-100 or USD amount, at most 2 decimals; ignored for none",
+            "type": "string"
+          }
+        },
+        "required": [
+          "discountKind",
+          "servicesKind"
+        ],
+        "type": "object"
+      },
+      "PricingUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/PricingUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "discountKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "discountValue": {
+            "description": "Percent 0-100 or USD amount, at most 2 decimals; ignored for none",
+            "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "description": "The pricing's updatedAt as read; null while it had the defaults",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "servicesKind": {
+            "enum": [
+              "none",
+              "percent",
+              "amount"
+            ],
+            "type": "string"
+          },
+          "servicesLabel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per locale, at most 200 characters; empty for the default label",
+            "type": "object"
+          },
+          "servicesValue": {
+            "description": "Percent 0-100 or USD amount, at most 2 decimals; ignored for none",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "discountKind",
+          "servicesKind"
         ],
         "type": "object"
       },
@@ -3880,6 +4912,31 @@
         ],
         "type": "object"
       },
+      "RequiredAddon": {
+        "additionalProperties": false,
+        "properties": {
+          "modelNumber": {
+            "description": "Empty when unknown (deleted)",
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Empty when unknown (deleted)",
+            "type": "object"
+          }
+        },
+        "required": [
+          "variantId",
+          "modelNumber",
+          "variantName"
+        ],
+        "type": "object"
+      },
       "Role": {
         "description": "A user's role, highest first",
         "enum": [
@@ -3938,6 +4995,56 @@
         "required": [
           "role",
           "permissions"
+        ],
+        "type": "object"
+      },
+      "SnapshotCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "SnapshotProductType": {
+        "additionalProperties": false,
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "abbreviation",
+          "color"
         ],
         "type": "object"
       },
@@ -8522,6 +9629,400 @@
         ]
       }
     },
+    "/api/versions/{versionId}/bom": {
+      "get": {
+        "description": "Computed from the placements of the version's plans (not existing ones) and its manual lines, priced from the version's snapshots, with groups, totals, pricing and manual lines.",
+        "operationId": "getBom",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BOM"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the bill of materials of a version",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/catalog-changes": {
+      "get": {
+        "description": "The used snapshots that differ from the catalog (or whose variant was deleted), field by field, with the effect on the USD grand total.",
+        "operationId": "getCatalogChanges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogChanges"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Preview \"Update from catalog\"",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/catalog-changes/apply": {
+      "post": {
+        "description": "Re-snapshots the selected variants (or all); deleted variants and unchanged snapshots are skipped.",
+        "operationId": "applyCatalogChanges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update snapshots from the catalog",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/manual-lines": {
+      "get": {
+        "operationId": "listManualLines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManualLine"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the manual lines of a version",
+        "tags": [
+          "bom"
+        ]
+      },
+      "post": {
+        "description": "A catalog line (variantId; snapshot taken at the variant's first appearance) or a free-text line (name, unitPrice).",
+        "operationId": "createManualLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualLineInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualLine"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a manual line",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/manual-lines/order": {
+      "put": {
+        "operationId": "reorderManualLines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManualLine"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of the manual lines",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/manual-lines/{id}": {
+      "delete": {
+        "operationId": "deleteManualLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a manual line",
+        "tags": [
+          "bom"
+        ]
+      },
+      "put": {
+        "description": "409 bom.line_stale when it changed since expectedUpdatedAt.",
+        "operationId": "updateManualLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualLineUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualLine"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change a manual line",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
     "/api/versions/{versionId}/plans": {
       "get": {
         "description": "In their order, without content.",
@@ -8696,6 +10197,152 @@
         "summary": "Reorder the plans of a version",
         "tags": [
           "plans"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/pricing": {
+      "get": {
+        "operationId": "getPricing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pricing"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the pricing of a version",
+        "tags": [
+          "bom"
+        ]
+      },
+      "put": {
+        "description": "Returns the new BOM. 409 pricing.stale when it changed since expectedUpdatedAt.",
+        "operationId": "updatePricing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BOM"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Save the pricing of a version",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/pricing/preview": {
+      "post": {
+        "description": "Validates like a save and returns the totals the version would have; nothing is saved.",
+        "operationId": "previewPricing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BOMTotals"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Totals for unsaved pricing values",
+        "tags": [
+          "bom"
         ]
       }
     }

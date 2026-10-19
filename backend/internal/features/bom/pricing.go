@@ -147,18 +147,18 @@ func (s *Service) SavePricing(ctx context.Context, versionID uuid.UUID, in Prici
 
 // PreviewPricing returns the totals the version would have with the given
 // pricing, without saving it.
-func (s *Service) PreviewPricing(ctx context.Context, versionID uuid.UUID, in PricingInput) (Totals, error) {
+func (s *Service) PreviewPricing(ctx context.Context, versionID uuid.UUID, in PricingInput) (BOMTotals, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
-		return Totals{}, err
+		return BOMTotals{}, err
 	}
 	params, err := validPricing(in)
 	if err != nil {
-		return Totals{}, err
+		return BOMTotals{}, err
 	}
 	st, err := s.load(ctx, actor, versionID)
 	if err != nil {
-		return Totals{}, err
+		return BOMTotals{}, err
 	}
 	b := st.bom()
 	return st.totals(price(b.Totals.Subtotal), pricingOf(params)), nil
