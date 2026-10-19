@@ -371,8 +371,8 @@
   },
   "columns": {
     "title": "Neue Spalten – was bedeuten sie?",
-    "description_one": "{{count}} Spalte passt noch zu keinem Katalogfeld. Gib an, was sie bedeutet: nur Information oder ein neues Katalogfeld, das SnapFlow für seine Prüfungen nutzen kann.",
-    "description_other": "{{count}} Spalten passen noch zu keinem Katalogfeld. Gib für jede an, was sie bedeutet: nur Information oder ein neues Katalogfeld, das SnapFlow für seine Prüfungen nutzen kann.",
+    "description_one": "{{count}} Spalte passt noch zu keinem Katalogfeld. Gib an, was sie bedeutet: nur Information, ein vorhandenes Katalogfeld oder ein neues, das SnapFlow für seine Prüfungen nutzen kann.",
+    "description_other": "{{count}} Spalten passen noch zu keinem Katalogfeld. Gib für jede an, was sie bedeutet: nur Information, ein vorhandenes Katalogfeld oder ein neues, das SnapFlow für seine Prüfungen nutzen kann.",
     "columnNamed": "Spalte „{{column}}“ ({{letter}})",
     "columnLetter": "Spalte {{letter}}",
     "attributeKey": "Attribut {{key}}",
@@ -392,8 +392,9 @@
     "unit": "Einheit",
     "options": "Auswahlwerte",
     "optionsHint": "Wert eingeben und Enter drücken.",
+    "optionsFixed": "Diese Bedeutung braucht genau diese Auswahlwerte.",
     "meaning": "Bedeutung für die Prüfungen",
-    "meaningHint": "Was SnapFlow mit dem Wert macht; „Keine Bedeutung“ behält ihn als Information am Produkt.",
+    "meaningHint": "Was SnapFlow mit dem Wert macht; „Nur Information“ behält ihn am Produkt, ohne ihn zu prüfen.",
     "outputKind": "Ausgangsart",
     "loadType": "Lastart",
     "productTypes": "Nur für diese Produkttypen",
@@ -405,7 +406,7 @@
     "knownField": "Katalogfeld „{{field}}“ · {{meaning}}",
     "status": {
       "information": "Nur Information",
-      "category": "Bekannt, ohne Bedeutung (Attribut einer Kategorie, kein Katalogfeld)",
+      "category": "Bekannt, ohne Bedeutung",
       "field": "Katalogfeld"
     },
     "knownFieldKey": "Katalogfeld „{{key}}“",
@@ -421,6 +422,8 @@
       "other_field": "mit Feld {{field}} verknüpft in {{category}}",
       "unlinked": "Attribut von {{category}}, kein Feld"
     },
-    "anyLoadType": "Jede Lastart"
+    "anyLoadType": "Jede Lastart",
+    "keep": "Wie erkannt lassen",
+    "keepColumn": "Spalte {{column}} wie erkannt lassen"
   }
 }

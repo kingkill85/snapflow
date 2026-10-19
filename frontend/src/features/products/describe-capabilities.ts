@@ -40,7 +40,7 @@ export function useDescribeCapabilities() {
       if (ch.limitsA.length > 0) channel.push(t('capabilities.limitsA', { limits: limits(ch.limitsA, 'A') }))
       if (ch.minLoadsW.length > 0) channel.push(t('capabilities.minLoads', { limits: limits(ch.minLoadsW, 'W') }))
       for (const alt of ch.alternatives) {
-        channel.push(t('capabilities.alternative', { max: n(alt.max), per: n(alt.per), kind: kindName(alt.outputKindId, alt.outputKindKey) }))
+        channel.push(t('capabilities.alternative', { count: alt.per, max: n(alt.max), per: n(alt.per), kind: kindName(alt.outputKindId, alt.outputKindKey) }))
       }
       parts.push(channel.join(', '))
     }

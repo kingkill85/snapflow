@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Pencil } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Pencil, Undo2 } from 'lucide-react'
 import { useRef } from 'react'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -30,7 +30,7 @@ import {
   type TranslatableValue,
   useFieldError,
 } from '@/components/ui'
-import { useMeaningLabel } from '@/catalog/meaning-labels'
+import { useFixedOptionLabel, useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 // The mapping's "New columns – what do they mean?" step (D188): every
@@ -104,13 +104,14 @@ function answerFields(count: number): ApiFieldMap {
   return map
 }
 
-function toInput(a: Answer): CatalogFieldInput {
+/** fixed: the choices the meaning prescribes (motor_type: ac, dc) with their labels, sent instead of the typed ones. */
+function toInput(a: Answer, fixed?: CatalogFieldInput['options']): CatalogFieldInput {
   return {
     key: a.key.trim(),
     label: fromTranslatable(a.label) as CatalogFieldInput['label'],
     type: a.type,
     ...(a.unit.trim() ? { unit: a.unit.trim() } : {}),
-    ...(a.type === 'enum' ? { options: a.options.map((o) => ({ key: snakeKey(o), label: { en: o } })) } : {}),
+    ...(a.type === 'enum' ? { options: fixed ?? a.options.map((o) => ({ key: snakeKey(o), label: { en: o } })) } : {}),
     ...(a.meaning ? { meaning: a.meaning as CatalogFieldInputMeaning } : {}),
     ...(a.meaning && a.outputKindId ? { outputKindId: a.outputKindId } : {}),
     ...(a.meaning && a.loadTypeId ? { loadTypeId: a.loadTypeId } : {}),
@@ -150,6 +151,12 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
   const answer = useAnswerImportColumns()
 
   const meaningLabel = useMeaningLabel()
+  const fixedOption = useFixedOptionLabel()
+  /** The choices a meaning prescribes (motor_type: ac, dc), if any. */
+  const fixedOptionsOf = (meaning: string) => {
+    const keys = meanings.data?.items.find((m) => m.meaning === meaning)?.options ?? []
+    return keys.length > 0 ? keys : undefined
+  }
   const meaningOptions = [{ value: '', label: meaningLabel() }, ...(meanings.data?.items ?? []).map((m) => ({ value: m.meaning, label: meaningLabel(m.meaning) }))]
   const typeOptions = fieldTypes.map((v) => ({ value: v, label: t(`columns.type.${v}`) }))
   const modeOptions = [
@@ -178,7 +185,7 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
         ? { target: a.target, information: true }
         : a.mode === 'existing'
           ? { target: a.target, fieldKey: a.fieldKey }
-          : { target: a.target, field: toInput(a) },
+          : { target: a.target, field: toInput(a, fixedOptionsOf(a.meaning)?.map((key) => ({ key, label: fixedOption.text(key) as CatalogFieldInput['label'] }))) },
     )
     try {
       const result = await answer.mutateAsync({ data: { mapping, answers: body } })
@@ -203,9 +210,17 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
               const spec = meanings.data?.items.find((m) => m.meaning === a?.meaning)
               return (
                 <li key={c.target} aria-label={columnName(c)} className="space-y-3 rounded-control border border-line p-3">
-                  <p className="text-sm font-medium">
-                    {columnName(c)} <span className="font-normal text-muted">{t('columns.attributeKey', { key: c.key })}</span>
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-sm font-medium">
+                      {columnName(c)} <span className="font-normal text-muted">{t('columns.attributeKey', { key: c.key })}</span>
+                    </p>
+                    {c.status !== 'unknown' && (
+                      // A known column being answered again can go back to what was matched.
+                      <Button variant="secondary" size="sm" aria-label={t('columns.keepColumn', { column: c.column || c.columnLetter })} onClick={() => rows.remove(i)}>
+                        <Undo2 /> {t('columns.keep')}
+                      </Button>
+                    )}
+                  </div>
                   <div className="max-w-sm">
                     <FormSelectField control={form.control} name={`answers.${i}.mode`} label={t('columns.mode')} options={modeOptions} />
                   </div>
@@ -227,7 +242,14 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
                       <FormTranslatableField control={form.control} name={`answers.${i}.label`} label={t('columns.label')} required />
                       <FormSelectField control={form.control} name={`answers.${i}.type`} label={t('columns.typeLabel')} options={typeOptions} required />
                       <Field label={t('columns.unit')} {...form.register(`answers.${i}.unit`)} error={fieldError(errors?.unit?.message)} />
-                      {a.type === 'enum' && (
+                      {a.type === 'enum' && spec && spec.options.length > 0 && (
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium">{t('columns.options')}</p>
+                          <p>{spec.options.map((o) => fixedOption.label(o)).join(', ')}</p>
+                          <p className="text-muted">{t('columns.optionsFixed')}</p>
+                        </div>
+                      )}
+                      {a.type === 'enum' && !(spec && spec.options.length > 0) && (
                         <Controller
                           control={form.control}
                           name={`answers.${i}.options`}
@@ -321,7 +343,7 @@ export function KnownColumns({ columns, onChange }: { columns: (ImportColumn & {
           <li key={c.target} className="flex flex-wrap items-start justify-between gap-2 py-2" aria-label={c.column || c.columnLetter}>
             <span>{c.column || c.columnLetter}</span>
             <span className="flex flex-wrap items-center gap-2">
-              <span className="text-right text-muted">
+              <span className="text-muted sm:text-right">
                 {status(c)}
                 {c.categories.map((cat) => (
                   <span key={cat.categoryId} className="block">

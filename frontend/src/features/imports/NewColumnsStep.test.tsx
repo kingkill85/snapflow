@@ -64,6 +64,7 @@ function columnHandlers(answer: (body: ImportColumnAnswers) => Response) {
         items: [
           { meaning: 'channels_supplied', outputKind: true, loadType: false, loadTypeRequired: false, options: [], types: ['integer'] },
           { meaning: 'channel_limit_w', outputKind: true, loadType: true, loadTypeRequired: true, options: [], types: ['number', 'integer'] },
+          { meaning: 'motor_type', outputKind: false, loadType: false, loadTypeRequired: false, options: ['ac', 'dc'], types: ['enum'] },
         ],
       }),
     ),
@@ -172,6 +173,34 @@ describe('NewColumnsStep', () => {
     expect(bodies[1].mapping?.fields.find((f) => f.target === 'attribute.dimmer_w')).toMatchObject({ fieldKey: 'dimmer_led_w' })
   })
 
+  it('a meaning with fixed choices (motor type) sends them with their labels', async () => {
+    lookups([])
+    runHandlers(() => run({ mapping: withAttribute }))
+    const answers = columnHandlers(() => problem(422, { code: 'validation.failed', fields: [] }))
+    previewHandler(blockedUntilAnswered)
+    previewLists()
+    const user = userEvent.setup()
+    renderRoutes(routes, { route: runRoute })
+
+    await user.click(await screen.findByRole('button', { name: 'Preview' }))
+    const row = await screen.findByRole('listitem', { name: 'Column "Price" (D)' })
+    await chooseOption(user, within(row).getByRole('combobox', { name: 'Meaning for the checks' }), 'Motor type (AC/DC)')
+    expect(within(row).getByRole('combobox', { name: /Value type/ })).toHaveTextContent('Choice')
+    // Fixed choices, no free text.
+    expect(within(row).getByText('AC motor, DC motor')).toBeInTheDocument()
+    expect(within(row).queryByRole('textbox', { name: /Choices/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save answers and preview' }))
+    await waitFor(() => expect(answers).toHaveLength(1))
+    expect(answers[0].answers[0].field).toMatchObject({
+      type: 'enum',
+      meaning: 'motor_type',
+      options: [
+        { key: 'ac', label: { en: 'AC motor', de: 'AC-Motor' } },
+        { key: 'dc', label: { en: 'DC motor', de: 'DC-Motor' } },
+      ],
+    })
+  })
+
   it('goes back to the mapping without answering', async () => {
     lookups([])
     runHandlers(() => run({ mapping: withAttribute }))
@@ -235,8 +264,11 @@ describe('NewColumnsStep', () => {
     await chooseOption(user, within(row).getByRole('combobox', { name: 'This column is' }), 'An existing catalog field')
     await chooseOption(user, within(row).getByRole('combobox', { name: 'Catalog field' }), 'Max LED per output (dimmer_led_w)')
 
-    // The column matched automatically: answered again as just information.
+    // The column matched automatically: changed, kept as known, then answered again as just information.
     await user.click(within(known).getByRole('button', { name: 'Change what column Width means' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep column Width as known' }))
+    expect(screen.queryByRole('listitem', { name: 'Column "Width" (E)' })).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('region', { name: 'Known columns' })).getByRole('button', { name: 'Change what column Width means' }))
     const width = await screen.findByRole('listitem', { name: 'Column "Width" (E)' })
     await chooseOption(user, within(width).getByRole('combobox', { name: 'This column is' }), 'Just information')
     await user.click(screen.getByRole('button', { name: 'Save answers and preview' }))

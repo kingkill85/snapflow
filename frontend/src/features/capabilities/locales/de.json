@@ -98,5 +98,9 @@
     "zigbee_router": "Zigbee-Router",
     "motor_type": "Motortyp (AC/DC)",
     "alternative_allowed": "Darf als andere Ausgangsart dienen"
+  },
+  "fixedOption": {
+    "ac": "AC-Motor",
+    "dc": "DC-Motor"
   }
 }

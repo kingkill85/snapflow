@@ -63,6 +63,8 @@ export function OutputKindsPage() {
     },
     {
       header: t('field.key'),
+      // Tablets (768–1023 px): the key is in the editor; the row actions need the room (D322).
+      className: 'md:max-lg:hidden',
       cell: (p) => <code className="text-xs">{p.key}</code>,
     },
     {

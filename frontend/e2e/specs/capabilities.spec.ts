@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { type Page } from '@playwright/test'
 
-import { chooseOption, expect, row, test, unique, uniqueKey } from '../fixtures'
+import { chooseOption, expect, row, test, translation, unique, uniqueKey } from '../fixtures'
 
 // Catalog capabilities (step 3a) through the UI: a CSV with capability
 // columns the catalog does not know yet is imported with a profile; the
@@ -35,12 +35,17 @@ test('an import asks what new capability columns mean; the product then shows it
 
   const model = `CAP-${tag}`.toUpperCase()
   const category = unique('Capability dimmers')
-  const columns = { dimmers: `Dimmers ${tag}`, led: `LED max ${tag}`, width: `Width ${tag}`, notes: `Notes ${tag}` }
+  const columns = { dimmers: `Dimmers ${tag}`, led: `LED max ${tag}`, width: `Width ${tag}`, notes: `Notes ${tag}`, standby: `Standby ${tag}` }
+  // A field the standby column matches by key, and the one it really means (chosen with "Change").
+  const fieldPost = (key: string, en: string) => api.ctx.post('/api/catalog-fields', { data: { key, label: { en }, type: 'number', unit: 'W' } })
+  expect((await fieldPost(`standby_${tag}`, unique('Standby (matched)'))).status()).toBe(201)
+  const standbyLabel = unique('Standby power')
+  expect((await fieldPost(`standby_power_${tag}`, standbyLabel)).status()).toBe(201)
   const file = join(mkdtempSync(join(tmpdir(), 'snapflow-capabilities-')), 'capabilities.csv')
   writeFileSync(
     file,
-    `Model;Name;Category;Variant;Price;${columns.dimmers};${columns.led};${columns.width};${columns.notes}\n` +
-      `${model};Dimmer 6ch;${category};Standard;99.00;6;200;6;made in EU\n`,
+    `Model;Name;Category;Variant;Price;${columns.dimmers};${columns.led};${columns.width};${columns.notes};${columns.standby}\n` +
+      `${model};Dimmer 6ch;${category};Standard;99.00;6;200;6;made in EU;0.4\n`,
   )
   const profileName = unique('Capabilities')
   // Listing first creates the starter profile while there is none (D121), as the imports spec running alongside expects.
@@ -65,6 +70,7 @@ test('an import asks what new capability columns mean; the product then shows it
           attr(columns.led, `led_w_${tag}`),
           attr(columns.width, `width_${tag}`),
           attr(columns.notes, `notes_${tag}`),
+          attr(columns.standby, `standby_${tag}`),
         ],
       },
     },
@@ -92,6 +98,14 @@ test('an import asks what new capability columns mean; the product then shows it
   // Notes: just information.
   await chooseOption(column(columns.notes).getByRole('combobox', { name: 'This column is' }), 'Just information')
 
+  // The standby column matched a field by key; "Change" links the field it really means.
+  const known = page.getByRole('region', { name: 'Known columns' })
+  await expect(known.getByRole('listitem', { name: columns.standby })).toContainText('Catalog field')
+  await page.getByRole('button', { name: `Change what column ${columns.standby} means` }).click()
+  const standby = column(columns.standby)
+  await expect(standby.getByRole('combobox', { name: 'This column is' })).toHaveText('An existing catalog field')
+  await chooseOption(standby.getByRole('combobox', { name: /^Catalog field/ }), `${standbyLabel} (standby_power_${tag})`)
+
   await page.getByRole('button', { name: 'Save answers and preview' }).click()
   await expect(page.getByText('The file has no errors or warnings.')).toBeVisible()
   await page.getByRole('button', { name: 'Apply import' }).click()
@@ -100,6 +114,12 @@ test('an import asks what new capability columns mean; the product then shows it
   // The fields exist now, and the next import knows the columns.
   const fields = (await (await api.ctx.get('/api/catalog-fields')).json()) as { items: { key: string; meaning?: string }[] }
   expect(fields.items.find((f) => f.key === `dimmers_${tag}`)?.meaning).toBe('channels_supplied')
+  // The created category links the standby attribute to the chosen field.
+  const categories = (await (await api.ctx.get('/api/categories', { params: { includeInactive: true } })).json()) as {
+    items: { name: { en: string }; attributes: { key: string; fieldKey?: string }[] }[]
+  }
+  const created = categories.items.find((c) => c.name.en === category)
+  expect(created?.attributes.find((a) => a.key === `standby_${tag}`)?.fieldKey).toBe(`standby_power_${tag}`)
 
   const products = (await (await api.ctx.get('/api/products', { params: { search: model, includeInactive: true } })).json()) as {
     items: { id: string; modelNumber: string }[]
@@ -108,7 +128,7 @@ test('an import asks what new capability columns mean; the product then shows it
   expect(product).toBeTruthy()
   await page.goto(`/catalog/products/${product?.id}`)
   const block = page.getByTestId('capabilities')
-  await expect(block).toContainText(`6 × ${kindName}, max 200 W ${loadName} · 6 TE · mounting: Floorplan`)
+  await expect(block).toContainText(`6 × ${kindName}, max 200 W ${loadName} · 6 TE wide · mounting: Floorplan`)
 })
 
 test('a category keeps its mounting and a product type its reserve when other fields are edited', async ({ page, api }) => {
@@ -143,5 +163,61 @@ test('a category keeps its mounting and a product type its reserve when other fi
   expect((await api.productType(type.id)) as unknown as { reservePercent: number; abbreviation: string }).toMatchObject({
     reservePercent: 30,
     abbreviation: 'RS',
+  })
+})
+
+test('an output kind lists its alternatives; a product type takes its topology', async ({ page, api }) => {
+  const tag = uniqueKey('').replace(/^_+/, '')
+  const relay = await (await api.ctx.post('/api/output-kinds', { data: { key: `relay_${tag}`, name: { en: unique('Relay out') }, isActive: true } })).json()
+  const dimmer = await (await api.ctx.post('/api/output-kinds', { data: { key: `dim_${tag}`, name: { en: unique('Dimmer out') }, isActive: true } })).json()
+
+  // Output kind: two alternatives, one removed again.
+  await page.goto('/catalog/output-kinds')
+  await page.getByRole('button', { name: 'New output kind' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New output kind' })
+  await dialog.getByLabel('Key').fill(`blind_${tag}`)
+  await (await translation(dialog, 'Name', 'en')).fill(unique('Blind out'))
+  await dialog.getByRole('button', { name: 'Add alternative' }).click()
+  const first = dialog.getByRole('group', { name: 'Alternative 1' })
+  await chooseOption(first.getByRole('combobox', { name: /^Kind/ }), relay.name.en)
+  await first.getByLabel(/^Channels needed/).fill('2')
+  await dialog.getByRole('button', { name: 'Add alternative' }).click()
+  const second = dialog.getByRole('group', { name: 'Alternative 2' })
+  await chooseOption(second.getByRole('combobox', { name: /^Kind/ }), dimmer.name.en)
+  await second.getByLabel(/^Channels needed/).fill('3')
+  await dialog.getByRole('button', { name: 'Add alternative' }).click()
+  await dialog.getByRole('button', { name: 'Remove Alternative 3' }).click()
+  await expect(dialog.getByRole('group', { name: 'Alternative 3' })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Create' }).click()
+  await expect(dialog).toBeHidden()
+  const kinds = (await (await api.ctx.get('/api/output-kinds', { params: { includeInactive: true } })).json()) as {
+    items: { key: string; alternatives: { outputKindId: string; count: number }[] }[]
+  }
+  // Listed in output kind order, not in the order entered.
+  expect([...(kinds.items.find((k) => k.key === `blind_${tag}`)?.alternatives ?? [])].sort((a, b) => a.count - b.count)).toEqual([
+    { outputKindId: relay.id, count: 2 },
+    { outputKindId: dimmer.id, count: 3 },
+  ])
+  // Reopened, the list shows both.
+  await row(page, `blind_${tag}`).getByRole('button', { name: 'Edit' }).click()
+  const edit = page.getByRole('dialog', { name: 'Edit output kind' })
+  await expect(edit.getByRole('group', { name: /^Alternative \d$/ })).toHaveCount(2)
+  const counts = await edit.getByLabel(/^Channels needed/).evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).value))
+  expect(counts.sort()).toEqual(['2', '3'])
+  await edit.getByRole('button', { name: 'Cancel' }).click()
+
+  // Product type: wireless with a default of places; bus fields hidden.
+  const type = await api.createProductType({ name: { en: unique('Wireless system') } })
+  await page.goto('/catalog/product-types')
+  await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
+  const typeDialog = page.getByRole('dialog', { name: 'Edit product type' })
+  await chooseOption(typeDialog.getByRole('combobox', { name: /^Topology/ }), 'Wireless')
+  await expect(typeDialog.getByLabel(/^Default bus current/)).toHaveCount(0)
+  await typeDialog.getByLabel(/^Default wireless places/).fill('2')
+  await typeDialog.getByRole('button', { name: 'Update' }).click()
+  await expect(typeDialog).toBeHidden()
+  expect((await api.productType(type.id)) as unknown as { topology: string; defaultWirelessPlacesUsed: number }).toMatchObject({
+    topology: 'wireless',
+    defaultWirelessPlacesUsed: 2,
   })
 })

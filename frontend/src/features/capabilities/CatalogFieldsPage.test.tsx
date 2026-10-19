@@ -173,8 +173,8 @@ describe('CatalogFieldsPage', () => {
       type: 'enum',
       meaning: 'motor_type',
       options: [
-        { key: 'ac', label: { en: 'AC' } },
-        { key: 'dc', label: { en: 'DC' } },
+        { key: 'ac', label: { en: 'AC motor', de: 'AC-Motor' } },
+        { key: 'dc', label: { en: 'DC motor', de: 'DC-Motor' } },
       ],
     })
   })

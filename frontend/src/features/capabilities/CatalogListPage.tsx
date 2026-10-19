@@ -76,7 +76,7 @@ export function CatalogListPage<T extends Item>(props: Props<T>) {
     {
       header: t('position'),
       cell: (p) => rows.indexOf(p) + 1,
-      className: 'w-px text-right tabular-nums',
+      className: 'w-px whitespace-nowrap text-right tabular-nums',
     },
     ...props.columns,
   ]

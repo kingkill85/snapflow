@@ -146,14 +146,15 @@
     "product": "Product",
     "channels": "{{n}} × {{kind}}",
     "max": "max {{limits}}",
-    "alternative": "or up to {{max}} × {{kind}} ({{per}} each)",
-    "moduleTotalA": "module max {{a}} A",
+    "alternative_one": "each also usable as {{kind}}",
+    "alternative_other": "or up to {{max}} × {{kind}} (from {{per}} channels each)",
+    "moduleTotalA": "max {{a}} A for the whole module",
     "busUsed": "uses {{ma}} mA bus current",
     "busSupplied": "supplies {{ma}} mA bus current",
     "busDevicesMax_one": "up to {{n}} device per line",
     "busDevicesMax_other": "up to {{n}} devices per line",
-    "railWidth": "{{te}} TE",
-    "enclosure": "enclosure {{rows}} rows × {{te}} TE",
+    "railWidth": "{{te}} TE wide",
+    "enclosure": "enclosure with {{rows}} rows of {{te}} TE",
     "wirelessSupplied_one": "{{n}} wireless place",
     "wirelessSupplied_other": "{{n}} wireless places",
     "wirelessUsed_one": "uses {{n}} wireless place",
@@ -161,8 +162,8 @@
     "router": "Zigbee router",
     "noRouter": "no Zigbee router",
     "motor": {
-      "ac": "AC motor",
-      "dc": "DC motor"
+      "ac": "for AC motors",
+      "dc": "for DC motors"
     },
     "mounting": "mounting: {{mounting}}",
     "valueW": "{{v}} W",
@@ -170,7 +171,7 @@
     "withLoad": "{{value}} {{load}}",
     "limitsA": "max {{limits}} per channel",
     "minLoads": "min {{limits}} per channel",
-    "moduleTotalsW": "module max {{limits}}",
+    "moduleTotalsW": "max {{limits}} for the whole module",
     "systemDefault": "{{text}} (system default)"
   }
 }

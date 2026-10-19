@@ -371,8 +371,8 @@
   },
   "columns": {
     "title": "New columns – what do they mean?",
-    "description_one": "{{count}} column matches no catalog field yet. Say what it means: just information, or a new catalog field SnapFlow can use for its checks.",
-    "description_other": "{{count}} columns match no catalog field yet. Say what each means: just information, or a new catalog field SnapFlow can use for its checks.",
+    "description_one": "{{count}} column matches no catalog field yet. Say what it means: just information, an existing catalog field, or a new one SnapFlow can use for its checks.",
+    "description_other": "{{count}} columns match no catalog field yet. Say what each means: just information, an existing catalog field, or a new one SnapFlow can use for its checks.",
     "columnNamed": "Column \"{{column}}\" ({{letter}})",
     "columnLetter": "Column {{letter}}",
     "attributeKey": "attribute {{key}}",
@@ -392,8 +392,9 @@
     "unit": "Unit",
     "options": "Choices",
     "optionsHint": "Type a choice and press Enter.",
+    "optionsFixed": "This meaning needs exactly these choices.",
     "meaning": "Meaning for the checks",
-    "meaningHint": "What SnapFlow does with the value; \"No meaning\" keeps it as information on the product.",
+    "meaningHint": "What SnapFlow does with the value; \"Just information\" keeps it on the product without checking it.",
     "outputKind": "Output kind",
     "loadType": "Load type",
     "productTypes": "Only for these product types",
@@ -405,7 +406,7 @@
     "knownField": "Catalog field \"{{field}}\" · {{meaning}}",
     "status": {
       "information": "Just information",
-      "category": "Known, no meaning (an attribute of a category, no catalog field)",
+      "category": "Known, no meaning",
       "field": "Catalog field"
     },
     "knownFieldKey": "Catalog field \"{{key}}\"",
@@ -421,6 +422,8 @@
       "other_field": "linked to field {{field}} in {{category}}",
       "unlinked": "attribute of {{category}}, no field"
     },
-    "anyLoadType": "Any load type"
+    "anyLoadType": "Any load type",
+    "keep": "Keep as known",
+    "keepColumn": "Keep column {{column}} as known"
   }
 }

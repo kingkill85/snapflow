@@ -33,7 +33,7 @@ import {
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
-import { useMeaningLabel } from '@/catalog/meaning-labels'
+import { useFixedOptionLabel, useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 import {
@@ -65,6 +65,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
   const fieldError = useFieldError()
   const localized = useLocalized()
   const meaningLabel = useMeaningLabel()
+  const fixedText = useFixedOptionLabel().text
   const queryClient = useQueryClient()
   const create = useCreateCatalogField()
   const update = useUpdateCatalogField()
@@ -106,10 +107,10 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
     if (current.map((o) => o.key).join(',') === fixedKey) return
     setValue(
       'options',
-      keys.map((key) => current.find((o) => o.key === key) ?? { key, label: toTranslatable({ en: key.toUpperCase() }) }),
+      keys.map((key) => current.find((o) => o.key === key) ?? { key, label: toTranslatable(fixedText(key)) }),
       { shouldDirty: true },
     )
-  }, [fixedKey, getValues, setValue])
+  }, [fixedKey, getValues, setValue, fixedText])
   // A field categories link keeps its key and type (catalog_field.in_use).
   const inUse = (item?.inUse ?? 0) > 0
   const usedByNames = (item?.usedBy ?? []).map((c) => localized(c.name) || c.key).join(', ')
