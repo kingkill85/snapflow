@@ -155,7 +155,7 @@ func TestValidity(t *testing.T) {
 		{name: "units above quantity", conns: []*Conn{conn(ledB, dim, f.dimmer, 1, 1), conn(ledB, dim, f.dimmer, 2, 2)}, want: []string{CodeUnitsExceeded}},
 		{name: "W limit per load type exceeded", conns: []*Conn{conn(ledA, dim, f.dimmer, 1, 3), conn(ledB, dim, f.dimmer, 1, 1)},
 			want: []string{CodeChannelOverloadW}}, // 150 + 60 > 200
-		{name: "W limit of the load type", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1)}}, // 250 <= 300 halogen
+		{name: "W limit of the load type", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1)}},                                                // 250 <= 300 halogen
 		{name: "mixed load types within Σ load ÷ limit", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1), conn(tiny, dim, f.dimmer, 1, 1)}}, // 250/300 + 2/200 = 0.84
 		{name: "mixed load types over Σ load ÷ limit", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1), conn(ledB, dim, f.dimmer, 1, 1)},
 			want: []string{CodeChannelOverloadW}}, // 250/300 + 60/200 = 1.13

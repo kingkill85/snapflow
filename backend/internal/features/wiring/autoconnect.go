@@ -672,11 +672,11 @@ func (s *Service) Apply(ctx context.Context, versionID uuid.UUID, in AutoConnect
 			return nil
 		}
 		type row struct {
-			NeedPlanID   uuid.UUID `json:"need_plan_id"`
-			NeedID       uuid.UUID `json:"need_id"`
-			Units        int32     `json:"units"`
-			TargetPlanID uuid.UUID `json:"target_plan_id"`
-			TargetItemID uuid.UUID `json:"target_item_id"`
+			NeedPlanID   uuid.UUID  `json:"need_plan_id"`
+			NeedID       uuid.UUID  `json:"need_id"`
+			Units        int32      `json:"units"`
+			TargetPlanID uuid.UUID  `json:"target_plan_id"`
+			TargetItemID uuid.UUID  `json:"target_item_id"`
 			OutputKindID uuid.UUID  `json:"output_kind_id"`
 			ChannelNo    int        `json:"channel_no"`
 			AltBase      *uuid.UUID `json:"alt_base_output_kind_id"`

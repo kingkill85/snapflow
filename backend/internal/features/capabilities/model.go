@@ -12,16 +12,16 @@ import (
 
 // LoadType is a kind of load a need has (LED, halogen, AC motor, ...).
 type LoadType struct {
-	ID        uuid.UUID    `json:"id"`
-	Key       string       `json:"key" example:"led"`
-	Name      i18n.Text    `json:"name"`
+	ID   uuid.UUID `json:"id"`
+	Key  string    `json:"key" example:"led"`
+	Name i18n.Text `json:"name"`
 	// PowerFactor converts W into A: I = P / (V · PF) (D407).
-	PowerFactor float64    `json:"powerFactor" doc:"0.10-1.00; converts W into A for limits in A: I = P / (V · PF)"`
-	SortOrder int32        `json:"sortOrder"`
-	IsActive  bool         `json:"isActive"`
-	CreatedAt time.Time    `json:"createdAt"`
-	UpdatedAt time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can       auth.Actions `json:"can"`
+	PowerFactor float64      `json:"powerFactor" doc:"0.10-1.00; converts W into A for limits in A: I = P / (V · PF)"`
+	SortOrder   int32        `json:"sortOrder"`
+	IsActive    bool         `json:"isActive"`
+	CreatedAt   time.Time    `json:"createdAt"`
+	UpdatedAt   time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can         auth.Actions `json:"can"`
 }
 
 type LoadTypeInput struct {
@@ -79,14 +79,14 @@ type OutputKindUpdate struct {
 type Meaning string
 
 const (
-	MeaningNone                   Meaning = ""
-	MeaningChannelsSupplied       Meaning = "channels_supplied"
-	MeaningChannelLimitW          Meaning = "channel_limit_w"
-	MeaningChannelLimitA          Meaning = "channel_limit_a"
-	MeaningChannelMinLoadW        Meaning = "channel_min_load_w"
+	MeaningNone             Meaning = ""
+	MeaningChannelsSupplied Meaning = "channels_supplied"
+	MeaningChannelLimitW    Meaning = "channel_limit_w"
+	MeaningChannelLimitA    Meaning = "channel_limit_a"
+	MeaningChannelMinLoadW  Meaning = "channel_min_load_w"
 	// MeaningChannelVoltage (per output kind): the voltage the channels
 	// switch when it is not the product type's nominal voltage (D407).
-	MeaningChannelVoltage Meaning = "channel_voltage"
+	MeaningChannelVoltage         Meaning = "channel_voltage"
 	MeaningModuleTotalA           Meaning = "module_total_a"
 	MeaningModuleTotalW           Meaning = "module_total_w"
 	MeaningBusCurrentUsedMa       Meaning = "bus_current_used_ma"
