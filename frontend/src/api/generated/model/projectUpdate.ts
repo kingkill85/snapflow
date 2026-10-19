@@ -14,8 +14,10 @@ export interface ProjectUpdate {
   currency?: string;
   /** Left out: the stored customer stays (create: none) */
   customer?: ProjectCustomerInput;
-  /** Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1 */
+  /** Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet */
   exchangeRate?: string;
+  /** online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above */
+  exchangeRateSource?: string;
   /** updatedAt as last read; if the project changed since, the update fails with project.stale */
   expectedUpdatedAt: string;
   /** A content language; defaults to en */

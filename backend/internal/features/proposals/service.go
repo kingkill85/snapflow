@@ -165,8 +165,11 @@ func (s *Service) out(ctx context.Context, actor auth.Actor, rows []store.Propos
 			CreatedAt: r.CreatedAt, Can: ProposalActions{Delete: actor.Can(auth.PermProjectsDelete)},
 			Totals: bom.BOMTotals{
 				BOMAmounts: bom.BOMAmounts{Subtotal: r.Subtotal, Discount: r.Discount, Services: r.Services, GrandTotal: r.GrandTotal},
-				Currency:   r.Currency, Rate: trimRate(r.ExchangeRate),
+				Currency:   r.Currency, Rate: trimRate(r.ExchangeRate), RateDate: r.ExchangeRateDate,
 			},
+		}
+		if r.ExchangeRateSource != nil {
+			p.Totals.RateSource = *r.ExchangeRateSource
 		}
 		if r.ProductTypeID != nil {
 			name := i18n.Text{}
@@ -393,6 +396,10 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	if err != nil {
 		return nil, err
 	}
+	if r.bom.Totals.Currency != "USD" && r.bom.Totals.Rate == "" {
+		return nil, apperr.Conflict("proposal.rate_missing", "set the project's exchange rate before generating a proposal").
+			With("currency", r.bom.Totals.Currency)
+	}
 	pages, err := s.planPages(ctx, r)
 	if err != nil {
 		return nil, err
@@ -443,6 +450,10 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 			ProductTypeID: typeID, ProductTypeName: typeName, FileID: f.ID,
 			FileName: FileName(number, r.project.Name, exp.FileExtension()), Currency: t.Currency, ExchangeRate: t.Rate,
 			Subtotal: t.Subtotal, Discount: t.Discount, Services: t.Services, GrandTotal: t.GrandTotal, CreatedBy: &actor.UserID,
+			ExchangeRateDate: t.RateDate,
+		}
+		if t.RateSource != "" {
+			p.ExchangeRateSource = &t.RateSource
 		}
 		if t.Converted != nil {
 			cv := t.Converted

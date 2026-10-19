@@ -550,7 +550,7 @@
           },
           "converted": {
             "$ref": "#/components/schemas/NullableBOMAmounts",
-            "description": "Null for USD projects"
+            "description": "Null for USD projects and without a rate"
           },
           "currency": {
             "type": "string"
@@ -562,6 +562,19 @@
             "type": "string"
           },
           "rate": {
+            "description": "Units of the currency per 1 USD; empty for a non-USD project without a rate yet",
+            "type": "string"
+          },
+          "rateDate": {
+            "description": "When the rate was fetched (provider's date) or entered; null for USD and without a rate",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rateSource": {
+            "description": "online, manual; empty for USD and without a rate",
             "type": "string"
           },
           "services": {
@@ -574,6 +587,8 @@
         "required": [
           "currency",
           "rate",
+          "rateDate",
+          "rateSource",
           "converted",
           "subtotal",
           "discount",
@@ -1052,6 +1067,68 @@
         ],
         "type": "object"
       },
+      "Currency": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "ISO 4217",
+            "examples": [
+              "EUR"
+            ],
+            "type": "string"
+          },
+          "minorUnits": {
+            "examples": [
+              2
+            ],
+            "format": "int32",
+            "type": "integer"
+          },
+          "online": {
+            "description": "The online provider has a rate for it (false for all while the provider is not reachable)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "minorUnits",
+          "online"
+        ],
+        "type": "object"
+      },
+      "CurrencyList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CurrencyList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "description": "Sorted by code",
+            "items": {
+              "$ref": "#/components/schemas/Currency"
+            },
+            "type": "array"
+          },
+          "recent": {
+            "description": "Currencies other than USD of the caller's tenant's projects, most recently changed first (at most 5)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "recent"
+        ],
+        "type": "object"
+      },
       "Error": {
         "additionalProperties": false,
         "properties": {
@@ -1096,6 +1173,73 @@
         "required": [
           "status",
           "code"
+        ],
+        "type": "object"
+      },
+      "ExchangeRate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ExchangeRate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "examples": [
+              "EUR"
+            ],
+            "type": "string"
+          },
+          "date": {
+            "description": "The provider's last update",
+            "format": "date-time",
+            "type": "string"
+          },
+          "provider": {
+            "examples": [
+              "open.er-api.com"
+            ],
+            "type": "string"
+          },
+          "rate": {
+            "description": "Units of the currency per 1 USD, 6 decimals at most",
+            "examples": [
+              "0.9237"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "rate",
+          "date",
+          "provider"
+        ],
+        "type": "object"
+      },
+      "ExchangeRateSet": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ExchangeRateSet.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "rate": {
+            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rate"
         ],
         "type": "object"
       },
@@ -4870,11 +5014,49 @@
             "$ref": "#/components/schemas/ProjectCustomer"
           },
           "exchangeRate": {
-            "description": "Units of the currency per 1 USD, decimal string",
+            "description": "Units of the currency per 1 USD, decimal string; null: a non-USD project without a rate yet (amounts are shown in USD only)",
             "examples": [
               "0.92"
             ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exchangeRateAgeDays": {
+            "description": "Whole days since exchangeRateDate (0 without a date)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "exchangeRateDate": {
+            "description": "Online: the provider's update time; manual: when it was entered; null for USD and without a rate",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exchangeRateMaxAgeDays": {
+            "description": "Days after which an online rate counts as stale (server configuration)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "exchangeRateProvider": {
+            "description": "The online provider (host name); empty unless online",
             "type": "string"
+          },
+          "exchangeRateSource": {
+            "description": "none for USD projects and without a rate",
+            "enum": [
+              "none",
+              "online",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "exchangeRateStale": {
+            "description": "An online rate older than EXCHANGE_RATE_MAX_AGE_DAYS (manual rates never are)",
+            "type": "boolean"
           },
           "id": {
             "type": "string"
@@ -4949,6 +5131,12 @@
           "language",
           "currency",
           "exchangeRate",
+          "exchangeRateDate",
+          "exchangeRateSource",
+          "exchangeRateProvider",
+          "exchangeRateAgeDays",
+          "exchangeRateStale",
+          "exchangeRateMaxAgeDays",
           "customer",
           "notes",
           "productTypeIds",
@@ -5004,7 +5192,11 @@
             "description": "Left out: the stored customer stays (create: none)"
           },
           "exchangeRate": {
-            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
+            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet",
+            "type": "string"
+          },
+          "exchangeRateSource": {
+            "description": "online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above",
             "type": "string"
           },
           "language": {
@@ -5233,7 +5425,11 @@
             "description": "Left out: the stored customer stays (create: none)"
           },
           "exchangeRate": {
-            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1",
+            "description": "Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet",
+            "type": "string"
+          },
+          "exchangeRateSource": {
+            "description": "online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above",
             "type": "string"
           },
           "expectedUpdatedAt": {
@@ -6749,6 +6945,80 @@
         "summary": "Update a category",
         "tags": [
           "categories"
+        ]
+      }
+    },
+    "/api/currencies": {
+      "get": {
+        "operationId": "listCurrencies",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrencyList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the currencies a project may use",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/exchange-rates/{currency}": {
+      "get": {
+        "description": "Cached for an hour; 503 exchange_rate.unavailable when the provider is not reachable and no rates of the last 24 hours are cached.",
+        "operationId": "getExchangeRate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeRate"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the online provider's current rate of a currency",
+        "tags": [
+          "projects"
         ]
       }
     },
@@ -9556,6 +9826,102 @@
           }
         },
         "summary": "Update a project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{id}/exchange-rate": {
+      "put": {
+        "description": "Non-USD, active projects only. The rate is marked manual with today's date and never replaced automatically.",
+        "operationId": "setProjectExchangeRate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeRateSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Enter a project's rate by hand",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{id}/exchange-rate/refresh": {
+      "post": {
+        "description": "Non-USD, active projects only (409 project.exchange_rate_usd, project.read_only). The rate is marked online with the provider's date.",
+        "operationId": "refreshProjectExchangeRate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Store the online provider's current rate in a project",
         "tags": [
           "projects"
         ]

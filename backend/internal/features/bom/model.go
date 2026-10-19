@@ -96,9 +96,11 @@ type BOMAmounts struct {
 // converted grand total may differ from the sum of converted parts).
 type BOMTotals struct {
 	BOMAmounts
-	Currency  string              `json:"currency"`
-	Rate      string              `json:"rate"`
-	Converted *NullableBOMAmounts `json:"converted" doc:"Null for USD projects"`
+	Currency   string              `json:"currency"`
+	Rate       string              `json:"rate" doc:"Units of the currency per 1 USD; empty for a non-USD project without a rate yet"`
+	RateDate   *time.Time          `json:"rateDate" nullable:"true" doc:"When the rate was fetched (provider's date) or entered; null for USD and without a rate"`
+	RateSource string              `json:"rateSource" doc:"online, manual; empty for USD and without a rate"`
+	Converted  *NullableBOMAmounts `json:"converted" doc:"Null for USD projects and without a rate"`
 }
 
 // CategoryGroup is the lines of one category within a product type.

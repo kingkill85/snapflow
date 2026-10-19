@@ -206,23 +206,26 @@ type ProductVariant struct {
 }
 
 type Project struct {
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	Number          string
-	Name            string
-	Status          string
-	Language        string
-	Currency        string
-	ExchangeRate    string
-	CustomerName    string
-	CustomerCompany string
-	CustomerEmail   string
-	CustomerPhone   string
-	CustomerAddress string
-	Notes           string
-	CreatedBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                   uuid.UUID
+	TenantID             uuid.UUID
+	Number               string
+	Name                 string
+	Status               string
+	Language             string
+	Currency             string
+	ExchangeRate         *string
+	CustomerName         string
+	CustomerCompany      string
+	CustomerEmail        string
+	CustomerPhone        string
+	CustomerAddress      string
+	Notes                string
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ExchangeRateDate     *time.Time
+	ExchangeRateSource   *string
+	ExchangeRateProvider string
 }
 
 type ProjectNumberCounter struct {
@@ -272,6 +275,8 @@ type Proposal struct {
 	ConvertedGrandTotal *string
 	CreatedBy           *uuid.UUID
 	CreatedAt           time.Time
+	ExchangeRateDate    *time.Time
+	ExchangeRateSource  *string
 }
 
 type ProposalCounter struct {

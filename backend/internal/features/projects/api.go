@@ -175,4 +175,74 @@ func Register(api huma.API, svc *Service) {
 	}, func(ctx context.Context, in *versionIDParams) (*struct{}, error) {
 		return nil, svc.DeleteVersion(ctx, in.ID, in.VersionID)
 	})
+
+	registerRates(api, svc)
+}
+
+type setRateInput struct {
+	ID   uuid.UUID `path:"id" format:"uuid"`
+	Body ExchangeRateSet
+}
+
+func registerRates(api huma.API, svc *Service) {
+	huma.Register(api, huma.Operation{
+		OperationID: "listCurrencies",
+		Method:      http.MethodGet,
+		Path:        "/api/currencies",
+		Summary:     "List the currencies a project may use",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, _ *struct{}) (*struct{ Body CurrencyList }, error) {
+		l, err := svc.Currencies(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &struct{ Body CurrencyList }{Body: l}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getExchangeRate",
+		Method:      http.MethodGet,
+		Path:        "/api/exchange-rates/{currency}",
+		Summary:     "Get the online provider's current rate of a currency",
+		Description: "Cached for an hour; 503 exchange_rate.unavailable when the provider is not reachable and no rates of the last 24 hours are cached.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *struct {
+		Currency string `path:"currency" pattern:"^[A-Z]{3}$"`
+	}) (*struct{ Body ExchangeRate }, error) {
+		r, err := svc.ExchangeRate(ctx, in.Currency)
+		if err != nil {
+			return nil, err
+		}
+		return &struct{ Body ExchangeRate }{Body: r}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "refreshProjectExchangeRate",
+		Method:      http.MethodPost,
+		Path:        "/api/projects/{id}/exchange-rate/refresh",
+		Summary:     "Store the online provider's current rate in a project",
+		Description: "Non-USD, active projects only (409 project.exchange_rate_usd, project.read_only). The rate is marked online with the provider's date.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *idParam) (*projectOutput, error) {
+		p, err := svc.RefreshRate(ctx, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return &projectOutput{Body: p}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "setProjectExchangeRate",
+		Method:      http.MethodPut,
+		Path:        "/api/projects/{id}/exchange-rate",
+		Summary:     "Enter a project's rate by hand",
+		Description: "Non-USD, active projects only. The rate is marked manual with today's date and never replaced automatically.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *setRateInput) (*projectOutput, error) {
+		p, err := svc.SetRate(ctx, in.ID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &projectOutput{Body: p}, nil
+	})
 }

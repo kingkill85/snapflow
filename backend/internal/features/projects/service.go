@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -36,7 +35,9 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
+	"github.com/kingkill85/snapflow/backend/internal/platform/exchangerate"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
+	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 )
 
 var (
@@ -63,10 +64,24 @@ type Service struct {
 	tenants  *tenants.Service
 	// now is the clock of project numbers (their year, in UTC).
 	now func() time.Time
+	// rates fetches online exchange rates; maxRateAge is when an online
+	// rate counts as stale (days).
+	rates      *exchangerate.Client
+	maxRateAge int
 }
 
 func NewService(db DB, types *producttypes.Service, tenants *tenants.Service) *Service {
-	return &Service{db: db, q: store.New(db), types: types, tenants: tenants, now: time.Now}
+	return &Service{db: db, q: store.New(db), types: types, tenants: tenants, now: time.Now,
+		rates: exchangerate.New(nil), maxRateAge: DefaultMaxRateAgeDays}
+}
+
+// UseExchangeRates sets the online exchange rates and the age (days) after
+// which an online rate is stale. Call it while wiring the features.
+func (s *Service) UseExchangeRates(c *exchangerate.Client, maxAgeDays int) {
+	s.rates = c
+	if maxAgeDays > 0 {
+		s.maxRateAge = maxAgeDays
+	}
 }
 
 // inScope runs fn in one transaction scoped to actor (row-level security,
@@ -202,7 +217,6 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 	p := Project{
 		ID: row.ID, TenantID: row.TenantID, Tenant: ref, Number: row.Number, Name: row.Name,
 		Status: ProjectStatus(row.Status), Language: row.Language, Currency: row.Currency,
-		ExchangeRate: trimRate(row.ExchangeRate),
 		Customer: ProjectCustomer{
 			Name: row.CustomerName, Company: row.CustomerCompany, Email: row.CustomerEmail,
 			Phone: row.CustomerPhone, Address: row.CustomerAddress,
@@ -214,6 +228,7 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 	for i, v := range versions {
 		p.Versions[i] = versionOf(v, can, len(versions))
 	}
+	s.setRate(&p, row)
 	return p, nil
 }
 
@@ -241,7 +256,8 @@ func (s *Service) Create(ctx context.Context, in ProjectCreate) (Project, error)
 		createdBy := actor.UserID
 		row, err := q.CreateProject(ctx, store.CreateProjectParams{
 			TenantID: tenantID, Number: number, Name: v.name, Language: v.language, Currency: v.currency,
-			ExchangeRate: v.rate, CustomerName: v.customer.Name, CustomerCompany: v.customer.Company,
+			ExchangeRate: v.rate.rate, ExchangeRateDate: v.rate.date, ExchangeRateSource: v.rate.source,
+			ExchangeRateProvider: v.rate.provider, CustomerName: v.customer.Name, CustomerCompany: v.customer.Company,
 			CustomerEmail: v.customer.Email, CustomerPhone: v.customer.Phone, CustomerAddress: v.customer.Address,
 			Notes: v.notes, CreatedBy: &createdBy,
 		})
@@ -321,7 +337,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProjectUpdate) (P
 		}
 		if _, err := q.UpdateProject(ctx, store.UpdateProjectParams{
 			ID: id, TenantID: tenantID, Number: number, Name: v.name, Status: string(in.Status),
-			Language: v.language, Currency: v.currency, ExchangeRate: v.rate,
+			Language: v.language, Currency: v.currency, ExchangeRate: v.rate.rate, ExchangeRateDate: v.rate.date,
+			ExchangeRateSource: v.rate.source, ExchangeRateProvider: v.rate.provider,
 			CustomerName: v.customer.Name, CustomerCompany: v.customer.Company, CustomerEmail: v.customer.Email,
 			CustomerPhone: v.customer.Phone, CustomerAddress: v.customer.Address, Notes: v.notes,
 		}); err != nil {
@@ -649,9 +666,10 @@ func (s *Service) resolveTenant(ctx context.Context, actor auth.Actor, requested
 }
 
 type validated struct {
-	name, language, currency, rate, notes string
-	customer                              ProjectCustomer
-	typeIDs                               []uuid.UUID
+	name, language, currency, notes string
+	rate                            rateValue
+	customer                        ProjectCustomer
+	typeIDs                         []uuid.UUID
 }
 
 // validate checks and normalises the input. current and currentTypes are the
@@ -715,33 +733,28 @@ func (s *Service) validate(ctx context.Context, in ProjectInput, current *store.
 		add(f)
 	}
 
-	v.language, v.currency, v.rate = in.Language, strings.TrimSpace(in.Currency), strings.TrimSpace(in.ExchangeRate)
+	v.language, v.currency = in.Language, strings.TrimSpace(in.Currency)
 	if current != nil {
 		v.language = cmpOr(v.language, current.Language)
 		v.currency = cmpOr(v.currency, current.Currency)
-		v.rate = cmpOr(v.rate, current.ExchangeRate)
 	}
 	v.language = cmpOr(v.language, i18n.DefaultLocale)
 	v.currency = cmpOr(v.currency, DefaultCurrency)
-	v.rate = cmpOr(v.rate, "1")
 	if !i18n.IsLocale(v.language) {
 		errs = append(errs, apperr.Field("body.language", "validation.locale", "not a content language"))
 	}
-	if !currencyPattern.MatchString(v.currency) {
-		errs = append(errs, apperr.Field("body.currency", "project.currency_format", "use a three-letter ISO 4217 code"))
-	}
-	rate, ok := new(big.Rat).SetString(v.rate)
 	switch {
-	case current == nil || v.rate != current.ExchangeRate:
-		if !ratePattern.MatchString(v.rate) || !ok || rate.Sign() <= 0 {
-			errs = append(errs, apperr.Field("body.exchangeRate", "project.exchange_rate", "the exchange rate must be a number above 0"))
-			break
-		}
-		fallthrough
+	case !currencyPattern.MatchString(v.currency):
+		errs = append(errs, apperr.Field("body.currency", "project.currency_format", "use a three-letter ISO 4217 code"))
+	case (current == nil || v.currency != current.Currency) && !money.IsCurrency(v.currency):
+		errs = append(errs, apperr.Field("body.currency", "project.currency_unknown", "not a supported ISO 4217 currency").With("currency", v.currency))
 	default:
-		if v.currency == DefaultCurrency && ok && rate.Cmp(big.NewRat(1, 1)) != 0 {
-			errs = append(errs, apperr.Field("body.exchangeRate", "project.exchange_rate", "USD has the exchange rate 1"))
+		r, f, err := s.validateRate(ctx, v.currency, in, current)
+		if err != nil {
+			return v, err
 		}
+		add(f)
+		v.rate = r
 	}
 
 	typeErrs, err := s.validateTypes(ctx, &v, in.ProductTypeIDs, current != nil, currentTypes)

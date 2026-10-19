@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
@@ -49,7 +50,7 @@ func (q *Queries) FilesOfVersions(ctx context.Context, versionIds []uuid.UUID) (
 }
 
 const getProposal = `-- name: GetProposal :one
-SELECT id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at FROM proposals WHERE id = $1
+SELECT id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at, exchange_rate_date, exchange_rate_source FROM proposals WHERE id = $1
 `
 
 func (q *Queries) GetProposal(ctx context.Context, id uuid.UUID) (Proposal, error) {
@@ -79,6 +80,8 @@ func (q *Queries) GetProposal(ctx context.Context, id uuid.UUID) (Proposal, erro
 		&i.ConvertedGrandTotal,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
 	)
 	return i, err
 }
@@ -86,13 +89,14 @@ func (q *Queries) GetProposal(ctx context.Context, id uuid.UUID) (Proposal, erro
 const insertProposal = `-- name: InsertProposal :one
 INSERT INTO proposals (tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name,
     file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal,
-    converted_discount, converted_services, converted_grand_total, created_by)
+    converted_discount, converted_services, converted_grand_total, created_by, exchange_rate_date, exchange_rate_source)
 VALUES ($1, $2, $3, $4, $5,
     $6, $7, $8, $9,
     $10, $11, $12, $13, $14,
     $15, $16, $17, $18,
-    $19, $20, $21)
-RETURNING id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at
+    $19, $20, $21,
+    $22, $23)
+RETURNING id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at, exchange_rate_date, exchange_rate_source
 `
 
 type InsertProposalParams struct {
@@ -117,6 +121,8 @@ type InsertProposalParams struct {
 	ConvertedServices   *string
 	ConvertedGrandTotal *string
 	CreatedBy           *uuid.UUID
+	ExchangeRateDate    *time.Time
+	ExchangeRateSource  *string
 }
 
 func (q *Queries) InsertProposal(ctx context.Context, arg InsertProposalParams) (Proposal, error) {
@@ -142,6 +148,8 @@ func (q *Queries) InsertProposal(ctx context.Context, arg InsertProposalParams) 
 		arg.ConvertedServices,
 		arg.ConvertedGrandTotal,
 		arg.CreatedBy,
+		arg.ExchangeRateDate,
+		arg.ExchangeRateSource,
 	)
 	var i Proposal
 	err := row.Scan(
@@ -168,12 +176,14 @@ func (q *Queries) InsertProposal(ctx context.Context, arg InsertProposalParams) 
 		&i.ConvertedGrandTotal,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
 	)
 	return i, err
 }
 
 const listProposals = `-- name: ListProposals :many
-SELECT id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at FROM proposals WHERE version_id = $1 ORDER BY seq DESC, product_type_id NULLS FIRST, number
+SELECT id, tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name, file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal, converted_discount, converted_services, converted_grand_total, created_by, created_at, exchange_rate_date, exchange_rate_source FROM proposals WHERE version_id = $1 ORDER BY seq DESC, product_type_id NULLS FIRST, number
 `
 
 func (q *Queries) ListProposals(ctx context.Context, versionID uuid.UUID) ([]Proposal, error) {
@@ -209,6 +219,8 @@ func (q *Queries) ListProposals(ctx context.Context, versionID uuid.UUID) ([]Pro
 			&i.ConvertedGrandTotal,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.ExchangeRateDate,
+			&i.ExchangeRateSource,
 		); err != nil {
 			return nil, err
 		}

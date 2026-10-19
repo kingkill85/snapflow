@@ -17,6 +17,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
+	"github.com/kingkill85/snapflow/backend/internal/platform/exchangerate"
 )
 
 const Version = "0.1.0"
@@ -33,6 +34,11 @@ type Deps struct {
 	// ProposalGenerations bounds the proposal generations running at once
 	// (0: the default, 2).
 	ProposalGenerations int
+	// ExchangeRates are the online exchange rates (nil: none, every fetch
+	// is exchange_rate.unavailable). ExchangeRateMaxAgeDays is when an
+	// online rate is stale (0: the default, 7).
+	ExchangeRates          *exchangerate.Client
+	ExchangeRateMaxAgeDays int
 }
 
 // New returns the router with all API routes and the huma API for tests.

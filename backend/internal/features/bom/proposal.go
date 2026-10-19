@@ -82,7 +82,8 @@ func SplitByProductType(b BOM, typeIDs []uuid.UUID) ([]Part, error) {
 		}
 		part.ManualLines = []ManualLine{}
 		part.Warnings = []BOMWarning{}
-		part.Totals = BOMTotals{BOMAmounts: amountsOf(money.USDConverter, totals[gi]), Currency: b.Totals.Currency, Rate: b.Totals.Rate}
+		part.Totals = BOMTotals{BOMAmounts: amountsOf(money.USDConverter, totals[gi]), Currency: b.Totals.Currency, Rate: b.Totals.Rate,
+			RateDate: b.Totals.RateDate, RateSource: b.Totals.RateSource}
 		if cur != nil {
 			part.Totals.Converted = &NullableBOMAmounts{BOMAmounts: amountsOf(cur.Converter, convTotals[gi])}
 		}

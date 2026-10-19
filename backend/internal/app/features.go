@@ -53,6 +53,9 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users)
 	imports.Register(api, importSvc)
 	projectSvc := projects.NewService(deps.DB, productTypes, c.tenants)
+	if deps.ExchangeRates != nil {
+		projectSvc.UseExchangeRates(deps.ExchangeRates, deps.ExchangeRateMaxAgeDays)
+	}
 	c.tenants.UseProjects(projectSvc)
 	projects.Register(api, projectSvc)
 	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users)

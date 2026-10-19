@@ -102,7 +102,11 @@ func (c content) build() document.Document {
 	add(c.totalsTable())
 	notes := []string{l.t("net")}
 	if c.converted() {
-		notes = append(notes, l.t("converted", l.number(c.bom.Totals.Rate), c.bom.Totals.Currency))
+		if d := c.bom.Totals.RateDate; d != nil {
+			notes = append(notes, l.t("convertedDated", l.number(c.bom.Totals.Rate), c.bom.Totals.Currency, l.date(*d)))
+		} else {
+			notes = append(notes, l.t("converted", l.number(c.bom.Totals.Rate), c.bom.Totals.Currency))
+		}
 	}
 	add(document.Paragraph{Runs: []document.Run{{Text: strings.Join(notes, " ")}}, Style: document.Muted})
 	if t := text(c.bom.Pricing.ClosingText, l); t != "" {

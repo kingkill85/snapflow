@@ -12,12 +12,13 @@ RETURNING last_seq;
 -- name: InsertProposal :one
 INSERT INTO proposals (tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name,
     file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal,
-    converted_discount, converted_services, converted_grand_total, created_by)
+    converted_discount, converted_services, converted_grand_total, created_by, exchange_rate_date, exchange_rate_source)
 VALUES (sqlc.arg(tenant_id), sqlc.arg(version_id), sqlc.arg(seq), sqlc.arg(number), sqlc.arg(exporter),
     sqlc.arg(language), sqlc.narg(product_type_id), sqlc.narg(product_type_name), sqlc.arg(file_id),
     sqlc.arg(file_name), sqlc.arg(currency), sqlc.arg(exchange_rate), sqlc.arg(subtotal), sqlc.arg(discount),
     sqlc.arg(services), sqlc.arg(grand_total), sqlc.narg(converted_subtotal), sqlc.narg(converted_discount),
-    sqlc.narg(converted_services), sqlc.narg(converted_grand_total), sqlc.narg(created_by))
+    sqlc.narg(converted_services), sqlc.narg(converted_grand_total), sqlc.narg(created_by),
+    sqlc.narg(exchange_rate_date), sqlc.narg(exchange_rate_source))
 RETURNING *;
 
 -- name: ListProposals :many
