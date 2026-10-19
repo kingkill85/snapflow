@@ -7,10 +7,11 @@
 
 export interface OutputKindAlternative {
   /**
-     * How many channels of that kind make one of this kind
+     * How many channels of that kind make one of this kind (fixed groups: 1+2, 3+4, ...)
      * @minimum 1
      * @maximum 16
      */
   count: number;
+  /** The kind whose channels act as this kind */
   outputKindId: string;
 }

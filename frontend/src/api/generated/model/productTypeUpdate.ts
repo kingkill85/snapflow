@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductTypeUpdateName } from './productTypeUpdateName';
+import type { ProductTypeUpdateTopology } from './productTypeUpdateTopology';
 
 export interface ProductTypeUpdate {
   /** A URL to the JSON Schema for this object. */
@@ -17,6 +18,8 @@ export interface ProductTypeUpdate {
   color?: string;
   /** 1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
   defaultBusCurrentMa?: number;
+  /** 1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
+  defaultWirelessPlacesUsed?: number;
   /** updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale */
   expectedUpdatedAt: string;
   isActive: boolean;
@@ -26,4 +29,6 @@ export interface ProductTypeUpdate {
   name: ProductTypeUpdateName;
   /** 0-90; default 20; on update, left out keeps the stored value (D294) */
   reservePercent?: number;
+  /** Default none; on update, left out keeps the stored value (D294) */
+  topology?: ProductTypeUpdateTopology;
 }

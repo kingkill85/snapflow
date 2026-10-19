@@ -701,6 +701,23 @@ func (q *Queries) ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
 	return exists, err
 }
 
+const profilesLinkingField = `-- name: ProfilesLinkingField :one
+SELECT count(*) FROM import_profiles p
+WHERE EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p.mapping -> 'fields') f
+    WHERE f ->> 'fieldKey' = $1::text
+)
+`
+
+// ProfilesLinkingField counts the profiles whose mapping links an
+// attribute column to the catalog field key.
+func (q *Queries) ProfilesLinkingField(ctx context.Context, fieldKey string) (int64, error) {
+	row := q.db.QueryRow(ctx, profilesLinkingField, fieldKey)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const referencedFiles = `-- name: ReferencedFiles :many
 SELECT DISTINCT file_id::uuid AS file_id FROM import_runs WHERE file_id = ANY($1::uuid[])
 `

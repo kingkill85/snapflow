@@ -46,10 +46,26 @@ UPDATE categories p SET sort_order = o.ord
 FROM unnest(sqlc.arg(ids)::uuid[]) WITH ORDINALITY AS o (id, ord)
 WHERE p.id = o.id;
 
--- FieldInUse reports whether any category attribute (product or instance)
--- links the catalog field key.
--- name: FieldInUse :one
-SELECT EXISTS (
-    SELECT 1 FROM categories c, jsonb_array_elements(c.attributes || c.instance_attributes) a
-    WHERE a ->> 'fieldKey' = sqlc.arg(field_key)::text
-);
+-- FieldUsers lists the categories linking each catalog field key.
+-- name: FieldUsers :many
+SELECT l.field_key, c.id, c.key, c.name
+FROM category_field_links l JOIN categories c ON c.id = l.category_id
+ORDER BY l.field_key, c.sort_order, c.key;
+
+-- name: DeleteFieldLinks :exec
+DELETE FROM category_field_links WHERE category_id = $1;
+
+-- InsertFieldLinks stores the fields a category links (its save keeps them
+-- in step with attributes[].fieldKey, D305).
+-- name: InsertFieldLinks :exec
+INSERT INTO category_field_links (category_id, field_key)
+SELECT sqlc.arg(category_id)::uuid, unnest(sqlc.arg(field_keys)::text[]);
+
+-- name: LockCategory :one
+SELECT * FROM categories WHERE id = $1 FOR UPDATE;
+
+-- name: SetCategoryAttributes :one
+UPDATE categories
+SET attributes = $2, instance_attributes = $3, updated_at = greatest(now(), updated_at + interval '1 microsecond')
+WHERE id = $1
+RETURNING *;

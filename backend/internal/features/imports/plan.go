@@ -38,6 +38,9 @@ const StandardVariantName = "Standard"
 type planEntry struct {
 	// A category to create.
 	Category *categories.CategoryInput `json:"category,omitempty"`
+	// Links of an existing category (ID) to link: attribute key -> catalog
+	// field key (its unlinked attributes the columns' fields match).
+	Links map[string]string `json:"links,omitempty"`
 	// The product's state after the import; CategorySeq is set when its
 	// category is one this run creates.
 	Product     *products.ProductInput `json:"product,omitempty"`
@@ -146,8 +149,13 @@ type planner struct {
 	attrKeys []string
 	// new categories by key
 	newCategories map[string]*entry
-	typeByID      map[uuid.UUID]producttypes.ProductType
-	categoryByID  map[uuid.UUID]categories.Category
+	// linkEntries are the existing categories whose unlinked attributes
+	// the run links to the columns' catalog fields (by category id);
+	// linkWarned the category/key pairs warned about (type mismatch).
+	linkEntries  map[uuid.UUID]*entry
+	linkWarned   map[string]bool
+	typeByID     map[uuid.UUID]producttypes.ProductType
+	categoryByID map[uuid.UUID]categories.Category
 	// constType and constCategory are the product type and category of a
 	// constant (resolved once).
 	constType     *producttypes.ProductType
@@ -187,6 +195,13 @@ func buildPlan(in planInput, loc string) (*plan, error) {
 			if v := &in.catalog[i].Variants[j]; v.SKU != "" {
 				p.skuOwners[products.MatchKey(v.SKU)] = v
 			}
+		}
+	}
+	p.linkEntries = map[uuid.UUID]*entry{}
+	p.linkWarned = map[string]bool{}
+	for _, f := range in.mapping.Fields {
+		if t, ok := parseTarget(f.Target); ok && t.kind == tAttribute && f.FieldKey != "" && !f.Information {
+			p.scope.FieldKeys = append(p.scope.FieldKeys, f.FieldKey)
 		}
 	}
 	p.targets = make([]target, len(in.mapping.Fields))
@@ -674,6 +689,58 @@ func (p *planner) newCategoryEntry(key, name string) *entry {
 	return e
 }
 
+// planLinks plans linking the attributes of an existing category that
+// the mapped columns feed to the columns' catalog fields: an attribute
+// with the column's key and no field link of its own gets the column's
+// field when the types match (a "changed" category item, applied through
+// the categories service in the apply's transaction); another type is a
+// warning (import.attribute_not_linked) and the attribute stays unlinked.
+// Undoing the run leaves the links (they only add a meaning).
+func (p *planner) planLinks(cat categories.Category, g *group) {
+	for i, f := range p.mapping.Fields {
+		t := p.targets[i]
+		if t.kind != tAttribute || f.Information || f.FieldKey == "" {
+			continue
+		}
+		field, ok := p.fields[f.FieldKey]
+		if !ok {
+			continue
+		}
+		for _, a := range cat.Attributes {
+			if a.Key != t.key || a.FieldKey != "" {
+				continue
+			}
+			if a.Type != field.Type {
+				if w := cat.ID.String() + "/" + a.Key; !p.linkWarned[w] {
+					p.linkWarned[w] = true
+					p.issue("warning", nil, i, "import.attribute_not_linked",
+						map[string]any{"key": a.Key, "field": field.Key, "category": cat.Key, "type": string(a.Type), "expected": string(field.Type)})
+				}
+				continue
+			}
+			e := p.linkEntries[cat.ID]
+			if e == nil {
+				id := cat.ID
+				e = &entry{item: ImportItem{Seq: len(p.entries) + 1, Entity: "category", Status: "changed", ID: &id, Key: cat.Key, Name: cat.Name,
+					Changes: []ImportFieldChange{}}}
+				e.plan.ID, e.plan.ExpectedUpdatedAt, e.plan.Links = &id, cat.UpdatedAt, map[string]string{}
+				p.entries = append(p.entries, e)
+				p.linkEntries[cat.ID] = e
+				p.counts.Categories.Changed++
+			}
+			if _, done := e.plan.Links[a.Key]; !done {
+				e.plan.Links[a.Key] = field.Key
+				e.item.Changes = append(e.item.Changes, ImportFieldChange{Field: "attributes." + a.Key + ".fieldKey", After: field.Key})
+			}
+		}
+	}
+	if e := p.linkEntries[cat.ID]; e != nil {
+		for _, r := range g.rows {
+			e.item.Rows = append(e.item.Rows, r.row.Number)
+		}
+	}
+}
+
 func humanize(key string) string {
 	s := strings.ReplaceAll(key, "_", " ")
 	return strings.ToUpper(s[:1]) + s[1:]
@@ -694,6 +761,9 @@ func (p *planner) planProduct(g *group) {
 	cat, catSeq, catOK := p.resolveCategory(first)
 	ok := typeOK && catOK
 	g.pt, g.cat, g.catSeq = pt, cat, catSeq
+	if catOK && catSeq == 0 && cat.ID != uuid.Nil {
+		p.planLinks(cat, g)
+	}
 	if ce := p.newCategories[cat.Key]; catSeq != 0 && ce != nil {
 		for _, r := range g.rows {
 			ce.item.Rows = append(ce.item.Rows, r.row.Number)

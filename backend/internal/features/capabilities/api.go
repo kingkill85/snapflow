@@ -77,7 +77,8 @@ func Register(api huma.API, svc *Service) {
 	})
 	registerCRUD(api, crud[CatalogField, CatalogFieldInput, CatalogFieldUpdate, CatalogFieldList]{
 		tag: "catalog-fields", path: "/api/catalog-fields", one: "CatalogField", many: "CatalogFields", what: "catalog field",
-		list: func(ctx context.Context, _ bool) (CatalogFieldList, error) {
+		// Fields have no active flag: no includeInactive.
+		listAll: func(ctx context.Context) (CatalogFieldList, error) {
 			items, err := svc.Fields(ctx)
 			return CatalogFieldList{Items: items}, err
 		},
@@ -106,6 +107,7 @@ func Register(api huma.API, svc *Service) {
 type crud[T, In, Up, List any] struct {
 	tag, path, one, many, what string
 	list                       func(context.Context, bool) (List, error)
+	listAll                    func(context.Context) (List, error) // instead of list, without includeInactive
 	get                        func(context.Context, uuid.UUID) (T, error)
 	create                     func(context.Context, In) (T, error)
 	update                     func(context.Context, uuid.UUID, Up) (T, error)
@@ -115,16 +117,27 @@ type crud[T, In, Up, List any] struct {
 
 func registerCRUD[T, In, Up, List any](api huma.API, c crud[T, In, Up, List]) {
 	tags := []string{c.tag}
-	huma.Register(api, huma.Operation{
+	listOp := huma.Operation{
 		OperationID: "list" + c.many, Method: http.MethodGet, Path: c.path, Summary: "List " + c.what + "s", Tags: tags,
 		Description: "In catalog order (sortOrder, then key).",
-	}, func(ctx context.Context, in *listInput) (*body[List], error) {
-		out, err := c.list(ctx, in.IncludeInactive)
-		if err != nil {
-			return nil, err
-		}
-		return &body[List]{Body: out}, nil
-	})
+	}
+	if c.listAll != nil {
+		huma.Register(api, listOp, func(ctx context.Context, _ *struct{}) (*body[List], error) {
+			out, err := c.listAll(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return &body[List]{Body: out}, nil
+		})
+	} else {
+		huma.Register(api, listOp, func(ctx context.Context, in *listInput) (*body[List], error) {
+			out, err := c.list(ctx, in.IncludeInactive)
+			if err != nil {
+				return nil, err
+			}
+			return &body[List]{Body: out}, nil
+		})
+	}
 	huma.Register(api, huma.Operation{
 		OperationID: "reorder" + c.many, Method: http.MethodPut, Path: c.path + "/order", Summary: "Set the order of " + c.what + "s",
 		Description: "ids must list every entry (active or not) exactly once.", Tags: tags,

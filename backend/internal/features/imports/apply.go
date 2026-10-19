@@ -218,12 +218,16 @@ func (s *Service) checkToken(ctx context.Context, tx pgx.Tx, run store.ImportRun
 	if err != nil {
 		return nil, nil, err
 	}
+	fields, err := s.caps.WithTx(tx).FieldsByKey(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
 	var scope catalogScope
 	if err := json.Unmarshal(run.CatalogScope, &scope); err != nil {
 		return nil, nil, err
 	}
 	scope.normalize()
-	token, err := scopeToken(typeList, catList, catalog, scope)
+	token, err := scopeToken(typeList, catList, catalog, fields, scope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -510,6 +514,16 @@ func (ex *executor) write(cats *categories.Service, prods *products.Service, it 
 	ctx, p := ex.ctx, it.plan
 	switch it.entity {
 	case "category":
+		if it.status == "changed" {
+			// Links of an existing category's attributes to catalog fields
+			// (D-import links). No change log entry: undo leaves the links
+			// (they only add a meaning) and must not delete the category.
+			if err := cats.LinkFields(ctx, *p.ID, p.Links); err != nil {
+				return nil, err
+			}
+			applied.Categories.Changed++
+			return nil, nil
+		}
 		c, err := cats.Create(ctx, *p.Category)
 		if err != nil {
 			return nil, err

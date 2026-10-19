@@ -83,7 +83,7 @@ func TestUnknownColumns(t *testing.T) {
 	p = assertError(t, api.Post("/api/import-columns/answers", api.Admin.Cookie, map[string]any{"mapping": mapping, "answers": []any{
 		map[string]any{"target": "attribute.notes", "information": true},
 		map[string]any{"target": "attribute.bus_current", "field": map[string]any{"key": "relay_outputs", "label": map[string]string{"en": "X"},
-			"type": "number", "meaning": "channels_supplied"}},
+			"type": "integer", "meaning": "channels_supplied"}},
 	}}), http.StatusUnprocessableEntity, "validation.failed")
 	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.answers[1].field.outputKindId validation.required",
 		"body.answers[1].field.key catalog_field.key_taken"}) {

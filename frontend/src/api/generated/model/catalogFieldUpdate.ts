@@ -23,7 +23,7 @@ export interface CatalogFieldUpdate {
   key: string;
   /** At most 100 characters; "en" is required */
   label: CatalogFieldUpdateLabel;
-  /** Required by channel_limit_w, else not allowed */
+  /** Required by channel_limit_w, optional for channel_limit_a, channel_min_load_w and module_total_w, else not allowed */
   loadTypeId?: string;
   /** Leave out for just information */
   meaning?: CatalogFieldUpdateMeaning;

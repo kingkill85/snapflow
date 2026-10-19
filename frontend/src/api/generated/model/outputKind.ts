@@ -11,8 +11,8 @@ import type { OutputKindName } from './outputKindName';
 export interface OutputKind {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** N channels of another kind act as one of this kind (e.g. 2 relay outputs = 1 blind output) */
-  alternative?: OutputKindAlternative;
+  /** Channels of other kinds that can act as one of this kind (e.g. 2 relay outputs = 1 blind output), in fixed groups; products opt in with a field of meaning alternative_allowed */
+  alternatives: OutputKindAlternative[];
   can: Actions;
   createdAt: string;
   /** The function types a channel of this kind serves */

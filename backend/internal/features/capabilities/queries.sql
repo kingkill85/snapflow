@@ -50,13 +50,13 @@ ORDER BY sort_order, key;
 SELECT * FROM output_kinds WHERE id = $1;
 
 -- name: CreateOutputKind :one
-INSERT INTO output_kinds (key, name, is_active, alternative_kind_id, alternative_count, sort_order)
-VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order), 0) + 1 FROM output_kinds))
+INSERT INTO output_kinds (key, name, is_active, sort_order)
+VALUES ($1, $2, $3, (SELECT coalesce(max(sort_order), 0) + 1 FROM output_kinds))
 RETURNING *;
 
 -- name: UpdateOutputKind :one
 UPDATE output_kinds
-SET key = $2, name = $3, is_active = $4, alternative_kind_id = $5, alternative_count = $6,
+SET key = $2, name = $3, is_active = $4,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;
@@ -85,10 +85,19 @@ DELETE FROM output_kind_function_types WHERE output_kind_id = $1;
 INSERT INTO output_kind_function_types (output_kind_id, function_type_id)
 SELECT sqlc.arg(output_kind_id)::uuid, unnest(sqlc.arg(function_type_ids)::uuid[]);
 
--- AlternativeChainTarget is the alternative kind of the given kind (to
--- refuse cycles: a kind whose alternative names it back).
--- name: AlternativeOf :one
-SELECT alternative_kind_id FROM output_kinds WHERE id = $1;
+-- name: ListOutputKindAlternatives :many
+SELECT * FROM output_kind_alternatives ORDER BY output_kind_id, from_kind_id;
+
+-- name: DeleteOutputKindAlternatives :exec
+DELETE FROM output_kind_alternatives WHERE output_kind_id = $1;
+
+-- name: InsertOutputKindAlternative :exec
+INSERT INTO output_kind_alternatives (output_kind_id, from_kind_id, count) VALUES ($1, $2, $3);
+
+-- AlternativeCycle reports whether from_kind has kind as one of its
+-- alternatives (a cycle of two).
+-- name: AlternativeCycle :one
+SELECT EXISTS (SELECT 1 FROM output_kind_alternatives WHERE output_kind_id = sqlc.arg(from_kind_id) AND from_kind_id = sqlc.arg(kind_id));
 
 -- ---------------------------------------------------------------- catalog fields
 
@@ -97,6 +106,16 @@ SELECT * FROM catalog_fields ORDER BY sort_order, key;
 
 -- name: GetCatalogField :one
 SELECT * FROM catalog_fields WHERE id = $1;
+
+-- LockCatalogField locks a field against concurrent links (categories take
+-- FOR SHARE on the fields they link, D305) before its key or type changes.
+-- name: LockCatalogField :one
+SELECT * FROM catalog_fields WHERE id = $1 FOR UPDATE;
+
+-- ShareCatalogFields locks the linked fields of a category save: their type
+-- cannot change until the save commits.
+-- name: ShareCatalogFields :many
+SELECT * FROM catalog_fields WHERE key = ANY(sqlc.arg(keys)::text[]) ORDER BY key FOR SHARE;
 
 -- name: CreateCatalogField :one
 INSERT INTO catalog_fields (key, label, value_type, unit, options, etim_feature, meaning, output_kind_id, load_type_id, sort_order)

@@ -2,13 +2,17 @@ package capabilities_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
@@ -171,11 +175,15 @@ func TestOutputKinds(t *testing.T) {
 	api := apptest.New(t)
 	sw := create[functiontypes.FunctionType](t, api, "/api/function-types", map[string]any{"key": "switching", "name": name("Switching")})
 	relay := outputKind(t, api, "relay_output", map[string]any{"functionTypeIds": []any{sw.ID}})
-	blind := outputKind(t, api, "blind_output", map[string]any{"alternative": map[string]any{"outputKindId": relay.ID, "count": 2}})
-	if len(relay.FunctionTypeIDs) != 1 || relay.FunctionTypeIDs[0] != sw.ID || relay.Alternative != nil {
+	dimmer := outputKind(t, api, "dimmer_output", nil)
+	blind := outputKind(t, api, "blind_output", map[string]any{"alternatives": []any{
+		map[string]any{"outputKindId": relay.ID, "count": 2}, map[string]any{"outputKindId": dimmer.ID, "count": 2}}})
+	if len(relay.FunctionTypeIDs) != 1 || relay.FunctionTypeIDs[0] != sw.ID || len(relay.Alternatives) != 0 {
 		t.Errorf("relay %+v", relay)
 	}
-	if blind.Alternative == nil || blind.Alternative.OutputKindID != relay.ID || blind.Alternative.Count != 2 || len(blind.FunctionTypeIDs) != 0 {
+	if !reflect.DeepEqual(blind.Alternatives, []capabilities.OutputKindAlternative{{OutputKindID: relay.ID, Count: 2}, {OutputKindID: dimmer.ID, Count: 2}}) &&
+		!reflect.DeepEqual(blind.Alternatives, []capabilities.OutputKindAlternative{{OutputKindID: dimmer.ID, Count: 2}, {OutputKindID: relay.ID, Count: 2}}) ||
+		len(blind.FunctionTypeIDs) != 0 {
 		t.Errorf("blind %+v", blind)
 	}
 	// No cycles of two, not itself, the count in range, known function types.
@@ -183,15 +191,27 @@ func TestOutputKinds(t *testing.T) {
 		body["key"], body["name"], body["isActive"], body["expectedUpdatedAt"] = k.Key, name(k.Key), true, k.UpdatedAt
 		return api.Put("/api/output-kinds/"+k.ID.String(), api.Admin.Cookie, body)
 	}
-	p := assertError(t, upd(relay, map[string]any{"alternative": map[string]any{"outputKindId": blind.ID, "count": 1}}),
+	alt := func(id uuid.UUID, n int) map[string]any { return map[string]any{"outputKindId": id, "count": n} }
+	p := assertError(t, upd(relay, map[string]any{"alternatives": []any{alt(blind.ID, 1)}}),
 		http.StatusUnprocessableEntity, "validation.failed")
-	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.alternative.outputKindId output_kind.alternative_cycle"}) {
+	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.alternatives[0].outputKindId output_kind.alternative_cycle"}) {
 		t.Errorf("cycle %v", got)
 	}
-	p = assertError(t, upd(relay, map[string]any{"alternative": map[string]any{"outputKindId": relay.ID, "count": 1}}),
+	p = assertError(t, upd(relay, map[string]any{"alternatives": []any{alt(dimmer.ID, 1), alt(relay.ID, 1)}}),
 		http.StatusUnprocessableEntity, "validation.failed")
-	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.alternative.outputKindId output_kind.alternative_self"}) {
+	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.alternatives[1].outputKindId output_kind.alternative_self"}) {
 		t.Errorf("self %v", got)
+	}
+	p = assertError(t, upd(relay, map[string]any{"alternatives": []any{alt(dimmer.ID, 1), alt(dimmer.ID, 2)}}),
+		http.StatusUnprocessableEntity, "validation.failed")
+	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.alternatives[1].outputKindId output_kind.alternative_duplicate"}) {
+		t.Errorf("duplicate alternative %v", got)
+	}
+	// Universal channels: each dimmer output may act as a relay output.
+	universal := decode[capabilities.OutputKind](t, upd(relay, map[string]any{"functionTypeIds": []any{sw.ID}, "alternatives": []any{alt(dimmer.ID, 1)}}))
+	relay = universal
+	if len(universal.Alternatives) != 1 || universal.Alternatives[0].Count != 1 {
+		t.Errorf("universal %+v", universal)
 	}
 	p = assertError(t, upd(relay, map[string]any{"functionTypeIds": []any{sw.ID, sw.ID}}), http.StatusUnprocessableEntity, "validation.failed")
 	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.functionTypeIds[1] output_kind.function_type_duplicate"}) {
@@ -210,6 +230,7 @@ func TestOutputKinds(t *testing.T) {
 	assertError(t, api.Delete("/api/output-kinds/"+relay.ID.String(), api.Admin.Cookie), http.StatusConflict, "output_kind.in_use")
 	expect(t, api.Delete("/api/output-kinds/"+blind.ID.String(), api.Admin.Cookie), http.StatusNoContent)
 	expect(t, api.Delete("/api/output-kinds/"+relay.ID.String(), api.Admin.Cookie), http.StatusNoContent)
+	expect(t, api.Delete("/api/output-kinds/"+dimmer.ID.String(), api.Admin.Cookie), http.StatusNoContent)
 }
 
 func TestFieldValidation(t *testing.T) {
@@ -235,10 +256,21 @@ func TestFieldValidation(t *testing.T) {
 			[]string{"body.outputKindId catalog_field.param_not_allowed", "body.productTypeIds catalog_field.param_not_allowed"}},
 		{map[string]any{"key": "w", "type": "number", "meaning": "bus_current_used_ma", "loadTypeId": led.ID},
 			[]string{"body.loadTypeId catalog_field.param_not_allowed"}},
-		{map[string]any{"key": "w", "type": "number", "meaning": "channels_supplied", "outputKindId": led.ID},
+		{map[string]any{"key": "w", "type": "integer", "meaning": "channels_supplied", "outputKindId": led.ID},
 			[]string{"body.outputKindId output_kind.not_found"}},
-		{map[string]any{"key": "w", "type": "enum", "meaning": "motor_type"},
-			[]string{"body.options attribute.options_required"}},
+		{map[string]any{"key": "w", "type": "enum", "meaning": "motor_type",
+			"options": []any{map[string]any{"key": "ac", "label": name("AC")}, map[string]any{"key": "three_phase", "label": name("3~")}}},
+			[]string{"body.options catalog_field.meaning_options"}},
+		{map[string]any{"key": "w", "type": "text", "meaning": "motor_type"},
+			[]string{"body.type catalog_field.meaning_type"}},
+		{map[string]any{"key": "w", "type": "number", "meaning": "channels_supplied", "outputKindId": relay.ID},
+			[]string{"body.type catalog_field.meaning_type"}},
+		{map[string]any{"key": "w", "type": "number", "meaning": "enclosure_rows"},
+			[]string{"body.type catalog_field.meaning_type"}},
+		{map[string]any{"key": "w", "type": "number", "meaning": "wireless_place_used"},
+			[]string{"body.type catalog_field.meaning_type"}},
+		{map[string]any{"key": "w", "type": "number", "meaning": "alternative_allowed", "outputKindId": relay.ID},
+			[]string{"body.type catalog_field.meaning_type"}},
 		{map[string]any{"key": "Bad", "type": "boolean", "meaning": "zigbee_router", "unit": "much too long a unit"},
 			[]string{"body.key catalog_field.key_format", "body.unit validation.too_long"}},
 	}
@@ -266,9 +298,14 @@ func TestFieldValidation(t *testing.T) {
 	assertError(t, api.Delete("/api/output-kinds/"+relay.ID.String(), api.Admin.Cookie), http.StatusConflict, "output_kind.in_use")
 	assertError(t, api.Delete("/api/load-types/"+led.ID.String(), api.Admin.Cookie), http.StatusConflict, "load_type.in_use")
 	meanings := decode[capabilities.MeaningList](t, api.Get("/api/catalog-field-meanings", api.Admin.Cookie))
-	if len(meanings.Items) != 16 || meanings.Items[1].Meaning != capabilities.MeaningChannelLimitW || !meanings.Items[1].LoadType {
+	if len(meanings.Items) != 17 || meanings.Items[1].Meaning != capabilities.MeaningChannelLimitW || !meanings.Items[1].LoadTypeRequired ||
+		!meanings.Items[2].LoadType || meanings.Items[2].LoadTypeRequired {
 		t.Errorf("meanings %+v", meanings.Items)
 	}
+	// Optional load types: channel_limit_a with and without one.
+	field(t, api, map[string]any{"key": "a_any", "type": "number", "meaning": "channel_limit_a", "outputKindId": relay.ID})
+	field(t, api, map[string]any{"key": "a_led", "type": "number", "meaning": "channel_limit_a", "outputKindId": relay.ID, "loadTypeId": led.ID})
+	field(t, api, map[string]any{"key": "total_led", "type": "number", "meaning": "module_total_w", "loadTypeId": led.ID})
 }
 
 func TestPermissions(t *testing.T) {
@@ -321,6 +358,26 @@ func TestProductTypeSettings(t *testing.T) {
 	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.defaultBusCurrentMa validation.range", "body.reservePercent validation.range"}) {
 		t.Errorf("fields %v", got)
 	}
+	// Topology (D304): default none, kept when left out.
+	if pt.Topology != "none" {
+		t.Errorf("topology %q", pt.Topology)
+	}
+	got = decode[producttypes.ProductType](t, api.Put("/api/product-types/"+pt.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "knx", "name": name("KNX"), "isActive": true, "topology": "wireless", "defaultWirelessPlacesUsed": 2, "expectedUpdatedAt": got.UpdatedAt}))
+	if got.Topology != "wireless" || got.DefaultWirelessPlacesUsed == nil || *got.DefaultWirelessPlacesUsed != 2 {
+		t.Errorf("topology %+v", got)
+	}
+	got = decode[producttypes.ProductType](t, api.Put("/api/product-types/"+pt.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "knx", "name": name("KNX"), "isActive": true, "expectedUpdatedAt": got.UpdatedAt}))
+	if got.Topology != "wireless" || got.DefaultWirelessPlacesUsed == nil {
+		t.Errorf("topology kept %+v", got)
+	}
+	p = assertError(t, api.Put("/api/product-types/"+pt.ID.String(), api.Admin.Cookie, map[string]any{
+		"key": "knx", "name": name("KNX"), "isActive": true, "defaultWirelessPlacesUsed": 5000, "expectedUpdatedAt": got.UpdatedAt}),
+		http.StatusUnprocessableEntity, "validation.failed")
+	if got := fieldCodes(p); !reflect.DeepEqual(got, []string{"body.defaultWirelessPlacesUsed validation.range"}) {
+		t.Errorf("topology fields %v", got)
+	}
 }
 
 type capabilityWorld struct {
@@ -332,11 +389,13 @@ type capabilityWorld struct {
 
 func setupWorld(t *testing.T, api *apptest.API) capabilityWorld {
 	var w capabilityWorld
-	w.knx = create[producttypes.ProductType](t, api, "/api/product-types", map[string]any{"key": "knx", "name": name("KNX"), "isActive": true})
-	w.zigbee = create[producttypes.ProductType](t, api, "/api/product-types", map[string]any{"key": "zigbee", "name": name("Zigbee"), "isActive": true})
+	w.knx = create[producttypes.ProductType](t, api, "/api/product-types", map[string]any{"key": "knx", "name": name("KNX"), "isActive": true,
+		"topology": "bus", "defaultBusCurrentMa": 10})
+	w.zigbee = create[producttypes.ProductType](t, api, "/api/product-types", map[string]any{"key": "zigbee", "name": name("Zigbee"), "isActive": true,
+		"topology": "wireless", "defaultWirelessPlacesUsed": 1})
 	w.relay = outputKind(t, api, "relay_output", nil)
 	w.dimmer = outputKind(t, api, "dimmer_output", nil)
-	w.blind = outputKind(t, api, "blind_output", map[string]any{"alternative": map[string]any{"outputKindId": w.relay.ID, "count": 2}})
+	w.blind = outputKind(t, api, "blind_output", map[string]any{"alternatives": []any{map[string]any{"outputKindId": w.relay.ID, "count": 2}}})
 	w.led = loadType(t, api, "led")
 	field(t, api, map[string]any{"key": "relay_outputs", "type": "integer", "meaning": "channels_supplied", "outputKindId": w.relay.ID})
 	field(t, api, map[string]any{"key": "dimmer_outputs", "type": "integer", "meaning": "channels_supplied", "outputKindId": w.dimmer.ID})
@@ -349,6 +408,10 @@ func setupWorld(t *testing.T, api *apptest.API) capabilityWorld {
 	field(t, api, map[string]any{"key": "motor", "type": "enum", "meaning": "motor_type",
 		"options": []any{map[string]any{"key": "ac", "label": name("AC")}, map[string]any{"key": "dc", "label": name("DC")}}})
 	field(t, api, map[string]any{"key": "notes", "type": "text"})
+	field(t, api, map[string]any{"key": "relays_as_blinds", "type": "boolean", "meaning": "alternative_allowed", "outputKindId": w.blind.ID})
+	field(t, api, map[string]any{"key": "relay_min_w", "type": "number", "meaning": "channel_min_load_w", "outputKindId": w.relay.ID})
+	field(t, api, map[string]any{"key": "module_w", "type": "number", "meaning": "module_total_w"})
+	field(t, api, map[string]any{"key": "module_led_w", "type": "number", "meaning": "module_total_w", "loadTypeId": w.led.ID})
 	attr := func(key, typ, fieldKey string, extra map[string]any) map[string]any {
 		a := map[string]any{"key": key, "label": name(key), "type": typ, "fieldKey": fieldKey}
 		for k, v := range extra {
@@ -369,6 +432,10 @@ func setupWorld(t *testing.T, api *apptest.API) capabilityWorld {
 			attr("motor", "enum", "motor", map[string]any{"scope": "variant", "options": []any{map[string]any{"key": "x", "label": name("X")}}}),
 			attr("notes", "text", "notes", nil),
 			attr("plain", "integer", "", nil),
+			attr("as_blinds", "boolean", "relays_as_blinds", nil),
+			attr("relay_min", "number", "relay_min_w", nil),
+			attr("module_w", "number", "module_w", nil),
+			attr("module_led", "number", "module_led_w", nil),
 		}})
 	return w
 }
@@ -442,7 +509,8 @@ func TestCapabilities(t *testing.T) {
 	api := apptest.New(t)
 	w := setupWorld(t, api)
 	p := newProduct(t, api, w, w.knx.ID, "KNX-1", map[string]any{"relays": 8, "dimmers": 2, "dimmer_led": 200, "width": 4.5,
-		"place": 1, "router": true, "notes": "x", "plain": 3, "bus_ma": nil}, "")
+		"place": 1, "router": true, "notes": "x", "plain": 3, "bus_ma": nil, "as_blinds": true, "relay_min": 5,
+		"module_w": 3000, "module_led": 1200}, "")
 	c := p.Capabilities
 	if c.Mounting != "board" || len(c.Channels) != 2 {
 		t.Fatalf("capabilities %+v", c)
@@ -450,24 +518,43 @@ func TestCapabilities(t *testing.T) {
 	// In output kind order: relay, dimmer.
 	relay, dimmer := c.Channels[0], c.Channels[1]
 	if relay.OutputKindKey != "relay_output" || relay.Count != 8 || len(relay.LimitsW) != 0 ||
-		!reflect.DeepEqual(relay.Alternatives, []capabilities.ChannelAlternative{{OutputKindID: w.blind.ID, OutputKindKey: "blind_output", Per: 2, Max: 4}}) {
+		!reflect.DeepEqual(relay.Alternatives, []capabilities.ChannelAlternative{{OutputKindID: w.blind.ID, OutputKindKey: "blind_output", Per: 2, Max: 4}}) ||
+		len(relay.MinLoadsW) != 1 || relay.MinLoadsW[0].LoadTypeID != nil || relay.MinLoadsW[0].Value != 5 {
 		t.Errorf("relay %+v", relay)
 	}
-	if dimmer.Count != 2 || len(dimmer.LimitsW) != 1 || dimmer.LimitsW[0].LoadTypeKey != "led" || dimmer.LimitsW[0].MaxW != 200 ||
+	if dimmer.Count != 2 || len(dimmer.LimitsW) != 1 || dimmer.LimitsW[0].LoadTypeKey != "led" || dimmer.LimitsW[0].Value != 200 ||
 		len(dimmer.Alternatives) != 0 {
 		t.Errorf("dimmer %+v", dimmer)
 	}
-	// Empty values do not count; a meaning limited to Zigbee does not apply
+	if len(c.ModuleTotalsW) != 2 || c.ModuleTotalsW[0].LoadTypeID != nil || c.ModuleTotalsW[0].Value != 3000 ||
+		c.ModuleTotalsW[1].LoadTypeKey != "led" || c.ModuleTotalsW[1].Value != 1200 {
+		t.Errorf("module totals %+v", c.ModuleTotalsW)
+	}
+	// Empty values do not count (the bus current falls back to the KNX
+	// default, marked as such); a meaning limited to Zigbee does not apply
 	// to KNX.
-	if c.BusCurrentUsedMa != nil || c.WirelessPlacesUsed != nil || c.RailWidthTE == nil || *c.RailWidthTE != 4.5 ||
-		c.ZigbeeRouter == nil || !*c.ZigbeeRouter || c.MotorType != "" {
+	if c.BusCurrentUsedMa == nil || *c.BusCurrentUsedMa != 10 || !c.BusCurrentUsedMaDefault || c.WirelessPlacesUsed != nil ||
+		c.RailWidthTE == nil || *c.RailWidthTE != 4.5 || c.ZigbeeRouter == nil || !*c.ZigbeeRouter || c.MotorType != "" {
 		t.Errorf("capabilities %+v", c)
 	}
+	// Without the opt-in no alternatives (D303).
+	plain := newProduct(t, api, w, w.knx.ID, "KNX-2", map[string]any{"relays": 8, "as_blinds": false, "bus_ma": 20}, "")
+	if len(plain.Capabilities.Channels) != 1 || len(plain.Capabilities.Channels[0].Alternatives) != 0 ||
+		*plain.Capabilities.BusCurrentUsedMa != 20 || plain.Capabilities.BusCurrentUsedMaDefault {
+		t.Errorf("no opt-in %+v", plain.Capabilities)
+	}
 	// The product's mounting override wins; Zigbee products use a place.
-	z := newProduct(t, api, w, w.zigbee.ID, "ZB-1", map[string]any{"place": 1, "bus_ma": 12}, "floorplan")
+	z := newProduct(t, api, w, w.zigbee.ID, "ZB-1", map[string]any{"place": 3, "bus_ma": 12}, "floorplan")
 	if z.Mounting != "floorplan" || z.Capabilities.Mounting != "floorplan" || z.Capabilities.WirelessPlacesUsed == nil ||
-		*z.Capabilities.WirelessPlacesUsed != 1 || *z.Capabilities.BusCurrentUsedMa != 12 || len(z.Capabilities.Channels) != 0 {
+		*z.Capabilities.WirelessPlacesUsed != 3 || z.Capabilities.WirelessPlacesUsedDefault || *z.Capabilities.BusCurrentUsedMa != 12 ||
+		z.Capabilities.BusCurrentUsedMaDefault || len(z.Capabilities.Channels) != 0 {
 		t.Errorf("zigbee %+v", z.Capabilities)
+	}
+	// A Zigbee product without a value uses the product type's default place.
+	z2 := newProduct(t, api, w, w.zigbee.ID, "ZB-2", map[string]any{}, "")
+	if z2.Capabilities.WirelessPlacesUsed == nil || *z2.Capabilities.WirelessPlacesUsed != 1 || !z2.Capabilities.WirelessPlacesUsedDefault ||
+		z2.Capabilities.BusCurrentUsedMa != nil {
+		t.Errorf("zigbee default %+v", z2.Capabilities)
 	}
 	assertError(t, api.Post("/api/products", api.Admin.Cookie, map[string]any{"productTypeId": w.knx.ID, "categoryId": w.category.ID,
 		"modelNumber": "X", "name": name("X"), "mounting": "roof"}), http.StatusUnprocessableEntity, "validation.failed")
@@ -510,8 +597,97 @@ func TestCapabilities(t *testing.T) {
 	}
 }
 
-// Compute directly: the first attribute of a meaning wins, false and blank
-// values do not count.
+// Inactive output kinds are left out of the computation: their channels and
+// the alternatives to them (D311).
+func TestCapabilitiesInactiveKinds(t *testing.T) {
+	api := apptest.New(t)
+	w := setupWorld(t, api)
+	p := newProduct(t, api, w, w.knx.ID, "KNX-1", map[string]any{"relays": 4, "dimmers": 2, "as_blinds": true}, "")
+	if len(p.Capabilities.Channels) != 2 || len(p.Capabilities.Channels[0].Alternatives) != 1 {
+		t.Fatalf("active %+v", p.Capabilities.Channels)
+	}
+	deactivate := func(k capabilities.OutputKind) {
+		k = decode[capabilities.OutputKind](t, api.Get("/api/output-kinds/"+k.ID.String(), api.Admin.Cookie))
+		expect(t, api.Put("/api/output-kinds/"+k.ID.String(), api.Admin.Cookie, map[string]any{"key": k.Key, "name": k.Name,
+			"isActive": false, "alternatives": k.Alternatives, "expectedUpdatedAt": k.UpdatedAt}), http.StatusOK)
+	}
+	deactivate(w.blind)
+	got := decode[products.Product](t, api.Get("/api/products/"+p.ID.String(), api.Admin.Cookie))
+	if len(got.Capabilities.Channels) != 2 || len(got.Capabilities.Channels[0].Alternatives) != 0 {
+		t.Errorf("blind inactive %+v", got.Capabilities.Channels)
+	}
+	deactivate(w.relay)
+	got = decode[products.Product](t, api.Get("/api/products/"+p.ID.String(), api.Admin.Cookie))
+	if len(got.Capabilities.Channels) != 1 || got.Capabilities.Channels[0].OutputKindKey != "dimmer_output" {
+		t.Errorf("relay inactive %+v", got.Capabilities.Channels)
+	}
+}
+
+// Linked attributes are resolved from the field when read (D308): a unit or
+// option change shows at once.
+func TestCategoryReadsFieldChanges(t *testing.T) {
+	api := apptest.New(t)
+	w := setupWorld(t, api)
+	fields := decode[capabilities.CatalogFieldList](t, api.Get("/api/catalog-fields", api.Admin.Cookie))
+	for _, f := range fields.Items {
+		switch f.Key {
+		case "width_te":
+			if f.InUse != 1 || len(f.UsedBy) != 1 || f.UsedBy[0].Key != "actuators" {
+				t.Errorf("in use %+v", f)
+			}
+			expect(t, api.Put("/api/catalog-fields/"+f.ID.String(), api.Admin.Cookie, map[string]any{"key": f.Key, "label": f.Label,
+				"type": "number", "unit": "mm", "meaning": "rail_width_te", "expectedUpdatedAt": f.UpdatedAt}), http.StatusOK)
+		case "notes":
+			if f.InUse != 1 {
+				t.Errorf("notes in use %+v", f)
+			}
+		}
+	}
+	c := decode[categories.Category](t, api.Get("/api/categories/"+w.category.ID.String(), api.Admin.Cookie))
+	if c.Attributes[4].Key != "width" || c.Attributes[4].Unit != "mm" {
+		t.Errorf("width %+v", c.Attributes[4])
+	}
+}
+
+// A category save and a field type change cannot both win (D305): whichever
+// commits first, the other sees it.
+func TestFieldLinkRace(t *testing.T) {
+	api := apptest.New(t)
+	for i := range 8 {
+		key := fmt.Sprintf("race_%d", i)
+		f := field(t, api, map[string]any{"key": key, "type": "integer"})
+		body := map[string]any{"key": key, "name": name(key), "isActive": true, "instanceAttributes": []any{},
+			"attributes": []any{map[string]any{"key": "n", "label": name("N"), "type": "integer", "fieldKey": key}}}
+		var wg sync.WaitGroup
+		var catCode, fieldCode int
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			catCode = api.Post("/api/categories", api.Admin.Cookie, body).Code
+		}()
+		go func() {
+			defer wg.Done()
+			fieldCode = api.Put("/api/catalog-fields/"+f.ID.String(), api.Admin.Cookie, map[string]any{"key": key, "label": name(key),
+				"type": "text", "expectedUpdatedAt": f.UpdatedAt}).Code
+		}()
+		wg.Wait()
+		// Exactly one wins.
+		switch {
+		case catCode == http.StatusCreated && fieldCode == http.StatusConflict:
+		case catCode == http.StatusUnprocessableEntity && fieldCode == http.StatusOK:
+		default:
+			t.Errorf("round %d: category %d, field %d", i, catCode, fieldCode)
+		}
+	}
+	// Delete against a link: the foreign key.
+	f := field(t, api, map[string]any{"key": "linked", "type": "integer"})
+	create[categories.Category](t, api, "/api/categories", map[string]any{"key": "linked", "name": name("L"), "isActive": true,
+		"instanceAttributes": []any{}, "attributes": []any{map[string]any{"key": "n", "label": name("N"), "type": "integer", "fieldKey": "linked"}}})
+	assertError(t, api.Delete("/api/catalog-fields/"+f.ID.String(), api.Admin.Cookie), http.StatusConflict, "catalog_field.in_use")
+}
+
+// Compute directly: the first attribute of a meaning wins, blank values do
+// not count; wireless_place_used yes/no is 1/0 (D312).
 func TestCompute(t *testing.T) {
 	kind := capabilities.OutputKind{Key: "relay"}
 	kind.ID[0] = 1
@@ -525,13 +701,30 @@ func TestCompute(t *testing.T) {
 	in := capabilities.Input{Mounting: "both", Values: map[string]any{"x": 3.0, "y": 5.0, "w": false}}
 	in.Schema = append(in.Schema, categoriesAttr("x", "a"), categoriesAttr("y", "a"), categoriesAttr("w", "w"))
 	c := capabilities.Compute(reg, in)
-	if len(c.Channels) != 1 || c.Channels[0].Count != 3 || c.WirelessPlacesUsed != nil || c.Mounting != "both" {
+	if len(c.Channels) != 1 || c.Channels[0].Count != 3 || c.WirelessPlacesUsed == nil || *c.WirelessPlacesUsed != 0 || c.Mounting != "both" {
 		t.Errorf("compute %+v", c)
 	}
 	in.Values = map[string]any{"y": 0.0, "w": true}
 	c = capabilities.Compute(reg, in)
 	if len(c.Channels) != 0 || c.WirelessPlacesUsed == nil || *c.WirelessPlacesUsed != 1 {
 		t.Errorf("compute %+v", c)
+	}
+	in.Values = map[string]any{}
+	if c = capabilities.Compute(reg, in); c.WirelessPlacesUsed != nil {
+		t.Errorf("missing %+v", c)
+	}
+	// A meaning limited to another product type does not count.
+	other := uuid.New()
+	f := reg.Fields["a"]
+	f.ProductTypeIDs = []uuid.UUID{other}
+	reg.Fields["a"] = f
+	in.Values = map[string]any{"x": 3.0}
+	if c = capabilities.Compute(reg, in); len(c.Channels) != 0 {
+		t.Errorf("limited %+v", c)
+	}
+	in.ProductTypeID = other
+	if c = capabilities.Compute(reg, in); len(c.Channels) != 1 {
+		t.Errorf("limited to this type %+v", c)
 	}
 }
 

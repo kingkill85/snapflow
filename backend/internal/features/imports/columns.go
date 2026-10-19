@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
@@ -18,9 +20,12 @@ import (
 // set: a column answered as information stays so; a column linked to an
 // existing field keeps it; otherwise the attribute key, then the header
 // text are compared with each field's key and labels, ignoring case,
-// spacing and punctuation. A column no field matches is known when an
-// existing category defines the attribute key (its schema says what it is),
-// else unknown.
+// spacing and punctuation. A column no field matches is known ("category":
+// known, no meaning) when an existing category defines the attribute key
+// (with a fixed mapping.categoryId only that category counts), else
+// unknown. Each column lists the considered categories that define its key
+// with the link status (linked, will_link, type_mismatch, other_field,
+// unlinked).
 func checkColumns(m ImportMapping, fields map[string]capabilities.CatalogField, cats []categories.Category) (ImportMapping, []ImportColumn) {
 	byName := map[string]string{}
 	keys := make([]string, 0, len(fields))
@@ -46,10 +51,13 @@ func checkColumns(m ImportMapping, fields map[string]capabilities.CatalogField, 
 			}
 		}
 	}
-	defined := map[string]bool{}
-	for _, c := range cats {
-		for _, a := range c.Attributes {
-			defined[a.Key] = true
+	considered := cats
+	if m.CategoryID != nil {
+		considered = nil
+		for _, c := range cats {
+			if c.ID == *m.CategoryID {
+				considered = append(considered, c)
+			}
 		}
 	}
 	out := []ImportColumn{}
@@ -59,7 +67,8 @@ func checkColumns(m ImportMapping, fields map[string]capabilities.CatalogField, 
 		if !ok || t.kind != tAttribute {
 			continue
 		}
-		col := ImportColumn{FieldIndex: i, Target: f.Target, Key: t.key, Column: f.Column, ColumnLetter: f.ColumnLetter}
+		col := ImportColumn{FieldIndex: i, Target: f.Target, Key: t.key, Column: f.Column, ColumnLetter: f.ColumnLetter,
+			Categories: []ImportColumnCategory{}}
 		if _, ok := fields[f.FieldKey]; !ok {
 			f.FieldKey = ""
 		}
@@ -71,14 +80,41 @@ func checkColumns(m ImportMapping, fields map[string]capabilities.CatalogField, 
 				}
 			}
 		}
+		if f.Information {
+			f.FieldKey = ""
+		}
+		var field *capabilities.CatalogField
+		if f.FieldKey != "" {
+			fl := fields[f.FieldKey]
+			field = &fl
+		}
+		for _, c := range considered {
+			for _, a := range c.Attributes {
+				if a.Key != t.key {
+					continue
+				}
+				cc := ImportColumnCategory{CategoryID: c.ID, Key: c.Key, Name: c.Name, AttributeType: string(a.Type), FieldKey: a.FieldKey}
+				switch {
+				case field != nil && a.FieldKey == field.Key:
+					cc.Status = ColumnCategoryLinked
+				case a.FieldKey != "":
+					cc.Status = ColumnCategoryOtherField
+				case field == nil:
+					cc.Status = ColumnCategoryUnlinked
+				case a.Type == field.Type:
+					cc.Status = ColumnCategoryWillLink
+				default:
+					cc.Status = ColumnCategoryTypeMismatch
+				}
+				col.Categories = append(col.Categories, cc)
+			}
+		}
 		switch {
 		case f.Information:
-			f.FieldKey = ""
 			col.Status = ColumnInformation
-		case f.FieldKey != "":
-			field := fields[f.FieldKey]
-			col.Status, col.Field = ColumnField, &field
-		case defined[t.key]:
+		case field != nil:
+			col.Status, col.Field = ColumnField, field
+		case len(col.Categories) > 0:
 			col.Status = ColumnCategory
 		default:
 			col.Status = ColumnUnknown
@@ -142,8 +178,10 @@ func (s *Service) Columns(ctx context.Context, in ImportColumnsInput) (ImportCol
 }
 
 // AnswerColumns answers attribute columns: each answer creates a catalog
-// field (in one transaction, all or none) and links the column to it, or
-// marks the column as just information. Returns the column check of the
+// field (in one transaction, all or none) and links the column to it,
+// links it to an existing field (fieldKey), or marks the column as just
+// information. Any attribute column may be answered, also one the check
+// matched automatically (overriding a fuzzy match). Returns the column check of the
 // answered mapping; the client previews with it (and saves it in the
 // profile to keep the answers).
 func (s *Service) AnswerColumns(ctx context.Context, in ImportColumnAnswers) (ImportColumns, error) {
@@ -165,6 +203,7 @@ func (s *Service) AnswerColumns(ctx context.Context, in ImportColumnAnswers) (Im
 		}
 	}
 	var (
+		fields   map[string]capabilities.CatalogField
 		creates  []capabilities.CatalogFieldInput
 		createAt []int // answer index of each create
 		answered = map[string]bool{}
@@ -179,13 +218,33 @@ func (s *Service) AnswerColumns(ctx context.Context, in ImportColumnAnswers) (Im
 		case answered[a.Target]:
 			errs = append(errs, apperr.Field(loc+".target", "import_profile.target_duplicate", "answered twice"))
 			continue
-		case a.Information == (a.Field != nil):
-			errs = append(errs, apperr.Field(loc, "import.answer_required", "choose a field or just information"))
+		}
+		kinds := 0
+		for _, set := range []bool{a.Information, a.Field != nil, strings.TrimSpace(a.FieldKey) != ""} {
+			if set {
+				kinds++
+			}
+		}
+		if kinds != 1 {
+			errs = append(errs, apperr.Field(loc, "import.answer_required", "choose a new field, an existing field or just information"))
 			continue
 		}
 		answered[a.Target] = true
 		if a.Information {
 			mapping.Fields[fi].Information, mapping.Fields[fi].FieldKey = true, ""
+			continue
+		}
+		if key := strings.TrimSpace(a.FieldKey); key != "" {
+			if fields == nil {
+				if fields, err = s.caps.FieldsByKey(ctx); err != nil {
+					return ImportColumns{}, err
+				}
+			}
+			if _, ok := fields[key]; !ok {
+				errs = append(errs, apperr.Field(loc+".fieldKey", "import.answer_field_not_found", "no such catalog field").With("key", key))
+				continue
+			}
+			mapping.Fields[fi].FieldKey, mapping.Fields[fi].Information = key, false
 			continue
 		}
 		creates = append(creates, *a.Field)
@@ -204,7 +263,7 @@ func (s *Service) AnswerColumns(ctx context.Context, in ImportColumnAnswers) (Im
 			mapping.Fields[fi].FieldKey, mapping.Fields[fi].Information = f.Key, false
 		}
 	}
-	fields, err := s.caps.FieldsByKey(ctx)
+	fields, err = s.caps.FieldsByKey(ctx)
 	if err != nil {
 		return ImportColumns{}, err
 	}
@@ -228,4 +287,16 @@ func mountingValue(cell string) (string, bool) {
 		return string(capabilities.MountingBoth), true
 	}
 	return "", false
+}
+
+// ProfilesLinkingField counts the import profiles whose mapping links an
+// attribute column to the catalog field key (capabilities refuses changing
+// such a key: catalog_field.key_referenced). With tx it reads in tx.
+func (s *Service) ProfilesLinkingField(ctx context.Context, tx pgx.Tx, key string) (int, error) {
+	q := s.q
+	if tx != nil {
+		q = q.WithTx(tx)
+	}
+	n, err := q.ProfilesLinkingField(ctx, key)
+	return int(n), err
 }

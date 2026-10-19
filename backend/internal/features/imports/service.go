@@ -575,7 +575,7 @@ func (s *Service) Preview(ctx context.Context, id uuid.UUID, in ImportPreviewInp
 			pl.images[name] = id
 		}
 	}
-	token, err := scopeToken(types, cats, catalog, pl.scope)
+	token, err := scopeToken(types, cats, catalog, fields, pl.scope)
 	if err != nil {
 		return ImportRun{}, err
 	}

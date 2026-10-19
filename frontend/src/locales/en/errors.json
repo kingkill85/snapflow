@@ -45,7 +45,8 @@
     "unknown": "This attribute does not exist in this category.",
     "wrong_scope": "This attribute is set per $t(attribute.scope_name.{{scope}}).",
     "field_not_found": "There is no catalog field \"{{key}}\".",
-    "field_type": "The linked field \"{{key}}\" is $t(attribute.type_name.{{expected}}); use that type."
+    "field_type": "The linked field \"{{key}}\" is $t(attribute.type_name.{{expected}}); use that type.",
+    "type_or": "or"
   },
   "auth": {
     "account_disabled": "Your account is disabled. Please contact your administrator.",
@@ -71,7 +72,9 @@
   "catalog_field": {
     "in_use": "Categories link the field \"{{key}}\": its key and type cannot change and it cannot be deleted.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
+    "key_referenced": "Import profiles use the key \"{{key}}\": it cannot change.",
     "key_taken": "The key \"{{key}}\" is already used.",
+    "meaning_options": "For this meaning the choices must be exactly: {{expected}}.",
     "meaning_type": "This meaning needs another value type ({{expected}}).",
     "not_found": "This field no longer exists.",
     "order_mismatch": "The fields have changed in the meantime. Please reload and try again.",
@@ -110,11 +113,14 @@
     "addon_ambiguous": "The add-on \"{{ref}}\" matches more than one variant; the first one is used.",
     "addon_not_found": "The add-on \"{{ref}}\" was found neither in the file nor in the catalog.",
     "addon_skipped": "The add-on \"{{ref}}\" is in a row with errors and is left out.",
-    "answer_required": "Choose a field or \"just information\".",
+    "answer_field_not_found": "There is no catalog field \"{{key}}\".",
+    "answer_required": "Choose a new field, an existing field or \"just information\".",
     "answer_target": "No mapped column has this target.",
+    "attribute_not_linked": "The attribute \"{{key}}\" of the category \"{{category}}\" stays unlinked: the field \"{{field}}\" is {{expected}}, the attribute {{type}}.",
     "category_unknown": "There is no category \"{{value}}\". Create it, or turn on \"Create missing categories\".",
     "column_missing": "The file has no column \"{{column}}\".",
-    "columns_unknown": "{{count}} new columns need an answer first: what do they mean? ({{columns}})",
+    "columns_unknown_one": "{{count}} new column needs an answer first: what does it mean? ({{columns}})",
+    "columns_unknown_other": "{{count}} new columns need an answer first: what do they mean? ({{columns}})",
     "duplicate_sku": "The SKU \"{{sku}}\" appears more than once in the file.",
     "duplicate_variant": "The variant \"{{name}}\" appears more than once for this product.",
     "file_type": "Only .xlsx workbooks and UTF-8 .csv files can be imported.",
@@ -167,7 +173,8 @@
     "unavailable": "No connection to the server."
   },
   "output_kind": {
-    "alternative_cycle": "That output kind already uses this one as its alternative.",
+    "alternative_cycle": "That output kind already has this one as an alternative.",
+    "alternative_duplicate": "This output kind is listed twice as an alternative.",
     "alternative_self": "An output kind cannot be its own alternative.",
     "function_type_duplicate": "This function type is listed twice.",
     "in_use": "This output kind is still used by catalog fields or as another output kind's alternative.",

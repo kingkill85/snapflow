@@ -13,17 +13,22 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
-const alternativeOf = `-- name: AlternativeOf :one
-SELECT alternative_kind_id FROM output_kinds WHERE id = $1
+const alternativeCycle = `-- name: AlternativeCycle :one
+SELECT EXISTS (SELECT 1 FROM output_kind_alternatives WHERE output_kind_id = $1 AND from_kind_id = $2)
 `
 
-// AlternativeChainTarget is the alternative kind of the given kind (to
-// refuse cycles: a kind whose alternative names it back).
-func (q *Queries) AlternativeOf(ctx context.Context, id uuid.UUID) (*uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, alternativeOf, id)
-	var alternative_kind_id *uuid.UUID
-	err := row.Scan(&alternative_kind_id)
-	return alternative_kind_id, err
+type AlternativeCycleParams struct {
+	FromKindID uuid.UUID
+	KindID     uuid.UUID
+}
+
+// AlternativeCycle reports whether from_kind has kind as one of its
+// alternatives (a cycle of two).
+func (q *Queries) AlternativeCycle(ctx context.Context, arg AlternativeCycleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, alternativeCycle, arg.FromKindID, arg.KindID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const catalogFieldExists = `-- name: CatalogFieldExists :one
@@ -114,27 +119,19 @@ func (q *Queries) CreateLoadType(ctx context.Context, arg CreateLoadTypeParams) 
 }
 
 const createOutputKind = `-- name: CreateOutputKind :one
-INSERT INTO output_kinds (key, name, is_active, alternative_kind_id, alternative_count, sort_order)
-VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order), 0) + 1 FROM output_kinds))
-RETURNING id, key, name, sort_order, is_active, alternative_kind_id, alternative_count, created_at, updated_at
+INSERT INTO output_kinds (key, name, is_active, sort_order)
+VALUES ($1, $2, $3, (SELECT coalesce(max(sort_order), 0) + 1 FROM output_kinds))
+RETURNING id, key, name, sort_order, is_active, created_at, updated_at
 `
 
 type CreateOutputKindParams struct {
-	Key               string
-	Name              i18n.Text
-	IsActive          bool
-	AlternativeKindID *uuid.UUID
-	AlternativeCount  *int32
+	Key      string
+	Name     i18n.Text
+	IsActive bool
 }
 
 func (q *Queries) CreateOutputKind(ctx context.Context, arg CreateOutputKindParams) (OutputKind, error) {
-	row := q.db.QueryRow(ctx, createOutputKind,
-		arg.Key,
-		arg.Name,
-		arg.IsActive,
-		arg.AlternativeKindID,
-		arg.AlternativeCount,
-	)
+	row := q.db.QueryRow(ctx, createOutputKind, arg.Key, arg.Name, arg.IsActive)
 	var i OutputKind
 	err := row.Scan(
 		&i.ID,
@@ -142,8 +139,6 @@ func (q *Queries) CreateOutputKind(ctx context.Context, arg CreateOutputKindPara
 		&i.Name,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.AlternativeKindID,
-		&i.AlternativeCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -193,6 +188,15 @@ func (q *Queries) DeleteOutputKind(ctx context.Context, id uuid.UUID) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteOutputKindAlternatives = `-- name: DeleteOutputKindAlternatives :exec
+DELETE FROM output_kind_alternatives WHERE output_kind_id = $1
+`
+
+func (q *Queries) DeleteOutputKindAlternatives(ctx context.Context, outputKindID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOutputKindAlternatives, outputKindID)
+	return err
 }
 
 const deleteOutputKindFunctionTypes = `-- name: DeleteOutputKindFunctionTypes :exec
@@ -249,7 +253,7 @@ func (q *Queries) GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, erro
 }
 
 const getOutputKind = `-- name: GetOutputKind :one
-SELECT id, key, name, sort_order, is_active, alternative_kind_id, alternative_count, created_at, updated_at FROM output_kinds WHERE id = $1
+SELECT id, key, name, sort_order, is_active, created_at, updated_at FROM output_kinds WHERE id = $1
 `
 
 func (q *Queries) GetOutputKind(ctx context.Context, id uuid.UUID) (OutputKind, error) {
@@ -261,8 +265,6 @@ func (q *Queries) GetOutputKind(ctx context.Context, id uuid.UUID) (OutputKind, 
 		&i.Name,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.AlternativeKindID,
-		&i.AlternativeCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -281,6 +283,21 @@ type InsertCatalogFieldProductTypesParams struct {
 
 func (q *Queries) InsertCatalogFieldProductTypes(ctx context.Context, arg InsertCatalogFieldProductTypesParams) error {
 	_, err := q.db.Exec(ctx, insertCatalogFieldProductTypes, arg.CatalogFieldID, arg.ProductTypeIds)
+	return err
+}
+
+const insertOutputKindAlternative = `-- name: InsertOutputKindAlternative :exec
+INSERT INTO output_kind_alternatives (output_kind_id, from_kind_id, count) VALUES ($1, $2, $3)
+`
+
+type InsertOutputKindAlternativeParams struct {
+	OutputKindID uuid.UUID
+	FromKindID   uuid.UUID
+	Count        int32
+}
+
+func (q *Queries) InsertOutputKindAlternative(ctx context.Context, arg InsertOutputKindAlternativeParams) error {
+	_, err := q.db.Exec(ctx, insertOutputKindAlternative, arg.OutputKindID, arg.FromKindID, arg.Count)
 	return err
 }
 
@@ -399,6 +416,30 @@ func (q *Queries) ListLoadTypes(ctx context.Context, includeInactive bool) ([]Lo
 	return items, nil
 }
 
+const listOutputKindAlternatives = `-- name: ListOutputKindAlternatives :many
+SELECT output_kind_id, from_kind_id, count FROM output_kind_alternatives ORDER BY output_kind_id, from_kind_id
+`
+
+func (q *Queries) ListOutputKindAlternatives(ctx context.Context) ([]OutputKindAlternative, error) {
+	rows, err := q.db.Query(ctx, listOutputKindAlternatives)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OutputKindAlternative{}
+	for rows.Next() {
+		var i OutputKindAlternative
+		if err := rows.Scan(&i.OutputKindID, &i.FromKindID, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOutputKindFunctionTypes = `-- name: ListOutputKindFunctionTypes :many
 SELECT output_kind_id, function_type_id FROM output_kind_function_types ORDER BY output_kind_id, function_type_id
 `
@@ -425,7 +466,7 @@ func (q *Queries) ListOutputKindFunctionTypes(ctx context.Context) ([]OutputKind
 
 const listOutputKinds = `-- name: ListOutputKinds :many
 
-SELECT id, key, name, sort_order, is_active, alternative_kind_id, alternative_count, created_at, updated_at FROM output_kinds
+SELECT id, key, name, sort_order, is_active, created_at, updated_at FROM output_kinds
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -446,8 +487,6 @@ func (q *Queries) ListOutputKinds(ctx context.Context, includeInactive bool) ([]
 			&i.Name,
 			&i.SortOrder,
 			&i.IsActive,
-			&i.AlternativeKindID,
-			&i.AlternativeCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -470,6 +509,33 @@ func (q *Queries) LoadTypeExists(ctx context.Context, id uuid.UUID) (bool, error
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const lockCatalogField = `-- name: LockCatalogField :one
+SELECT id, key, label, value_type, unit, options, etim_feature, meaning, output_kind_id, load_type_id, sort_order, created_at, updated_at FROM catalog_fields WHERE id = $1 FOR UPDATE
+`
+
+// LockCatalogField locks a field against concurrent links (categories take
+// FOR SHARE on the fields they link, D305) before its key or type changes.
+func (q *Queries) LockCatalogField(ctx context.Context, id uuid.UUID) (CatalogField, error) {
+	row := q.db.QueryRow(ctx, lockCatalogField, id)
+	var i CatalogField
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Label,
+		&i.ValueType,
+		&i.Unit,
+		&i.Options,
+		&i.EtimFeature,
+		&i.Meaning,
+		&i.OutputKindID,
+		&i.LoadTypeID,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const lockCatalogFieldIDs = `-- name: LockCatalogFieldIDs :many
@@ -599,6 +665,46 @@ func (q *Queries) SetOutputKindOrder(ctx context.Context, ids []uuid.UUID) error
 	return err
 }
 
+const shareCatalogFields = `-- name: ShareCatalogFields :many
+SELECT id, key, label, value_type, unit, options, etim_feature, meaning, output_kind_id, load_type_id, sort_order, created_at, updated_at FROM catalog_fields WHERE key = ANY($1::text[]) ORDER BY key FOR SHARE
+`
+
+// ShareCatalogFields locks the linked fields of a category save: their type
+// cannot change until the save commits.
+func (q *Queries) ShareCatalogFields(ctx context.Context, keys []string) ([]CatalogField, error) {
+	rows, err := q.db.Query(ctx, shareCatalogFields, keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogField{}
+	for rows.Next() {
+		var i CatalogField
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Label,
+			&i.ValueType,
+			&i.Unit,
+			&i.Options,
+			&i.EtimFeature,
+			&i.Meaning,
+			&i.OutputKindID,
+			&i.LoadTypeID,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCatalogField = `-- name: UpdateCatalogField :one
 UPDATE catalog_fields
 SET key = $2, label = $3, value_type = $4, unit = $5, options = $6, etim_feature = $7, meaning = $8,
@@ -694,10 +800,10 @@ func (q *Queries) UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) 
 
 const updateOutputKind = `-- name: UpdateOutputKind :one
 UPDATE output_kinds
-SET key = $2, name = $3, is_active = $4, alternative_kind_id = $5, alternative_count = $6,
+SET key = $2, name = $3, is_active = $4,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $7
-RETURNING id, key, name, sort_order, is_active, alternative_kind_id, alternative_count, created_at, updated_at
+WHERE id = $1 AND updated_at = $5
+RETURNING id, key, name, sort_order, is_active, created_at, updated_at
 `
 
 type UpdateOutputKindParams struct {
@@ -705,8 +811,6 @@ type UpdateOutputKindParams struct {
 	Key               string
 	Name              i18n.Text
 	IsActive          bool
-	AlternativeKindID *uuid.UUID
-	AlternativeCount  *int32
 	ExpectedUpdatedAt time.Time
 }
 
@@ -716,8 +820,6 @@ func (q *Queries) UpdateOutputKind(ctx context.Context, arg UpdateOutputKindPara
 		arg.Key,
 		arg.Name,
 		arg.IsActive,
-		arg.AlternativeKindID,
-		arg.AlternativeCount,
 		arg.ExpectedUpdatedAt,
 	)
 	var i OutputKind
@@ -727,8 +829,6 @@ func (q *Queries) UpdateOutputKind(ctx context.Context, arg UpdateOutputKindPara
 		&i.Name,
 		&i.SortOrder,
 		&i.IsActive,
-		&i.AlternativeKindID,
-		&i.AlternativeCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

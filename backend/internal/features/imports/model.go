@@ -205,7 +205,7 @@ type ImportCounts struct {
 	RowsSkipped int                `json:"rowsSkipped" doc:"Rows with errors (skipped, or blocking with all or nothing)"`
 	Errors      int                `json:"errors"`
 	Warnings    int                `json:"warnings"`
-	Categories  ImportCounter      `json:"categories" doc:"Only new: categories to create"`
+	Categories  ImportCounter      `json:"categories" doc:"new: categories to create; changed: existing categories whose attributes get linked to catalog fields"`
 	Products    ImportCounter      `json:"products"`
 	Variants    ImportCounter      `json:"variants"`
 	Addons      ImportAddonCounter `json:"addons"`
@@ -363,14 +363,44 @@ type ImportColumn struct {
 	// category defines the attribute) or unknown (must be answered).
 	Status string                     `json:"status" enum:"field,information,category,unknown"`
 	Field  *capabilities.CatalogField `json:"field,omitempty" doc:"The catalog field (status field)"`
+	// Categories are the existing categories considered (the fixed
+	// mapping.categoryId only, else all) that define the attribute key.
+	Categories []ImportColumnCategory `json:"categories" doc:"Existing categories (the fixed categoryId only, else all) that define the attribute key, with the link status"`
 }
 
-// ImportColumnAnswer answers an unknown column: a new catalog field, or
-// just information.
+// Link statuses of a category attribute against its column.
+const (
+	ColumnCategoryLinked       = "linked"
+	ColumnCategoryWillLink     = "will_link"
+	ColumnCategoryTypeMismatch = "type_mismatch"
+	ColumnCategoryOtherField   = "other_field"
+	ColumnCategoryUnlinked     = "unlinked"
+)
+
+// ImportColumnCategory is an existing category that defines a column's
+// attribute key.
+type ImportColumnCategory struct {
+	CategoryID    uuid.UUID `json:"categoryId"`
+	Key           string    `json:"key"`
+	Name          i18n.Text `json:"name"`
+	AttributeType string    `json:"attributeType" doc:"The attribute's value type"`
+	FieldKey      string    `json:"fieldKey,omitempty" doc:"The catalog field the attribute links, if any"`
+	// Status: linked (to the column's field), will_link (unlinked, same
+	// type: the import links it when the category's rows are applied),
+	// type_mismatch (unlinked, other type: stays unlinked, warning
+	// import.attribute_not_linked), other_field (linked to another field),
+	// unlinked (the column has no field: known, no meaning).
+	Status string `json:"status" enum:"linked,will_link,type_mismatch,other_field,unlinked"`
+}
+
+// ImportColumnAnswer answers a column (unknown, or matched automatically
+// to override the match): a new catalog field, an existing one, or just
+// information; exactly one.
 type ImportColumnAnswer struct {
 	Target      string                          `json:"target" maxLength:"100" doc:"The attribute target of the column, e.g. attribute.dimmer_outputs"`
 	Information bool                            `json:"information,omitempty" doc:"Just information: no catalog field"`
 	Field       *capabilities.CatalogFieldInput `json:"field,omitempty" doc:"Create this catalog field and link the column to it"`
+	FieldKey    string                          `json:"fieldKey,omitempty" maxLength:"64" doc:"Link the column to this existing catalog field (import.answer_field_not_found if there is none)"`
 }
 
 // ImportColumnAnswers is the body of the answers.

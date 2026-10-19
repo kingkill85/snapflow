@@ -5,9 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListCatalogFieldsParams = {
-/**
- * Also list inactive entries
- */
-includeInactive?: boolean;
-};
+export type FieldUserName = {[key: string]: string};

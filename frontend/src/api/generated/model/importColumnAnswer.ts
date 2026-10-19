@@ -9,6 +9,11 @@ import type { CatalogFieldInput } from './catalogFieldInput';
 export interface ImportColumnAnswer {
   /** Create this catalog field and link the column to it */
   field?: CatalogFieldInput;
+  /**
+     * Link the column to this existing catalog field (import.answer_field_not_found if there is none)
+     * @maxLength 64
+     */
+  fieldKey?: string;
   /** Just information: no catalog field */
   information?: boolean;
   /**

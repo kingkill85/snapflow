@@ -28,4 +28,5 @@ export const CatalogFieldUpdateMeaning = {
   wireless_place_used: 'wireless_place_used',
   zigbee_router: 'zigbee_router',
   motor_type: 'motor_type',
+  alternative_allowed: 'alternative_allowed',
 } as const;

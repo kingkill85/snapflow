@@ -11,7 +11,7 @@ import type { ImportSourceColumn } from './importSourceColumn';
 
 export interface ImportCounts {
   addons: ImportAddonCounter;
-  /** Only new: categories to create */
+  /** new: categories to create; changed: existing categories whose attributes get linked to catalog fields */
   categories: ImportCounter;
   errors: number;
   images: ImportImageCounter;

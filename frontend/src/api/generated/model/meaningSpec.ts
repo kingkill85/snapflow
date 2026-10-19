@@ -6,9 +6,13 @@
  */
 
 export interface MeaningSpec {
-  /** Needs a load type (loadTypeId) */
+  /** Takes a load type (loadTypeId); required only with loadTypeRequired */
   loadType: boolean;
+  /** The load type is required */
+  loadTypeRequired: boolean;
   meaning: string;
+  /** Enum fields: the option keys the field must have, exactly (motor_type: ac, dc) */
+  options: string[];
   /** Needs an output kind (outputKindId) */
   outputKind: boolean;
   /** Value types a field with this meaning may have */

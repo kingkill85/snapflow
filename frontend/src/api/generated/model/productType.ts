@@ -6,6 +6,7 @@
  */
 import type { Actions } from './actions';
 import type { ProductTypeName } from './productTypeName';
+import type { ProductTypeTopology } from './productTypeTopology';
 
 export interface ProductType {
   /** A URL to the JSON Schema for this object. */
@@ -20,6 +21,8 @@ export interface ProductType {
   createdAt: string;
   /** Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown */
   defaultBusCurrentMa?: number;
+  /** Wireless places a device of this system uses without its own value (wireless topology); empty = unknown */
+  defaultWirelessPlacesUsed?: number;
   id: string;
   /** Inactive types are hidden from lists unless asked for */
   isActive: boolean;
@@ -31,6 +34,8 @@ export interface ProductType {
   reservePercent: number;
   /** Position in the catalog, 1 first */
   sortOrder: number;
+  /** How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none */
+  topology: ProductTypeTopology;
   /** Send it back as expectedUpdatedAt when updating */
   updatedAt: string;
 }

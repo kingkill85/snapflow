@@ -6,7 +6,7 @@
  */
 
 /**
- * Motor type of blind outputs
+ * Motors the blind outputs drive (D310)
  */
 export type CapabilitiesMotorType = typeof CapabilitiesMotorType[keyof typeof CapabilitiesMotorType];
 

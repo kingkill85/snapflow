@@ -51,28 +51,37 @@ type DB interface {
 	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
 }
 
-// FieldUsage reports whether a category links the catalog field key (wired
-// to categories.Service.FieldInUse; capabilities does not read categories).
-type FieldUsage func(ctx context.Context, key string) (bool, error)
+// FieldUsage returns the categories that link each catalog field key, read
+// in tx (nil: outside a transaction). Wired to categories.Service.FieldUsers;
+// capabilities does not read categories (D305).
+type FieldUsage func(ctx context.Context, tx pgx.Tx) (map[string][]FieldUser, error)
 
 type Service struct {
-	db    DB
-	q     *store.Queries
-	usage FieldUsage
+	db          DB
+	q           *store.Queries
+	usage       FieldUsage
+	profileRefs ProfileRefs
 }
+
+// ProfileRefs counts the import profiles whose mapping links a catalog field
+// key (wired to imports.Service.ProfilesLinkingField).
+type ProfileRefs func(ctx context.Context, tx pgx.Tx, key string) (int, error)
+
+// OnProfileRefs sets the lookup of import profiles linking a field key.
+func (s *Service) OnProfileRefs(fn ProfileRefs) { s.profileRefs = fn }
 
 func NewService(db DB) *Service {
 	return &Service{db: db, q: store.New(db)}
 }
 
-// OnFieldUsage sets the check whether a catalog field is linked by a
-// category (its key and type then cannot change, and it cannot be deleted).
+// OnFieldUsage sets the lookup of the categories linking each field (a
+// linked field's key and type cannot change, and it cannot be deleted).
 func (s *Service) OnFieldUsage(fn FieldUsage) { s.usage = fn }
 
 // WithTx returns the service working inside tx (see database.Nested).
 func (s *Service) WithTx(tx pgx.Tx) *Service {
 	out := NewService(database.NewNested(tx))
-	out.usage = s.usage
+	out.usage, out.profileRefs = s.usage, s.profileRefs
 	return out
 }
 
@@ -203,26 +212,36 @@ func (s *Service) OutputKinds(ctx context.Context, includeInactive bool) ([]Outp
 	if err != nil {
 		return nil, err
 	}
-	var (
-		rows  []store.OutputKind
-		links []store.OutputKindFunctionType
-	)
+	var out []OutputKind
 	err = database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
-		q := s.q.WithTx(tx)
 		var err error
-		if rows, err = q.ListOutputKinds(ctx, includeInactive); err != nil {
-			return err
-		}
-		links, err = q.ListOutputKindFunctionTypes(ctx)
+		out, err = readOutputKinds(ctx, s.q.WithTx(tx), actor, includeInactive)
 		return err
 	})
+	return out, err
+}
+
+func readOutputKinds(ctx context.Context, q *store.Queries, actor auth.Actor, includeInactive bool) ([]OutputKind, error) {
+	rows, err := q.ListOutputKinds(ctx, includeInactive)
+	if err != nil {
+		return nil, err
+	}
+	links, err := q.ListOutputKindFunctionTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	alts, err := q.ListOutputKindAlternatives(ctx)
 	if err != nil {
 		return nil, err
 	}
 	served := servedBy(links)
+	alternatives := map[uuid.UUID][]OutputKindAlternative{}
+	for _, a := range alts {
+		alternatives[a.OutputKindID] = append(alternatives[a.OutputKindID], OutputKindAlternative{OutputKindID: a.FromKindID, Count: a.Count})
+	}
 	out := make([]OutputKind, len(rows))
 	for i, r := range rows {
-		out[i] = outputKindOut(actor, r, served[r.ID])
+		out[i] = outputKindOut(actor, r, served[r.ID], alternatives[r.ID])
 	}
 	return out, nil
 }
@@ -256,16 +275,14 @@ func (s *Service) CreateOutputKind(ctx context.Context, in OutputKindInput) (Out
 		if err := q.LockOrder(ctx, outputKindOrderLock); err != nil {
 			return err
 		}
-		if err := checkAlternative(ctx, q, uuid.Nil, in.Alternative); err != nil {
-			return err
-		}
-		kindID, count := alternativeParams(in.Alternative)
-		row, err := q.CreateOutputKind(ctx, store.CreateOutputKindParams{Key: in.Key, Name: in.Name, IsActive: in.IsActive,
-			AlternativeKindID: kindID, AlternativeCount: count})
+		row, err := q.CreateOutputKind(ctx, store.CreateOutputKindParams{Key: in.Key, Name: in.Name, IsActive: in.IsActive})
 		if err != nil {
 			return err
 		}
 		id = row.ID
+		if err := setAlternatives(ctx, q, id, in.Alternatives); err != nil {
+			return err
+		}
 		return setServed(ctx, q, id, in.FunctionTypeIDs)
 	})
 	if err != nil {
@@ -288,12 +305,14 @@ func (s *Service) UpdateOutputKind(ctx context.Context, id uuid.UUID, in OutputK
 		if err := q.LockOrder(ctx, outputKindOrderLock); err != nil {
 			return err
 		}
-		if err := checkAlternative(ctx, q, id, in.Alternative); err != nil {
+		if _, err := q.UpdateOutputKind(ctx, store.UpdateOutputKindParams{ID: id, Key: in.Key, Name: in.Name, IsActive: in.IsActive,
+			ExpectedUpdatedAt: in.ExpectedUpdatedAt}); err != nil {
 			return err
 		}
-		kindID, count := alternativeParams(in.Alternative)
-		if _, err := q.UpdateOutputKind(ctx, store.UpdateOutputKindParams{ID: id, Key: in.Key, Name: in.Name, IsActive: in.IsActive,
-			AlternativeKindID: kindID, AlternativeCount: count, ExpectedUpdatedAt: in.ExpectedUpdatedAt}); err != nil {
+		if err := q.DeleteOutputKindAlternatives(ctx, id); err != nil {
+			return err
+		}
+		if err := setAlternatives(ctx, q, id, in.Alternatives); err != nil {
 			return err
 		}
 		if err := q.DeleteOutputKindFunctionTypes(ctx, id); err != nil {
@@ -343,9 +362,16 @@ func validateOutputKind(in OutputKindInput) (OutputKindInput, error) {
 		}
 		seen[id] = true
 	}
-	if a := in.Alternative; a != nil && (a.Count < 1 || a.Count > maxAlternative) {
-		errs = append(errs, apperr.Field("body.alternative.count", "validation.range", "out of range").
-			With("min", 1).With("max", maxAlternative))
+	from := map[uuid.UUID]bool{}
+	for i, a := range in.Alternatives {
+		if a.Count < 1 || a.Count > maxAlternative {
+			errs = append(errs, apperr.Field(fmt.Sprintf("body.alternatives[%d].count", i), "validation.range", "out of range").
+				With("min", 1).With("max", maxAlternative))
+		}
+		if from[a.OutputKindID] {
+			errs = append(errs, apperr.Field(fmt.Sprintf("body.alternatives[%d].outputKindId", i), "output_kind.alternative_duplicate", "listed twice"))
+		}
+		from[a.OutputKindID] = true
 	}
 	if in.FunctionTypeIDs == nil {
 		in.FunctionTypeIDs = []uuid.UUID{}
@@ -356,36 +382,44 @@ func validateOutputKind(in OutputKindInput) (OutputKindInput, error) {
 	return in, nil
 }
 
-// checkAlternative refuses an unknown alternative kind, the kind itself and
-// a kind whose alternative is this one (a cycle of two; longer cycles are
-// harmless: alternatives are not followed transitively).
-func checkAlternative(ctx context.Context, q *store.Queries, self uuid.UUID, a *OutputKindAlternative) error {
-	if a == nil {
-		return nil
+// setAlternatives stores a kind's alternatives (under the order lock, so two
+// kinds cannot become each other's alternative concurrently). It refuses an
+// unknown kind, the kind itself and a kind that has this one as its
+// alternative (a cycle of two; longer cycles are harmless: alternatives are
+// not followed transitively).
+func setAlternatives(ctx context.Context, q *store.Queries, self uuid.UUID, alts []OutputKindAlternative) error {
+	var errs []apperr.FieldError
+	for i, a := range alts {
+		loc := fmt.Sprintf("body.alternatives[%d].outputKindId", i)
+		if a.OutputKindID == self {
+			errs = append(errs, apperr.Field(loc, "output_kind.alternative_self", "a kind cannot be its own alternative"))
+			continue
+		}
+		exists, err := q.OutputKindExists(ctx, a.OutputKindID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			errs = append(errs, apperr.Field(loc, "output_kind.not_found", "no such output kind"))
+			continue
+		}
+		cycle, err := q.AlternativeCycle(ctx, store.AlternativeCycleParams{FromKindID: a.OutputKindID, KindID: self})
+		if err != nil {
+			return err
+		}
+		if cycle {
+			errs = append(errs, apperr.Field(loc, "output_kind.alternative_cycle", "that kind has this kind as its alternative"))
+		}
 	}
-	loc := "body.alternative.outputKindId"
-	if a.OutputKindID == self {
-		return apperr.Validation(apperr.Field(loc, "output_kind.alternative_self", "a kind cannot be its own alternative"))
+	if len(errs) > 0 {
+		return apperr.Validation(errs...)
 	}
-	alt, err := q.AlternativeOf(ctx, a.OutputKindID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.Validation(apperr.Field(loc, "output_kind.not_found", "no such output kind"))
-	}
-	if err != nil {
-		return err
-	}
-	if self != uuid.Nil && alt != nil && *alt == self {
-		return apperr.Validation(apperr.Field(loc, "output_kind.alternative_cycle", "that kind has this kind as its alternative"))
+	for _, a := range alts {
+		if err := q.InsertOutputKindAlternative(ctx, store.InsertOutputKindAlternativeParams{OutputKindID: self, FromKindID: a.OutputKindID, Count: a.Count}); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-func alternativeParams(a *OutputKindAlternative) (*uuid.UUID, *int32) {
-	if a == nil {
-		return nil, nil
-	}
-	id, n := a.OutputKindID, a.Count
-	return &id, &n
 }
 
 func setServed(ctx context.Context, q *store.Queries, id uuid.UUID, functionTypeIDs []uuid.UUID) error {
@@ -408,15 +442,16 @@ func servedBy(links []store.OutputKindFunctionType) map[uuid.UUID][]uuid.UUID {
 	return out
 }
 
-func outputKindOut(actor auth.Actor, r store.OutputKind, served []uuid.UUID) OutputKind {
+func outputKindOut(actor auth.Actor, r store.OutputKind, served []uuid.UUID, alts []OutputKindAlternative) OutputKind {
 	write := actor.Can(auth.PermCatalogWrite)
 	k := OutputKind{ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		FunctionTypeIDs: served, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Can: auth.Actions{Update: write, Delete: write}}
 	if k.FunctionTypeIDs == nil {
 		k.FunctionTypeIDs = []uuid.UUID{}
 	}
-	if r.AlternativeKindID != nil && r.AlternativeCount != nil {
-		k.Alternative = &OutputKindAlternative{OutputKindID: *r.AlternativeKindID, Count: *r.AlternativeCount}
+	k.Alternatives = alts
+	if k.Alternatives == nil {
+		k.Alternatives = []OutputKindAlternative{}
 	}
 	return k
 }
@@ -429,19 +464,34 @@ func (s *Service) Fields(ctx context.Context) ([]CatalogField, error) {
 	if err != nil {
 		return nil, err
 	}
-	var (
-		rows  []store.CatalogField
-		links []store.CatalogFieldProductType
-	)
+	var out []CatalogField
 	err = database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
-		q := s.q.WithTx(tx)
 		var err error
-		if rows, err = q.ListCatalogFields(ctx); err != nil {
+		if out, err = readFields(ctx, s.q.WithTx(tx), actor); err != nil {
 			return err
 		}
-		links, err = q.ListCatalogFieldProductTypes(ctx)
-		return err
+		if s.usage == nil {
+			return nil
+		}
+		users, err := s.usage(ctx, tx)
+		if err != nil {
+			return err
+		}
+		for i := range out {
+			out[i].UsedBy = append(out[i].UsedBy, users[out[i].Key]...)
+			out[i].InUse = len(out[i].UsedBy)
+		}
+		return nil
 	})
+	return out, err
+}
+
+func readFields(ctx context.Context, q *store.Queries, actor auth.Actor) ([]CatalogField, error) {
+	rows, err := q.ListCatalogFields(ctx)
+	if err != nil {
+		return nil, err
+	}
+	links, err := q.ListCatalogFieldProductTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -458,9 +508,42 @@ func (s *Service) Fields(ctx context.Context) ([]CatalogField, error) {
 	return out, nil
 }
 
-// FieldsByKey returns the catalog fields by key.
+// LockFields locks the catalog fields with the given keys against key and
+// type changes until the caller's transaction ends (the categories service
+// calls it, through WithTx, before it validates and stores links; D305) and
+// returns them by key. Unknown keys are left out.
+func (s *Service) LockFields(ctx context.Context, keys []string) (map[string]CatalogField, error) {
+	actor, err := auth.Require(ctx, auth.PermCatalogRead)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ShareCatalogFields(ctx, keys)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]CatalogField, len(rows))
+	for _, r := range rows {
+		f, err := fieldOut(actor, r, nil)
+		if err != nil {
+			return nil, err
+		}
+		out[f.Key] = f
+	}
+	return out, nil
+}
+
+// FieldsByKey returns the catalog fields by key (without inUse / usedBy).
 func (s *Service) FieldsByKey(ctx context.Context) (map[string]CatalogField, error) {
-	list, err := s.Fields(ctx)
+	actor, err := auth.Require(ctx, auth.PermCatalogRead)
+	if err != nil {
+		return nil, err
+	}
+	var list []CatalogField
+	err = database.InTx(ctx, s.db, database.ReadOnlySnapshot, func(tx pgx.Tx) error {
+		var err error
+		list, err = readFields(ctx, s.q.WithTx(tx), actor)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -592,30 +675,31 @@ func insertField(ctx context.Context, q *store.Queries, in CatalogFieldInput, op
 }
 
 // UpdateField replaces a catalog field. A field a category links keeps its
-// key and type (catalog_field.in_use); label, unit, options and meaning may
-// change (the meaning applies at once, categories copy unit and options on
-// their next save).
+// key and type (catalog_field.in_use: checked under a row lock that category
+// saves wait for, and the key by a foreign key, D305); label, unit, options
+// and meaning may change and apply at once (categories resolve linked
+// attributes from the field when read, D308).
 func (s *Service) UpdateField(ctx context.Context, id uuid.UUID, in CatalogFieldUpdate) (CatalogField, error) {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return CatalogField{}, err
 	}
-	current, err := s.q.GetCatalogField(ctx, id)
-	if err != nil {
-		return CatalogField{}, mapErr(err, "catalog_field", "")
-	}
-	if current.Key != in.Key || current.ValueType != string(in.Type) {
-		used, err := s.used(ctx, current.Key)
+	err := database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		current, err := q.LockCatalogField(ctx, id)
 		if err != nil {
-			return CatalogField{}, err
+			return err
 		}
-		if used {
-			return CatalogField{}, apperr.Conflict("catalog_field.in_use", "categories link this field: its key and type cannot change").
-				With("key", current.Key)
+		if current.Key != in.Key || current.ValueType != string(in.Type) {
+			if err := s.checkUnused(ctx, tx, current.Key, "categories link this field: its key and type cannot change"); err != nil {
+				return err
+			}
+			if current.Key != in.Key {
+				if err := s.checkKeyUnreferenced(ctx, tx, current.Key); err != nil {
+					return err
+				}
+			}
 		}
-	}
-	err = s.inTx(ctx, func(q *store.Queries) error {
 		var options []byte
-		var err error
 		if in.CatalogFieldInput, options, err = s.validateField(ctx, q, in.CatalogFieldInput, "body"); err != nil {
 			return err
 		}
@@ -643,21 +727,11 @@ func (s *Service) UpdateField(ctx context.Context, id uuid.UUID, in CatalogField
 	return s.Field(ctx, id)
 }
 
-// DeleteField removes a catalog field no category links (catalog_field.in_use).
+// DeleteField removes a catalog field no category links (catalog_field.in_use,
+// from the foreign key of category_field_links).
 func (s *Service) DeleteField(ctx context.Context, id uuid.UUID) error {
 	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
 		return err
-	}
-	current, err := s.q.GetCatalogField(ctx, id)
-	if err != nil {
-		return mapErr(err, "catalog_field", "")
-	}
-	used, err := s.used(ctx, current.Key)
-	if err != nil {
-		return err
-	}
-	if used {
-		return apperr.Conflict("catalog_field.in_use", "categories link this field").With("key", current.Key)
 	}
 	return s.deleteRow(ctx, "catalog_field", func(q *store.Queries) (int64, error) { return q.DeleteCatalogField(ctx, id) })
 }
@@ -675,11 +749,39 @@ func (s *Service) ReorderFields(ctx context.Context, ids []uuid.UUID) ([]Catalog
 	return s.Fields(ctx)
 }
 
-func (s *Service) used(ctx context.Context, key string) (bool, error) {
+// checkUnused fails with catalog_field.in_use when a category links key
+// (read in tx, after the field row is locked: a category save that linked it
+// first has committed, one that comes later waits and sees the change).
+func (s *Service) checkUnused(ctx context.Context, tx pgx.Tx, key, msg string) error {
 	if s.usage == nil {
-		return false, nil
+		return nil
 	}
-	return s.usage(ctx, key)
+	users, err := s.usage(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if n := len(users[key]); n > 0 {
+		return apperr.Conflict("catalog_field.in_use", msg).With("key", key).With("count", n)
+	}
+	return nil
+}
+
+// checkKeyUnreferenced refuses a key change while an import profile links
+// the key (catalog_field.key_referenced, D309): the profile would lose its
+// link silently.
+func (s *Service) checkKeyUnreferenced(ctx context.Context, tx pgx.Tx, key string) error {
+	if s.profileRefs == nil {
+		return nil
+	}
+	n, err := s.profileRefs(ctx, tx, key)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return apperr.Conflict("catalog_field.key_referenced", "import profiles link this field: its key cannot change").
+			With("key", key).With("count", n)
+	}
+	return nil
 }
 
 // validateField checks a field (loc is its location, "body" for the field
@@ -760,6 +862,20 @@ func (s *Service) checkMeaning(ctx context.Context, q *store.Queries, in *Catalo
 		}
 		errs = append(errs, apperr.Field(loc+".type", "catalog_field.meaning_type", "the meaning needs another value type").
 			With("expected", strings.Join(types, ", ")))
+	} else if len(spec.Options) > 0 {
+		// The option keys must be exactly the ones the meaning reads
+		// (motor_type: ac, dc; D310).
+		keys := make([]string, len(in.Options))
+		for i, o := range in.Options {
+			keys[i] = o.Key
+		}
+		want := slices.Clone(spec.Options)
+		slices.Sort(keys)
+		slices.Sort(want)
+		if !slices.Equal(keys, want) {
+			errs = append(errs, apperr.Field(loc+".options", "catalog_field.meaning_options", "the meaning needs exactly these choices").
+				With("expected", strings.Join(spec.Options, ", ")))
+		}
 	}
 	switch {
 	case spec.OutputKind && in.OutputKindID == nil:
@@ -772,7 +888,7 @@ func (s *Service) checkMeaning(ctx context.Context, q *store.Queries, in *Catalo
 		}
 	}
 	switch {
-	case spec.LoadType && in.LoadTypeID == nil:
+	case spec.LoadTypeRequired && in.LoadTypeID == nil:
 		errs = append(errs, apperr.Field(loc+".loadTypeId", "validation.required", "choose a load type"))
 	case !spec.LoadType && in.LoadTypeID != nil:
 		errs = append(errs, apperr.Field(loc+".loadTypeId", "catalog_field.param_not_allowed", "this meaning has no load type"))

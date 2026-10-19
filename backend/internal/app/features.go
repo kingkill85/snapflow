@@ -46,7 +46,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	capSvc := capabilities.NewService(deps.DB)
 	capabilities.Register(api, capSvc)
 	cats := categories.NewService(deps.DB, capSvc)
-	capSvc.OnFieldUsage(cats.FieldInUse)
+	capSvc.OnFieldUsage(cats.FieldUsers)
 	categories.Register(api, cats)
 	fileSvc := files.NewService(deps.DB, deps.Storage)
 	files.Register(api, fileSvc)
@@ -55,6 +55,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	products.Register(api, productSvc)
 	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users, capSvc)
 	imports.Register(api, importSvc)
+	capSvc.OnProfileRefs(importSvc.ProfilesLinkingField)
 	projectSvc := projects.NewService(deps.DB, productTypes, c.tenants)
 	if deps.ExchangeRates != nil {
 		projectSvc.UseExchangeRates(deps.ExchangeRates, deps.ExchangeRateMaxAgeDays)

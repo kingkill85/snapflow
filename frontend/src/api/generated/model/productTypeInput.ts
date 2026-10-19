@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductTypeInputName } from './productTypeInputName';
+import type { ProductTypeInputTopology } from './productTypeInputTopology';
 
 export interface ProductTypeInput {
   /** A URL to the JSON Schema for this object. */
@@ -17,6 +18,8 @@ export interface ProductTypeInput {
   color?: string;
   /** 1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
   defaultBusCurrentMa?: number;
+  /** 1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
+  defaultWirelessPlacesUsed?: number;
   isActive: boolean;
   /** Lower snake case, 1-64 characters */
   key: string;
@@ -24,4 +27,6 @@ export interface ProductTypeInput {
   name: ProductTypeInputName;
   /** 0-90; default 20; on update, left out keeps the stored value (D294) */
   reservePercent?: number;
+  /** Default none; on update, left out keeps the stored value (D294) */
+  topology?: ProductTypeInputTopology;
 }

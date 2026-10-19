@@ -9,6 +9,7 @@ import type { AttributeOption } from './attributeOption';
 import type { CatalogFieldLabel } from './catalogFieldLabel';
 import type { CatalogFieldMeaning } from './catalogFieldMeaning';
 import type { CatalogFieldType } from './catalogFieldType';
+import type { FieldUser } from './fieldUser';
 
 export interface CatalogField {
   /** A URL to the JSON Schema for this object. */
@@ -18,9 +19,11 @@ export interface CatalogField {
   /** ETIM feature code, informational */
   etimFeature?: string;
   id: string;
+  /** Categories linking the field; while > 0 its key and type cannot change and it cannot be deleted */
+  inUse: number;
   key: string;
   label: CatalogFieldLabel;
-  /** Parameter of channel_limit_w */
+  /** Parameter of channel_limit_w (required) and channel_limit_a, channel_min_load_w, module_total_w (optional: empty = any load type) */
   loadTypeId?: string;
   /** What the value means for the checks; empty = just information */
   meaning?: CatalogFieldMeaning;
@@ -35,4 +38,6 @@ export interface CatalogField {
   unit?: string;
   /** Send it back as expectedUpdatedAt when updating */
   updatedAt: string;
+  /** The categories linking the field */
+  usedBy: FieldUser[];
 }

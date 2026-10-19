@@ -5,9 +5,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CatalogField } from './catalogField';
+import type { ImportColumnCategory } from './importColumnCategory';
 import type { ImportColumnStatus } from './importColumnStatus';
 
 export interface ImportColumn {
+  /** Existing categories (the fixed categoryId only, else all) that define the attribute key, with the link status */
+  categories: ImportColumnCategory[];
   /** Header text */
   column?: string;
   columnLetter?: string;

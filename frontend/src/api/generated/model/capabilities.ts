@@ -7,24 +7,29 @@
 import type { CapabilitiesMotorType } from './capabilitiesMotorType';
 import type { CapabilitiesMounting } from './capabilitiesMounting';
 import type { ChannelCapability } from './channelCapability';
+import type { Limit } from './limit';
 
 export interface Capabilities {
   busCurrentSuppliedMa?: number;
   busCurrentUsedMa?: number;
+  /** busCurrentUsedMa is the product type's default (the product has no value) */
+  busCurrentUsedMaDefault: boolean;
   busDevicesMax?: number;
   channels: ChannelCapability[];
   enclosureRows?: number;
   enclosureTePerRow?: number;
   /** Limit for the whole module (A) */
   moduleTotalA?: number;
-  /** Limit for the whole module (W) */
-  moduleTotalW?: number;
-  /** Motor type of blind outputs */
+  /** Limits for the whole module (W): one without a load type applies to any load */
+  moduleTotalsW: Limit[];
+  /** Motors the blind outputs drive (D310) */
   motorType?: CapabilitiesMotorType;
   mounting: CapabilitiesMounting;
   /** Width on the DIN rail in TE (17.5 mm), decimal */
   railWidthTe?: number;
   wirelessPlacesSupplied?: number;
   wirelessPlacesUsed?: number;
+  /** wirelessPlacesUsed is the product type's default (the product has no value) */
+  wirelessPlacesUsedDefault: boolean;
   zigbeeRouter?: boolean;
 }

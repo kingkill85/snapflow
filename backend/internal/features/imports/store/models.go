@@ -48,6 +48,11 @@ type Category struct {
 	Mounting           string
 }
 
+type CategoryFieldLink struct {
+	CategoryID uuid.UUID
+	FieldKey   string
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -156,15 +161,19 @@ type LoadType struct {
 }
 
 type OutputKind struct {
-	ID                uuid.UUID
-	Key               string
-	Name              i18n.Text
-	SortOrder         int32
-	IsActive          bool
-	AlternativeKindID *uuid.UUID
-	AlternativeCount  *int32
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID        uuid.UUID
+	Key       string
+	Name      i18n.Text
+	SortOrder int32
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type OutputKindAlternative struct {
+	OutputKindID uuid.UUID
+	FromKindID   uuid.UUID
+	Count        int32
 }
 
 type OutputKindFunctionType struct {
@@ -235,18 +244,20 @@ type Product struct {
 }
 
 type ProductType struct {
-	ID                  uuid.UUID
-	Key                 string
-	Name                i18n.Text
-	Color               *string
-	SortOrder           int32
-	IsActive            bool
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	Abbreviation        *string
-	DefaultBusCurrentMa *int32
-	ReservePercent      int32
-	BusDevicesMax       *int32
+	ID                        uuid.UUID
+	Key                       string
+	Name                      i18n.Text
+	Color                     *string
+	SortOrder                 int32
+	IsActive                  bool
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	Abbreviation              *string
+	DefaultBusCurrentMa       *int32
+	ReservePercent            int32
+	BusDevicesMax             *int32
+	Topology                  string
+	DefaultWirelessPlacesUsed *int32
 }
 
 type ProductVariant struct {

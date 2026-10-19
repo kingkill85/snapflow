@@ -652,6 +652,10 @@
             "format": "double",
             "type": "number"
           },
+          "busCurrentUsedMaDefault": {
+            "description": "busCurrentUsedMa is the product type's default (the product has no value)",
+            "type": "boolean"
+          },
           "busDevicesMax": {
             "format": "double",
             "type": "number"
@@ -675,13 +679,15 @@
             "format": "double",
             "type": "number"
           },
-          "moduleTotalW": {
-            "description": "Limit for the whole module (W)",
-            "format": "double",
-            "type": "number"
+          "moduleTotalsW": {
+            "description": "Limits for the whole module (W): one without a load type applies to any load",
+            "items": {
+              "$ref": "#/components/schemas/Limit"
+            },
+            "type": "array"
           },
           "motorType": {
-            "description": "Motor type of blind outputs",
+            "description": "Motors the blind outputs drive (D310)",
             "enum": [
               "ac",
               "dc"
@@ -709,13 +715,20 @@
             "format": "double",
             "type": "number"
           },
+          "wirelessPlacesUsedDefault": {
+            "description": "wirelessPlacesUsed is the product type's default (the product has no value)",
+            "type": "boolean"
+          },
           "zigbeeRouter": {
             "type": "boolean"
           }
         },
         "required": [
           "mounting",
-          "channels"
+          "channels",
+          "moduleTotalsW",
+          "busCurrentUsedMaDefault",
+          "wirelessPlacesUsedDefault"
         ],
         "type": "object"
       },
@@ -842,6 +855,11 @@
           "id": {
             "type": "string"
           },
+          "inUse": {
+            "description": "Categories linking the field; while \u003e 0 its key and type cannot change and it cannot be deleted",
+            "format": "int64",
+            "type": "integer"
+          },
           "key": {
             "examples": [
               "dimmer_outputs"
@@ -855,7 +873,7 @@
             "type": "object"
           },
           "loadTypeId": {
-            "description": "Parameter of channel_limit_w",
+            "description": "Parameter of channel_limit_w (required) and channel_limit_a, channel_min_load_w, module_total_w (optional: empty = any load type)",
             "type": "string"
           },
           "meaning": {
@@ -876,7 +894,8 @@
               "wireless_places_supplied",
               "wireless_place_used",
               "zigbee_router",
-              "motor_type"
+              "motor_type",
+              "alternative_allowed"
             ],
             "type": "string"
           },
@@ -922,6 +941,13 @@
             "description": "Send it back as expectedUpdatedAt when updating",
             "format": "date-time",
             "type": "string"
+          },
+          "usedBy": {
+            "description": "The categories linking the field",
+            "items": {
+              "$ref": "#/components/schemas/FieldUser"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -932,6 +958,8 @@
           "options",
           "productTypeIds",
           "sortOrder",
+          "inUse",
+          "usedBy",
           "createdAt",
           "updatedAt",
           "can"
@@ -970,7 +998,7 @@
             "type": "object"
           },
           "loadTypeId": {
-            "description": "Required by channel_limit_w, else not allowed",
+            "description": "Required by channel_limit_w, optional for channel_limit_a, channel_min_load_w and module_total_w, else not allowed",
             "type": "string"
           },
           "meaning": {
@@ -991,7 +1019,8 @@
               "wireless_places_supplied",
               "wireless_place_used",
               "zigbee_router",
-              "motor_type"
+              "motor_type",
+              "alternative_allowed"
             ],
             "type": "string"
           },
@@ -1097,7 +1126,7 @@
             "type": "object"
           },
           "loadTypeId": {
-            "description": "Required by channel_limit_w, else not allowed",
+            "description": "Required by channel_limit_w, optional for channel_limit_a, channel_min_load_w and module_total_w, else not allowed",
             "type": "string"
           },
           "meaning": {
@@ -1118,7 +1147,8 @@
               "wireless_places_supplied",
               "wireless_place_used",
               "zigbee_router",
-              "motor_type"
+              "motor_type",
+              "alternative_allowed"
             ],
             "type": "string"
           },
@@ -1533,7 +1563,7 @@
         "additionalProperties": false,
         "properties": {
           "max": {
-            "description": "How many of that kind these channels give at most",
+            "description": "How many of that kind these channels give at most: floor(count / per)",
             "format": "int64",
             "type": "integer"
           },
@@ -1544,7 +1574,7 @@
             "type": "string"
           },
           "per": {
-            "description": "Channels used for one",
+            "description": "Channels used for one (a fixed group: 1..per, per+1..2*per, ...)",
             "format": "int64",
             "type": "integer"
           }
@@ -1561,7 +1591,7 @@
         "additionalProperties": false,
         "properties": {
           "alternatives": {
-            "description": "Other kinds these channels can act as, per group of channels",
+            "description": "Other kinds these channels can act as (the product opts in), in fixed groups of per channels",
             "items": {
               "$ref": "#/components/schemas/ChannelAlternative"
             },
@@ -1571,22 +1601,26 @@
             "format": "int64",
             "type": "integer"
           },
-          "limitA": {
-            "description": "Max A per channel",
-            "format": "double",
-            "type": "number"
+          "limitsA": {
+            "description": "Max A per channel; one without a load type applies to any load",
+            "items": {
+              "$ref": "#/components/schemas/Limit"
+            },
+            "type": "array"
           },
           "limitsW": {
             "description": "Max W per channel by load type",
             "items": {
-              "$ref": "#/components/schemas/LoadLimit"
+              "$ref": "#/components/schemas/Limit"
             },
             "type": "array"
           },
-          "minLoadW": {
-            "description": "Minimum load per channel (W)",
-            "format": "double",
-            "type": "number"
+          "minLoadsW": {
+            "description": "Minimum load per channel (W); one without a load type applies to any load",
+            "items": {
+              "$ref": "#/components/schemas/Limit"
+            },
+            "type": "array"
           },
           "outputKindId": {
             "type": "string"
@@ -1600,6 +1634,8 @@
           "outputKindKey",
           "count",
           "limitsW",
+          "limitsA",
+          "minLoadsW",
           "alternatives"
         ],
         "type": "object"
@@ -1867,6 +1903,29 @@
         "required": [
           "location",
           "code"
+        ],
+        "type": "object"
+      },
+      "FieldUser": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
         ],
         "type": "object"
       },
@@ -2334,6 +2393,13 @@
       "ImportColumn": {
         "additionalProperties": false,
         "properties": {
+          "categories": {
+            "description": "Existing categories (the fixed categoryId only, else all) that define the attribute key, with the link status",
+            "items": {
+              "$ref": "#/components/schemas/ImportColumnCategory"
+            },
+            "type": "array"
+          },
           "column": {
             "description": "Header text",
             "type": "string"
@@ -2377,7 +2443,8 @@
           "fieldIndex",
           "target",
           "key",
-          "status"
+          "status",
+          "categories"
         ],
         "type": "object"
       },
@@ -2387,6 +2454,11 @@
           "field": {
             "$ref": "#/components/schemas/CatalogFieldInput",
             "description": "Create this catalog field and link the column to it"
+          },
+          "fieldKey": {
+            "description": "Link the column to this existing catalog field (import.answer_field_not_found if there is none)",
+            "maxLength": 64,
+            "type": "string"
           },
           "information": {
             "description": "Just information: no catalog field",
@@ -2429,6 +2501,49 @@
         "required": [
           "mapping",
           "answers"
+        ],
+        "type": "object"
+      },
+      "ImportColumnCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "attributeType": {
+            "description": "The attribute's value type",
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "fieldKey": {
+            "description": "The catalog field the attribute links, if any",
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "linked",
+              "will_link",
+              "type_mismatch",
+              "other_field",
+              "unlinked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "categoryId",
+          "key",
+          "name",
+          "attributeType",
+          "status"
         ],
         "type": "object"
       },
@@ -2525,7 +2640,7 @@
           },
           "categories": {
             "$ref": "#/components/schemas/ImportCounter",
-            "description": "Only new: categories to create"
+            "description": "new: categories to create; changed: existing categories whose attributes get linked to catalog fields"
           },
           "errors": {
             "format": "int64",
@@ -3643,6 +3758,26 @@
         },
         "type": "object"
       },
+      "Limit": {
+        "additionalProperties": false,
+        "properties": {
+          "loadTypeId": {
+            "description": "Empty = any load type",
+            "type": "string"
+          },
+          "loadTypeKey": {
+            "type": "string"
+          },
+          "value": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
       "LineQuantities": {
         "additionalProperties": false,
         "properties": {
@@ -3681,27 +3816,6 @@
           "zones",
           "unzoned",
           "manual"
-        ],
-        "type": "object"
-      },
-      "LoadLimit": {
-        "additionalProperties": false,
-        "properties": {
-          "loadTypeId": {
-            "type": "string"
-          },
-          "loadTypeKey": {
-            "type": "string"
-          },
-          "maxW": {
-            "format": "double",
-            "type": "number"
-          }
-        },
-        "required": [
-          "loadTypeId",
-          "loadTypeKey",
-          "maxW"
         ],
         "type": "object"
       },
@@ -4144,11 +4258,22 @@
         "additionalProperties": false,
         "properties": {
           "loadType": {
-            "description": "Needs a load type (loadTypeId)",
+            "description": "Takes a load type (loadTypeId); required only with loadTypeRequired",
+            "type": "boolean"
+          },
+          "loadTypeRequired": {
+            "description": "The load type is required",
             "type": "boolean"
           },
           "meaning": {
             "type": "string"
+          },
+          "options": {
+            "description": "Enum fields: the option keys the field must have, exactly (motor_type: ac, dc)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "outputKind": {
             "description": "Needs an output kind (outputKindId)",
@@ -4166,7 +4291,9 @@
           "meaning",
           "outputKind",
           "loadType",
-          "types"
+          "loadTypeRequired",
+          "types",
+          "options"
         ],
         "type": "object"
       },
@@ -4521,9 +4648,12 @@
             "readOnly": true,
             "type": "string"
           },
-          "alternative": {
-            "$ref": "#/components/schemas/OutputKindAlternative",
-            "description": "N channels of another kind act as one of this kind (e.g. 2 relay outputs = 1 blind output)"
+          "alternatives": {
+            "description": "Channels of other kinds that can act as one of this kind (e.g. 2 relay outputs = 1 blind output), in fixed groups; products opt in with a field of meaning alternative_allowed",
+            "items": {
+              "$ref": "#/components/schemas/OutputKindAlternative"
+            },
+            "type": "array"
           },
           "can": {
             "$ref": "#/components/schemas/Actions"
@@ -4574,6 +4704,7 @@
           "sortOrder",
           "isActive",
           "functionTypeIds",
+          "alternatives",
           "createdAt",
           "updatedAt",
           "can"
@@ -4584,13 +4715,14 @@
         "additionalProperties": false,
         "properties": {
           "count": {
-            "description": "How many channels of that kind make one of this kind",
+            "description": "How many channels of that kind make one of this kind (fixed groups: 1+2, 3+4, ...)",
             "format": "int32",
             "maximum": 16,
             "minimum": 1,
             "type": "integer"
           },
           "outputKindId": {
+            "description": "The kind whose channels act as this kind",
             "type": "string"
           }
         },
@@ -4612,12 +4744,16 @@
             "readOnly": true,
             "type": "string"
           },
-          "alternative": {
-            "$ref": "#/components/schemas/OutputKindAlternative",
-            "description": "Leave out for none"
+          "alternatives": {
+            "description": "Each other kind once; left out = none (lists of new endpoints are replaced, D306)",
+            "items": {
+              "$ref": "#/components/schemas/OutputKindAlternative"
+            },
+            "maxItems": 50,
+            "type": "array"
           },
           "functionTypeIds": {
-            "description": "Function types it serves (existing ones, each once)",
+            "description": "Function types it serves (existing ones, each once); left out = none",
             "items": {
               "type": "string"
             },
@@ -4685,9 +4821,13 @@
             "readOnly": true,
             "type": "string"
           },
-          "alternative": {
-            "$ref": "#/components/schemas/OutputKindAlternative",
-            "description": "Leave out for none"
+          "alternatives": {
+            "description": "Each other kind once; left out = none (lists of new endpoints are replaced, D306)",
+            "items": {
+              "$ref": "#/components/schemas/OutputKindAlternative"
+            },
+            "maxItems": 50,
+            "type": "array"
           },
           "expectedUpdatedAt": {
             "description": "updatedAt as last read; if it changed since, the update fails with output_kind.stale",
@@ -4695,7 +4835,7 @@
             "type": "string"
           },
           "functionTypeIds": {
-            "description": "Function types it serves (existing ones, each once)",
+            "description": "Function types it serves (existing ones, each once); left out = none",
             "items": {
               "type": "string"
             },
@@ -5927,6 +6067,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "defaultWirelessPlacesUsed": {
+            "description": "Wireless places a device of this system uses without its own value (wireless topology); empty = unknown",
+            "format": "int32",
+            "type": "integer"
+          },
           "id": {
             "type": "string"
           },
@@ -5958,6 +6103,15 @@
             "format": "int32",
             "type": "integer"
           },
+          "topology": {
+            "description": "How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none",
+            "enum": [
+              "bus",
+              "wireless",
+              "none"
+            ],
+            "type": "string"
+          },
           "updatedAt": {
             "description": "Send it back as expectedUpdatedAt when updating",
             "format": "date-time",
@@ -5971,6 +6125,7 @@
           "sortOrder",
           "isActive",
           "reservePercent",
+          "topology",
           "createdAt",
           "updatedAt",
           "can"
@@ -6013,6 +6168,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "defaultWirelessPlacesUsed": {
+            "description": "1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)",
+            "format": "int32",
+            "type": "integer"
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -6034,6 +6194,15 @@
             "description": "0-90; default 20; on update, left out keeps the stored value (D294)",
             "format": "int32",
             "type": "integer"
+          },
+          "topology": {
+            "description": "Default none; on update, left out keeps the stored value (D294)",
+            "enum": [
+              "bus",
+              "wireless",
+              "none"
+            ],
+            "type": "string"
           }
         },
         "required": [
@@ -6164,6 +6333,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "defaultWirelessPlacesUsed": {
+            "description": "1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)",
+            "format": "int32",
+            "type": "integer"
+          },
           "expectedUpdatedAt": {
             "description": "updatedAt of the product type as last read; if it changed since, the update fails with product_type.stale",
             "format": "date-time",
@@ -6190,6 +6364,15 @@
             "description": "0-90; default 20; on update, left out keeps the stored value (D294)",
             "format": "int32",
             "type": "integer"
+          },
+          "topology": {
+            "description": "Default none; on update, left out keeps the stored value (D294)",
+            "enum": [
+              "bus",
+              "wireless",
+              "none"
+            ],
+            "type": "string"
           }
         },
         "required": [
@@ -8061,18 +8244,6 @@
       "get": {
         "description": "In catalog order (sortOrder, then key).",
         "operationId": "listCatalogFields",
-        "parameters": [
-          {
-            "description": "Also list inactive entries",
-            "explode": false,
-            "in": "query",
-            "name": "includeInactive",
-            "schema": {
-              "description": "Also list inactive entries",
-              "type": "boolean"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {

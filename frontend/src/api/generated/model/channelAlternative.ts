@@ -6,10 +6,10 @@
  */
 
 export interface ChannelAlternative {
-  /** How many of that kind these channels give at most */
+  /** How many of that kind these channels give at most: floor(count / per) */
   max: number;
   outputKindId: string;
   outputKindKey: string;
-  /** Channels used for one */
+  /** Channels used for one (a fixed group: 1..per, per+1..2*per, ...) */
   per: number;
 }

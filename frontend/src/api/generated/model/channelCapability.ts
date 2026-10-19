@@ -5,18 +5,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChannelAlternative } from './channelAlternative';
-import type { LoadLimit } from './loadLimit';
+import type { Limit } from './limit';
 
 export interface ChannelCapability {
-  /** Other kinds these channels can act as, per group of channels */
+  /** Other kinds these channels can act as (the product opts in), in fixed groups of per channels */
   alternatives: ChannelAlternative[];
   count: number;
-  /** Max A per channel */
-  limitA?: number;
+  /** Max A per channel; one without a load type applies to any load */
+  limitsA: Limit[];
   /** Max W per channel by load type */
-  limitsW: LoadLimit[];
-  /** Minimum load per channel (W) */
-  minLoadW?: number;
+  limitsW: Limit[];
+  /** Minimum load per channel (W); one without a load type applies to any load */
+  minLoadsW: Limit[];
   outputKindId: string;
   outputKindKey: string;
 }

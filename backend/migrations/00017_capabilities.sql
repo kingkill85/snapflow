@@ -1,6 +1,6 @@
 -- +goose Up
 -- Step 3a, catalog capabilities (D187-D191, D284-): load types, output kinds
--- with the function types they serve and an optional alternative ("2 relay
+-- with the function types they serve and their alternatives ("2 relay
 -- outputs act as 1 blind output"), the catalog-wide field registry with
 -- meanings for the checks, mounting per category with a product override,
 -- and the system settings of product types. Global catalog configuration:
@@ -19,23 +19,31 @@ CREATE TABLE load_types (
 );
 
 -- Output kinds: the kinds of channel a module supplies (dimmer output, relay
--- output, ...). "alternative_count of alternative_kind act as 1 of this
--- kind": e.g. blind output <- 2 relay outputs.
+-- output, ...).
 CREATE TABLE output_kinds (
-    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    key                 text NOT NULL UNIQUE CHECK (key ~ '^[a-z][a-z0-9_]*$' AND char_length(key) <= 64),
-    name                jsonb NOT NULL,
-    sort_order          integer NOT NULL,
-    is_active           boolean NOT NULL DEFAULT true,
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    key        text NOT NULL UNIQUE CHECK (key ~ '^[a-z][a-z0-9_]*$' AND char_length(key) <= 64),
+    name       jsonb NOT NULL,
+    sort_order integer NOT NULL,
+    is_active  boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Alternatives of an output kind: "count channels of from_kind act as one
+-- of output_kind" (blind output <- 2 relay outputs, as fixed pairs 1+2,
+-- 3+4, ...; D303). A product uses them only where it opts in (meaning
+-- alternative_allowed).
+CREATE TABLE output_kind_alternatives (
+    output_kind_id uuid NOT NULL REFERENCES output_kinds (id) ON DELETE CASCADE,
     -- RESTRICT: a kind another kind names as its alternative cannot be
     -- deleted (output_kind.in_use).
-    alternative_kind_id uuid REFERENCES output_kinds (id) ON DELETE RESTRICT,
-    alternative_count   integer CHECK (alternative_count BETWEEN 1 AND 16),
-    created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
-    CHECK ((alternative_kind_id IS NULL) = (alternative_count IS NULL)),
-    CHECK (alternative_kind_id <> id)
+    from_kind_id   uuid NOT NULL REFERENCES output_kinds (id) ON DELETE RESTRICT,
+    count          integer NOT NULL CHECK (count BETWEEN 1 AND 16),
+    PRIMARY KEY (output_kind_id, from_kind_id),
+    CHECK (output_kind_id <> from_kind_id)
 );
+CREATE INDEX output_kind_alternatives_from_idx ON output_kind_alternatives (from_kind_id);
 
 -- The function types an output kind serves (a need of that function can be
 -- connected to a channel of that kind).
@@ -79,7 +87,8 @@ CREATE TABLE catalog_fields (
         'module_total_a', 'module_total_w',
         'bus_current_used_ma', 'bus_current_supplied_ma', 'bus_devices_max',
         'rail_width_te', 'enclosure_rows', 'enclosure_te_per_row',
-        'wireless_places_supplied', 'wireless_place_used', 'zigbee_router', 'motor_type')),
+        'wireless_places_supplied', 'wireless_place_used', 'zigbee_router', 'motor_type',
+        'alternative_allowed')),
     -- Parameters of the meaning. RESTRICT: output_kind.in_use / load_type.in_use.
     output_kind_id uuid REFERENCES output_kinds (id) ON DELETE RESTRICT,
     load_type_id   uuid REFERENCES load_types (id) ON DELETE RESTRICT,
@@ -89,6 +98,17 @@ CREATE TABLE catalog_fields (
 );
 CREATE INDEX catalog_fields_output_kind_idx ON catalog_fields (output_kind_id);
 CREATE INDEX catalog_fields_load_type_idx ON catalog_fields (load_type_id);
+
+-- The catalog fields category attributes link (attributes[].fieldKey),
+-- maintained by the categories service with each category save (D305).
+-- RESTRICT on key update and delete makes catalog_field.in_use real, also
+-- against a concurrent link.
+CREATE TABLE category_field_links (
+    category_id uuid NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+    field_key   text NOT NULL REFERENCES catalog_fields (key) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    PRIMARY KEY (category_id, field_key)
+);
+CREATE INDEX category_field_links_field_key_idx ON category_field_links (field_key);
 
 -- The product types a field's meaning is limited to (none = all, D191).
 CREATE TABLE catalog_field_product_types (
@@ -109,7 +129,11 @@ ALTER TABLE products ADD COLUMN mounting text CHECK (mounting IN ('floorplan', '
 ALTER TABLE product_types
     ADD COLUMN default_bus_current_ma integer CHECK (default_bus_current_ma BETWEEN 1 AND 100000),
     ADD COLUMN reserve_percent integer NOT NULL DEFAULT 20 CHECK (reserve_percent BETWEEN 0 AND 90),
-    ADD COLUMN bus_devices_max integer CHECK (bus_devices_max BETWEEN 1 AND 100000);
+    ADD COLUMN bus_devices_max integer CHECK (bus_devices_max BETWEEN 1 AND 100000),
+    -- How devices of the system connect: a bus (KNX, HDL), wireless
+    -- (Zigbee) or neither; selects the defaults below (D304).
+    ADD COLUMN topology text NOT NULL DEFAULT 'none' CHECK (topology IN ('bus', 'wireless', 'none')),
+    ADD COLUMN default_wireless_places_used integer CHECK (default_wireless_places_used BETWEEN 1 AND 1000);
 
 -- Seeds (spec 3a).
 INSERT INTO load_types (key, name, sort_order) VALUES
@@ -129,9 +153,9 @@ INSERT INTO output_kinds (key, name, sort_order) VALUES
     ('input', '{"en": "Input", "de": "Eingang"}', 4),
     ('dali_output', '{"en": "DALI output", "de": "DALI-Ausgang"}', 5),
     ('analog_0_10v_output', '{"en": "0–10 V output", "de": "0–10-V-Ausgang"}', 6);
--- 2 relay outputs act as 1 blind output (mixed use per pair).
-UPDATE output_kinds SET alternative_kind_id = (SELECT id FROM output_kinds WHERE key = 'relay_output'), alternative_count = 2
-WHERE key = 'blind_output';
+-- 2 relay outputs act as 1 blind output (fixed pairs; products opt in).
+INSERT INTO output_kind_alternatives (output_kind_id, from_kind_id, count)
+SELECT b.id, r.id, 2 FROM output_kinds b, output_kinds r WHERE b.key = 'blind_output' AND r.key = 'relay_output';
 
 -- Served function types and circuit flags, for the function type keys that
 -- exist (function types are admin data; none are seeded).
@@ -162,13 +186,16 @@ JOIN function_types f ON f.key = s.function
 JOIN load_types l ON l.key = s.load;
 
 -- +goose Down
-ALTER TABLE product_types DROP COLUMN default_bus_current_ma, DROP COLUMN reserve_percent, DROP COLUMN bus_devices_max;
+ALTER TABLE product_types DROP COLUMN default_bus_current_ma, DROP COLUMN reserve_percent, DROP COLUMN bus_devices_max,
+    DROP COLUMN topology, DROP COLUMN default_wireless_places_used;
 ALTER TABLE products DROP COLUMN mounting;
 ALTER TABLE categories DROP COLUMN mounting;
 DROP TABLE catalog_field_product_types;
+DROP TABLE category_field_links;
 DROP TABLE catalog_fields;
 DROP TABLE function_type_load_types;
 ALTER TABLE function_types DROP COLUMN allows_circuit;
 DROP TABLE output_kind_function_types;
+DROP TABLE output_kind_alternatives;
 DROP TABLE output_kinds;
 DROP TABLE load_types;

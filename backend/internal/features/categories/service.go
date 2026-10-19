@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -100,10 +101,112 @@ func (s *Service) WithTx(tx pgx.Tx) *Service {
 	return NewService(database.NewNested(tx), s.fields.WithTx(tx))
 }
 
-// FieldInUse reports whether a category attribute links the catalog field
-// key (capabilities.FieldUsage).
-func (s *Service) FieldInUse(ctx context.Context, key string) (bool, error) {
-	return s.q.FieldInUse(ctx, key)
+// FieldUsers returns the categories linking each catalog field key, read in
+// tx when given (capabilities.FieldUsage).
+func (s *Service) FieldUsers(ctx context.Context, tx pgx.Tx) (map[string][]capabilities.FieldUser, error) {
+	q := s.q
+	if tx != nil {
+		q = q.WithTx(tx)
+	}
+	rows, err := q.FieldUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]capabilities.FieldUser{}
+	for _, r := range rows {
+		out[r.FieldKey] = append(out[r.FieldKey], capabilities.FieldUser{ID: r.ID, Key: r.Key, Name: r.Name})
+	}
+	return out, nil
+}
+
+// LinkFields links attributes of an existing category to catalog fields
+// (attribute key -> field key; the import, D313): product and instance
+// attributes with that key and no link yet get the field when the types
+// match (attribute.field_type otherwise). Runs in its own transaction, or
+// in the caller's through WithTx.
+func (s *Service) LinkFields(ctx context.Context, id uuid.UUID, links map[string]string) error {
+	if _, err := auth.Require(ctx, auth.PermCatalogWrite); err != nil {
+		return err
+	}
+	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		row, err := q.LockCategory(ctx, id)
+		if err != nil {
+			return mapErr(err, "")
+		}
+		attrs := slices.Clone(row.Attributes)
+		inst := slices.Clone(row.InstanceAttributes)
+		for i := range attrs {
+			if k, ok := links[attrs[i].Key]; ok && attrs[i].FieldKey == "" {
+				attrs[i].FieldKey = k
+			}
+		}
+		for i := range inst {
+			if k, ok := links[inst[i].Key]; ok && inst[i].FieldKey == "" {
+				inst[i].FieldKey = k
+			}
+		}
+		in := CategoryInput{Attributes: attrs, InstanceAttributes: inst}
+		if err := s.linkLocked(ctx, tx, &in); err != nil {
+			return err
+		}
+		if _, err := q.SetCategoryAttributes(ctx, store.SetCategoryAttributesParams{ID: id, Attributes: in.Attributes,
+			InstanceAttributes: in.InstanceAttributes}); err != nil {
+			return err
+		}
+		return syncLinks(ctx, q, id, in)
+	})
+}
+
+// linkLocked locks the fields in links (FOR SHARE: their key and type cannot
+// change until tx ends, D305) and applies them; problems are a validation
+// error.
+func (s *Service) linkLocked(ctx context.Context, tx pgx.Tx, in *CategoryInput) error {
+	keys := linkedKeys(*in)
+	if len(keys) == 0 {
+		return nil
+	}
+	fields, err := s.fields.WithTx(tx).LockFields(ctx, keys)
+	if err != nil {
+		return err
+	}
+	if errs := applyLinks(in, fields); len(errs) > 0 {
+		return apperr.Validation(errs...)
+	}
+	return nil
+}
+
+// syncLinks stores the fields the category links (category_field_links).
+func syncLinks(ctx context.Context, q *store.Queries, id uuid.UUID, in CategoryInput) error {
+	if err := q.DeleteFieldLinks(ctx, id); err != nil {
+		return err
+	}
+	keys := linkedKeys(in)
+	if len(keys) == 0 {
+		return nil
+	}
+	err := q.InsertFieldLinks(ctx, store.InsertFieldLinksParams{CategoryID: id, FieldKeys: keys})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return apperr.Validation(apperr.Field("body.attributes", "attribute.field_not_found", "a linked catalog field no longer exists"))
+	}
+	return err
+}
+
+func linkedKeys(in CategoryInput) []string {
+	var keys []string
+	for _, a := range in.Attributes {
+		if k := strings.TrimSpace(a.FieldKey); k != "" && !slices.Contains(keys, k) {
+			keys = append(keys, k)
+		}
+	}
+	for _, a := range in.InstanceAttributes {
+		if k := strings.TrimSpace(a.FieldKey); k != "" && !slices.Contains(keys, k) {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // inTx runs fn in one transaction; any error rolls it back. A transaction
@@ -125,7 +228,11 @@ func (s *Service) List(ctx context.Context, includeInactive bool) ([]Category, e
 	if err != nil {
 		return nil, err
 	}
-	return fromRows(actor, rows), nil
+	fields, err := s.fields.FieldsByKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fromRows(actor, rows, fields), nil
 }
 
 // Get returns a category, active or not.
@@ -138,7 +245,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Category, error) {
 	if err != nil {
 		return Category{}, mapErr(err, "")
 	}
-	return fromRow(actor, row), nil
+	return s.out(ctx, actor, row)
 }
 
 // Create adds a category at the end of the order.
@@ -152,7 +259,11 @@ func (s *Service) Create(ctx context.Context, in CategoryInput) (Category, error
 		return Category{}, err
 	}
 	var row store.Category
-	err = s.inTx(ctx, func(q *store.Queries) error {
+	err = database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		if err := s.linkLocked(ctx, tx, &in); err != nil {
+			return err
+		}
 		if err := q.LockCategoryOrder(ctx, orderLockKey); err != nil {
 			return err
 		}
@@ -161,12 +272,15 @@ func (s *Service) Create(ctx context.Context, in CategoryInput) (Category, error
 			IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
 			Mounting: in.Mounting,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return syncLinks(ctx, q, row.ID, in)
 	})
 	if err != nil {
 		return Category{}, mapErr(err, in.Key)
 	}
-	return fromRow(actor, row), nil
+	return s.out(ctx, actor, row)
 }
 
 // Update replaces a category; its position stays. It fails with
@@ -193,14 +307,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 		return Category{}, err
 	}
 	var row store.Category
-	err = s.inTx(ctx, func(q *store.Queries) error {
+	err = database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		if err := s.linkLocked(ctx, tx, &in.CategoryInput); err != nil {
+			return err
+		}
 		var err error
 		row, err = q.UpdateCategory(ctx, store.UpdateCategoryParams{
 			ID: id, Key: in.Key, Name: in.Name, Description: textPtr(in.Description),
 			IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
 			Mounting: in.Mounting, ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return syncLinks(ctx, q, id, in.CategoryInput)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		exists, err := s.q.CategoryExists(ctx, id)
@@ -215,7 +336,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 	if err != nil {
 		return Category{}, mapErr(err, in.Key)
 	}
-	return fromRow(actor, row), nil
+	return s.out(ctx, actor, row)
 }
 
 // Delete removes a category. Categories that products use cannot be deleted
@@ -268,7 +389,11 @@ func (s *Service) Reorder(ctx context.Context, ids []uuid.UUID) ([]Category, err
 	if err != nil {
 		return nil, err
 	}
-	return fromRows(actor, rows), nil
+	fields, err := s.fields.FieldsByKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fromRows(actor, rows, fields), nil
 }
 
 // sameSet reports whether ids holds every id of existing exactly once.
@@ -330,24 +455,23 @@ func (s *Service) validate(ctx context.Context, in CategoryInput) (CategoryInput
 	return in, nil
 }
 
-// linkFields applies the catalog fields that attributes link: the type must
-// be the field's (attribute.field_type), unit and options come from the
-// field; an unknown key is attribute.field_not_found.
+// linkFields checks the links against the current fields (so every problem
+// shows at once); the save checks them again under lock (linkLocked).
 func (s *Service) linkFields(ctx context.Context, in *CategoryInput) ([]apperr.FieldError, error) {
-	linked := false
-	for _, a := range in.Attributes {
-		linked = linked || strings.TrimSpace(a.FieldKey) != ""
-	}
-	for _, a := range in.InstanceAttributes {
-		linked = linked || strings.TrimSpace(a.FieldKey) != ""
-	}
-	if !linked {
+	if len(linkedKeys(*in)) == 0 {
 		return nil, nil
 	}
 	fields, err := s.fields.FieldsByKey(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return applyLinks(in, fields), nil
+}
+
+// applyLinks applies the catalog fields that attributes link: the type must
+// be the field's (attribute.field_type), unit and options come from the
+// field; an unknown key is attribute.field_not_found.
+func applyLinks(in *CategoryInput, fields map[string]capabilities.CatalogField) []apperr.FieldError {
 	var errs []apperr.FieldError
 	link := func(d *attrschema.Definition, loc string) {
 		d.FieldKey = strings.TrimSpace(d.FieldKey)
@@ -364,8 +488,7 @@ func (s *Service) linkFields(ctx context.Context, in *CategoryInput) ([]apperr.F
 				With("expected", string(f.Type)).With("key", f.Key))
 			return
 		}
-		linkedDef := f.Definition(d.Key)
-		d.Unit, d.Options = linkedDef.Unit, linkedDef.Options
+		resolve(d, f)
 	}
 	for i := range in.Attributes {
 		link(&in.Attributes[i].Definition, fmt.Sprintf("body.attributes[%d]", i))
@@ -373,7 +496,50 @@ func (s *Service) linkFields(ctx context.Context, in *CategoryInput) ([]apperr.F
 	for i := range in.InstanceAttributes {
 		link(&in.InstanceAttributes[i].Definition, fmt.Sprintf("body.instanceAttributes[%d]", i))
 	}
-	return errs, nil
+	return errs
+}
+
+// resolve gives a linked attribute the field's type, unit and options (the
+// stored copy is only a fallback: reads resolve from the field, D308).
+func resolve(d *attrschema.Definition, f capabilities.CatalogField) {
+	linked := f.Definition(d.Key)
+	d.Type, d.Unit, d.Options = linked.Type, linked.Unit, linked.Options
+}
+
+// resolveSchema returns a copy of schema with linked attributes resolved.
+func resolveSchema(schema attrschema.Schema, fields map[string]capabilities.CatalogField) attrschema.Schema {
+	if schema == nil {
+		return schema
+	}
+	out := slices.Clone(schema)
+	for i := range out {
+		if f, ok := fields[out[i].FieldKey]; ok && out[i].FieldKey != "" {
+			resolve(&out[i].Definition, f)
+		}
+	}
+	return out
+}
+
+func resolveInstance(schema attrschema.InstanceSchema, fields map[string]capabilities.CatalogField) attrschema.InstanceSchema {
+	if schema == nil {
+		return schema
+	}
+	out := slices.Clone(schema)
+	for i := range out {
+		if f, ok := fields[out[i].FieldKey]; ok && out[i].FieldKey != "" {
+			resolve(&out[i].Definition, f)
+		}
+	}
+	return out
+}
+
+// out is a row for the API, linked attributes resolved from their fields.
+func (s *Service) out(ctx context.Context, actor auth.Actor, r store.Category) (Category, error) {
+	fields, err := s.fields.FieldsByKey(ctx)
+	if err != nil {
+		return Category{}, err
+	}
+	return fromRow(actor, r, fields), nil
 }
 
 func textPtr(t i18n.Text) *i18n.Text {
@@ -399,19 +565,19 @@ func mapErr(err error, key string) error {
 	return err
 }
 
-func fromRows(actor auth.Actor, rows []store.Category) []Category {
+func fromRows(actor auth.Actor, rows []store.Category, fields map[string]capabilities.CatalogField) []Category {
 	out := make([]Category, len(rows))
 	for i, r := range rows {
-		out[i] = fromRow(actor, r)
+		out[i] = fromRow(actor, r, fields)
 	}
 	return out
 }
 
-func fromRow(actor auth.Actor, r store.Category) Category {
+func fromRow(actor auth.Actor, r store.Category, fields map[string]capabilities.CatalogField) Category {
 	write := actor.Can(auth.PermCatalogWrite)
 	c := Category{
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
-		Attributes: r.Attributes, InstanceAttributes: r.InstanceAttributes, Mounting: r.Mounting,
+		Attributes: resolveSchema(r.Attributes, fields), InstanceAttributes: resolveInstance(r.InstanceAttributes, fields), Mounting: r.Mounting,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Can: auth.Actions{Update: write, Delete: write},
 	}

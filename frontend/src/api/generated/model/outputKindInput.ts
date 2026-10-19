@@ -10,10 +10,13 @@ import type { OutputKindInputName } from './outputKindInputName';
 export interface OutputKindInput {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** Leave out for none */
-  alternative?: OutputKindAlternative;
   /**
-     * Function types it serves (existing ones, each once)
+     * Each other kind once; left out = none (lists of new endpoints are replaced, D306)
+     * @maxItems 50
+     */
+  alternatives?: OutputKindAlternative[];
+  /**
+     * Function types it serves (existing ones, each once); left out = none
      * @maxItems 200
      */
   functionTypeIds?: string[];

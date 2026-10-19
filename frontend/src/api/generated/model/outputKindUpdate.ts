@@ -10,12 +10,15 @@ import type { OutputKindUpdateName } from './outputKindUpdateName';
 export interface OutputKindUpdate {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** Leave out for none */
-  alternative?: OutputKindAlternative;
+  /**
+     * Each other kind once; left out = none (lists of new endpoints are replaced, D306)
+     * @maxItems 50
+     */
+  alternatives?: OutputKindAlternative[];
   /** updatedAt as last read; if it changed since, the update fails with output_kind.stale */
   expectedUpdatedAt: string;
   /**
-     * Function types it serves (existing ones, each once)
+     * Function types it serves (existing ones, each once); left out = none
      * @maxItems 200
      */
   functionTypeIds?: string[];

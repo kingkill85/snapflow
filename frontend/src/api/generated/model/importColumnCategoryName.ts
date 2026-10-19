@@ -5,8 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LoadLimit {
-  loadTypeId: string;
-  loadTypeKey: string;
-  maxW: number;
-}
+export type ImportColumnCategoryName = {[key: string]: string};

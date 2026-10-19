@@ -16,11 +16,15 @@ type Querier interface {
 	// creates never get the same sort order).
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	DeleteCategory(ctx context.Context, id uuid.UUID) (int64, error)
-	// FieldInUse reports whether any category attribute (product or instance)
-	// links the catalog field key.
-	FieldInUse(ctx context.Context, fieldKey string) (bool, error)
+	DeleteFieldLinks(ctx context.Context, categoryID uuid.UUID) error
+	// FieldUsers lists the categories linking each catalog field key.
+	FieldUsers(ctx context.Context) ([]FieldUsersRow, error)
 	GetCategory(ctx context.Context, id uuid.UUID) (Category, error)
+	// InsertFieldLinks stores the fields a category links (its save keeps them
+	// in step with attributes[].fieldKey, D305).
+	InsertFieldLinks(ctx context.Context, arg InsertFieldLinksParams) error
 	ListCategories(ctx context.Context, includeInactive bool) ([]Category, error)
+	LockCategory(ctx context.Context, id uuid.UUID) (Category, error)
 	// LockCategoryIDs locks every category row for a reorder, so none can
 	// be deleted or reordered underneath it; new rows are kept out by
 	// LockCategoryOrder, which the caller takes first.
@@ -28,6 +32,7 @@ type Querier interface {
 	// LockCategoryOrder serialises everything that assigns sort orders
 	// (create, reorder) until the transaction ends.
 	LockCategoryOrder(ctx context.Context, lockKey int64) error
+	SetCategoryAttributes(ctx context.Context, arg SetCategoryAttributesParams) (Category, error)
 	// SetCategoryOrder gives the ids sort orders 1..n in the given order.
 	SetCategoryOrder(ctx context.Context, ids []uuid.UUID) error
 	// UpdateCategory changes the category only if nobody else has since it was

@@ -29,7 +29,6 @@ import type {
   CatalogFieldList,
   CatalogFieldUpdate,
   Error,
-  ListCatalogFieldsParams,
   MeaningList,
   Order
 } from '../model';
@@ -180,14 +179,13 @@ export function useListCatalogFieldMeanings<TData = Awaited<ReturnType<typeof li
  * @summary List catalog fields
  */
 export const listCatalogFields = (
-    params?: ListCatalogFieldsParams,
+
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<CatalogFieldList>(
-      {url: `/api/catalog-fields`, method: 'GET',
-        params, signal
+      {url: `/api/catalog-fields`, method: 'GET', signal
     },
       );
     }
@@ -195,23 +193,23 @@ export const listCatalogFields = (
 
 
 
-export const getListCatalogFieldsQueryKey = (params?: ListCatalogFieldsParams,) => {
+export const getListCatalogFieldsQueryKey = () => {
     return [
-    `/api/catalog-fields`, ...(params ? [params] : [])
+    `/api/catalog-fields`
     ] as const;
     }
 
 
-export const getListCatalogFieldsQueryOptions = <TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>(params?: ListCatalogFieldsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
+export const getListCatalogFieldsQueryOptions = <TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCatalogFieldsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListCatalogFieldsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCatalogFields>>> = ({ signal }) => listCatalogFields(params, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCatalogFields>>> = ({ signal }) => listCatalogFields(signal);
 
 
 
@@ -225,7 +223,7 @@ export type ListCatalogFieldsQueryError = ErrorType<Error>
 
 
 export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>(
- params: undefined |  ListCatalogFieldsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>> & Pick<
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCatalogFields>>,
           TError,
@@ -235,7 +233,7 @@ export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatal
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>(
- params?: ListCatalogFieldsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>> & Pick<
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCatalogFields>>,
           TError,
@@ -245,7 +243,7 @@ export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatal
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>(
- params?: ListCatalogFieldsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -253,11 +251,11 @@ export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatal
  */
 
 export function useListCatalogFields<TData = Awaited<ReturnType<typeof listCatalogFields>>, TError = ErrorType<Error>>(
- params?: ListCatalogFieldsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCatalogFields>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListCatalogFieldsQueryOptions(params,options)
+  const queryOptions = getListCatalogFieldsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -11,9 +11,9 @@ import (
 )
 
 type Querier interface {
-	// AlternativeChainTarget is the alternative kind of the given kind (to
-	// refuse cycles: a kind whose alternative names it back).
-	AlternativeOf(ctx context.Context, id uuid.UUID) (*uuid.UUID, error)
+	// AlternativeCycle reports whether from_kind has kind as one of its
+	// alternatives (a cycle of two).
+	AlternativeCycle(ctx context.Context, arg AlternativeCycleParams) (bool, error)
 	CatalogFieldExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CreateCatalogField(ctx context.Context, arg CreateCatalogFieldParams) (CatalogField, error)
 	CreateLoadType(ctx context.Context, arg CreateLoadTypeParams) (LoadType, error)
@@ -22,21 +22,27 @@ type Querier interface {
 	DeleteCatalogFieldProductTypes(ctx context.Context, catalogFieldID uuid.UUID) error
 	DeleteLoadType(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteOutputKind(ctx context.Context, id uuid.UUID) (int64, error)
+	DeleteOutputKindAlternatives(ctx context.Context, outputKindID uuid.UUID) error
 	DeleteOutputKindFunctionTypes(ctx context.Context, outputKindID uuid.UUID) error
 	GetCatalogField(ctx context.Context, id uuid.UUID) (CatalogField, error)
 	GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, error)
 	GetOutputKind(ctx context.Context, id uuid.UUID) (OutputKind, error)
 	InsertCatalogFieldProductTypes(ctx context.Context, arg InsertCatalogFieldProductTypesParams) error
+	InsertOutputKindAlternative(ctx context.Context, arg InsertOutputKindAlternativeParams) error
 	InsertOutputKindFunctionTypes(ctx context.Context, arg InsertOutputKindFunctionTypesParams) error
 	ListCatalogFieldProductTypes(ctx context.Context) ([]CatalogFieldProductType, error)
 	// ---------------------------------------------------------------- catalog fields
 	ListCatalogFields(ctx context.Context) ([]CatalogField, error)
 	// ---------------------------------------------------------------- load types
 	ListLoadTypes(ctx context.Context, includeInactive bool) ([]LoadType, error)
+	ListOutputKindAlternatives(ctx context.Context) ([]OutputKindAlternative, error)
 	ListOutputKindFunctionTypes(ctx context.Context) ([]OutputKindFunctionType, error)
 	// ---------------------------------------------------------------- output kinds
 	ListOutputKinds(ctx context.Context, includeInactive bool) ([]OutputKind, error)
 	LoadTypeExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// LockCatalogField locks a field against concurrent links (categories take
+	// FOR SHARE on the fields they link, D305) before its key or type changes.
+	LockCatalogField(ctx context.Context, id uuid.UUID) (CatalogField, error)
 	LockCatalogFieldIDs(ctx context.Context) ([]uuid.UUID, error)
 	LockLoadTypeIDs(ctx context.Context) ([]uuid.UUID, error)
 	// LockOrder serialises everything that assigns sort orders of one table
@@ -47,6 +53,9 @@ type Querier interface {
 	SetCatalogFieldOrder(ctx context.Context, ids []uuid.UUID) error
 	SetLoadTypeOrder(ctx context.Context, ids []uuid.UUID) error
 	SetOutputKindOrder(ctx context.Context, ids []uuid.UUID) error
+	// ShareCatalogFields locks the linked fields of a category save: their type
+	// cannot change until the save commits.
+	ShareCatalogFields(ctx context.Context, keys []string) ([]CatalogField, error)
 	UpdateCatalogField(ctx context.Context, arg UpdateCatalogFieldParams) (CatalogField, error)
 	UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) (LoadType, error)
 	UpdateOutputKind(ctx context.Context, arg UpdateOutputKindParams) (OutputKind, error)

@@ -45,7 +45,8 @@
     "unknown": "Dieses Attribut gibt es in dieser Kategorie nicht.",
     "wrong_scope": "Dieses Attribut wird pro $t(attribute.scope_name.{{scope}}) gesetzt.",
     "field_not_found": "Es gibt kein Katalogfeld „{{key}}“.",
-    "field_type": "Das verknüpfte Feld „{{key}}“ ist vom Typ $t(attribute.type_name.{{expected}}); verwenden Sie diesen Typ."
+    "field_type": "Das verknüpfte Feld „{{key}}“ ist vom Typ $t(attribute.type_name.{{expected}}); verwenden Sie diesen Typ.",
+    "type_or": "oder"
   },
   "auth": {
     "account_disabled": "Ihr Konto ist deaktiviert. Bitte wenden Sie sich an Ihren Administrator.",
@@ -71,7 +72,9 @@
   "catalog_field": {
     "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_referenced": "Importprofile verwenden den Schlüssel „{{key}}“: Er kann sich nicht ändern.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
+    "meaning_options": "Für diese Bedeutung müssen die Auswahlwerte genau diese sein: {{expected}}.",
     "meaning_type": "Diese Bedeutung braucht einen anderen Werttyp ({{expected}}).",
     "not_found": "Dieses Feld existiert nicht mehr.",
     "order_mismatch": "Die Felder wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
@@ -110,11 +113,14 @@
     "addon_ambiguous": "Das Zubehör \"{{ref}}\" passt zu mehr als einer Variante; die erste wird verwendet.",
     "addon_not_found": "Das Zubehör \"{{ref}}\" wurde weder in der Datei noch im Katalog gefunden.",
     "addon_skipped": "Das Zubehör \"{{ref}}\" steht in einer Zeile mit Fehlern und wird ausgelassen.",
-    "answer_required": "Wählen Sie ein Feld oder „Nur Information“.",
+    "answer_field_not_found": "Es gibt kein Katalogfeld \"{{key}}\".",
+    "answer_required": "Wählen Sie ein neues Feld, ein vorhandenes Feld oder „Nur Information“.",
     "answer_target": "Keine zugeordnete Spalte hat dieses Ziel.",
+    "attribute_not_linked": "Das Attribut \"{{key}}\" der Kategorie \"{{category}}\" bleibt unverknüpft: Das Feld \"{{field}}\" hat den Typ {{expected}}, das Attribut {{type}}.",
     "category_unknown": "Es gibt keine Kategorie \"{{value}}\". Legen Sie sie an oder schalten Sie „Fehlende Kategorien anlegen“ ein.",
     "column_missing": "Die Datei hat keine Spalte \"{{column}}\".",
-    "columns_unknown": "{{count}} neue Spalten brauchen zuerst eine Antwort: Was bedeuten sie? ({{columns}})",
+    "columns_unknown_one": "{{count}} neue Spalte braucht zuerst eine Antwort: Was bedeutet sie? ({{columns}})",
+    "columns_unknown_other": "{{count}} neue Spalten brauchen zuerst eine Antwort: Was bedeuten sie? ({{columns}})",
     "duplicate_sku": "Die SKU \"{{sku}}\" kommt in der Datei mehrfach vor.",
     "duplicate_variant": "Die Variante \"{{name}}\" kommt bei diesem Produkt mehrfach vor.",
     "file_type": "Importiert werden können nur .xlsx-Arbeitsmappen und .csv-Dateien in UTF-8.",
@@ -167,7 +173,8 @@
     "unavailable": "Keine Verbindung zum Server."
   },
   "output_kind": {
-    "alternative_cycle": "Diese Ausgangsart nutzt die aktuelle bereits als Alternative.",
+    "alternative_cycle": "Diese Ausgangsart hat diese bereits als Alternative.",
+    "alternative_duplicate": "Diese Ausgangsart ist doppelt als Alternative aufgeführt.",
     "alternative_self": "Eine Ausgangsart kann nicht ihre eigene Alternative sein.",
     "function_type_duplicate": "Dieser Funktionstyp ist doppelt aufgeführt.",
     "in_use": "Diese Ausgangsart wird noch von Katalogfeldern oder als Alternative einer anderen Ausgangsart verwendet.",

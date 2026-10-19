@@ -416,11 +416,11 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Produc
 		p.Description = *row.Description
 	}
 	p.Attributes, p.StaleAttributes, p.AttributeErrors = readValues(c.Attributes, attrschema.ScopeProduct, row.Attributes)
-	p.Capabilities = capabilities.Compute(reg, capabilityInput(row.ProductTypeID, row.Mounting, c, row.Attributes, nil))
+	p.Capabilities = capabilities.Compute(reg, capabilityInput(pt, row.Mounting, c, row.Attributes, nil))
 	p.Variants = make([]Variant, len(variants))
 	for i, v := range variants {
 		p.Variants[i] = variantOut(actor, v, c.Attributes, p.Available, addons[v.ID])
-		p.Variants[i].Capabilities = capabilities.Compute(reg, capabilityInput(row.ProductTypeID, row.Mounting, c, row.Attributes, v.Attributes))
+		p.Variants[i].Capabilities = capabilities.Compute(reg, capabilityInput(pt, row.Mounting, c, row.Attributes, v.Attributes))
 		if len(p.Variants[i].AttributeErrors) > 0 || len(p.Variants[i].StaleAttributes) > 0 {
 			p.VariantsWithProblems++
 		}
@@ -662,7 +662,7 @@ func (s *Service) variantDetail(ctx context.Context, actor auth.Actor, product s
 		return Variant{}, err
 	}
 	out := variantOut(actor, v, c.Attributes, product.IsActive && pt.IsActive && c.IsActive, addons[v.ID])
-	out.Capabilities = capabilities.Compute(reg, capabilityInput(product.ProductTypeID, product.Mounting, c, product.Attributes, v.Attributes))
+	out.Capabilities = capabilities.Compute(reg, capabilityInput(pt, product.Mounting, c, product.Attributes, v.Attributes))
 	return out, nil
 }
 
@@ -912,7 +912,7 @@ func (c *catalog) categoryOf(ctx context.Context, s *Service, id uuid.UUID) (cat
 
 // capabilityInput is what capabilities.Compute needs of a product (variant
 // values nil) or a variant: the effective mounting and the values of both.
-func capabilityInput(productTypeID uuid.UUID, mounting *string, c categories.Category, product, variant attrschema.Values) capabilities.Input {
+func capabilityInput(pt producttypes.ProductType, mounting *string, c categories.Category, product, variant attrschema.Values) capabilities.Input {
 	values := attrschema.Values{}
 	for k, v := range product {
 		values[k] = v
@@ -920,7 +920,9 @@ func capabilityInput(productTypeID uuid.UUID, mounting *string, c categories.Cat
 	for k, v := range variant {
 		values[k] = v
 	}
-	return capabilities.Input{ProductTypeID: productTypeID, Mounting: EffectiveMounting(mounting, c), Schema: c.Attributes, Values: values}
+	return capabilities.Input{ProductTypeID: pt.ID, Mounting: EffectiveMounting(mounting, c), Schema: c.Attributes, Values: values,
+		ProductType: capabilities.ProductTypeDefaults{Topology: capabilities.Topology(pt.Topology),
+			DefaultBusCurrentMa: pt.DefaultBusCurrentMa, DefaultWirelessPlacesUsed: pt.DefaultWirelessPlacesUsed}}
 }
 
 // EffectiveMounting is the product's mounting override, else its
@@ -954,13 +956,21 @@ func (s *Service) Capabilities(ctx context.Context, variantIDs []uuid.UUID) (map
 	for _, c := range cats {
 		byID[c.ID] = c
 	}
+	types, err := s.types.List(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	typeByID := make(map[uuid.UUID]producttypes.ProductType, len(types))
+	for _, t := range types {
+		typeByID[t.ID] = t
+	}
 	reg, err := s.caps.Registry(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := make(map[uuid.UUID]capabilities.Capabilities, len(rows))
 	for _, r := range rows {
-		out[r.ID] = capabilities.Compute(reg, capabilityInput(r.ProductTypeID, r.Mounting, byID[r.CategoryID], r.ProductAttributes, r.Attributes))
+		out[r.ID] = capabilities.Compute(reg, capabilityInput(typeByID[r.ProductTypeID], r.Mounting, byID[r.CategoryID], r.ProductAttributes, r.Attributes))
 	}
 	return out, nil
 }
