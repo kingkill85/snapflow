@@ -9,7 +9,7 @@
   "editItem": "{{name}} bearbeiten",
   "deleteItem": "{{name}} löschen",
   "deleteTitle": "Plan löschen",
-  "deleteMessage": "Plan {{name}} mit seinen Zonen und Produkten löschen? Das kann nicht rückgängig gemacht werden.",
+  "deleteMessage": "Plan „{{name}}“ mit seinen Zonen und Produkten löschen? Das kann nicht rückgängig gemacht werden.",
   "dialog": {
     "addTitle": "Plan hinzufügen",
     "editTitle": "Plan bearbeiten",
@@ -101,7 +101,7 @@
     "item": "Element {{n}}"
   },
   "lock": {
-    "heldBy": "{{name}} bearbeitet diesen Plan (bis {{time}}). Sie können ihn ansehen.",
+    "heldBy": "Wird bis {{time}} von {{name}} bearbeitet. Sie können den Plan ansehen.",
     "takenOver": "{{name}} hat diesen Plan übernommen. Noch nicht gespeicherte Änderungen sind verloren; Sie können ihn ansehen.",
     "takeOver": "Übernehmen",
     "retry": "Erneut versuchen"

@@ -9,7 +9,7 @@
   "editItem": "Edit {{name}}",
   "deleteItem": "Delete {{name}}",
   "deleteTitle": "Delete plan",
-  "deleteMessage": "Delete plan {{name}} with its zones and products? This cannot be undone.",
+  "deleteMessage": "Delete plan \"{{name}}\" with its zones and products? This cannot be undone.",
   "dialog": {
     "addTitle": "Add plan",
     "editTitle": "Edit plan",
@@ -101,7 +101,7 @@
     "item": "Item {{n}}"
   },
   "lock": {
-    "heldBy": "{{name}} is editing this plan (until {{time}}). You can view it.",
+    "heldBy": "Being edited by {{name}} until {{time}}. You can view the plan.",
     "takenOver": "{{name}} has taken over this plan. Changes not saved yet are lost; you can view it.",
     "takeOver": "Take over",
     "retry": "Try again"

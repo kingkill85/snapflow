@@ -66,29 +66,29 @@ describe('PlansSection', () => {
     await user.click(await screen.findByRole('button', { name: 'Add plan' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add plan' })
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    expect(await within(dialog).findAllByText('Required')).toHaveLength(1)
+    expect(await within(dialog).findAllByText('This field is required.')).toHaveLength(2)
 
     await user.type(within(dialog).getByLabelText(/^Name/), 'Ground floor')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    expect(await within(dialog).findByText('Required')).toBeInTheDocument()
+    expect(await within(dialog).findAllByText('This field is required.')).toHaveLength(1)
 
     await user.upload(within(dialog).getByLabelText('Floorplan image'), png())
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(form?.get('name')).toBe('Ground floor')
-    expect((form?.get('image') as File).name).toBe('floor.png')
+    expect(form?.get('image')).toMatchObject({ name: 'floor.png' })
     expect(await screen.findByRole('link', { name: 'Ground floor' })).toBeInTheDocument()
   })
 
   it('takes an image pasted into the dialog and refuses other file types', async () => {
     servePlans([])
-    const user = userEvent.setup()
+    const user = userEvent.setup({ applyAccept: false })
     renderWithProviders(<PlansSection projectId={projectId} versionId={versionId} canWrite />)
     await user.click(await screen.findByRole('button', { name: 'Add plan' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add plan' })
 
-    await user.upload(within(dialog).getByLabelText('Floorplan image'), new File(['x'], 'plan.pdf', { type: 'application/pdf' }), { applyAccept: false })
+    await user.upload(within(dialog).getByLabelText('Floorplan image'), new File(['x'], 'plan.pdf', { type: 'application/pdf' }))
     expect(await within(dialog).findByText('Only JPEG, PNG and WebP images are accepted.')).toBeInTheDocument()
 
     within(dialog).getByLabelText(/^Name/).focus()

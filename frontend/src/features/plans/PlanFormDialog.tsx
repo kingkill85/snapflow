@@ -81,11 +81,14 @@ export function PlanFormDialog({ open, onOpenChange, versionId, item, onSaved }:
     choose(file)
   }
 
+  // A new plan needs an image; checked with the name, so both errors show at once.
+  const requireImage = () => {
+    if (item || form.getValues('image')) return false
+    form.setError('image', { type: 'client', message: errorKey('validation.required') })
+    return true
+  }
   const submit = form.handleSubmit(async ({ name, image }) => {
-    if (!item && !image) {
-      form.setError('image', { type: 'client', message: errorKey('validation.required') })
-      return
-    }
+    if (requireImage()) return
     setProgress(undefined)
     let saved: Plan
     try {
@@ -96,7 +99,7 @@ export function PlanFormDialog({ open, onOpenChange, versionId, item, onSaved }:
     }
     onOpenChange(false)
     onSaved(saved)
-  })
+  }, requireImage)
 
   const imageError = fieldError(errors.image?.message)
 
