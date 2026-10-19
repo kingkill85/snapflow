@@ -63,8 +63,8 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
   }, [])
 
   const widest = Math.max(1, ...doc.rows.map((r) => r.capacityTe))
-  // 48 px: the row label column; 32 px of padding.
-  const pxPerTe = Math.min(maxPxPerTe, Math.max(minPxPerTe, (available - 48 - 32) / widest))
+  // 64 px: the row label column; 32 px of padding.
+  const pxPerTe = Math.min(maxPxPerTe, Math.max(minPxPerTe, (available - 64 - 32) / widest))
   const te = (n: number) => formatDecimal(n, separator)
 
   const offsetAt = (e: { clientX: number }, rail: HTMLElement, width: number) => {
@@ -152,7 +152,7 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
             const reach = Math.max(width, ...modules.map((m) => (m.offsetTe + widthOf(m)) * pxPerTe))
             return (
               <li key={row.id} className="flex items-start gap-2">
-                <div className="w-10 shrink-0 pt-6 text-right text-xs text-muted">{t('board.rowShort', { n: index + 1 })}</div>
+                <div className="w-14 shrink-0 pt-6 text-right text-xs whitespace-nowrap text-muted">{t('board.rowShort', { n: index + 1 })}</div>
                 <div className="space-y-1">
                   <p className={cn('text-xs tabular-nums', overflow ? 'font-medium text-warning' : 'text-muted')}>
                     {t('board.rowTotals', { n: index + 1, used: te(used), capacity: te(row.capacityTe) })}
@@ -272,8 +272,8 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
       {m.label && <span className="truncate text-muted">{m.label}</span>}
       <span className="mt-auto flex items-center gap-0.5 truncate text-muted tabular-nums">
         {warned && <TriangleAlert aria-hidden="true" className="size-3 shrink-0 text-warning" />}
-        {te(width)}
-        {variant?.productType.abbreviation && <span className="ml-auto">{variant.productType.abbreviation}</span>}
+        {t('board.moduleWidth', { width: te(width) })}
+        {variant?.productType.abbreviation && width * pxPerTe >= 72 && <span className="ml-auto">{variant.productType.abbreviation}</span>}
       </span>
     </div>
   )

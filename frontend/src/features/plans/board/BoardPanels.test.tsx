@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { useReducer } from 'react'
+import { useEffect, useReducer } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { Capabilities, VariantSearchItem } from '@/api/generated/model'
@@ -33,10 +33,12 @@ const start = (modules: BoardModuleDoc[] = []): BoardDocument => ({
   modules,
 })
 
-let current: BoardDocument
+const seen: { doc?: BoardDocument } = {}
 function Harness({ initial, panel, selection = [] }: { initial: BoardDocument; panel: 'settings' | 'inspector'; selection?: string[] }) {
   const [state, dispatch] = useReducer(boardReducer, initial, (d) => ({ ...initBoard(d), selection }))
-  current = state.history.present
+  useEffect(() => {
+    seen.doc = state.history.present
+  })
   return panel === 'settings' ? (
     <BoardSettings doc={state.history.present} enclosures={[enclosure]} variants={byId} caps={caps} widthOf={widthOf} editable dispatch={dispatch} warnings={[]} />
   ) : (
@@ -76,16 +78,16 @@ describe('rows editor', () => {
     renderWithProviders(<Harness initial={start([module('m1', r1, 0)])} panel="settings" />)
     expect(screen.getByRole('button', { name: 'Row 1 has modules and cannot be removed' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Add row' }))
-    expect(current.rows).toHaveLength(3)
-    expect(current.rows[2].capacityTe).toBe(12)
+    expect(seen.doc!.rows).toHaveLength(3)
+    expect(seen.doc!.rows[2].capacityTe).toBe(12)
     const field = screen.getByLabelText('Row 2 in TE')
     await user.clear(field)
     await user.type(field, '24.5')
-    expect(current.rows[1].capacityTe).toBe(24.5)
+    expect(seen.doc!.rows[1].capacityTe).toBe(24.5)
     await user.type(field, '5')
     expect(screen.getByText(/one decimal/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Remove row 3' }))
-    expect(current.rows).toHaveLength(2)
+    expect(seen.doc!.rows).toHaveLength(2)
   })
 
   it('choosing an enclosure fits rows to it (D357) and hides the rows editor', async () => {
@@ -93,9 +95,9 @@ describe('rows editor', () => {
     renderWithProviders(<Harness initial={start([module('m1', r1, 0), module('m2', r2, 0)])} panel="settings" />)
     await user.click(screen.getByRole('combobox', { name: 'Enclosure' }))
     await user.click(screen.getByRole('option', { name: /Cabinet/ }))
-    expect(current.enclosureVariantId).toBe(enclosure.id)
-    expect(current.rows).toEqual([{ id: r1, capacityTe: 18 }])
-    expect(current.modules.find((m) => m.id === 'm2')).toMatchObject({ rowId: r1, offsetTe: 4 })
+    expect(seen.doc!.enclosureVariantId).toBe(enclosure.id)
+    expect(seen.doc!.rows).toEqual([{ id: r1, capacityTe: 18 }])
+    expect(seen.doc!.modules.find((m) => m.id === 'm2')).toMatchObject({ rowId: r1, offsetTe: 4 })
     expect(screen.getByText('The enclosure gives 1 rows of 18 TE.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
   })
@@ -112,13 +114,13 @@ describe('module inspector', () => {
     expect(within(capabilities).getByText(/comes in a later step/)).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Label'), 'Q1')
-    expect(current.modules[0].label).toBe('Q1')
+    expect(seen.doc!.modules[0].label).toBe('Q1')
     await user.click(screen.getByRole('switch', { name: /Existing/ }))
-    expect(current.modules[0].existing).toBe(true)
+    expect(seen.doc!.modules[0].existing).toBe(true)
 
     await user.click(screen.getByRole('combobox', { name: 'Row' }))
     await user.click(screen.getByRole('option', { name: 'Row 2' }))
-    expect(current.modules[0]).toMatchObject({ rowId: r2, offsetTe: 2 })
+    expect(seen.doc!.modules[0]).toMatchObject({ rowId: r2, offsetTe: 2 })
   })
 
   it('refuses a product change that no longer fits', async () => {
@@ -127,7 +129,7 @@ describe('module inspector', () => {
     await user.click(screen.getByRole('button', { name: 'Change product' }))
     await user.click(screen.getByRole('button', { name: /Wide one/ }))
     expect(notices).toEqual(['There is no free space for it there.'])
-    expect(current.modules[0].variantId).toBe(actuator.id)
+    expect(seen.doc!.modules[0].variantId).toBe(actuator.id)
   })
 
   it('deletes several selected modules at once', async () => {
@@ -135,6 +137,6 @@ describe('module inspector', () => {
     renderWithProviders(<Harness initial={start([module('m1', r1, 0), module('m2', r1, 4)])} panel="inspector" selection={['m1', 'm2']} />)
     expect(screen.getByText('2 modules selected.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(current.modules).toEqual([])
+    expect(seen.doc!.modules).toEqual([])
   })
 })
