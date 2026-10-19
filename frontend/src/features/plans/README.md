@@ -199,3 +199,7 @@ by mounting, keyboard placement and move, undo, autosave, read-only, wrong kind,
 board card in `PlansSection.test.tsx`. E2E: `e2e/specs/boards.spec.ts` (enclosure, drag from the palette, totals, keyboard
 move, undo/redo, reload, BOM lines, Networks: second bus line, gateway reassignment, reload), `boards-visual.spec.ts`
 (`make e2e-visual`). The Networks tab lives in `features/networks` (tests in `NetworksTab.test.tsx`).
+
+### Board connections (3d)
+
+The board inspector's Channels section (`board/ModuleChannels.tsx`) lists a module's logical channels from the version's wiring view (`useWiringModel` in `features/checks`, numbering D387: native first, then alternatives with their base channels; blocked = a base channel used by another channel), each with its connected needs (need, plan · zone, units, power), Disconnect and "Connect a need" (`ConnectDialog`, channel mode). Connections are version data (no lock; `can.update`). Modules show "used/total ch" (`channelUse` in `board.ts`); the header shows the board's TE reserve status and free channels per kind from the checks. Wiring and checks are refetched after each board save. `?select=<moduleId>` opens the editor with that module in the inspector (links from the Checks tab, D404).
