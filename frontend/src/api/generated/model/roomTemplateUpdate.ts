@@ -4,7 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { RoomTemplateLine } from './roomTemplateLine';
+import type { RoomTemplateLineInput } from './roomTemplateLineInput';
 import type { RoomTemplateUpdateEquipmentLevel } from './roomTemplateUpdateEquipmentLevel';
 import type { RoomTemplateUpdateName } from './roomTemplateUpdateName';
 
@@ -22,7 +22,7 @@ export interface RoomTemplateUpdate {
      * At most 100
      * @maxItems 100
      */
-  lines: RoomTemplateLine[];
+  lines: RoomTemplateLineInput[];
   /** At most 100 characters; "en" is required */
   name: RoomTemplateUpdateName;
 }

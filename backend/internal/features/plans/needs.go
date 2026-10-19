@@ -13,6 +13,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
+	"github.com/kingkill85/snapflow/backend/internal/platform/watts"
 )
 
 // needCatalog holds the catalog facts needs are checked against: function
@@ -60,7 +61,7 @@ func readNeeds(ctx context.Context, q *store.Queries, id uuid.UUID) ([]PlanNeed,
 	out := make([]PlanNeed, len(rows))
 	for i, r := range rows {
 		out[i] = PlanNeed{
-			ID: r.ID, ZoneID: r.ZoneID, FunctionTypeID: r.FunctionTypeID, Quantity: r.Quantity, PowerW: r.PowerW,
+			ID: r.ID, ZoneID: r.ZoneID, FunctionTypeID: r.FunctionTypeID, Quantity: r.Quantity, PowerW: watts.FormatPtr(r.PowerW),
 			LoadTypeID: r.LoadTypeID, Label: r.Label, Note: r.Note, X: r.X, Y: r.Y,
 		}
 	}
@@ -79,7 +80,7 @@ func writeNeeds(ctx context.Context, q *store.Queries, tenantID, planID uuid.UUI
 		ID             uuid.UUID  `json:"id"`
 		FunctionTypeID uuid.UUID  `json:"function_type_id"`
 		Quantity       int32      `json:"quantity"`
-		PowerW         *float64   `json:"power_w"`
+		PowerW         *string    `json:"power_w"`
 		LoadTypeID     *uuid.UUID `json:"load_type_id"`
 		Label          string     `json:"label"`
 		Note           string     `json:"note"`
@@ -115,23 +116,26 @@ func assignNeedZones(zones []PlanZone, needs []PlanNeed) {
 }
 
 // keptNeeds are the stored needs when a save leaves needs out (D294): the
-// needs of zones that no longer exist go with their zone.
-func keptNeeds(stored []PlanNeed, zones []PlanZone) []PlanNeed {
-	out := []PlanNeed{}
+// needs of zones that no longer exist go with their zone; dropped counts
+// them (logged by the caller, D326).
+func keptNeeds(stored []PlanNeed, zones []PlanZone) (kept []PlanNeedInput, dropped int) {
+	kept = []PlanNeedInput{}
 	for _, n := range stored {
 		if n.X == nil && n.ZoneID != nil && !slices.ContainsFunc(zones, func(z PlanZone) bool { return z.ID == *n.ZoneID }) {
+			dropped++
 			continue
 		}
-		out = append(out, n)
+		kept = append(kept, n.input())
 	}
-	return out
+	return kept, dropped
 }
 
 // validateNeeds checks the needs of a content save (field errors at
 // body.needs[i].…). A stored need keeps an inactive function type and a load
-// type its function type no longer allows (warnings); new or changed ones
-// must be valid now.
-func validateNeeds(cat needCatalog, in, stored []PlanNeed, zones []PlanZone, w, h float64) ([]PlanNeed, []apperr.FieldError) {
+// type its function type no longer allows (warnings); so does a need the
+// client marks restored (undo/redo of content saved before, D343). New or
+// changed ones must be valid now.
+func validateNeeds(cat needCatalog, in []PlanNeedInput, stored []PlanNeed, restored []uuid.UUID, zones []PlanZone, w, h float64) ([]PlanNeed, []apperr.FieldError) {
 	var errs []apperr.FieldError
 	add := func(loc, code, detail string, params ...any) {
 		f := apperr.Field(loc, code, detail)
@@ -161,7 +165,8 @@ func validateNeeds(cat needCatalog, in, stored []PlanNeed, zones []PlanZone, w, 
 		}
 		seen[n.ID] = true
 		old, wasStored := prev[n.ID]
-		sameFunction := wasStored && old.FunctionTypeID == n.FunctionTypeID
+		isRestored := slices.Contains(restored, n.ID)
+		sameFunction := isRestored || wasStored && old.FunctionTypeID == n.FunctionTypeID
 
 		ft, ok := cat.functionTypes[n.FunctionTypeID]
 		switch {
@@ -173,12 +178,16 @@ func validateNeeds(cat needCatalog, in, stored []PlanNeed, zones []PlanZone, w, 
 		if n.Quantity < 1 || n.Quantity > MaxNeedQty {
 			add(loc+".quantity", "validation.range", "quantity out of range", "min", 1, "max", MaxNeedQty)
 		}
-		if n.PowerW != nil && (!finite(*n.PowerW) || *n.PowerW < 0 || *n.PowerW > MaxNeedPowerW) {
-			add(loc+".powerW", "validation.range", "power out of range", "min", 0, "max", MaxNeedPowerW)
+		if n.PowerW != nil {
+			if v, ok := watts.Parse(*n.PowerW); ok {
+				n.PowerW = &v
+			} else {
+				add(loc+".powerW", "need.power_invalid", "power must be 0-100000 with at most 2 decimals", "max", watts.Max)
+			}
 		}
 		if n.LoadTypeID != nil {
 			lt, found := cat.loadTypes[*n.LoadTypeID]
-			unchanged := sameFunction && old.LoadTypeID != nil && *old.LoadTypeID == *n.LoadTypeID
+			unchanged := isRestored || sameFunction && old.LoadTypeID != nil && *old.LoadTypeID == *n.LoadTypeID
 			switch {
 			case !found:
 				add(loc+".loadTypeId", "load_type.not_found", "no such load type")
@@ -212,7 +221,8 @@ func validateNeeds(cat needCatalog, in, stored []PlanNeed, zones []PlanZone, w, 
 		case !zoneIDs[*n.ZoneID]:
 			add(loc+".zoneId", "need.zone_not_found", "no such zone in this content")
 		}
-		out[i] = n
+		out[i] = PlanNeed{ID: n.ID, ZoneID: n.ZoneID, FunctionTypeID: n.FunctionTypeID, Quantity: n.Quantity, PowerW: n.PowerW,
+			LoadTypeID: n.LoadTypeID, Label: n.Label, Note: n.Note, X: n.X, Y: n.Y}
 	}
 	return out, errs
 }

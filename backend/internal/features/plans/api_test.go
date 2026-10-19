@@ -557,7 +557,8 @@ func TestVersionCopy(t *testing.T) {
 		t.Fatalf("copied content: %+v", content)
 	}
 	cz, cp := content.Zones[0], content.Placements[0]
-	if cz.ID == z || cp.ID == pid || cp.ZoneID == nil || *cp.ZoneID != cz.ID || cp.InstanceValues["address"] != float64(3) ||
+	// Zone and placement ids are kept (D339).
+	if cz.ID != z || cp.ID != pid || cp.ZoneID == nil || *cp.ZoneID != cz.ID || cp.InstanceValues["address"] != float64(3) ||
 		len(cp.AddonVariantIDs) != 1 {
 		t.Errorf("copied zone/placement: %+v %+v", cz, cp)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
+	"github.com/kingkill85/snapflow/backend/internal/platform/watts"
 )
 
 // NeedRef names a function type or load type of the summary.
@@ -28,8 +29,9 @@ type NullableNeedRef struct {
 // NeedTotals add up needs: units and power (quantity × power per unit, of
 // the needs with a power).
 type NeedTotals struct {
-	Quantity int64   `json:"quantity" doc:"Units (sum of quantities)"`
-	PowerW   float64 `json:"powerW" doc:"Sum of quantity × power per unit, of the needs with a power"`
+	Quantity int64  `json:"quantity" doc:"Units (sum of quantities)"`
+	PowerW   string `json:"powerW" doc:"Sum of quantity × power per unit of the needs with a power, exact, a decimal string with 2 decimals (\"0.00\" for none)" example:"420.50"`
+	sum      watts.Sum
 }
 
 // SummaryNeed is one need of the summary.
@@ -38,7 +40,7 @@ type SummaryNeed struct {
 	FunctionType NeedRef          `json:"functionType"`
 	LoadType     *NullableNeedRef `json:"loadType" doc:"null for none"`
 	Quantity     int32            `json:"quantity"`
-	PowerW       *float64         `json:"powerW" nullable:"true" doc:"Power per unit in W; null for unknown"`
+	PowerW       *string          `json:"powerW" nullable:"true" doc:"Power per unit in W, a decimal string with 2 decimals; null for unknown" example:"7.50"`
 	Label        string           `json:"label"`
 	Note         string           `json:"note"`
 	Symbol       bool             `json:"symbol" doc:"Drawn as a load symbol on the plan"`
@@ -81,12 +83,13 @@ type VersionNeeds struct {
 	Totals        NeedTotals          `json:"totals"`
 }
 
-func (t *NeedTotals) add(quantity int32, powerW *float64) {
+func (t *NeedTotals) add(quantity int32, powerW *string) {
 	t.Quantity += int64(quantity)
-	if powerW != nil {
-		t.PowerW += float64(quantity) * *powerW
-	}
+	t.sum.Add(quantity, powerW)
+	t.PowerW = t.sum.String()
 }
+
+func newTotals() *NeedTotals { return &NeedTotals{PowerW: watts.Sum{}.String()} }
 
 // VersionNeeds returns the needs summary of a version (projects.read).
 func (s *Service) VersionNeeds(ctx context.Context, versionID uuid.UUID) (VersionNeeds, error) {
@@ -140,7 +143,7 @@ func (s *Service) VersionNeeds(ctx context.Context, versionID uuid.UUID) (Versio
 	for _, z := range zoneRows {
 		zonesOf[z.PlanID] = append(zonesOf[z.PlanID], z)
 	}
-	out := VersionNeeds{Plans: []SummaryPlan{}, FunctionTypes: []FunctionTypeTotal{}, LoadTypes: []LoadTypeTotal{}}
+	out := VersionNeeds{Plans: []SummaryPlan{}, FunctionTypes: []FunctionTypeTotal{}, LoadTypes: []LoadTypeTotal{}, Totals: *newTotals()}
 	ftTotals := map[uuid.UUID]*NeedTotals{}
 	ltTotals := map[uuid.UUID]*NeedTotals{}
 	var noLoadType *NeedTotals
@@ -149,11 +152,11 @@ func (s *Service) VersionNeeds(ctx context.Context, versionID uuid.UUID) (Versio
 		if len(needs) == 0 {
 			continue
 		}
-		plan := SummaryPlan{PlanID: p.ID, Name: p.Name, Zones: []SummaryZone{}}
+		plan := SummaryPlan{PlanID: p.ID, Name: p.Name, Zones: []SummaryZone{}, Totals: *newTotals()}
 		groups := map[uuid.UUID]*SummaryZone{}
 		var none *SummaryZone
 		for _, z := range zonesOf[p.ID] {
-			groups[z.ID] = &SummaryZone{ZoneID: &z.ID, Name: z.Name, Needs: []SummaryNeed{}}
+			groups[z.ID] = &SummaryZone{ZoneID: &z.ID, Name: z.Name, Needs: []SummaryNeed{}, Totals: *newTotals()}
 		}
 		for _, n := range needs {
 			g := none
@@ -162,27 +165,27 @@ func (s *Service) VersionNeeds(ctx context.Context, versionID uuid.UUID) (Versio
 			}
 			if g == nil {
 				if none == nil {
-					none = &SummaryZone{Needs: []SummaryNeed{}}
+					none = &SummaryZone{Needs: []SummaryNeed{}, Totals: *newTotals()}
 				}
 				g = none
 			}
 			g.Needs = append(g.Needs, SummaryNeed{ID: n.ID, FunctionType: ftRef(n.FunctionTypeID), LoadType: ltRef(n.LoadTypeID),
-				Quantity: n.Quantity, PowerW: n.PowerW, Label: n.Label, Note: n.Note, Symbol: n.Symbol})
+				Quantity: n.Quantity, PowerW: watts.FormatPtr(n.PowerW), Label: n.Label, Note: n.Note, Symbol: n.Symbol})
 			g.Totals.add(n.Quantity, n.PowerW)
 			plan.Totals.add(n.Quantity, n.PowerW)
 			out.Totals.add(n.Quantity, n.PowerW)
 			if ftTotals[n.FunctionTypeID] == nil {
-				ftTotals[n.FunctionTypeID] = &NeedTotals{}
+				ftTotals[n.FunctionTypeID] = newTotals()
 			}
 			ftTotals[n.FunctionTypeID].add(n.Quantity, n.PowerW)
 			if n.LoadTypeID == nil {
 				if noLoadType == nil {
-					noLoadType = &NeedTotals{}
+					noLoadType = newTotals()
 				}
 				noLoadType.add(n.Quantity, n.PowerW)
 			} else {
 				if ltTotals[*n.LoadTypeID] == nil {
-					ltTotals[*n.LoadTypeID] = &NeedTotals{}
+					ltTotals[*n.LoadTypeID] = newTotals()
 				}
 				ltTotals[*n.LoadTypeID].add(n.Quantity, n.PowerW)
 			}

@@ -49,5 +49,5 @@ DELETE FROM room_template_lines WHERE template_id = $1;
 INSERT INTO room_template_lines (template_id, position, function_type_id, quantity, power_w, load_type_id, label)
 SELECT sqlc.arg(template_id)::uuid, r.position, r.function_type_id, r.quantity, r.power_w, r.load_type_id, r.label
 FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
-    AS r (position integer, function_type_id uuid, quantity integer, power_w double precision, load_type_id uuid,
+    AS r (position integer, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid,
           label text);

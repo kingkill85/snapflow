@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"regexp"
 	"slices"
@@ -30,6 +29,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
+	"github.com/kingkill85/snapflow/backend/internal/platform/watts"
 )
 
 // Limits.
@@ -40,7 +40,6 @@ const (
 	MaxLabelLength = 100
 	MaxLines       = 100
 	MaxQuantity    = 100
-	MaxPowerW      = 100000
 )
 
 // orderLock serialises sort order assignment (advisory lock key, unique in
@@ -49,13 +48,33 @@ const orderLock int64 = 0x5f_72_74_6f_72_64
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// RoomTemplateLine is one line of a template: n needs of a function type.
-type RoomTemplateLine struct {
-	FunctionTypeID uuid.UUID  `json:"functionTypeId"`
+// RoomTemplateLineInput is one line of a template as sent: n needs of a
+// function type.
+type RoomTemplateLineInput struct {
+	FunctionTypeID uuid.UUID  `json:"functionTypeId" doc:"An active function type (an inactive one is kept when the stored template has a line with it, D345)"`
 	Quantity       int32      `json:"quantity" doc:"1-100"`
-	PowerW         *float64   `json:"powerW" nullable:"true" doc:"Power per unit in W, 0-100000; null for unknown"`
-	LoadTypeID     *uuid.UUID `json:"loadTypeId" nullable:"true" doc:"One of the function type's allowed load types (any when it lists none); null for none"`
+	PowerW         *string    `json:"powerW" nullable:"true" doc:"Power per unit in W, a decimal string 0-100000 with at most 2 decimals; null for unknown" example:"7.5"`
+	LoadTypeID     *uuid.UUID `json:"loadTypeId" nullable:"true" doc:"An active load type the function type allows (any when it lists none); null for none. Kept when the stored template has a line with the same function type and load type (D345)"`
 	Label          string     `json:"label" doc:"At most 100 characters; empty for none"`
+}
+
+// LineWarning says why a stored line cannot be applied as it is.
+type LineWarning string
+
+const (
+	WarnLineFunctionTypeInactive LineWarning = "function_type_inactive"
+	WarnLineLoadTypeInactive     LineWarning = "load_type_inactive"
+	WarnLineLoadTypeNotAllowed   LineWarning = "load_type_not_allowed"
+)
+
+// RoomTemplateLine is a stored line with what is wrong with it.
+type RoomTemplateLine struct {
+	FunctionTypeID uuid.UUID     `json:"functionTypeId"`
+	Quantity       int32         `json:"quantity"`
+	PowerW         *string       `json:"powerW" nullable:"true" doc:"Power per unit in W, a decimal string with exactly 2 decimals; null for unknown" example:"7.50"`
+	LoadTypeID     *uuid.UUID    `json:"loadTypeId" nullable:"true" doc:"null for none"`
+	Label          string        `json:"label"`
+	Warnings       []LineWarning `json:"warnings" doc:"Why the line cannot be applied as it is (the editor skips such lines)" enum:"function_type_inactive,load_type_inactive,load_type_not_allowed"`
 }
 
 // RoomTemplate is a template of a room's needs.
@@ -77,7 +96,7 @@ type RoomTemplateInput struct {
 	Name           i18n.Text          `json:"name" doc:"At most 100 characters; \"en\" is required"`
 	EquipmentLevel i18n.Text          `json:"equipmentLevel,omitempty" doc:"At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none"`
 	IsActive       bool               `json:"isActive"`
-	Lines          []RoomTemplateLine `json:"lines" maxItems:"100" doc:"At most 100"`
+	Lines          []RoomTemplateLineInput `json:"lines" maxItems:"100" doc:"At most 100"`
 }
 
 type RoomTemplateUpdate struct {
@@ -144,13 +163,17 @@ func (s *Service) List(ctx context.Context, includeInactive bool) ([]RoomTemplat
 	if err != nil {
 		return nil, err
 	}
+	cat, err := s.lineCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
 	byTemplate := map[uuid.UUID][]store.RoomTemplateLine{}
 	for _, l := range lines {
 		byTemplate[l.TemplateID] = append(byTemplate[l.TemplateID], l)
 	}
 	out := make([]RoomTemplate, len(rows))
 	for i, r := range rows {
-		out[i] = templateOut(actor, r, byTemplate[r.ID])
+		out[i] = templateOut(actor, r, byTemplate[r.ID], cat)
 	}
 	return out, nil
 }
@@ -180,7 +203,11 @@ func (s *Service) get(ctx context.Context, actor auth.Actor, id uuid.UUID) (Room
 	if err != nil {
 		return RoomTemplate{}, mapErr(err, "")
 	}
-	return templateOut(actor, row, lines), nil
+	cat, err := s.lineCatalog(ctx)
+	if err != nil {
+		return RoomTemplate{}, err
+	}
+	return templateOut(actor, row, lines, cat), nil
 }
 
 func (s *Service) Create(ctx context.Context, in RoomTemplateInput) (RoomTemplate, error) {
@@ -188,7 +215,7 @@ func (s *Service) Create(ctx context.Context, in RoomTemplateInput) (RoomTemplat
 	if err != nil {
 		return RoomTemplate{}, err
 	}
-	if in, err = s.validate(ctx, in); err != nil {
+	if in, err = s.validate(ctx, in, nil); err != nil {
 		return RoomTemplate{}, err
 	}
 	var id uuid.UUID
@@ -214,7 +241,11 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in RoomTemplateUpdat
 	if err != nil {
 		return RoomTemplate{}, err
 	}
-	if in.RoomTemplateInput, err = s.validate(ctx, in.RoomTemplateInput); err != nil {
+	stored, err := s.q.ListLines(ctx, []uuid.UUID{id})
+	if err != nil {
+		return RoomTemplate{}, err
+	}
+	if in.RoomTemplateInput, err = s.validate(ctx, in.RoomTemplateInput, stored); err != nil {
 		return RoomTemplate{}, err
 	}
 	err = s.inTx(ctx, func(q *store.Queries) error {
@@ -284,7 +315,8 @@ func (s *Service) Reorder(ctx context.Context, ids []uuid.UUID) ([]RoomTemplate,
 
 // validate checks and normalises a template; the function types and load
 // types are read through their services (before the transaction, D243).
-func (s *Service) validate(ctx context.Context, in RoomTemplateInput) (RoomTemplateInput, error) {
+// stored are the lines of the template being updated (nil on create).
+func (s *Service) validate(ctx context.Context, in RoomTemplateInput, stored []store.RoomTemplateLine) (RoomTemplateInput, error) {
 	var errs []apperr.FieldError
 	add := func(loc, code, detail string, params ...any) {
 		f := apperr.Field(loc, code, detail)
@@ -323,7 +355,17 @@ func (s *Service) validate(ctx context.Context, in RoomTemplateInput) (RoomTempl
 		return in, err
 	}
 	if in.Lines == nil {
-		in.Lines = []RoomTemplateLine{}
+		in.Lines = []RoomTemplateLineInput{}
+	}
+	// keptFunction / keptLoad: a stored line has this function type (and
+	// load type), so the update may keep it although it is inactive (D345).
+	keptFunction := func(id uuid.UUID) bool {
+		return slices.ContainsFunc(stored, func(l store.RoomTemplateLine) bool { return l.FunctionTypeID == id })
+	}
+	keptLoad := func(ft, lt uuid.UUID) bool {
+		return slices.ContainsFunc(stored, func(l store.RoomTemplateLine) bool {
+			return l.FunctionTypeID == ft && l.LoadTypeID != nil && *l.LoadTypeID == lt
+		})
 	}
 	for i := range in.Lines {
 		l := &in.Lines[i]
@@ -332,20 +374,26 @@ func (s *Service) validate(ctx context.Context, in RoomTemplateInput) (RoomTempl
 		switch {
 		case ft < 0:
 			add(loc+".functionTypeId", "function_type.not_found", "no such function type")
-		case !fts[ft].IsActive:
+		case !fts[ft].IsActive && !keptFunction(l.FunctionTypeID):
 			add(loc+".functionTypeId", "need.function_type_inactive", "the function type is inactive")
 		}
 		if l.Quantity < 1 || l.Quantity > MaxQuantity {
 			add(loc+".quantity", "validation.range", "quantity out of range", "min", 1, "max", MaxQuantity)
 		}
-		if l.PowerW != nil && (math.IsNaN(*l.PowerW) || math.IsInf(*l.PowerW, 0) || *l.PowerW < 0 || *l.PowerW > MaxPowerW) {
-			add(loc+".powerW", "validation.range", "power out of range", "min", 0, "max", MaxPowerW)
+		if l.PowerW != nil {
+			if v, ok := watts.Parse(*l.PowerW); ok {
+				l.PowerW = &v
+			} else {
+				add(loc+".powerW", "need.power_invalid", "power must be 0-100000 with at most 2 decimals", "max", watts.Max)
+			}
 		}
 		if l.LoadTypeID != nil {
 			lt := slices.IndexFunc(lts, func(t capabilities.LoadType) bool { return t.ID == *l.LoadTypeID })
 			switch {
 			case lt < 0:
 				add(loc+".loadTypeId", "load_type.not_found", "no such load type")
+			case keptLoad(l.FunctionTypeID, *l.LoadTypeID):
+				// Kept as stored (flagged in the response).
 			case !lts[lt].IsActive:
 				add(loc+".loadTypeId", "need.load_type_inactive", "the load type is inactive")
 			case ft >= 0 && len(fts[ft].LoadTypeIDs) > 0 && !slices.Contains(fts[ft].LoadTypeIDs, *l.LoadTypeID):
@@ -373,7 +421,7 @@ func levelOrNil(t i18n.Text) *i18n.Text {
 	return &t
 }
 
-func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []RoomTemplateLine) error {
+func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []RoomTemplateLineInput) error {
 	if len(lines) == 0 {
 		return nil
 	}
@@ -381,7 +429,7 @@ func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []Ro
 		Position       int        `json:"position"`
 		FunctionTypeID uuid.UUID  `json:"function_type_id"`
 		Quantity       int32      `json:"quantity"`
-		PowerW         *float64   `json:"power_w"`
+		PowerW         *string    `json:"power_w"`
 		LoadTypeID     *uuid.UUID `json:"load_type_id"`
 		Label          string     `json:"label"`
 	}
@@ -397,7 +445,7 @@ func insertLines(ctx context.Context, q *store.Queries, id uuid.UUID, lines []Ro
 	return q.InsertLines(ctx, store.InsertLinesParams{TemplateID: id, Rows: data})
 }
 
-func templateOut(actor auth.Actor, r store.RoomTemplate, lines []store.RoomTemplateLine) RoomTemplate {
+func templateOut(actor auth.Actor, r store.RoomTemplate, lines []store.RoomTemplateLine, cat lineCatalog) RoomTemplate {
 	write := actor.Can(auth.PermCatalogWrite)
 	out := RoomTemplate{ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		Lines: make([]RoomTemplateLine, len(lines)), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
@@ -407,7 +455,51 @@ func templateOut(actor auth.Actor, r store.RoomTemplate, lines []store.RoomTempl
 		out.EquipmentLevel = *r.EquipmentLevel
 	}
 	for i, l := range lines {
-		out.Lines[i] = RoomTemplateLine{FunctionTypeID: l.FunctionTypeID, Quantity: l.Quantity, PowerW: l.PowerW, LoadTypeID: l.LoadTypeID, Label: l.Label}
+		out.Lines[i] = RoomTemplateLine{FunctionTypeID: l.FunctionTypeID, Quantity: l.Quantity, PowerW: watts.FormatPtr(l.PowerW),
+			LoadTypeID: l.LoadTypeID, Label: l.Label, Warnings: cat.warnings(l)}
+	}
+	return out
+}
+
+// lineCatalog are the function types and load types the lines are flagged
+// against.
+type lineCatalog struct {
+	functionTypes map[uuid.UUID]functiontypes.FunctionType
+	loadTypes     map[uuid.UUID]capabilities.LoadType
+}
+
+func (s *Service) lineCatalog(ctx context.Context) (lineCatalog, error) {
+	fts, err := s.functionTypes.List(ctx)
+	if err != nil {
+		return lineCatalog{}, err
+	}
+	lts, err := s.capabilities.LoadTypes(ctx, true)
+	if err != nil {
+		return lineCatalog{}, err
+	}
+	c := lineCatalog{functionTypes: map[uuid.UUID]functiontypes.FunctionType{}, loadTypes: map[uuid.UUID]capabilities.LoadType{}}
+	for _, f := range fts {
+		c.functionTypes[f.ID] = f
+	}
+	for _, l := range lts {
+		c.loadTypes[l.ID] = l
+	}
+	return c, nil
+}
+
+func (c lineCatalog) warnings(l store.RoomTemplateLine) []LineWarning {
+	out := []LineWarning{}
+	ft, ok := c.functionTypes[l.FunctionTypeID]
+	if ok && !ft.IsActive {
+		out = append(out, WarnLineFunctionTypeInactive)
+	}
+	if l.LoadTypeID != nil {
+		if lt, found := c.loadTypes[*l.LoadTypeID]; found && !lt.IsActive {
+			out = append(out, WarnLineLoadTypeInactive)
+		}
+		if ok && len(ft.LoadTypeIDs) > 0 && !slices.Contains(ft.LoadTypeIDs, *l.LoadTypeID) {
+			out = append(out, WarnLineLoadTypeNotAllowed)
+		}
 	}
 	return out
 }

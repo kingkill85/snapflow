@@ -6,7 +6,7 @@
  */
 import type { RoomTemplateInputEquipmentLevel } from './roomTemplateInputEquipmentLevel';
 import type { RoomTemplateInputName } from './roomTemplateInputName';
-import type { RoomTemplateLine } from './roomTemplateLine';
+import type { RoomTemplateLineInput } from './roomTemplateLineInput';
 
 export interface RoomTemplateInput {
   /** A URL to the JSON Schema for this object. */
@@ -20,7 +20,7 @@ export interface RoomTemplateInput {
      * At most 100
      * @maxItems 100
      */
-  lines: RoomTemplateLine[];
+  lines: RoomTemplateLineInput[];
   /** At most 100 characters; "en" is required */
   name: RoomTemplateInputName;
 }

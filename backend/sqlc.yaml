@@ -151,7 +151,7 @@ overrides:
           type: Text
       - column: plan_needs.power_w
         go_type:
-          type: float64
+          type: string
           pointer: true
       - column: plan_needs.x
         go_type:
@@ -163,7 +163,7 @@ overrides:
           pointer: true
       - column: room_template_lines.power_w
         go_type:
-          type: float64
+          type: string
           pointer: true
       - column: room_templates.name
         go_type:

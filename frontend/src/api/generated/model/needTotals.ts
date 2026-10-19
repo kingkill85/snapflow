@@ -6,8 +6,8 @@
  */
 
 export interface NeedTotals {
-  /** Sum of quantity × power per unit, of the needs with a power */
-  powerW: number;
+  /** Sum of quantity × power per unit of the needs with a power, exact, a decimal string with 2 decimals ("0.00" for none) */
+  powerW: string;
   /** Units (sum of quantities) */
   quantity: number;
 }

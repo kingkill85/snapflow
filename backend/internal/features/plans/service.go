@@ -56,6 +56,8 @@ type Service struct {
 	now func() time.Time
 	// contentHooks run when a plan's content is saved (OnContentSave).
 	contentHooks []ContentHook
+	// planCopiers run when a version's plans are copied (OnCopyPlans).
+	planCopiers []PlanCopier
 }
 
 func NewService(db DB, projectSvc *projects.Service, productSvc *products.Service, fileSvc *files.Service, userSvc *users.Service,

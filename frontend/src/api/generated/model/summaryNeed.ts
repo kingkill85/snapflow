@@ -15,10 +15,10 @@ export interface SummaryNeed {
   loadType: NullableNeedRef | null;
   note: string;
   /**
-     * Power per unit in W; null for unknown
+     * Power per unit in W, a decimal string with 2 decimals; null for unknown
      * @nullable
      */
-  powerW: number | null;
+  powerW: string | null;
   quantity: number;
   /** Drawn as a load symbol on the plan */
   symbol: boolean;

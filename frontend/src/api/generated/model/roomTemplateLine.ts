@@ -4,21 +4,22 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { RoomTemplateLineWarningsItem } from './roomTemplateLineWarningsItem';
 
 export interface RoomTemplateLine {
   functionTypeId: string;
-  /** At most 100 characters; empty for none */
   label: string;
   /**
-     * One of the function type's allowed load types (any when it lists none); null for none
+     * null for none
      * @nullable
      */
   loadTypeId: string | null;
   /**
-     * Power per unit in W, 0-100000; null for unknown
+     * Power per unit in W, a decimal string with exactly 2 decimals; null for unknown
      * @nullable
      */
-  powerW: number | null;
-  /** 1-100 */
+  powerW: string | null;
   quantity: number;
+  /** Why the line cannot be applied as it is (the editor skips such lines) */
+  warnings: RoomTemplateLineWarningsItem[];
 }

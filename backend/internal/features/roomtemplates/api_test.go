@@ -57,7 +57,7 @@ func fields(t *testing.T, resp *httptest.ResponseRecorder) []string {
 func text(en string) map[string]string { return map[string]string{"en": en} }
 
 func line(functionType string) map[string]any {
-	return map[string]any{"functionTypeId": functionType, "quantity": 2, "powerW": 40.5, "loadTypeId": nil, "label": "Ceiling"}
+	return map[string]any{"functionTypeId": functionType, "quantity": 2, "powerW": "40.5", "loadTypeId": nil, "label": "Ceiling"}
 }
 
 func TestRoomTemplates(t *testing.T) {
@@ -80,14 +80,16 @@ func TestRoomTemplates(t *testing.T) {
 	badLoad := line(blind)
 	badLoad["loadTypeId"] = led
 	badQty := line(blind)
-	badQty["quantity"], badQty["powerW"] = 0, 200000
+	badQty["quantity"], badQty["powerW"] = 0, "200000"
+	badPower := line(blind)
+	badPower["powerW"] = "1.234"
 	got := fields(t, api.Post("/api/room-templates", admin, map[string]any{
 		"key": "Bad Key", "name": map[string]string{"de": "x"}, "equipmentLevel": map[string]string{"de": "Komfort"}, "isActive": true,
-		"lines": []any{badLoad, badQty, line(uuid.NewString()), line(old)},
+		"lines": []any{badLoad, badQty, line(uuid.NewString()), line(old), badPower},
 	}))
 	for _, w := range []string{
 		"body.key room_template.key_format", "body.name.en validation.required", "body.equipmentLevel.en validation.required",
-		"body.lines[0].loadTypeId need.load_type_not_allowed", "body.lines[1].quantity validation.range", "body.lines[1].powerW validation.range",
+		"body.lines[0].loadTypeId need.load_type_not_allowed", "body.lines[1].quantity validation.range", "body.lines[1].powerW need.power_invalid", "body.lines[4].powerW need.power_invalid",
 		"body.lines[2].functionTypeId function_type.not_found", "body.lines[3].functionTypeId need.function_type_inactive",
 	} {
 		if !slices.Contains(got, w) {
@@ -104,7 +106,7 @@ func TestRoomTemplates(t *testing.T) {
 	wantCode(t, resp, http.StatusCreated, "")
 	living := decode[roomtemplates.RoomTemplate](t, resp)
 	if living.Name["en"] != "Living room" || living.EquipmentLevel["en"] != "Comfort" || len(living.Lines) != 1 ||
-		living.Lines[0].PowerW == nil || *living.Lines[0].PowerW != 40.5 || !living.Can.Update {
+		living.Lines[0].PowerW == nil || *living.Lines[0].PowerW != "40.50" || len(living.Lines[0].Warnings) != 0 || !living.Can.Update {
 		t.Errorf("created: %+v", living)
 	}
 	wantCode(t, api.Post("/api/room-templates", admin, map[string]any{"key": "living", "name": text("x"), "isActive": true, "lines": []any{}}),
@@ -128,6 +130,27 @@ func TestRoomTemplates(t *testing.T) {
 	wantCode(t, api.Put("/api/room-templates/"+living.ID.String(), admin, map[string]any{
 		"key": "living", "name": text("Living"), "isActive": true, "lines": []any{}, "expectedUpdatedAt": living.UpdatedAt,
 	}), http.StatusConflict, "room_template.stale")
+
+	// The blind is retired: the stored lines keep it on update (flagged),
+	// a line with another inactive function type is refused (D345).
+	wantCode(t, api.Put("/api/function-types/"+blind, admin, map[string]any{
+		"key": "rt_blind", "name": text("Blind"), "loadTypeIds": []string{motor}, "isActive": false}), http.StatusOK, "")
+	resp = api.Put("/api/room-templates/"+living.ID.String(), admin, map[string]any{
+		"key": "living", "name": text("Living"), "isActive": true, "lines": []any{line(blind), line(blind), line(old)},
+		"expectedUpdatedAt": updated.UpdatedAt,
+	})
+	if got := fields(t, resp); len(got) != 1 || got[0] != "body.lines[2].functionTypeId need.function_type_inactive" {
+		t.Errorf("inactive line: %v", got)
+	}
+	resp = api.Put("/api/room-templates/"+living.ID.String(), admin, map[string]any{
+		"key": "living", "name": text("Living"), "isActive": true, "lines": []any{line(blind), line(blind)},
+		"expectedUpdatedAt": updated.UpdatedAt,
+	})
+	wantCode(t, resp, http.StatusOK, "")
+	if kept := decode[roomtemplates.RoomTemplate](t, resp); len(kept.Lines) != 2 ||
+		!slices.Equal(kept.Lines[0].Warnings, []roomtemplates.LineWarning{roomtemplates.WarnLineFunctionTypeInactive}) {
+		t.Errorf("kept lines: %+v", kept.Lines)
+	}
 
 	// Lists: active only by default; order.
 	list := decode[roomtemplates.RoomTemplateList](t, api.Get("/api/room-templates", admin))

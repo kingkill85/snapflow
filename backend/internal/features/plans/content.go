@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"slices"
@@ -383,9 +384,16 @@ func (s *Service) validateContent(ctx context.Context, st stored, cat needCatalo
 	}
 	needsIn := in.Needs
 	if needsIn == nil {
-		needsIn = keptNeeds(st.needs, zones)
+		var dropped int
+		needsIn, dropped = keptNeeds(st.needs, zones)
+		if dropped > 0 {
+			// D326: a client that does not send needs deleted zones with
+			// needs; they went with their zone.
+			slog.WarnContext(ctx, "plans: a content save without needs dropped the needs of deleted zones",
+				"plan_id", st.plan.ID, "dropped", dropped)
+		}
 	}
-	needs, needErrs := validateNeeds(cat, needsIn, st.needs, zones, w, h)
+	needs, needErrs := validateNeeds(cat, needsIn, st.needs, in.RestoredNeedIDs, zones, w, h)
 	errs = append(errs, needErrs...)
 	if len(errs) > 0 {
 		return nil, nil, nil, apperr.Validation(errs...)
@@ -625,9 +633,21 @@ func (s *Service) scaleContent(ctx context.Context, q *store.Queries, plan store
 	return err
 }
 
-// CopyVersion copies the plans of source with their zones, placements and needs
-// into target (projects.Service.OnCopyVersion): new ids for plans, zones and
-// placements, the same image files (files are immutable), no locks.
+// PlanCopier copies what a feature owns of a version's plans (3d:
+// connections, keyed by plan id and need id) in tx, after the plans and their
+// content were copied. planIDs maps every source plan id to its copy; zone,
+// placement and need ids are kept (D339).
+type PlanCopier func(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, target projects.VersionRef) error
+
+// OnCopyPlans registers a plan copier; CopyVersion runs every one. Call it
+// while wiring the features, not concurrently with requests.
+func (s *Service) OnCopyPlans(c PlanCopier) { s.planCopiers = append(s.planCopiers, c) }
+
+// CopyVersion copies the plans of source with their zones, placements and
+// needs into target (projects.Service.OnCopyVersion): new plan ids, the same
+// zone, placement and need ids (they are unique per plan, D339), the same
+// image files (files are immutable), no locks. Then it runs the plan
+// copiers with the map of plan ids.
 func (s *Service) CopyVersion(ctx context.Context, tx pgx.Tx, source, target projects.VersionRef) error {
 	if _, err := auth.Require(ctx, auth.PermProjectsWrite); err != nil {
 		return err
@@ -637,42 +657,30 @@ func (s *Service) CopyVersion(ctx context.Context, tx pgx.Tx, source, target pro
 	if err != nil {
 		return err
 	}
+	planIDs := make(map[uuid.UUID]uuid.UUID, len(ids))
 	for _, id := range ids {
 		newID, err := q.CopyPlan(ctx, store.CopyPlanParams{TenantID: target.TenantID, VersionID: target.ID, ID: id})
 		if err != nil {
 			return err
 		}
+		planIDs[id] = newID
 		zones, placements, err := readContent(ctx, q, id)
 		if err != nil {
 			return err
-		}
-		zoneIDs := make(map[uuid.UUID]uuid.UUID, len(zones))
-		for i := range zones {
-			zoneIDs[zones[i].ID] = uuid.New()
-			zones[i].ID = zoneIDs[zones[i].ID]
-		}
-		for i := range placements {
-			placements[i].ID = uuid.New()
-			if z := placements[i].ZoneID; z != nil {
-				nz := zoneIDs[*z]
-				placements[i].ZoneID = &nz
-			}
 		}
 		needs, err := readNeeds(ctx, q, id)
 		if err != nil {
 			return err
 		}
-		for i := range needs {
-			needs[i].ID = uuid.New()
-			if z := needs[i].ZoneID; z != nil {
-				nz := zoneIDs[*z]
-				needs[i].ZoneID = &nz
-			}
-		}
 		if err := writeContent(ctx, q, target.TenantID, newID, zones, placements); err != nil {
 			return err
 		}
 		if err := writeNeeds(ctx, q, target.TenantID, newID, needs); err != nil {
+			return err
+		}
+	}
+	for _, c := range s.planCopiers {
+		if err := c(ctx, tx, planIDs, target); err != nil {
 			return err
 		}
 	}

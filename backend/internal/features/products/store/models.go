@@ -206,7 +206,7 @@ type PlanNeed struct {
 	TenantID       uuid.UUID
 	FunctionTypeID uuid.UUID
 	Quantity       int32
-	PowerW         *float64
+	PowerW         *string
 	LoadTypeID     *uuid.UUID
 	Label          string
 	Note           string
@@ -388,7 +388,7 @@ type RoomTemplateLine struct {
 	Position       int32
 	FunctionTypeID uuid.UUID
 	Quantity       int32
-	PowerW         *float64
+	PowerW         *string
 	LoadTypeID     *uuid.UUID
 	Label          string
 }

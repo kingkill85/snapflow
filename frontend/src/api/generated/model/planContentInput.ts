@@ -4,7 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { PlanNeed } from './planNeed';
+import type { PlanNeedInput } from './planNeedInput';
 import type { PlanPlacementInput } from './planPlacementInput';
 import type { PlanZone } from './planZone';
 
@@ -13,10 +13,12 @@ export interface PlanContentInput {
   readonly $schema?: string;
   /** contentUpdatedAt as last read; plan.stale otherwise */
   expectedContentUpdatedAt: string;
-  /** In order (the array order is stored); at most 2000. Left out keeps the stored needs (D294), dropping those of deleted zones */
-  needs?: PlanNeed[];
+  /** In order (the array order is stored); at most 2000. Left out (or null) keeps the stored needs (D294), dropping those of deleted zones */
+  needs?: PlanNeedInput[];
   /** In draw order (the array order is stored); at most 2000 */
   placements: PlanPlacementInput[];
+  /** Needs of this save that come back from content saved before (undo/redo in the editor): like a stored need they keep an inactive function type or load type (D343) */
+  restoredNeedIds?: string[];
   /**
      * Metres per image pixel, above 0; null for none
      * @nullable

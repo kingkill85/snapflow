@@ -67,6 +67,9 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	projects.Register(api, projectSvc)
 	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users, functionTypeSvc, capSvc)
 	projectSvc.OnCopyVersion(planSvc.CopyVersion)
+	for _, c := range deps.PlanCopiers {
+		planSvc.OnCopyPlans(c)
+	}
 	plans.Register(api, planSvc)
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)

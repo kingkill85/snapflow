@@ -219,7 +219,7 @@ const getPlan = `-- name: GetPlan :one
 SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT count(*) FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.id = $1
 `
@@ -277,7 +277,7 @@ INSERT INTO plan_needs (tenant_id, plan_id, id, function_type_id, quantity, powe
 SELECT $1::uuid, $2::uuid, r.id, r.function_type_id, r.quantity, r.power_w,
     r.load_type_id, r.label, r.note, r.x, r.y, r.zone_id, r.position
 FROM jsonb_to_recordset($3::jsonb)
-    AS r (id uuid, function_type_id uuid, quantity integer, power_w double precision, load_type_id uuid, label text,
+    AS r (id uuid, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid, label text,
           note text, x double precision, y double precision, zone_id uuid, position integer)
 `
 
@@ -422,7 +422,7 @@ const listPlans = `-- name: ListPlans :many
 SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT count(*) FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.version_id = $1
 ORDER BY p.position, p.id
@@ -722,7 +722,7 @@ type VersionNeedsRow struct {
 	ID             uuid.UUID
 	FunctionTypeID uuid.UUID
 	Quantity       int32
-	PowerW         *float64
+	PowerW         *string
 	LoadTypeID     *uuid.UUID
 	Label          string
 	Note           string

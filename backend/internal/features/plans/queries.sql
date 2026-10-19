@@ -5,7 +5,7 @@
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT count(*) FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.version_id = $1
 ORDER BY p.position, p.id;
@@ -14,7 +14,7 @@ ORDER BY p.position, p.id;
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT count(*) FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.id = $1;
 
@@ -106,7 +106,7 @@ INSERT INTO plan_needs (tenant_id, plan_id, id, function_type_id, quantity, powe
 SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.function_type_id, r.quantity, r.power_w,
     r.load_type_id, r.label, r.note, r.x, r.y, r.zone_id, r.position
 FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
-    AS r (id uuid, function_type_id uuid, quantity integer, power_w double precision, load_type_id uuid, label text,
+    AS r (id uuid, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid, label text,
           note text, x double precision, y double precision, zone_id uuid, position integer);
 
 -- VersionNeeds returns the needs of a version's plans (the needs summary).
