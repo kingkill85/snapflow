@@ -8,11 +8,13 @@ import type { LinePrefixScheme } from './linePrefixScheme';
 
 export interface LinePrefix {
   busLineId: string;
-  /** The line's address field is empty: the prefix is the default (KNX 1.<n>, HDL <n> for the n-th line of the system) */
+  /** The line's address field is empty: the prefix is the default (KNX 1.1-1.15, HDL 1-254: the first one no other line of the scheme uses) */
   default: boolean;
   /** The line's address field cannot be parsed (no automatic addresses) */
   invalid: boolean;
-  /** KNX area.line or HDL subnet the line's devices get; empty for scheme none or a malformed address */
+  /** The line has no address field and no default prefix is free: no automatic addresses */
+  noPrefix: boolean;
+  /** KNX area.line or HDL subnet the line's devices get; empty for scheme none, a malformed address or no free default */
   prefix?: string;
   scheme: LinePrefixScheme;
 }

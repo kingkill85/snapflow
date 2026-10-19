@@ -122,7 +122,7 @@
         "additionalProperties": false,
         "properties": {
           "hdl": {
-            "description": "subnet.device (0-254 each); only for HDL items",
+            "description": "subnet.device (1-254 each); only for HDL items",
             "type": "string"
           },
           "ieee": {
@@ -133,7 +133,7 @@
             "type": "string"
           },
           "knx": {
-            "description": "area.line.device (0-15.0-15.0-255); only for KNX items",
+            "description": "area.line.device (0-15.0-15.0-255, dots only); only for KNX items",
             "type": "string"
           },
           "note": {
@@ -6330,15 +6330,19 @@
             "type": "string"
           },
           "default": {
-            "description": "The line's address field is empty: the prefix is the default (KNX 1.\u003cn\u003e, HDL \u003cn\u003e for the n-th line of the system)",
+            "description": "The line's address field is empty: the prefix is the default (KNX 1.1-1.15, HDL 1-254: the first one no other line of the scheme uses)",
             "type": "boolean"
           },
           "invalid": {
             "description": "The line's address field cannot be parsed (no automatic addresses)",
             "type": "boolean"
           },
+          "noPrefix": {
+            "description": "The line has no address field and no default prefix is free: no automatic addresses",
+            "type": "boolean"
+          },
           "prefix": {
-            "description": "KNX area.line or HDL subnet the line's devices get; empty for scheme none or a malformed address",
+            "description": "KNX area.line or HDL subnet the line's devices get; empty for scheme none, a malformed address or no free default",
             "type": "string"
           },
           "scheme": {
@@ -6354,7 +6358,8 @@
           "busLineId",
           "scheme",
           "default",
-          "invalid"
+          "invalid",
+          "noPrefix"
         ],
         "type": "object"
       },
@@ -9144,6 +9149,16 @@
             ],
             "type": "string"
           },
+          "addressing": {
+            "description": "Device addresses: KNX individual address or HDL Buspro subnet.device (bus topology), EUI-64 / Zigbee IEEE (wireless topology), or none",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
+            ],
+            "type": "string"
+          },
           "busDevicesMax": {
             "description": "Default maximum devices per bus line; empty = not checked",
             "format": "int32",
@@ -9233,6 +9248,7 @@
           "reservePercent",
           "topology",
           "nominalVoltage",
+          "addressing",
           "createdAt",
           "updatedAt",
           "can"
@@ -9255,6 +9271,16 @@
             "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
             "examples": [
               "ZB"
+            ],
+            "type": "string"
+          },
+          "addressing": {
+            "description": "knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294)",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
             ],
             "type": "string"
           },
@@ -9425,6 +9451,16 @@
             "description": "Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none",
             "examples": [
               "ZB"
+            ],
+            "type": "string"
+          },
+          "addressing": {
+            "description": "knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294)",
+            "enum": [
+              "knx_individual",
+              "hdl",
+              "eui64",
+              "none"
             ],
             "type": "string"
           },

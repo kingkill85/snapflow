@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProductTypeUpdateAddressing } from './productTypeUpdateAddressing';
 import type { ProductTypeUpdateName } from './productTypeUpdateName';
 import type { ProductTypeUpdateTopology } from './productTypeUpdateTopology';
 
@@ -12,6 +13,8 @@ export interface ProductTypeUpdate {
   readonly $schema?: string;
   /** Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none */
   abbreviation?: string;
+  /** knx_individual and hdl need topology bus, eui64 wireless; on create, left out follows the key and topology (bus knx… → knx_individual, bus hdl… → hdl, wireless → eui64, else none); on update, left out keeps the stored value (D294) */
+  addressing?: ProductTypeUpdateAddressing;
   /** 1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294) */
   busDevicesMax?: number;
   /** Badge colour, #rrggbb (stored lower case); empty for none */

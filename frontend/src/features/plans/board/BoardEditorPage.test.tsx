@@ -254,7 +254,7 @@ describe('BoardEditorPage', () => {
         HttpResponse.json({
           versionId,
           items: [{ ...addressedItem, planId: board.id, itemId: m, busLineId: pid(95), address: { knx: '1.1.5', pinned: false } }],
-          lines: [{ busLineId: pid(95), scheme: 'knx', prefix: '1.1', default: true, invalid: false }],
+          lines: [{ busLineId: pid(95), scheme: 'knx', prefix: '1.1', default: true, invalid: false, noPrefix: false }],
           can: { update: true },
         }),
       ),

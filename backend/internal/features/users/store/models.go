@@ -383,6 +383,7 @@ type ProductType struct {
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
 	NominalVoltage            int32
+	Addressing                string
 }
 
 type ProductVariant struct {

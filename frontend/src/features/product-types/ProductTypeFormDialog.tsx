@@ -88,13 +88,14 @@ const schema = z.object({
     .trim()
     .refine((v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 1000, errorKey('validation.range', { min: 1, max: 1000 })),
   topology: z.enum(['bus', 'wireless', 'none']),
+  addressing: z.enum(['knx_individual', 'hdl', 'eui64', 'none']),
   defaultWirelessPlacesUsed: optionalWhole(1, 1000),
   isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
 
 const fields = {
-  ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'defaultBusCurrentMa', 'reservePercent', 'busDevicesMax', 'nominalVoltage', 'topology', 'defaultWirelessPlacesUsed', 'isActive']),
+  ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'defaultBusCurrentMa', 'reservePercent', 'busDevicesMax', 'nominalVoltage', 'topology', 'addressing', 'defaultWirelessPlacesUsed', 'isActive']),
   ...translatableApiFields('name'),
 }
 
@@ -108,6 +109,7 @@ const toFormValues = (item: ProductType | null): FormValues => ({
   busDevicesMax: item?.busDevicesMax?.toString() ?? '',
   nominalVoltage: (item?.nominalVoltage ?? 230).toString(),
   topology: item?.topology ?? 'none',
+  addressing: item?.addressing ?? 'none',
   defaultWirelessPlacesUsed: item?.defaultWirelessPlacesUsed?.toString() ?? '',
   isActive: item?.isActive ?? true,
 })
@@ -126,9 +128,16 @@ const toInput = (v: FormValues): ProductTypeInput => {
     busDevicesMax: Number(v.busDevicesMax.trim() || 0),
     nominalVoltage: Number(v.nominalVoltage.trim()),
     topology: v.topology,
+    addressing: v.addressing,
     defaultWirelessPlacesUsed: Number(v.defaultWirelessPlacesUsed.trim() || 0),
     isActive: v.isActive,
   }
+}
+
+const addressingByTopology: Record<FormValues['topology'], readonly FormValues['addressing'][]> = {
+  none: ['none'],
+  bus: ['none', 'knx_individual', 'hdl'],
+  wireless: ['none', 'eui64'],
 }
 
 type Props = {
@@ -178,6 +187,14 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
 
   const [name, abbreviation, color, topology] = useWatch({ control: form.control, name: ['name', 'abbreviation', 'color', 'topology'] })
   const topologyOptions = (['none', 'bus', 'wireless'] as const).map((v) => ({ value: v, label: t(`topology.${v}`) }))
+  // The schemes the topology allows (the API refuses the others).
+  const allowedAddressing = addressingByTopology[topology]
+  const addressingOptions = allowedAddressing.map((v) => ({ value: v, label: t(`addressing.${v}`) }))
+  const addressing = useWatch({ control: form.control, name: 'addressing' })
+  const { setValue } = form
+  useEffect(() => {
+    if (!allowedAddressing.includes(addressing)) setValue('addressing', 'none')
+  }, [allowedAddressing, addressing, setValue])
   const previewColor = /^#[0-9a-fA-F]{6}$/.test(color.trim()) ? color.trim() : undefined
 
   const submit = form.handleSubmit(async (values) => {
@@ -281,14 +298,24 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
       </div>
       <div className="space-y-3">
         <p className="text-sm font-medium">{t('field.systemSettings')}</p>
-        <FormSelectField
-          control={form.control}
-          name="topology"
-          label={t('field.topology')}
-          hint={t('field.topologyHint')}
-          options={topologyOptions}
-          error={fieldError(errors.topology?.message)}
-        />
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          <FormSelectField
+            control={form.control}
+            name="topology"
+            label={t('field.topology')}
+            hint={t('field.topologyHint')}
+            options={topologyOptions}
+            error={fieldError(errors.topology?.message)}
+          />
+          <FormSelectField
+            control={form.control}
+            name="addressing"
+            label={t('field.addressing')}
+            hint={t('field.addressingHint')}
+            options={addressingOptions}
+            error={fieldError(errors.addressing?.message)}
+          />
+        </div>
         {/* The defaults of the other topologies stay in the form and are sent as they are (D294). */}
         <div className="grid items-start gap-4 sm:grid-cols-3">
           {topology === 'bus' && (

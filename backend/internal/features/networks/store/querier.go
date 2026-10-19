@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	ClearAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error)
 	// CopyAddresses copies the addresses of a version into another with the
 	// plan ids mapped (a JSON object source id -> copy id).
 	CopyAddresses(ctx context.Context, arg CopyAddressesParams) error
@@ -24,6 +25,8 @@ type Querier interface {
 	CreateBusLine(ctx context.Context, arg CreateBusLineParams) (BusLine, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAssignment(ctx context.Context, arg DeleteAssignmentParams) error
+	// DeleteAutoAddresses removes the automatic rows without a note;
+	// ClearAutoAddresses keeps the note of the others.
 	DeleteAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error)
 	DeleteBusLine(ctx context.Context, arg DeleteBusLineParams) (int64, error)
 	GetBusLine(ctx context.Context, arg GetBusLineParams) (BusLine, error)

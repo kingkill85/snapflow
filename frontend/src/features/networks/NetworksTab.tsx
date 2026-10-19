@@ -109,6 +109,7 @@ export function NetworksTab({ versionId }: { versionId: string }) {
   const canUpdate = data.can.update
 
   const setAssignment = async (assignment: AssignmentInput) => {
+    setAssigned(null) // the notice is about the last assign only
     try {
       await assign.mutateAsync({ versionId, data: { assignments: [assignment] } })
     } catch {
@@ -128,6 +129,7 @@ export function NetworksTab({ versionId }: { versionId: string }) {
     const i = ids.indexOf(line.id)
     const j = ids.indexOf(neighbour.id)
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    setAssigned(null)
     try {
       await reorder.mutateAsync({ versionId, data: { ids } })
     } catch {
@@ -172,7 +174,7 @@ export function NetworksTab({ versionId }: { versionId: string }) {
 
   return (
     <ChecksContext.Provider value={checks.data}>
-    <AddressesContext.Provider value={{ versionId, data: addresses.data }}>
+    <AddressesContext.Provider value={{ versionId, data: addresses.data, onWrite: () => setAssigned(null) }}>
       <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 space-y-1">
@@ -190,6 +192,7 @@ export function NetworksTab({ versionId }: { versionId: string }) {
               disabled={addressBusy}
               onClick={() => {
                 clearAddresses.reset()
+                setAssigned(null)
                 setClearing(true)
               }}
             >
@@ -411,6 +414,7 @@ function LineBlock({ line, lines, first, last, actions, onAssign, assignBusy, on
         )}
       </div>
       {prefix?.invalid && <Notice tone="warning">{t('address.lineInvalid', { address: line.address })}</Notice>}
+      {prefix?.noPrefix && <Notice tone="warning">{t('address.lineNoPrefix')}</Notice>}
       <MemberTable label={line.name} members={line.members} lines={lines} actions={actions} lineId={line.id} />
     </div>
   )
@@ -451,10 +455,8 @@ function MemberTable({
       ),
     },
   ]
-  if (lineId !== undefined) {
-    columns.push({ header: t('columns.assignment'), cell: (m) => <AssignmentBadge pinned={m.pinned} /> })
-    columns.push({ header: t('columns.address'), cell: (m) => <AddressCell device={m} name={names.full(m)} /> })
-  }
+  if (lineId !== undefined) columns.push({ header: t('columns.assignment'), cell: (m) => <AssignmentBadge pinned={m.pinned} /> })
+  columns.push({ header: t('columns.address'), cell: (m) => <AddressCell device={m} name={names.full(m)} /> })
   if (actions && lineId !== undefined) {
     columns.push({
       header: t('columns.line'),
@@ -548,10 +550,8 @@ function DeviceTable({
     { header: t('columns.label'), cell: (d) => d.label },
     { header: t('columns.places'), cell: (d) => <span className="tabular-nums">{places(d)}</span> },
   ]
-  if (gateway) {
-    columns.push({ header: t('columns.assignment'), cell: (d) => <AssignmentBadge pinned={d.pinned} /> })
-    columns.push({ header: t('columns.address'), cell: (d) => <AddressCell device={d} name={names.full(d)} /> })
-  }
+  if (gateway) columns.push({ header: t('columns.assignment'), cell: (d) => <AssignmentBadge pinned={d.pinned} /> })
+  columns.push({ header: t('columns.address'), cell: (d) => <AddressCell device={d} name={names.full(d)} /> })
   if (actions && gateway) {
     const value = gatewayKey(gateway)
     columns.push({

@@ -58,11 +58,12 @@ export function Loading() {
  * (see setApiFieldErrors). `action`: a way out shown next to the text, e.g. a
  * Reload button.
  */
-export function ErrorMessage({ error, fields, action }: { error: unknown; fields?: ApiFieldMap; action?: ReactNode }) {
+export function ErrorMessage({ error, fields, action, id }: { error: unknown; fields?: ApiFieldMap; action?: ReactNode; id?: string }) {
   const message = useErrorMessage()
   if (!error) return null
   return (
     <div
+      id={id}
       role="alert"
       className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
     >

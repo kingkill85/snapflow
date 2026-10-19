@@ -24,6 +24,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   reservePercent: 20,
   nominalVoltage: 230,
   topology: 'none',
+  addressing: 'none',
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -141,6 +142,8 @@ describe('ProductTypesPage', () => {
     await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Wireless')
     expect(within(dialog).queryByLabelText('Devices per line')).not.toBeInTheDocument()
     await u.type(within(dialog).getByLabelText('Default wireless places'), '1')
+    // Addressing offers the schemes of the topology.
+    await chooseOption(u, within(dialog).getByLabelText('Addressing'), 'EUI-64 (Zigbee IEEE)')
     // The preview follows the form; a light colour gets black text.
     expect(preview).toHaveTextContent('KNXKNX')
     expect(within(preview).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#FFCC00', color: '#000000' })
@@ -159,6 +162,7 @@ describe('ProductTypesPage', () => {
       busDevicesMax: 0,
       nominalVoltage: 230,
       topology: 'wireless',
+      addressing: 'eui64',
       defaultWirelessPlacesUsed: 1,
       isActive: true,
     })
@@ -290,6 +294,7 @@ describe('ProductTypesPage', () => {
       busDevicesMax: 64,
       nominalVoltage: 110,
       topology: 'bus',
+      addressing: 'none',
       defaultWirelessPlacesUsed: 0,
       isActive: true,
       expectedUpdatedAt: alpha.updatedAt,

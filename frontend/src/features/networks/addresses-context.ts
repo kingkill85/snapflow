@@ -2,8 +2,15 @@ import { createContext, useContext } from 'react'
 
 import type { AddressedItem, Addresses, LinePrefix } from '@/api/generated/model'
 
-/** The version's device addresses (step 3e, D419); undefined while loading. */
-export const AddressesContext = createContext<{ versionId: string; data: Addresses | undefined }>({ versionId: '', data: undefined })
+/**
+ * The version's device addresses (step 3e, D419); undefined while loading.
+ * onWrite is called before an address is saved (the tab drops its notice
+ * about the last auto-assign).
+ */
+export const AddressesContext = createContext<{ versionId: string; data: Addresses | undefined; onWrite?: () => void }>({
+  versionId: '',
+  data: undefined,
+})
 
 const key = (i: { planId: string; itemId: string }) => `${i.planId}:${i.itemId}`
 

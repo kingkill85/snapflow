@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Actions } from './actions';
+import type { ProductTypeAddressing } from './productTypeAddressing';
 import type { ProductTypeName } from './productTypeName';
 import type { ProductTypeTopology } from './productTypeTopology';
 
@@ -13,6 +14,8 @@ export interface ProductType {
   readonly $schema?: string;
   /** Badge text, upper case, at most 6 characters */
   abbreviation?: string;
+  /** Device addresses: KNX individual address or HDL Buspro subnet.device (bus topology), EUI-64 / Zigbee IEEE (wireless topology), or none */
+  addressing: ProductTypeAddressing;
   /** Default maximum devices per bus line; empty = not checked */
   busDevicesMax?: number;
   can: Actions;

@@ -11,6 +11,20 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearAutoAddresses = `-- name: ClearAutoAddresses :execrows
+UPDATE device_addresses SET knx_area = NULL, knx_line = NULL, knx_device = NULL, hdl_subnet = NULL, hdl_device = NULL,
+    ieee = NULL, updated_at = now()
+WHERE version_id = $1 AND NOT pinned AND (knx_device IS NOT NULL OR hdl_device IS NOT NULL OR ieee IS NOT NULL)
+`
+
+func (q *Queries) ClearAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearAutoAddresses, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const copyAddresses = `-- name: CopyAddresses :exec
 INSERT INTO device_addresses (tenant_id, version_id, plan_id, item_id, knx_area, knx_line, knx_device, hdl_subnet, hdl_device, ieee, note, pinned)
 SELECT $1::uuid, $2::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.knx_area, a.knx_line,
@@ -156,9 +170,11 @@ func (q *Queries) DeleteAssignment(ctx context.Context, arg DeleteAssignmentPara
 }
 
 const deleteAutoAddresses = `-- name: DeleteAutoAddresses :execrows
-DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned
+DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned AND note = ''
 `
 
+// DeleteAutoAddresses removes the automatic rows without a note;
+// ClearAutoAddresses keeps the note of the others.
 func (q *Queries) DeleteAutoAddresses(ctx context.Context, versionID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAutoAddresses, versionID)
 	if err != nil {

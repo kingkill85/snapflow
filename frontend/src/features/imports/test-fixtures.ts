@@ -31,6 +31,7 @@ export const zigbee: ProductType = {
   reservePercent: 20,
   nominalVoltage: 230,
   topology: 'wireless',
+  addressing: 'eui64',
   color: '#1f6feb',
   sortOrder: 1,
   isActive: true,

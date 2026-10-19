@@ -291,6 +291,8 @@ type state struct {
 	types map[uuid.UUID]producttypes.ProductType
 	// addresses are the stored device addresses (3e), by (plan, item).
 	addresses map[[2]uuid.UUID]store.DeviceAddress
+	// loaded are the variant ids the catalog was loaded for.
+	loaded map[uuid.UUID]bool
 }
 
 func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUID) (state, error) {
@@ -316,6 +318,10 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 	}
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	ids = slices.Compact(ids)
+	st.loaded = make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		st.loaded[id] = true
+	}
 	if st.variants, err = s.products.BOMVariants(ctx, ids); err != nil {
 		return st, err
 	}

@@ -244,7 +244,10 @@ describe('NetworksTab', () => {
       const input = screen.getByRole('textbox', { name: 'Address of Switch actuator 8-fold · Kitchen, Ground floor' })
       await user.clear(input)
       await user.type(input, '1.2.7{Enter}')
-      expect(await screen.findByText('Another device already has the address 1.2.7.')).toBeInTheDocument()
+      const error = await screen.findByText('Another device already has the address 1.2.7.')
+      // The error describes the input.
+      expect(input).toHaveAttribute('aria-invalid', 'true')
+      expect(document.getElementById(input.getAttribute('aria-describedby') ?? '')).toContainElement(error)
       refuse = false
       await user.clear(input)
       await user.type(input, '1.1.9')
@@ -270,6 +273,69 @@ describe('NetworksTab', () => {
       await user.click(await screen.findByRole('button', { name: 'Edit address of Door sensor · Front door, Ground floor' }))
       await user.type(screen.getByRole('textbox', { name: /Address of Door sensor/ }), '00:12:4b:00:1c:a1:b2:c4{Enter}')
       await waitFor(() => expect(bodies).toEqual([{ addresses: [{ planId: doorSensor.planId, itemId: doorSensor.itemId, ieee: '00:12:4b:00:1c:a1:b2:c4' }] }]))
+    })
+
+    it('cancels with Escape, sends nothing for an unchanged value and clears with an empty one', async () => {
+      const user = userEvent.setup()
+      serve(networks)
+      const bodies: unknown[] = []
+      server.use(
+        http.put('/api/versions/:versionId/addresses', async ({ request }) => {
+          bodies.push(await request.json())
+          return HttpResponse.json(addresses)
+        }),
+      )
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      const edit = await screen.findByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' })
+      const input = () => screen.getByRole('textbox', { name: 'Address of Switch actuator 8-fold · Kitchen, Ground floor' })
+
+      // Escape cancels.
+      await user.click(edit)
+      await user.clear(input())
+      await user.type(input(), '1.1.4{Escape}')
+      expect(screen.queryByRole('textbox', { name: /Address of/ })).not.toBeInTheDocument()
+
+      // Unchanged: closes without a request (the automatic address stays automatic).
+      await user.click(screen.getByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
+      expect(input()).toHaveValue('1.1.1')
+      await user.type(input(), '{Enter}')
+      expect(screen.queryByRole('textbox', { name: /Address of/ })).not.toBeInTheDocument()
+
+      // Empty clears.
+      await user.click(screen.getByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
+      await user.clear(input())
+      await user.click(screen.getByRole('button', { name: 'Save address' }))
+      await waitFor(() => expect(bodies).toEqual([{ addresses: [{ planId: actuator.planId, itemId: actuator.itemId }] }]))
+    })
+
+    it('shows the address of devices without a line or gateway', async () => {
+      serve({ ...networks, busSystems: [{ ...networks.busSystems[0], unassigned: [actuator] }] })
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      const table = await screen.findByRole('table', { name: 'KNX: Without line' })
+      expect(within(table).getByRole('columnheader', { name: 'Address' })).toBeInTheDocument()
+      expect(within(table).getByText('1.1.1')).toBeInTheDocument()
+    })
+
+    it('drops the assign notice after the next action', async () => {
+      const user = userEvent.setup()
+      serve(networks)
+      server.use(
+        http.post('/api/versions/:versionId/addresses/assign', () => HttpResponse.json({ ...addresses, assigned: 2, unassigned: 0 })),
+        http.put('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses)),
+      )
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      await user.click(await screen.findByRole('button', { name: 'Assign addresses on KNX 2' }))
+      expect(await screen.findByText('2 devices got an automatic address.')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
+      await user.clear(screen.getByRole('textbox', { name: /Address of Switch actuator/ }))
+      await user.type(screen.getByRole('textbox', { name: /Address of Switch actuator/ }), '1.1.9{Enter}')
+      await waitFor(() => expect(screen.queryByText('2 devices got an automatic address.')).not.toBeInTheDocument())
+    })
+
+    it('warns about a line without a free default prefix', async () => {
+      serve(networks, noChecks, { ...addresses, lines: [addresses.lines[0], { ...addresses.lines[1], prefix: undefined, noPrefix: true }] })
+      renderWithProviders(<NetworksTab versionId={versionId} />)
+      expect(await screen.findByText(/No default line address is free/)).toBeInTheDocument()
     })
 
     it('assigns all lines or one line and clears automatic addresses', async () => {

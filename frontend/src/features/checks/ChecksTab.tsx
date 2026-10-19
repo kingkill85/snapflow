@@ -209,7 +209,7 @@ function Findings({
     const r = f.refs
     if (f.code === 'network_assignment_dangling') return `${versionPath(projectId, versionId)}?tab=networks`
     // A device's address (D419): its Address cell in the Networks tab.
-    if ((f.code === 'address_duplicate' || f.code === 'address_outside_line') && r.itemId) return `${versionPath(projectId, versionId)}?tab=networks#device-${r.itemId}`
+    if ((f.code === 'address_duplicate' || f.code === 'address_outside_line' || f.code === 'address_device_zero') && r.itemId) return `${versionPath(projectId, versionId)}?tab=networks#device-${r.itemId}`
     if (r.busLineId) return `${versionPath(projectId, versionId)}?tab=networks#line-${r.busLineId}`
     if (r.targetPlanId && r.itemId) {
       if (planKind.get(r.targetPlanId) === 'board') return `${boardPath(projectId, versionId, r.targetPlanId)}?select=${r.itemId}`

@@ -35,7 +35,15 @@
     "topology": "Topologie",
     "topologyHint": "Wie Geräte dieses Systems angebunden sind: Bus (Busstrom, Geräte pro Linie), Funk (Plätze am Gateway) oder keins von beiden.",
     "defaultWirelessPlacesUsed": "Standard-Funkplätze",
-    "defaultWirelessPlacesUsedHint": "Plätze am Gateway, die ein Gerät ohne eigenen Wert belegt (meist 1). Leer = unbekannt."
+    "defaultWirelessPlacesUsedHint": "Plätze am Gateway, die ein Gerät ohne eigenen Wert belegt (meist 1). Leer = unbekannt.",
+    "addressing": "Adressierung",
+    "addressingHint": "Die Geräteadressen dieses Systems im Reiter Netzwerke: KNX oder HDL Buspro für einen Bus, EUI-64 (Zigbee-IEEE) für Funk."
+  },
+  "addressing": {
+    "none": "Keine",
+    "knx_individual": "KNX-Einzeladresse",
+    "hdl": "HDL Buspro (Subnetz.Gerät)",
+    "eui64": "EUI-64 (Zigbee-IEEE)"
   },
   "topology": {
     "none": "Keine",

@@ -36,6 +36,8 @@
     "address_outside_line": "{{item}}: address {{address}} is outside its line {{line}} ({{prefix}})",
     "address_missing": "{{name}}: {{count}} devices without address",
     "bus_line_address_invalid": "{{name}}: the line address \"{{address}}\" cannot be read",
+    "bus_line_address_duplicate": "{{name}}: {{count}} lines use the line address {{prefix}}",
+    "address_device_zero": "{{item}}: address {{address}} uses device 0, which is reserved for the line coupler",
     "unknown": "Check {{code}}"
   },
   "candidate": {

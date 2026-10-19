@@ -23,12 +23,12 @@ func addrOf(a networks.Addresses, item uuid.UUID) *networks.DeviceAddress {
 }
 
 func TestParse(t *testing.T) {
-	for s, ok := range map[string]bool{"1.1.1": true, "15/15/255": true, "16.1.1": false, "1.1.256": false, "1.1": false, "a.b.c": false} {
+	for s, ok := range map[string]bool{"1.1.1": true, "15.15.255": true, "15/15/255": false, "1.1/1": false, "16.1.1": false, "1.1.256": false, "1.1": false, "a.b.c": false} {
 		if _, got := networks.ParseKNX(s); got != ok {
 			t.Errorf("KNX %q: %v", s, got)
 		}
 	}
-	for s, ok := range map[string]bool{"1.12": true, "254.254": true, "255.1": false, "1": false} {
+	for s, ok := range map[string]bool{"1.12": true, "254.254": true, "1.1": true, "255.1": false, "0.1": false, "1.0": false, "1.255": false, "1": false} {
 		if _, got := networks.ParseHDL(s); got != ok {
 			t.Errorf("HDL %q: %v", s, got)
 		}

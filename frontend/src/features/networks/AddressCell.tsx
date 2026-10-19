@@ -16,7 +16,7 @@ import { useRefreshNetworks } from './refresh'
  */
 export function AddressCell({ device, name }: { device: { planId: string; itemId: string }; name: string }) {
   const { t } = useTranslation('networks')
-  const { versionId, data } = useContext(AddressesContext)
+  const { versionId, data, onWrite } = useContext(AddressesContext)
   const item = useAddressedItem(device)
   const save = useSetAddresses()
   const refresh = useRefreshNetworks(versionId)
@@ -31,12 +31,20 @@ export function AddressCell({ device, name }: { device: { planId: string; itemId
   if (!item || item.powerSupply || item.scheme === 'none') return wrap(<span className="text-muted">{t('address.none')}</span>)
   const value = addressValue(item)
 
+  const errorId = `device-${device.itemId}-address-error`
   const submit = async () => {
     if (editing === null) return
     const input: AddressInput = { planId: item.planId, itemId: item.itemId }
     const v = editing.trim()
+    // Unchanged: nothing to save (an automatic address would become pinned).
+    if (v === value) {
+      setEditing(null)
+      save.reset()
+      return
+    }
     if (v !== '') input[item.scheme as 'knx' | 'hdl' | 'ieee'] = v
     if (item.address?.note) input.note = item.address.note
+    onWrite?.()
     try {
       await save.mutateAsync({ versionId, data: { addresses: [input] } })
     } catch {
@@ -65,6 +73,7 @@ export function AddressCell({ device, name }: { device: { planId: string; itemId
             value={editing}
             placeholder={t(`address.placeholder.${item.scheme as 'knx' | 'hdl' | 'ieee'}`)}
             aria-invalid={!!save.error}
+            aria-describedby={save.error ? errorId : undefined}
             autoFocus
             onChange={(e) => setEditing(e.target.value)}
             onKeyDown={onKey}
@@ -80,7 +89,7 @@ export function AddressCell({ device, name }: { device: { planId: string; itemId
             }}
           />
         </div>
-        {save.error && <ErrorMessage error={save.error} />}
+        {save.error && <ErrorMessage id={errorId} error={save.error} />}
       </>,
     )
 

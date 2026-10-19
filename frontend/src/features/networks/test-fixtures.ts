@@ -139,8 +139,8 @@ export const addresses: Addresses = {
     addressed(pinnedBulb, { systemId: zigbee.id, scheme: 'ieee', address: { ieee: '00124B001CA1B2C3', pinned: true } }),
   ],
   lines: [
-    { busLineId: knx1, scheme: 'knx', prefix: '1.1', default: false, invalid: false },
-    { busLineId: knx2, scheme: 'knx', prefix: '1.2', default: true, invalid: false },
+    { busLineId: knx1, scheme: 'knx', prefix: '1.1', default: false, invalid: false, noPrefix: false },
+    { busLineId: knx2, scheme: 'knx', prefix: '1.2', default: true, invalid: false, noPrefix: false },
   ],
   can: { update: true },
 }

@@ -35,7 +35,15 @@
     "topology": "Topology",
     "topologyHint": "How devices of this system connect: a bus (bus current, devices per line), wireless (places at a gateway) or neither.",
     "defaultWirelessPlacesUsed": "Default wireless places",
-    "defaultWirelessPlacesUsedHint": "Places at the gateway a device uses without its own value (usually 1). Empty = unknown."
+    "defaultWirelessPlacesUsedHint": "Places at the gateway a device uses without its own value (usually 1). Empty = unknown.",
+    "addressing": "Addressing",
+    "addressingHint": "The device addresses of this system on the Networks tab: KNX or HDL Buspro for a bus, EUI-64 (Zigbee IEEE) for wireless."
+  },
+  "addressing": {
+    "none": "None",
+    "knx_individual": "KNX individual address",
+    "hdl": "HDL Buspro (subnet.device)",
+    "eui64": "EUI-64 (Zigbee IEEE)"
   },
   "topology": {
     "none": "None",

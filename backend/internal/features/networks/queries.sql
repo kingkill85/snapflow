@@ -81,8 +81,15 @@ ON CONFLICT (plan_id, item_id) DO UPDATE SET knx_area = EXCLUDED.knx_area, knx_l
 -- name: DeleteAddress :exec
 DELETE FROM device_addresses WHERE version_id = $1 AND plan_id = $2 AND item_id = $3;
 
+-- DeleteAutoAddresses removes the automatic rows without a note;
+-- ClearAutoAddresses keeps the note of the others.
 -- name: DeleteAutoAddresses :execrows
-DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned;
+DELETE FROM device_addresses WHERE version_id = $1 AND NOT pinned AND note = '';
+
+-- name: ClearAutoAddresses :execrows
+UPDATE device_addresses SET knx_area = NULL, knx_line = NULL, knx_device = NULL, hdl_subnet = NULL, hdl_device = NULL,
+    ieee = NULL, updated_at = now()
+WHERE version_id = $1 AND NOT pinned AND (knx_device IS NOT NULL OR hdl_device IS NOT NULL OR ieee IS NOT NULL);
 
 -- CopyAddresses copies the addresses of a version into another with the
 -- plan ids mapped (a JSON object source id -> copy id).

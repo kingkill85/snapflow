@@ -6,12 +6,12 @@
  */
 
 export interface AddressInput {
-  /** subnet.device (0-254 each); only for HDL items */
+  /** subnet.device (1-254 each); only for HDL items */
   hdl?: string;
   /** 16 hex digits (separators : - and spaces ignored); only for wireless items */
   ieee?: string;
   itemId: string;
-  /** area.line.device (0-15.0-15.0-255); only for KNX items */
+  /** area.line.device (0-15.0-15.0-255, dots only); only for KNX items */
   knx?: string;
   /** At most 200 characters */
   note?: string;

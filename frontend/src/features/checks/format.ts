@@ -91,6 +91,8 @@ export const findingCodes = [
   'address_outside_line',
   'address_missing',
   'bus_line_address_invalid',
+  'bus_line_address_duplicate',
+  'address_device_zero',
 ] as const
 export type FindingCode = (typeof findingCodes)[number]
 

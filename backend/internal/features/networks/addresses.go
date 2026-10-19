@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/networks/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
@@ -25,9 +27,8 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
 
-// Addressing schemes of a system (D419): by the product type's key (knx…,
-// hdl…) for bus systems; every wireless system has IEEE addresses; other
-// systems only a note.
+// Addressing schemes of an item (D419): from its product type's addressing
+// setting (knx_individual → knx, hdl → hdl, eui64 → ieee, none).
 const (
 	SchemeKNX  = "knx"
 	SchemeHDL  = "hdl"
@@ -39,15 +40,15 @@ const (
 	MaxAddressChanges = 2000
 )
 
-// SchemeOf is the addressing scheme of a system.
+// SchemeOf is the addressing scheme of a system: its addressing setting
+// (the database ties KNX and HDL to the bus topology, EUI-64 to wireless).
 func SchemeOf(t producttypes.ProductType) string {
-	key := strings.ToLower(t.Key)
 	switch {
-	case t.Topology == TopologyBus && strings.HasPrefix(key, "knx"):
+	case t.Addressing == producttypes.AddressingKNX && t.Topology == TopologyBus:
 		return SchemeKNX
-	case t.Topology == TopologyBus && strings.HasPrefix(key, "hdl"):
+	case t.Addressing == producttypes.AddressingHDL && t.Topology == TopologyBus:
 		return SchemeHDL
-	case t.Topology == TopologyWireless:
+	case t.Addressing == producttypes.AddressingEUI64 && t.Topology == TopologyWireless:
 		return SchemeIEEE
 	}
 	return SchemeNone
@@ -81,9 +82,10 @@ type AddressedItem struct {
 type LinePrefix struct {
 	BusLineID uuid.UUID `json:"busLineId"`
 	Scheme    string    `json:"scheme" enum:"knx,hdl,none"`
-	Prefix    string    `json:"prefix,omitempty" doc:"KNX area.line or HDL subnet the line's devices get; empty for scheme none or a malformed address"`
-	Default   bool      `json:"default" doc:"The line's address field is empty: the prefix is the default (KNX 1.<n>, HDL <n> for the n-th line of the system)"`
+	Prefix    string    `json:"prefix,omitempty" doc:"KNX area.line or HDL subnet the line's devices get; empty for scheme none, a malformed address or no free default"`
+	Default   bool      `json:"default" doc:"The line's address field is empty: the prefix is the default (KNX 1.1-1.15, HDL 1-254: the first one no other line of the scheme uses)"`
 	Invalid   bool      `json:"invalid" doc:"The line's address field cannot be parsed (no automatic addresses)"`
+	NoPrefix  bool      `json:"noPrefix" doc:"The line has no address field and no default prefix is free: no automatic addresses"`
 }
 
 // Addresses are the addresses of a version's bus and wireless items.
@@ -103,8 +105,8 @@ type AddressesActions struct {
 type AddressInput struct {
 	PlanID uuid.UUID `json:"planId"`
 	ItemID uuid.UUID `json:"itemId"`
-	KNX    string    `json:"knx,omitempty" doc:"area.line.device (0-15.0-15.0-255); only for KNX items"`
-	HDL    string    `json:"hdl,omitempty" doc:"subnet.device (0-254 each); only for HDL items"`
+	KNX    string    `json:"knx,omitempty" doc:"area.line.device (0-15.0-15.0-255, dots only); only for KNX items"`
+	HDL    string    `json:"hdl,omitempty" doc:"subnet.device (1-254 each); only for HDL items"`
 	IEEE   string    `json:"ieee,omitempty" doc:"16 hex digits (separators : - and spaces ignored); only for wireless items"`
 	Note   string    `json:"note,omitempty" doc:"At most 200 characters"`
 }
@@ -129,8 +131,9 @@ type AssignResult struct {
 // ---------------------------------------------------------------- parsing
 
 var (
-	knxLineRe   = regexp.MustCompile(`^(\d{1,2})[./](\d{1,2})$`)
-	knxDeviceRe = regexp.MustCompile(`^(\d{1,2})[./](\d{1,2})[./](\d{1,3})$`)
+	// KNX individual addresses take dots only ("/" writes group addresses).
+	knxLineRe   = regexp.MustCompile(`^(\d{1,2})\.(\d{1,2})$`)
+	knxDeviceRe = regexp.MustCompile(`^(\d{1,2})\.(\d{1,2})\.(\d{1,3})$`)
 	hdlDeviceRe = regexp.MustCompile(`^(\d{1,3})[./](\d{1,3})$`)
 	hdlSubnetRe = regexp.MustCompile(`^(\d{1,3})$`)
 )
@@ -147,7 +150,7 @@ type hdlAddr struct{ subnet, device int }
 
 func (a hdlAddr) String() string { return fmt.Sprintf("%d.%d", a.subnet, a.device) }
 
-// ParseKNX parses area.line.device (0-15.0-15.0-255; "/" also separates).
+// ParseKNX parses area.line.device (0-15.0-15.0-255, separated by dots).
 func ParseKNX(s string) (knxAddr, bool) {
 	m := knxDeviceRe.FindStringSubmatch(strings.TrimSpace(s))
 	if m == nil {
@@ -157,14 +160,14 @@ func ParseKNX(s string) (knxAddr, bool) {
 	return a, a.area <= 15 && a.line <= 15 && a.device <= 255
 }
 
-// ParseHDL parses subnet.device (0-254 each).
+// ParseHDL parses subnet.device (1-254 each: 0 and 255 are reserved).
 func ParseHDL(s string) (hdlAddr, bool) {
 	m := hdlDeviceRe.FindStringSubmatch(strings.TrimSpace(s))
 	if m == nil {
 		return hdlAddr{}, false
 	}
 	a := hdlAddr{atoi(m[1]), atoi(m[2])}
-	return a, a.subnet <= 254 && a.device <= 254
+	return a, a.subnet >= 1 && a.subnet <= 254 && a.device >= 1 && a.device <= 254
 }
 
 // ParseIEEE normalises an IEEE address: 16 hex digits, upper case;
@@ -184,7 +187,7 @@ func ParseIEEE(s string) (string, bool) {
 }
 
 // parseLinePrefix parses a bus line's address field: KNX "area.line"
-// (0-15 each, "/" also separates), HDL "subnet" (0-254). ok is false for a
+// (0-15 each, dots only), HDL "subnet" (1-254). ok is false for a
 // malformed field; empty is ok with set false.
 func parseLinePrefix(scheme, address string) (prefix [2]int, set, ok bool) {
 	address = strings.TrimSpace(address)
@@ -205,7 +208,7 @@ func parseLinePrefix(scheme, address string) (prefix [2]int, set, ok bool) {
 			return prefix, false, false
 		}
 		prefix[0] = atoi(m[1])
-		return prefix, true, prefix[0] <= 254
+		return prefix, true, prefix[0] >= 1 && prefix[0] <= 254
 	}
 	return prefix, false, true
 }
@@ -232,15 +235,33 @@ type lineInfo struct {
 	prefix  [2]int
 	set     bool // from the address field
 	invalid bool
+	// noPrefix: no address field and no default prefix free.
+	noPrefix bool
+}
+
+// usable says whether the line's devices can get automatic addresses.
+func (li lineInfo) usable() bool {
+	return (li.scheme == SchemeKNX || li.scheme == SchemeHDL) && !li.invalid && !li.noPrefix
+}
+
+func (li lineInfo) prefixKey() string {
+	switch li.scheme {
+	case SchemeKNX:
+		return fmt.Sprintf("knx:%d.%d", li.prefix[0], li.prefix[1])
+	case SchemeHDL:
+		return fmt.Sprintf("hdl:%d", li.prefix[0])
+	}
+	return ""
 }
 
 // lineInfos are the version's lines with their prefixes: the address field,
-// else KNX 1.n / HDL n for the n-th line of the system (n ≤ 15 resp. 254).
+// else a default — KNX 1.1 to 1.15, HDL subnet 1 to 254, the first one no
+// other line of the scheme uses (address fields first, then the defaults of
+// earlier lines in line order); none when every one is taken.
 func (st state) lineInfos() []lineInfo {
-	n := map[uuid.UUID]int{}
 	out := make([]lineInfo, 0, len(st.lines))
+	used := map[string]bool{}
 	for _, l := range st.lines {
-		n[l.ProductTypeID]++
 		li := lineInfo{line: l, scheme: SchemeOf(st.types[l.ProductTypeID])}
 		p, set, ok := parseLinePrefix(li.scheme, l.Address)
 		switch {
@@ -248,18 +269,40 @@ func (st state) lineInfos() []lineInfo {
 			li.invalid = true
 		case set:
 			li.prefix, li.set = p, true
-		case li.scheme == SchemeKNX:
-			li.prefix = [2]int{1, min(n[l.ProductTypeID], 15)}
-		case li.scheme == SchemeHDL:
-			li.prefix = [2]int{min(n[l.ProductTypeID], 254), 0}
+			used[li.prefixKey()] = true
 		}
 		out = append(out, li)
+	}
+	for i := range out {
+		li := &out[i]
+		if li.set || li.invalid || (li.scheme != SchemeKNX && li.scheme != SchemeHDL) {
+			continue
+		}
+		last := 254
+		if li.scheme == SchemeKNX {
+			last = 15
+		}
+		li.noPrefix = true
+		for n := 1; n <= last; n++ {
+			if li.scheme == SchemeKNX {
+				li.prefix = [2]int{1, n}
+			} else {
+				li.prefix = [2]int{n, 0}
+			}
+			if !used[li.prefixKey()] {
+				used[li.prefixKey()], li.noPrefix = true, false
+				break
+			}
+		}
+		if li.noPrefix {
+			li.prefix = [2]int{}
+		}
 	}
 	return out
 }
 
 func (li lineInfo) prefixString() string {
-	if li.invalid {
+	if li.invalid || li.noPrefix {
 		return ""
 	}
 	switch li.scheme {
@@ -323,7 +366,7 @@ func (st state) addressesView(can bool) Addresses {
 			continue
 		}
 		out.Lines = append(out.Lines, LinePrefix{BusLineID: li.line.ID, Scheme: li.scheme, Prefix: li.prefixString(),
-			Default: !li.set && !li.invalid, Invalid: li.invalid})
+			Default: !li.set && !li.invalid, Invalid: li.invalid, NoPrefix: li.noPrefix})
 	}
 	return out
 }
@@ -346,7 +389,9 @@ func (s *Service) GetAddresses(ctx context.Context, versionID uuid.UUID) (Addres
 // AddressIssue is a finding of the address rules for the checks engine.
 type AddressIssue struct {
 	// Code: address_duplicate (error), address_outside_line (warning),
-	// bus_line_address_invalid (warning), address_missing (info, one per
+	// address_device_zero (warning: KNX device 0 is the line coupler's),
+	// bus_line_address_invalid (warning), bus_line_address_duplicate
+	// (warning, per line sharing its prefix), address_missing (info, one per
 	// line with the count).
 	Code           string
 	Severity       string
@@ -380,6 +425,24 @@ func (st state) addressIssues() []AddressIssue {
 				Params: map[string]any{"name": li.line.Name, "address": li.line.Address}})
 		}
 	}
+	// Lines of a scheme sharing a prefix (only address fields can: the
+	// defaults skip taken prefixes).
+	prefixLines := map[string][]lineInfo{}
+	for _, li := range infos {
+		if li.usable() {
+			prefixLines[li.prefixKey()] = append(prefixLines[li.prefixKey()], li)
+		}
+	}
+	for _, li := range infos {
+		if !li.usable() {
+			continue
+		}
+		if same := prefixLines[li.prefixKey()]; len(same) > 1 {
+			id := li.line.ID
+			out = append(out, AddressIssue{Code: "bus_line_address_duplicate", Severity: "warning", BusLineID: &id,
+				Params: map[string]any{"name": li.line.Name, "prefix": li.prefixString(), "count": len(same)}})
+		}
+	}
 	items := st.addressed()
 	seen := map[string][]int{}
 	missing := map[uuid.UUID]int{}
@@ -390,6 +453,11 @@ func (st state) addressIssues() []AddressIssue {
 			switch {
 			case it.Scheme == SchemeKNX && a.KNX != "":
 				key("knx:" + a.KNX)
+				if k, _ := ParseKNX(a.KNX); k.device == 0 {
+					pl, id := it.PlanID, it.ItemID
+					out = append(out, AddressIssue{Code: "address_device_zero", Severity: "warning", PlanID: &pl, ItemID: &id,
+						BusLineID: it.BusLineID, Params: map[string]any{"address": a.KNX}})
+				}
 			case it.Scheme == SchemeHDL && a.HDL != "":
 				key("hdl:" + a.HDL)
 			case it.Scheme == SchemeIEEE && a.IEEE != "":
@@ -449,8 +517,12 @@ func (st state) addressIssues() []AddressIssue {
 
 // ---------------------------------------------------------------- writing
 
-// SetAddresses sets or clears addresses by hand (pinned). Rows of items
-// that are no longer bus or wireless items of the version are removed.
+// SetAddresses sets or clears addresses by hand. A row is pinned when it
+// holds an address; a note alone is not pinned (auto-assign fills it in).
+// Rows of items that are no longer bus or wireless items of the version are
+// removed. Validation runs on the state read under the version's lock, so
+// concurrent writes cannot both take an address (the database's unique
+// constraints back it up).
 func (s *Service) SetAddresses(ctx context.Context, versionID uuid.UUID, in AddressesInput) (Addresses, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
@@ -464,13 +536,88 @@ func (s *Service) SetAddresses(ctx context.Context, versionID uuid.UUID, in Addr
 		return Addresses{}, err
 	}
 	if !st.ref.Writable() {
-		return Addresses{}, apperr.Conflict("project.read_only", "the project is completed or cancelled; reopen it first")
+		return Addresses{}, errReadOnly()
 	}
-	byKey := map[[2]uuid.UUID]AddressedItem{}
+	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
+		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
+		if err != nil {
+			return err
+		}
+		if err := st.reread(ctx, s, tx, q); err != nil {
+			return err
+		}
+		byKey := st.byKey()
+		result, errs := st.setResult(in, byKey)
+		if len(errs) > 0 {
+			return apperr.Validation(errs...)
+		}
+		if err := s.dropDangling(ctx, q, st, byKey); err != nil {
+			return err
+		}
+		for _, a := range in.Addresses {
+			key := [2]uuid.UUID{a.PlanID, a.ItemID}
+			row, ok := result[key]
+			if !ok {
+				if err := q.DeleteAddress(ctx, store.DeleteAddressParams{VersionID: versionID, PlanID: a.PlanID, ItemID: a.ItemID}); err != nil {
+					return err
+				}
+				continue
+			}
+			row.TenantID = ref.TenantID
+			if err := upsert(ctx, q, row); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return Addresses{}, mapAddressErr(err)
+	}
+	return s.GetAddresses(ctx, versionID)
+}
+
+func errReadOnly() error {
+	return apperr.Conflict("project.read_only", "the project is completed or cancelled; reopen it first")
+}
+
+// reread reads the version's plans, lines, assignments and addresses again
+// inside a write transaction (after the version lock). The catalog stays the
+// one loaded before; a variant it lacks means the plans changed meanwhile.
+func (st *state) reread(ctx context.Context, s *Service, tx pgx.Tx, q *store.Queries) error {
+	if err := st.read(ctx, s, tx, q); err != nil {
+		return err
+	}
+	for _, p := range st.plans {
+		for _, it := range p.Items {
+			if it.VariantID != nil && !st.loaded[*it.VariantID] {
+				return errNetworkChanged()
+			}
+		}
+	}
+	return nil
+}
+
+func errNetworkChanged() error {
+	return apperr.Conflict("network.changed", "the plan was changed meanwhile; reload")
+}
+
+// byKey are the version's bus and wireless items by (plan, item).
+func (st state) byKey() map[[2]uuid.UUID]AddressedItem {
+	out := map[[2]uuid.UUID]AddressedItem{}
 	for _, it := range st.addressed() {
-		byKey[[2]uuid.UUID{it.PlanID, it.ItemID}] = it
+		out[[2]uuid.UUID{it.PlanID, it.ItemID}] = it
 	}
-	// The resulting addresses, for the uniqueness rule.
+	return out
+}
+
+func hasAddress(r store.DeviceAddress) bool {
+	return r.KnxDevice != nil || r.HdlDevice != nil || r.Ieee != nil
+}
+
+// setResult validates a batch of address changes against the state: the
+// resulting rows of the current items by key (a changed key missing from it
+// is deleted), or the field errors.
+func (st state) setResult(in AddressesInput, byKey map[[2]uuid.UUID]AddressedItem) (map[[2]uuid.UUID]store.DeviceAddress, []apperr.FieldError) {
 	result := map[[2]uuid.UUID]store.DeviceAddress{}
 	for k, r := range st.addresses {
 		if _, ok := byKey[k]; ok {
@@ -482,7 +629,7 @@ func (s *Service) SetAddresses(ctx context.Context, versionID uuid.UUID, in Addr
 	for i, a := range in.Addresses {
 		loc := fmt.Sprintf("body.addresses[%d]", i)
 		key := [2]uuid.UUID{a.PlanID, a.ItemID}
-		row := store.DeviceAddress{PlanID: a.PlanID, ItemID: a.ItemID, VersionID: versionID, Pinned: true, Note: strings.TrimSpace(a.Note)}
+		row := store.DeviceAddress{PlanID: a.PlanID, ItemID: a.ItemID, VersionID: st.ref.ID, Note: strings.TrimSpace(a.Note)}
 		empty := strings.TrimSpace(a.KNX) == "" && strings.TrimSpace(a.HDL) == "" && strings.TrimSpace(a.IEEE) == "" && row.Note == ""
 		if empty {
 			delete(result, key)
@@ -518,7 +665,7 @@ func (s *Service) SetAddresses(ctx context.Context, versionID uuid.UUID, in Addr
 			case it.Scheme != SchemeHDL:
 				errs = append(errs, apperr.Field(loc+".hdl", "address.scheme_mismatch", "the item has no HDL address").With("scheme", it.Scheme))
 			case !ok:
-				errs = append(errs, apperr.Field(loc+".hdl", "address.hdl_invalid", "subnet.device, 0-254 each").With("value", v))
+				errs = append(errs, apperr.Field(loc+".hdl", "address.hdl_invalid", "subnet.device, 1-254 each").With("value", v))
 			default:
 				sn, d := int16(h.subnet), int16(h.device)
 				row.HdlSubnet, row.HdlDevice = &sn, &d
@@ -535,76 +682,50 @@ func (s *Service) SetAddresses(ctx context.Context, versionID uuid.UUID, in Addr
 				row.Ieee = &ieee
 			}
 		}
+		// Pinned only with an address: a note alone leaves it automatic.
+		row.Pinned = hasAddress(row)
 		result[key] = row
 		changed[key] = i
 	}
-	if len(errs) == 0 {
-		// Uniqueness per version among the resulting addresses: reported at
-		// the changed entry.
-		owner := map[string][2]uuid.UUID{}
-		keys := make([][2]uuid.UUID, 0, len(result))
-		for k := range result {
-			keys = append(keys, k)
-		}
-		// Unchanged rows first, so the changed entry is the one refused.
-		slices.SortFunc(keys, func(a, b [2]uuid.UUID) int {
-			_, ca := changed[a]
-			_, cb := changed[b]
-			if ca != cb {
-				if ca {
-					return 1
-				}
-				return -1
-			}
-			return cmp.Or(strings.Compare(a[0].String(), b[0].String()), strings.Compare(a[1].String(), b[1].String()))
-		})
-		for _, k := range keys {
-			a := addressOf(result[k])
-			for field, v := range map[string]string{"knx": a.KNX, "hdl": a.HDL, "ieee": a.IEEE} {
-				if v == "" {
-					continue
-				}
-				if _, taken := owner[field+":"+v]; taken {
-					if i, ok := changed[k]; ok {
-						errs = append(errs, apperr.Field(fmt.Sprintf("body.addresses[%d].%s", i, field), "address.taken", "another device has this address").With("address", v))
-					}
-					continue
-				}
-				owner[field+":"+v] = k
-			}
-		}
-	}
 	if len(errs) > 0 {
-		return Addresses{}, apperr.Validation(errs...)
+		return nil, errs
 	}
-	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
-		if err != nil {
-			return err
+	// Uniqueness per version among the resulting addresses: reported at the
+	// changed entry.
+	owner := map[string][2]uuid.UUID{}
+	keys := make([][2]uuid.UUID, 0, len(result))
+	for k := range result {
+		keys = append(keys, k)
+	}
+	// Unchanged rows first, so the changed entry is the one refused.
+	slices.SortFunc(keys, func(a, b [2]uuid.UUID) int {
+		_, ca := changed[a]
+		_, cb := changed[b]
+		if ca != cb {
+			if ca {
+				return 1
+			}
+			return -1
 		}
-		if err := s.dropDangling(ctx, q, st, byKey); err != nil {
-			return err
-		}
-		for _, a := range in.Addresses {
-			key := [2]uuid.UUID{a.PlanID, a.ItemID}
-			row, ok := result[key]
-			if !ok {
-				if err := q.DeleteAddress(ctx, store.DeleteAddressParams{VersionID: versionID, PlanID: a.PlanID, ItemID: a.ItemID}); err != nil {
-					return err
+		return cmp.Or(strings.Compare(a[0].String(), b[0].String()), strings.Compare(a[1].String(), b[1].String()))
+	})
+	for _, k := range keys {
+		a := addressOf(result[k])
+		for _, f := range [][2]string{{"knx", a.KNX}, {"hdl", a.HDL}, {"ieee", a.IEEE}} {
+			field, v := f[0], f[1]
+			if v == "" {
+				continue
+			}
+			if _, taken := owner[field+":"+v]; taken {
+				if i, ok := changed[k]; ok {
+					errs = append(errs, apperr.Field(fmt.Sprintf("body.addresses[%d].%s", i, field), "address.taken", "another device has this address").With("address", v))
 				}
 				continue
 			}
-			row.TenantID = ref.TenantID
-			if err := upsert(ctx, q, row); err != nil {
-				return err
-			}
+			owner[field+":"+v] = k
 		}
-		return nil
-	})
-	if err != nil {
-		return Addresses{}, mapAddressErr(err)
 	}
-	return s.GetAddresses(ctx, versionID)
+	return result, errs
 }
 
 func upsert(ctx context.Context, q *store.Queries, r store.DeviceAddress) error {
@@ -629,7 +750,13 @@ func (s *Service) dropDangling(ctx context.Context, q *store.Queries, st state, 
 
 func mapAddressErr(err error) error {
 	if isFKViolation(err) {
-		return apperr.Conflict("network.changed", "the plan was changed meanwhile; reload")
+		return errNetworkChanged()
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.HasPrefix(pgErr.ConstraintName, "device_addresses_") {
+		// The service checks under the version lock; the constraints are
+		// the backstop.
+		return apperr.Conflict("address.taken", "another device has this address")
 	}
 	return err
 }
@@ -640,7 +767,8 @@ func mapAddressErr(err error) error {
 // device numbers and HDL device ids from 1 upwards, skipping numbers other
 // items of the version hold. Addresses set by hand (pinned) are never
 // changed; automatic ones in scope are recomputed. Power supplies and
-// wireless items get none.
+// wireless items get none. It works on the state read under the version's
+// lock.
 func (s *Service) Assign(ctx context.Context, versionID uuid.UUID, in AssignInput) (AssignResult, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
@@ -651,28 +779,29 @@ func (s *Service) Assign(ctx context.Context, versionID uuid.UUID, in AssignInpu
 		return AssignResult{}, err
 	}
 	if !st.ref.Writable() {
-		return AssignResult{}, apperr.Conflict("project.read_only", "the project is completed or cancelled; reopen it first")
+		return AssignResult{}, errReadOnly()
 	}
-	lines := map[uuid.UUID]bool{}
-	for _, l := range st.lines {
-		lines[l.ID] = true
-	}
-	for i, id := range in.BusLineIDs {
-		if !lines[id] {
-			return AssignResult{}, apperr.Invalid(fmt.Sprintf("body.busLineIds[%d]", i), "bus_line.not_found", "no such line in the version")
-		}
-	}
-	rows, assigned, unassigned := st.assign(in.BusLineIDs)
-	byKey := map[[2]uuid.UUID]AddressedItem{}
-	for _, it := range st.addressed() {
-		byKey[[2]uuid.UUID{it.PlanID, it.ItemID}] = it
-	}
+	var assigned, unassigned int
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
 		if err != nil {
 			return err
 		}
-		if err := s.dropDangling(ctx, q, st, byKey); err != nil {
+		if err := st.reread(ctx, s, tx, q); err != nil {
+			return err
+		}
+		lines := map[uuid.UUID]bool{}
+		for _, l := range st.lines {
+			lines[l.ID] = true
+		}
+		for i, id := range in.BusLineIDs {
+			if !lines[id] {
+				return apperr.Invalid(fmt.Sprintf("body.busLineIds[%d]", i), "bus_line.not_found", "no such line in the version")
+			}
+		}
+		var rows []assignRow
+		rows, assigned, unassigned = st.assign(in.BusLineIDs)
+		if err := s.dropDangling(ctx, q, st, st.byKey()); err != nil {
 			return err
 		}
 		for _, r := range rows {
@@ -714,12 +843,15 @@ func (st state) assign(scope []uuid.UUID) ([]assignRow, int, int) {
 		planKind[p.ID], planPos[p.ID] = p.Kind, i
 	}
 	// Taken numbers: every address that stays (outside scope or pinned).
+	// A pinned row without an address of the item's scheme (a note only)
+	// counts as automatic.
 	taken := map[string]bool{}
 	var todo []AddressedItem
 	for _, it := range items {
 		a := it.Address
+		held := a != nil && ((it.Scheme == SchemeKNX && a.KNX != "") || (it.Scheme == SchemeHDL && a.HDL != ""))
 		auto := it.BusLineID != nil && inScope(*it.BusLineID) && (it.Scheme == SchemeKNX || it.Scheme == SchemeHDL) && !it.PowerSupply &&
-			(a == nil || !a.Pinned)
+			(a == nil || !a.Pinned || !held)
 		if auto {
 			todo = append(todo, it)
 			continue
@@ -744,10 +876,6 @@ func (st state) assign(scope []uuid.UUID) ([]assignRow, int, int) {
 		}
 		return cmp.Compare(planPos[a.PlanID], planPos[b.PlanID])
 	})
-	infos := map[uuid.UUID]lineInfo{}
-	for _, li := range st.lineInfos() {
-		infos[li.line.ID] = li
-	}
 	next := map[uuid.UUID]int{}
 	var out []assignRow
 	assigned, unassigned := 0, 0
@@ -765,7 +893,7 @@ func (st state) assign(scope []uuid.UUID) ([]assignRow, int, int) {
 				limit = 254
 			}
 			ok := false
-			for n := max(next[li.line.ID], 1); !li.invalid && n <= limit; n++ {
+			for n := max(next[li.line.ID], 1); li.usable() && n <= limit; n++ {
 				var k string
 				if li.scheme == SchemeKNX {
 					k = "knx:" + knxAddr{li.prefix[0], li.prefix[1], n}.String()
@@ -803,6 +931,7 @@ func (st state) assign(scope []uuid.UUID) ([]assignRow, int, int) {
 
 // ClearAutomatic removes the automatic addresses of a version (auto must be
 // true: addresses set by hand are cleared one by one with SetAddresses).
+// Notes stay.
 func (s *Service) ClearAutomatic(ctx context.Context, versionID uuid.UUID, auto bool) (Addresses, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
@@ -815,7 +944,10 @@ func (s *Service) ClearAutomatic(ctx context.Context, versionID uuid.UUID, auto 
 		if _, err := s.projects.WriteVersion(ctx, tx, versionID, true); err != nil {
 			return err
 		}
-		_, err := q.DeleteAutoAddresses(ctx, versionID)
+		if _, err := q.DeleteAutoAddresses(ctx, versionID); err != nil {
+			return err
+		}
+		_, err := q.ClearAutoAddresses(ctx, versionID)
 		return err
 	})
 	if err != nil {
