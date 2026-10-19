@@ -123,7 +123,7 @@ test('plans: draw, place, edit, zones, undo/redo, reload', async ({ page, api })
   // Zone properties in the inspector (click in the list selects).
   await zones.getByRole('button', { name: 'Zone 2', exact: true }).click()
   const inspector = page.getByRole('tabpanel', { name: 'Inspector' })
-  await inspector.getByLabel('Name').fill('Living room')
+  await inspector.getByLabel('Name', { exact: true }).fill('Living room')
   await saved(page)
 
   // Reload shows the saved content.
