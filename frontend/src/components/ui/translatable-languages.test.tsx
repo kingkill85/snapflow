@@ -43,6 +43,6 @@ describe('a third language', () => {
     await user.type(within(dialog).getByLabelText('Name'), 'Variateur')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer', fr: 'Variateur' }, allowsCircuit: false, loadTypeIds: [] }))
+    await waitFor(() => expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer', fr: 'Variateur' }, allowsCircuit: false, loadTypeIds: [], isActive: true }))
   })
 })

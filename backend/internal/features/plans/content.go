@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"slices"
@@ -34,7 +35,11 @@ func (s *Service) Content(ctx context.Context, id uuid.UUID) (PlanContent, error
 	if err != nil {
 		return PlanContent{}, err
 	}
-	return s.contentOf(ctx, st.ref, st.plan, st.zones, st.placements)
+	cat, err := s.needCatalog(ctx)
+	if err != nil {
+		return PlanContent{}, err
+	}
+	return s.contentOf(ctx, st.ref, st.plan, st.zones, st.placements, st.needs, cat)
 }
 
 // stored is a plan with its content as read in one snapshot.
@@ -43,6 +48,7 @@ type stored struct {
 	plan       store.GetPlanRow
 	zones      []PlanZone
 	placements []PlanPlacement
+	needs      []PlanNeed
 }
 
 func (s *Service) stored(ctx context.Context, actor auth.Actor, id uuid.UUID) (stored, error) {
@@ -55,7 +61,10 @@ func (s *Service) stored(ctx context.Context, actor auth.Actor, id uuid.UUID) (s
 		if st.plan, err = q.GetPlan(ctx, id); err != nil {
 			return notFound(err)
 		}
-		st.zones, st.placements, err = readContent(ctx, q, id)
+		if st.zones, st.placements, err = readContent(ctx, q, id); err != nil {
+			return err
+		}
+		st.needs, err = readNeeds(ctx, q, id)
 		return err
 	})
 	return st, err
@@ -122,11 +131,16 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 	if !st.plan.ContentUpdatedAt.Equal(in.ExpectedContentUpdatedAt) {
 		return PlanContent{}, errStale()
 	}
-	zones, placements, err := s.validateContent(ctx, st, in)
+	cat, err := s.needCatalog(ctx)
+	if err != nil {
+		return PlanContent{}, err
+	}
+	zones, placements, needs, err := s.validateContent(ctx, st, cat, in)
 	if err != nil {
 		return PlanContent{}, err
 	}
 	assignZones(zones, placements)
+	assignNeedZones(zones, needs)
 	prepared, err := s.prepareContentHooks(ctx, st.plan.VersionID, placements)
 	if err != nil {
 		return PlanContent{}, err
@@ -151,6 +165,9 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 		if err := writeContent(ctx, q, locked.TenantID, id, zones, placements); err != nil {
 			return err
 		}
+		if err := writeNeeds(ctx, q, locked.TenantID, id, needs); err != nil {
+			return err
+		}
 		if err := s.runContentHooks(ctx, tx, ref, prepared); err != nil {
 			return err
 		}
@@ -163,7 +180,7 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 	if err != nil {
 		return PlanContent{}, err
 	}
-	return s.contentOf(ctx, st.ref, row, zones, placements)
+	return s.contentOf(ctx, st.ref, row, zones, placements, needs, cat)
 }
 
 // writeContent replaces the stored zones and placements (upsert by id and
@@ -237,7 +254,7 @@ func writeContent(ctx context.Context, q *store.Queries, tenantID, planID uuid.U
 // validateContent checks and normalises the content against the plan's
 // image and the catalog. All problems are returned together, located at
 // body.zones[i].… and body.placements[i].….
-func (s *Service) validateContent(ctx context.Context, st stored, in PlanContentInput) ([]PlanZone, []PlanPlacement, error) {
+func (s *Service) validateContent(ctx context.Context, st stored, cat needCatalog, in PlanContentInput) ([]PlanZone, []PlanPlacement, []PlanNeed, error) {
 	w, h := float64(st.plan.ImageWidth), float64(st.plan.ImageHeight)
 	var errs []apperr.FieldError
 	add := func(loc, code, detail string, params ...any) {
@@ -253,8 +270,11 @@ func (s *Service) validateContent(ctx context.Context, st stored, in PlanContent
 	if len(in.Placements) > MaxPlacements {
 		add("body.placements", "validation.too_many", "too many placements", "max", MaxPlacements)
 	}
+	if len(in.Needs) > MaxNeeds {
+		add("body.needs", "validation.too_many", "too many needs", "max", MaxNeeds)
+	}
 	if len(errs) > 0 {
-		return nil, nil, apperr.Validation(errs...)
+		return nil, nil, nil, apperr.Validation(errs...)
 	}
 	if in.Scale != nil && (!finite(*in.Scale) || *in.Scale <= 0) {
 		add("body.scale", "validation.invalid", "the scale must be above 0")
@@ -298,7 +318,7 @@ func (s *Service) validateContent(ctx context.Context, st stored, in PlanContent
 	slices.SortFunc(variantIDs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	variants, err := s.products.PlacementVariants(ctx, slices.Compact(variantIDs))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	placements := make([]PlanPlacement, len(in.Placements))
@@ -362,10 +382,23 @@ func (s *Service) validateContent(ctx context.Context, st stored, in PlanContent
 			placements[i].CatalogVariantID = prev.CatalogVariantID
 		}
 	}
-	if len(errs) > 0 {
-		return nil, nil, apperr.Validation(errs...)
+	needsIn := in.Needs
+	if needsIn == nil {
+		var dropped int
+		needsIn, dropped = keptNeeds(st.needs, zones)
+		if dropped > 0 {
+			// D326: a client that does not send needs deleted zones with
+			// needs; they went with their zone.
+			slog.WarnContext(ctx, "plans: a content save without needs dropped the needs of deleted zones",
+				"plan_id", st.plan.ID, "dropped", dropped)
+		}
 	}
-	return zones, placements, nil
+	needs, needErrs := validateNeeds(cat, needsIn, st.needs, in.RestoredNeedIDs, zones, w, h)
+	errs = append(errs, needErrs...)
+	if len(errs) > 0 {
+		return nil, nil, nil, apperr.Validation(errs...)
+	}
+	return zones, placements, needs, nil
 }
 
 // checkAddons keeps the chosen optional add-ons that are add-on links of the
@@ -457,7 +490,8 @@ func checkText(loc, s string, maxLen int, required bool) *apperr.FieldError {
 }
 
 // contentOf builds the response of a plan's content with its warnings.
-func (s *Service) contentOf(ctx context.Context, ref projects.VersionRef, plan store.GetPlanRow, zones []PlanZone, placements []PlanPlacement) (PlanContent, error) {
+func (s *Service) contentOf(ctx context.Context, ref projects.VersionRef, plan store.GetPlanRow, zones []PlanZone, placements []PlanPlacement,
+	needs []PlanNeed, cat needCatalog) (PlanContent, error) {
 	warnings, err := s.warnings(ctx, ref, placements)
 	if err != nil {
 		return PlanContent{}, err
@@ -468,9 +502,12 @@ func (s *Service) contentOf(ctx context.Context, ref projects.VersionRef, plan s
 	if placements == nil {
 		placements = []PlanPlacement{}
 	}
+	if needs == nil {
+		needs = []PlanNeed{}
+	}
 	return PlanContent{
 		PlanID: plan.ID, ContentUpdatedAt: plan.ContentUpdatedAt, Scale: plan.Scale,
-		Zones: zones, Placements: placements, Warnings: warnings,
+		Zones: zones, Placements: placements, Needs: needs, Warnings: warnings, NeedWarnings: needWarnings(cat, needs),
 	}, nil
 }
 
@@ -566,7 +603,21 @@ func (s *Service) scaleContent(ctx context.Context, q *store.Queries, plan store
 			p.Height = math.Min(p.Height*f, float64(height))
 		}
 		assignZones(zones, placements)
+		needs, err := readNeeds(ctx, q, plan.ID)
+		if err != nil {
+			return err
+		}
+		for i := range needs {
+			if n := &needs[i]; n.X != nil && n.Y != nil {
+				x, y := clampX(*n.X), clampY(*n.Y)
+				n.X, n.Y = &x, &y
+			}
+		}
+		assignNeedZones(zones, needs)
 		if err := writeContent(ctx, q, plan.TenantID, plan.ID, zones, placements); err != nil {
+			return err
+		}
+		if err := writeNeeds(ctx, q, plan.TenantID, plan.ID, needs); err != nil {
 			return err
 		}
 		if scale != nil {
@@ -582,9 +633,21 @@ func (s *Service) scaleContent(ctx context.Context, q *store.Queries, plan store
 	return err
 }
 
-// CopyVersion copies the plans of source with their zones and placements
-// into target (projects.Service.OnCopyVersion): new ids for plans, zones and
-// placements, the same image files (files are immutable), no locks.
+// PlanCopier copies what a feature owns of a version's plans (3d:
+// connections, keyed by plan id and need id) in tx, after the plans and their
+// content were copied. planIDs maps every source plan id to its copy; zone,
+// placement and need ids are kept (D339).
+type PlanCopier func(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, target projects.VersionRef) error
+
+// OnCopyPlans registers a plan copier; CopyVersion runs every one. Call it
+// while wiring the features, not concurrently with requests.
+func (s *Service) OnCopyPlans(c PlanCopier) { s.planCopiers = append(s.planCopiers, c) }
+
+// CopyVersion copies the plans of source with their zones, placements and
+// needs into target (projects.Service.OnCopyVersion): new plan ids, the same
+// zone, placement and need ids (they are unique per plan, D339), the same
+// image files (files are immutable), no locks. Then it runs the plan
+// copiers with the map of plan ids.
 func (s *Service) CopyVersion(ctx context.Context, tx pgx.Tx, source, target projects.VersionRef) error {
 	if _, err := auth.Require(ctx, auth.PermProjectsWrite); err != nil {
 		return err
@@ -594,28 +657,30 @@ func (s *Service) CopyVersion(ctx context.Context, tx pgx.Tx, source, target pro
 	if err != nil {
 		return err
 	}
+	planIDs := make(map[uuid.UUID]uuid.UUID, len(ids))
 	for _, id := range ids {
 		newID, err := q.CopyPlan(ctx, store.CopyPlanParams{TenantID: target.TenantID, VersionID: target.ID, ID: id})
 		if err != nil {
 			return err
 		}
+		planIDs[id] = newID
 		zones, placements, err := readContent(ctx, q, id)
 		if err != nil {
 			return err
 		}
-		zoneIDs := make(map[uuid.UUID]uuid.UUID, len(zones))
-		for i := range zones {
-			zoneIDs[zones[i].ID] = uuid.New()
-			zones[i].ID = zoneIDs[zones[i].ID]
-		}
-		for i := range placements {
-			placements[i].ID = uuid.New()
-			if z := placements[i].ZoneID; z != nil {
-				nz := zoneIDs[*z]
-				placements[i].ZoneID = &nz
-			}
+		needs, err := readNeeds(ctx, q, id)
+		if err != nil {
+			return err
 		}
 		if err := writeContent(ctx, q, target.TenantID, newID, zones, placements); err != nil {
+			return err
+		}
+		if err := writeNeeds(ctx, q, target.TenantID, newID, needs); err != nil {
+			return err
+		}
+	}
+	for _, c := range s.planCopiers {
+		if err := c(ctx, tx, planIDs, target); err != nil {
 			return err
 		}
 	}

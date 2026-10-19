@@ -11,6 +11,8 @@ export interface FunctionTypeInput {
   readonly $schema?: string;
   /** Several needs may share one channel (default false); on update, left out keeps the stored value (D294) */
   allowsCircuit?: boolean;
+  /** Default true; on update, left out keeps the stored value (D294) */
+  isActive?: boolean;
   /**
      * @minLength 1
      * @maxLength 64

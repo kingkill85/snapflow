@@ -2,6 +2,7 @@
   "tabs": {
     "label": "Inhalt der Version",
     "plans": "Pläne",
+    "needs": "Bedarf",
     "bom": "Stückliste",
     "pricing": "Preise",
     "proposals": "Angebote"

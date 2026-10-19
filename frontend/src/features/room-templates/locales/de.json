@@ -1,0 +1,48 @@
+{
+  "title": "Raumvorlagen",
+  "description": "Typische Bedarfe eines Raums (Licht, Jalousien, Steckdosen, Taster), im Grundriss-Editor in einem Schritt einer Zone zugewiesen.",
+  "empty": "Noch keine Raumvorlagen.",
+  "new": "Neue Raumvorlage",
+  "edit": "Raumvorlage bearbeiten",
+  "deleteTitle": "Raumvorlage löschen",
+  "deleteMessage": "„{{name}}“ löschen? Pläne, die sie verwendet haben, behalten ihre Bedarfe.",
+  "moveUp": "{{name}} nach oben",
+  "moveDown": "{{name}} nach unten",
+  "lineCount_one": "{{count}} Zeile",
+  "lineCount_other": "{{count}} Zeilen",
+  "field": {
+    "key": "Schlüssel",
+    "keyHint": "z. B. wohnzimmer_komfort",
+    "name": "Name",
+    "equipmentLevel": "Ausstattung",
+    "equipmentLevelHint": "Optional, z. B. „Basis“ oder „Komfort“.",
+    "lines": "Zeilen",
+    "linesHint": "Jede Zeile wird ein Bedarf der Zone.",
+    "status": "Status",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Vorlagen können im Editor nicht angewendet werden."
+  },
+  "line": {
+    "title": "Zeile {{n}}",
+    "add": "Zeile hinzufügen",
+    "functionType": "Funktionstyp",
+    "quantity": "Anzahl",
+    "powerW": "Leistung je Stück (W)",
+    "powerWHint": "Leer lassen, wenn unbekannt.",
+    "loadType": "Lastart",
+    "noLoadType": "Keine",
+    "label": "Bezeichnung",
+    "labelHint": "z. B. Decke, Fenster",
+    "choose": "Auswählen …",
+    "inactiveOption": "{{name}} (inaktiv)",
+    "inactiveReference": "Verwendet einen inaktiven Funktionstyp oder eine inaktive Lastart. Vor dem Speichern eine aktive auswählen.",
+    "warning": {
+      "function_type_inactive": "Inaktiver Funktionstyp: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
+      "load_type_inactive": "Inaktive Lastart: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
+      "load_type_not_allowed": "Der Funktionstyp erlaubt diese Lastart nicht mehr: Diese Zeile wird beim Anwenden der Vorlage übersprungen."
+    }
+  },
+  "skipped_one": "{{count}} Zeile übersprungen",
+  "skipped_other": "{{count}} Zeilen übersprungen",
+  "skippedHint": "Zeilen mit inaktivem Funktionstyp oder inaktiver Lastart werden beim Anwenden der Vorlage übersprungen."
+}

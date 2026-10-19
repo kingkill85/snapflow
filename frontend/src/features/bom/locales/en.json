@@ -2,6 +2,7 @@
   "tabs": {
     "label": "Version contents",
     "plans": "Plans",
+    "needs": "Needs",
     "bom": "Bill of materials",
     "pricing": "Pricing",
     "proposals": "Proposals"

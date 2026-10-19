@@ -19,6 +19,7 @@ const pages = [
   { name: 'catalog-fields', path: '/catalog/fields', heading: 'Fields' },
   { name: 'output-kinds', path: '/catalog/output-kinds', heading: 'Output kinds' },
   { name: 'load-types', path: '/catalog/load-types', heading: 'Load types' },
+  { name: 'room-templates', path: '/catalog/room-templates', heading: 'Room templates' },
   { name: 'categories', path: '/catalog/categories', heading: 'Categories' },
   { name: 'category-new', path: '/catalog/categories/new', heading: 'New category' },
   { name: 'users', path: '/admin/users', heading: 'Users' },
@@ -57,6 +58,7 @@ const listPages = [
   { name: 'catalog-fields', path: '/catalog/fields', heading: { en: 'Fields', de: 'Felder' } },
   { name: 'output-kinds', path: '/catalog/output-kinds', heading: { en: 'Output kinds', de: 'Ausgangsarten' } },
   { name: 'load-types', path: '/catalog/load-types', heading: { en: 'Load types', de: 'Lastarten' } },
+  { name: 'room-templates', path: '/catalog/room-templates', heading: { en: 'Room templates', de: 'Raumvorlagen' } },
   { name: 'users', path: '/admin/users', heading: { en: 'Users', de: 'Benutzer' } },
   { name: 'tenants', path: '/admin/tenants', heading: { en: 'Tenants', de: 'Mandanten' } },
   { name: 'roles', path: '/admin/roles', heading: { en: 'Roles', de: 'Rollen' } },
@@ -136,6 +138,18 @@ for (const width of [1280, 1440, 1920]) {
           },
         })
         expect(field.status()).toBe(201)
+        // A room template with a long name and level: the widest Room templates row.
+        const lighting = await api.createFunctionType(uniqueKey('room_light'), unique('Dimmable light'))
+        const roomTemplate = await api.ctx.post('/api/room-templates', {
+          data: {
+            key: uniqueKey('living_comfort'),
+            name: { en: unique('Living room with open kitchen and dining area'), de: unique('Wohnzimmer mit offener Küche und Essbereich') },
+            equipmentLevel: { en: 'Comfort plus', de: 'Komfort plus' },
+            isActive: true,
+            lines: [{ functionTypeId: lighting.id, quantity: 4, powerW: '7.5', loadTypeId: null, label: 'Ceiling' }],
+          },
+        })
+        expect(roomTemplate.status()).toBe(201)
         // Required afterwards: the product misses the value, a problem badge in the status cell.
         await api.updateCategory(category.id, { attributes: [{ ...attribute, required: true }] })
         await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
@@ -279,6 +293,35 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await screenshot(page, testInfo, `product-type-dialog-${viewport.name}-${colorScheme}`)
       })
 
+      test('the room template dialog fits the screen', async ({ page, api }, testInfo) => {
+        const lighting = await api.createFunctionType(uniqueKey('room_light'), unique('Dimmable light with a rather long name'))
+        const name = unique('Living room with open kitchen and dining area')
+        const created = await api.ctx.post('/api/room-templates', {
+          data: {
+            key: uniqueKey('living_comfort'),
+            name: { en: name },
+            equipmentLevel: { en: 'Comfort' },
+            isActive: true,
+            lines: [
+              { functionTypeId: lighting.id, quantity: 4, powerW: '7.5', loadTypeId: null, label: 'Ceiling' },
+              { functionTypeId: lighting.id, quantity: 2, powerW: null, loadTypeId: null, label: 'Wall' },
+            ],
+          },
+        })
+        expect(created.status()).toBe(201)
+        const key = ((await created.json()) as { key: string }).key
+        await page.goto('/catalog/room-templates')
+        const row = page.getByRole('row').filter({ hasText: name })
+        await expect(row).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await row.getByRole('button', { name: 'Edit' }).click()
+        const dialog = page.getByRole('dialog', { name: 'Edit room template' })
+        await expect(dialog.getByLabel('Key')).toHaveValue(key)
+        await expect(dialog.getByRole('group', { name: 'Line 2' })).toBeVisible()
+        await expectNoHorizontalOverflow(page)
+        await screenshot(page, testInfo, `room-template-dialog-${viewport.name}-${colorScheme}`)
+      })
+
       test('the plans section and the plan editor fit the screen', async ({ page, api }, testInfo) => {
         const kind = await api.createKind({ name: { en: 'Switches with a rather long category name' } }, { abbreviation: 'ZB', color: '#1f6feb' })
         await api.createVariant((await api.createProduct({ ...kind.ids, name: { en: 'Wall switch with a long product name' } })).id, { name: { en: 'White' } })
@@ -340,6 +383,34 @@ for (const colorScheme of ['light', 'dark'] as const) {
             await expectNoHorizontalOverflow(page)
             await screenshot(page, testInfo, `${tab}-${viewport.name}-${colorScheme}-${lang}`, true)
           }
+        }
+        await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
+      })
+
+      test('the needs by room fit the screen', async ({ page, api }, testInfo) => {
+        const dimmer = await api.createFunctionType(uniqueKey('dimmer'), 'Dimmable light with a rather long name')
+        const blind = await api.createFunctionType(uniqueKey('blind'), 'Blind')
+        const project = await api.createProject({ name: unique('Villa Mustermann-Schmidt'), productTypeIds: [(await api.createProductType()).id] })
+        const version = project.versions[0].id
+        const image = { name: 'floorplan.png', mimeType: 'image/png', buffer: readFileSync(fileURLToPath(new URL('../assets/floorplan.png', import.meta.url))) }
+        const plan = await api.createPlan(version, 'Ground floor with a long plan name', image)
+        const living = crypto.randomUUID()
+        await api.savePlanContent(plan.id, {
+          zones: [{ id: living, name: 'Living room with a long zone name', color: '#22aa55', opacity: 0.3, points: [[0, 0], [600, 0], [600, 800], [0, 800]] }],
+          placements: [],
+          needs: [
+            { zoneId: living, functionTypeId: dimmer.id, quantity: 12, powerW: '7.5', label: 'Ceiling, along the window front', note: 'Warm white, dimmable to 1 %' },
+            { functionTypeId: blind.id, quantity: 2, x: 100, y: 100, label: 'Terrace door' },
+            { functionTypeId: blind.id, quantity: 1, x: 900, y: 700 },
+          ],
+        })
+        for (const lang of ['en', 'de'] as const) {
+          await page.goto('/profile')
+          await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
+          await page.goto(`/projects/${project.id}?tab=needs`)
+          await expect(page.getByRole('heading', { name: lang === 'en' ? 'Needs by room' : 'Bedarf nach Raum' })).toBeVisible()
+          await expectNoHorizontalOverflow(page)
+          await screenshot(page, testInfo, `needs-${viewport.name}-${colorScheme}-${lang}`, true)
         }
         await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
       })

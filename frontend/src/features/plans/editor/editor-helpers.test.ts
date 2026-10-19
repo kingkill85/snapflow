@@ -45,7 +45,7 @@ describe('default placement size', () => {
 
 describe('save errors', () => {
   it('maps body.placements[i] to the id of the i-th placement that was sent', () => {
-    const snapshot = { scale: null, zones: [], placements: [placement(1), placement(2)] }
+    const snapshot = { scale: null, zones: [], placements: [placement(1), placement(2)], needs: [] }
     const error = new ApiError({
       status: 422,
       code: 'validation.failed',

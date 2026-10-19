@@ -1,10 +1,14 @@
 import { useEffect, useRef } from 'react'
 
-import type { PlanPlacement } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement } from '@/api/generated/model'
 import { isCanvasKeyTarget, isModKey, isTypingTarget, type Size } from '@/canvas'
 
+import type { CopyResult } from './copies'
 import type { EditorAction, EditorState } from './editor-state'
-import { clampMove, duplicateOffset, duplicatePlacements } from './placements'
+import { clampMove, duplicateOffset } from './placements'
+
+/** Copies placements and load symbols by (dx, dy) as one step (the editor's `copyItems` with its notices). */
+export type CopyItems = (source: { placements: PlanPlacement[]; needs: PlanNeed[] }, dx: number, dy: number) => CopyResult
 
 type Options = {
   state: EditorState
@@ -16,6 +20,8 @@ type Options = {
   onEscape: () => void
   /** What select-all selects (visible placements and zones); all placements by default. */
   selectable?: () => string[]
+  /** Duplicate and paste. */
+  onCopy: CopyItems
 }
 
 /** The command a key press means, or undefined. Exported for tests. */
@@ -39,11 +45,11 @@ export function shortcutOf(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' 
  * the arrows (1 px, shift 10 px), duplicate, copy/paste within the plan,
  * select all, Esc. Never while typing in a field or with a dialog open.
  */
-export function useShortcuts({ state, dispatch, editable, image, onEscape, selectable }: Options) {
-  const clipboard = useRef<PlanPlacement[]>([])
-  const latest = useRef({ state, editable, image, onEscape, selectable })
+export function useShortcuts({ state, dispatch, editable, image, onEscape, selectable, onCopy }: Options) {
+  const clipboard = useRef<{ placements: PlanPlacement[]; needs: PlanNeed[] }>({ placements: [], needs: [] })
+  const latest = useRef({ state, editable, image, onEscape, selectable, onCopy })
   useEffect(() => {
-    latest.current = { state, editable, image, onEscape, selectable }
+    latest.current = { state, editable, image, onEscape, selectable, onCopy }
   })
 
   useEffect(() => {
@@ -53,9 +59,10 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
       if (!command) return
       // Plain keys (arrows, Delete, Backspace) belong to a focused control (button, switch, tab, ...).
       if ((command === 'nudge' || command === 'delete') && !isCanvasKeyTarget(e.target)) return
-      const { state, editable, image, onEscape, selectable } = latest.current
+      const { state, editable, image, onEscape, selectable, onCopy } = latest.current
       const doc = state.history.present
       const selected = doc.placements.filter((p) => state.selection.includes(p.id))
+      const selectedNeeds = doc.needs.filter((n) => state.selection.includes(n.id))
       const ids = state.selection
       switch (command) {
         case 'escape':
@@ -67,7 +74,7 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
           dispatch({ type: 'select', ids: selectable ? selectable() : doc.placements.map((p) => p.id) })
           return
         case 'copy':
-          if (selected.length > 0) clipboard.current = selected
+          if (selected.length + selectedNeeds.length > 0) clipboard.current = { placements: selected, needs: selectedNeeds }
           return
       }
       if (!editable) return
@@ -97,12 +104,11 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
         }
         case 'duplicate':
         case 'paste': {
-          const source = command === 'duplicate' ? selected : clipboard.current
-          if (source.length === 0) return
-          const copies = duplicatePlacements(source, duplicateOffset, duplicateOffset, image)
+          const source = command === 'duplicate' ? { placements: selected, needs: selectedNeeds } : clipboard.current
+          if (source.placements.length + source.needs.length === 0) return
+          const result = onCopy(source, duplicateOffset, duplicateOffset)
           // Pasting again goes further down-right.
-          if (command === 'paste') clipboard.current = copies
-          dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select: copies.map((c) => c.id) })
+          if (command === 'paste' && result.action) clipboard.current = { placements: result.placements, needs: result.needs }
           return
         }
       }

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { type Page, type Route } from '@playwright/test'
 
-import { Api, expect, test, unique } from '../fixtures'
+import { Api, expect, test, unique, uniqueKey } from '../fixtures'
 
 // Every page, dialog and state of plans and the floorplan editor (step 2b) at
 // phone, tablet and desktop width, light and dark, English and German: nothing
@@ -138,6 +138,27 @@ async function seed(api: Api, lang: Lang) {
     instanceValues: {},
     ...extra,
   })
+  // Needs (3b): function types with and without a pictogram, a load type, a room template.
+  const fn = async (key: string, en: string, de: string, loadTypeIds: string[] = []) =>
+    json<{ id: string }>(await api.ctx.post('/api/function-types', { data: { key: uniqueKey(key), name: { en, de }, allowsCircuit: false, loadTypeIds } }))
+  const led = await json<{ id: string }>(await api.ctx.post('/api/load-types', { data: { key: uniqueKey('led'), name: { en: 'LED', de: 'LED' }, isActive: true } }))
+  const dimmable = await fn('dimmable_light', 'Dimmable light', 'Dimmbares Licht', [led.id])
+  const blindFn = await fn('roller_blind', 'Roller blind', 'Rollladen')
+  const socketFn = await fn('socket', 'Switched socket', 'Schaltbare Steckdose')
+  const heating = await fn('heating_valve', 'Heating valve', 'Heizungsventil')
+  await api.ctx.post('/api/room-templates', {
+    data: {
+      key: uniqueKey('living'),
+      name: { en: 'Living room', de: 'Wohnzimmer' },
+      equipmentLevel: { en: 'Comfort', de: 'Komfort' },
+      isActive: true,
+      lines: [
+        { functionTypeId: dimmable.id, quantity: 4, powerW: '7.5', loadTypeId: led.id, label: 'Ceiling' },
+        { functionTypeId: blindFn.id, quantity: 2, powerW: null, loadTypeId: null, label: '' },
+      ],
+    },
+  })
+  const need = (functionTypeId: string, extra: object = {}) => ({ id: id(), zoneId: null, functionTypeId, quantity: 1, powerW: null, loadTypeId: null, label: '', note: '', x: null, y: null, ...extra })
   const switchPlacement = placement(sw.variant.id, 160, 140, { label: 'S1', addonVariantIds: [frame.id], instanceValues: { circuit: 'F3', height: 105 } })
   const content = {
     scale: 0.01,
@@ -155,7 +176,18 @@ async function seed(api: Api, lang: Lang) {
       placement(dimmer.variant.id, 700, 520),
       placement(sw.variant.id, 1000, 700),
     ],
+    needs: [] as object[],
   }
+  const bath = content.zones[2].id
+  content.needs = [
+    need(dimmable.id, { zoneId: bath, quantity: 3, powerW: '7.5', loadTypeId: led.id, label: 'Ceiling spots over the bathtub and the double washbasin', note: 'Warm white, IP44' }),
+    need(blindFn.id, { zoneId: bath, quantity: 1, label: 'Window' }),
+    need(heating.id, { zoneId: bath, quantity: 1 }),
+    need(dimmable.id, { x: 300, y: 250, quantity: 2, label: 'Pendant' }),
+    need(blindFn.id, { x: 1100, y: 100 }),
+    need(socketFn.id, { x: 700, y: 300, label: 'Coffee' }),
+    need(heating.id, { x: 900, y: 700 }),
+  ]
   await putContent(api, main.id, content)
   await putContent(api, upper.id, { scale: null, zones: [content.zones[0]], placements: [placement(sensor.variant.id, 300, 300)] })
   // Discontinued after it was placed: a warning marker.
@@ -258,6 +290,42 @@ for (const lang of ['en', 'de'] as const) {
             await tab(p, l.zones)
             await p.getByRole('tabpanel', { name: l.zones }).getByRole('button', { name: l.zone.bath, exact: true }).click()
             await tab(p, l.inspector)
+          },
+        },
+        {
+          name: 'editor-need-edit',
+          path: () => editor(s.main.id),
+          editor: true,
+          wide: true,
+          act: async (p) => {
+            await tab(p, l.zones)
+            await p.getByRole('tabpanel', { name: l.zones }).getByRole('button', { name: l.zone.bath, exact: true }).click()
+            await tab(p, l.inspector)
+            const needs = p.getByRole('tabpanel', { name: l.inspector }).getByRole('region', { name: lang === 'de' ? 'Bedarf' : 'Needs', exact: true })
+            await needs.getByRole('button', { name: lang === 'de' ? /bearbeiten$/ : /^Edit / }).first().click()
+            await needs.scrollIntoViewIfNeeded()
+          },
+        },
+        {
+          name: 'editor-place-need',
+          path: () => editor(s.main.id),
+          editor: true,
+          wide: true,
+          act: async (p) => {
+            await p.getByRole('button', { name: lang === 'de' ? 'Bedarf platzieren' : 'Place need' }).click()
+          },
+        },
+        {
+          name: 'editor-inspector-symbol',
+          path: () => editor(s.main.id),
+          editor: true,
+          wide: true,
+          act: async (p) => {
+            const map = await imageToPage(p)
+            const at = map.at(700, 300)
+            await p.mouse.click(at.x, at.y)
+            await tab(p, l.inspector)
+            await expect(p.getByRole('tabpanel', { name: l.inspector }).getByText(lang === 'de' ? 'Bedarfssymbol' : 'Need symbol')).toBeVisible()
           },
         },
         {

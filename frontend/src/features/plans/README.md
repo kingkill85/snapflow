@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole). Spec: `docs/specs/phase-2.md` → 2b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338, review fixes D339–D351, click-through D352–D354. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
 
 ## Files
 
@@ -22,17 +22,26 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D21
 | `editor/use-plan-lock.ts`, `editor/LockBanner.tsx` | Edit lock (D202) |
 | `editor/use-shortcuts.ts` | Keyboard shortcuts (plain keys only off controls, `isCanvasKeyTarget`, D212) |
 | `editor/placements.ts` | New placements, duplicates, `clampMove` / `clampGeometry` (edits stay inside the image, D213), `changeProduct` (D216) |
+| `editor/needs.ts`, `editor/need-catalog.ts`, `editor/NeedsSection.tsx` | Needs (3b): new needs and symbol copies, plain-words text, live zone of a symbol and counts per zone, applying a room template, symbol pictograms; the need catalog hook (function types, load types, active room templates); the zone inspector's Needs section, the need fields and the inspector of one load symbol |
+| `editor/copies.ts` | `copyItems`: the one path of Ctrl+D, paste and alt-drag (placements and load symbols as one batch step; symbols whose function type or load type is no longer usable are skipped with a notice; refused as a whole above 2000 needs, D347–D348) |
 | `src/canvas/` | Shared canvas base for all plan kinds: stage, viewport, image layer, geometry, theme (D198) |
 
 ## Document model
 
-`PlanDocument = { scale, zones, placements }` is exactly what `PUT /api/plans/{id}/content` takes
-(`toContentInput` adds `expectedContentUpdatedAt` and drops the server-computed `zoneId`). Array order is
+`PlanDocument = { scale, zones, placements, needs }` is exactly what `PUT /api/plans/{id}/content` takes
+(`toContentInput` adds `expectedContentUpdatedAt` and drops the placements' server-computed `zoneId`; needs are
+always sent, D331; `restoredNeedIds` lists the document needs whose ids the editor has received from the server in
+this session, so a need brought back by undo keeps an inactive function type, D343). Power per unit is the API's
+decimal string with 2 places; `parsePower` / `formatWatts` / `useNeedText` in `features/needs/format.ts` are the
+only parser and formatters (editor, overview, save-error list via `itemName`, D349). A need without position belongs to its `zoneId`; one with `x`/`y` is a load symbol (`isSymbol`),
+whose zone the backend computes (`needZoneId` computes it live the same way). Array order is
 draw order. Documents are immutable; `applyDocumentAction(doc, action)` returns a new document, or the
 same object when nothing changes. Ids are client uuids (`newId()`).
 
 `DocumentAction` already covers zones: `addZones`, `updateZones`, `remove` (placements and zones by id),
-`moveBy` (moves zone points too) and `setScale`. The editor's UI dispatches these; new kinds of
+`moveBy` (moves zone points and load symbols too) and `setScale`; needs: `addNeeds`, `updateNeeds`, `reorderNeeds`
+(the given needs swap into the places they hold), `remove` (also needs; a removed zone takes its needs without
+position along), and `batch` (several actions as one step, e.g. duplicating placements with symbols). The editor's UI dispatches these; new kinds of
 change go into `DocumentAction` + `applyDocumentAction` (with a test in `editor-state.test.ts`).
 
 ## Reducer, history, selection
@@ -43,7 +52,8 @@ change go into `DocumentAction` + `applyDocumentAction` (with a test in `editor-
   consecutive changes with the same key (the inspector uses `${id}:${field}` so typing is one step);
   `select` sets the selection with the change (e.g. select what was just added).
 - `undo` / `redo` (200 steps), `select`, `toggleSelect` (shift-click), `load` (reload: history starts over).
-- The selection is not in the history; ids that disappear are dropped. It holds placement **and zone** ids.
+- The selection is not in the history; ids that disappear are dropped. It holds placement, zone and load symbol ids
+  (needs without position are not selectable; their errors select their zone, `selectionFor`).
 
 Canvas interactions keep a local preview (`Interaction` in `PlanCanvas`) and dispatch one `change` on
 pointer up, so a drag is one undo step.
@@ -85,7 +95,11 @@ replaced, so it is cached immutably (D211).
 3. placements: `PlacementNode` per visible placement (`name="placement"`; hit-testing uses
    `findAncestor('.placement')`), alt-drag copies, `Handles` for one selected placement
    (`name="handle-nw|ne|se|sw|rotate"`), then the rubber band, drawing drafts and the measured calibration line
-4. zone names: `ZoneLabel` per visible zone, not listening, above the placements so a product never hides them (D224)
+4. zone names: `ZoneLabel` per visible zone, not listening, above the placements so a product never hides them (D224);
+   a name a load symbol would cover moves just above that symbol (`zoneLabelPoint`, D352)
+5. load symbols: `NeedNode` per visible load symbol (`name="need"`, hit-testing `findAncestor('.need')`, moved and
+   copied with the placements; screen-sized pictogram from `symbolIcon(key)` or the first letter, caption below, D333),
+   above the zone names (D352)
 
 Nodes that are UI and not content are named `chrome` (`export.ts`): the PNG export hides them.
 Strokes and labels are scaled by `k = 1 / viewport.scale` so they keep their screen size (while the PNG export draws, `k = exportPixel(image)`, D217).
@@ -94,7 +108,8 @@ The viewport keeps the image fitted while the stage changes size until the user 
 
 ## Tools and interactions
 
-`Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate'`. Drags are `Interaction`s with a local
+`Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate' | 'placeNeed'` ("Place need": the function type
+is chosen in a floating select over the canvas, a click places a symbol and returns to Select, D333). Drags are `Interaction`s with a local
 preview committed as one change on pointer up: `move` (placements and zones), `resize`, `rotate`, `band`,
 `drawRect`, `vertex` (corner drag, also after inserting at an edge midpoint), `scaleZone` (a frame handle: a corner
 scales proportionally around the opposite corner, Shift freely; a side stretches one axis; at least 10 image px
@@ -104,7 +119,7 @@ polygon, Esc drops a draft. Drawing a zone or picking the calibration points ret
 
 ## View state (not in the document)
 
-`PlanEditor` keeps beside the reducer: `layers` (`Layers`: hidden product types, categories, zones; hidden
+`PlanEditor` keeps beside the reducer: `layers` (`Layers`: hidden product types, categories, zones, need symbols; hidden
 items are filtered before drawing, so they are not hit-testable, and dropped from the selection),
 `resizeAll` (inspector switch, also used by canvas resizes via `resizeChanges`), `activeVertex` (the
 picked zone corner the inspector can remove) and the calibration points (open `CalibrateDialog`, docked non-modally over the right panel via
@@ -117,6 +132,15 @@ The Zones tab shows counts from `server.placements[].zoneId` (the last save's re
 different, a live estimate from `zoneAt`, an exact port of the backend's `geometry.go` (a point on an edge or
 corner is inside; smallest containing polygon by shoelace area, ties go to the zone drawn last).
 
+## Needs (3b)
+
+The zone inspector's Needs section (`ZoneNeeds`) lists the zone's needs without position, edits one inline
+(`NeedFields`: every field one keyed undo step), adds needs (select of active function types), reorders, deletes and
+applies a room template (`applyTemplate`: one `addNeeds`, lines with inactive references skipped and reported). A
+selected symbol gets `NeedInspector`. Warnings come from `server.needWarnings`. The Zones tab shows the units per zone
+(`needCounts`, live, D334). The version's needs overview is `features/needs` (D335), room templates
+`features/room-templates` (D336).
+
 ## Tests
 
 Vitest: `PlansSection.test.tsx` (list, dialogs), `editor/PlanEditorPage.test.tsx` (MSW; the Konva canvas
@@ -124,9 +148,11 @@ is replaced by a stand-in), `editor/editor-state.test.ts` (document, history, re
 `editor/use-autosave.test.ts`, `editor/Palette.test.tsx`, `editor/editor-helpers.test.ts`
 (palette data, default size, save errors, shortcuts, clamping), `editor/use-shortcuts.test.ts` (key scoping, nudge at the edge), `editor/use-plan-lock.test.ts`, `src/canvas/geometry.test.ts`, `src/canvas/keyboard.test.ts`; part B: `editor/zones.test.ts`, `editor/part-b-helpers.test.ts` (calibration,
 layers, export name, resize all), `editor/Inspector.test.tsx`, `editor/ZonesPanel.test.tsx` (with the Layers
-tab), `editor/CalibrateDialog.test.tsx`.
+tab), `editor/CalibrateDialog.test.tsx`; 3b: `editor/needs.test.ts` (document actions, undo of template and fields,
+helpers, error mapping, layers), `editor/NeedsSection.test.tsx` (section, add/edit, reorder, delete, template,
+symbol inspector), the Place need tool and layer in `editor/PlanEditorPage.test.tsx`.
 
-E2E: `e2e/specs/plans.spec.ts` (place by click and drop, move/resize/rotate, rectangle and polygon zones,
+E2E: `e2e/specs/needs.spec.ts` (room template, apply, add, place a symbol, reload, overview), `e2e/specs/plans.spec.ts` (place by click and drop, move/resize/rotate, rectangle and polygon zones,
 zone counts, undo/redo, reload, zone corners (drag, add at a midpoint, Alt-click remove), resizing a zone by its frame (corner, side, undo), calibration, layers, PNG export, lock and
 take-over, read-only project), the plans section and editor shell in `layout.spec.ts` (German tabs at 768 px), and
 `plans-visual.spec.ts` (`make e2e-visual`: every state and dialog at 390/768/1280 px, light/dark, en/de, with the exported PNG).

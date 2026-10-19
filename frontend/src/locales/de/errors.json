@@ -103,7 +103,7 @@
     "type": "Nur JPEG-, PNG- und WebP-Bilder werden akzeptiert."
   },
   "function_type": {
-    "in_use": "Ausgangsarten bedienen diesen Funktionstyp noch.",
+    "in_use": "Dieser Funktionstyp wird noch von Ausgangsarten, Bedarfen oder Raumvorlagen verwendet.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
@@ -162,12 +162,20 @@
     "target_unknown": "Dieses Ziel gibt es nicht."
   },
   "load_type": {
-    "in_use": "Diese Lastart wird noch von Funktionstypen oder Katalogfeldern verwendet.",
+    "in_use": "Diese Lastart wird noch von Funktionstypen, Katalogfeldern, Bedarfen oder Raumvorlagen verwendet.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
     "not_found": "Diese Lastart existiert nicht mehr.",
     "order_mismatch": "Die Lastarten wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
     "stale": "Jemand anderes hat diese Lastart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
+  },
+  "need": {
+    "function_type_inactive": "Dieser Funktionstyp ist nicht mehr aktiv. Wählen Sie einen anderen.",
+    "load_type_inactive": "Diese Lastart ist nicht mehr aktiv. Wählen Sie eine andere.",
+    "load_type_not_allowed": "Diese Lastart passt nicht zum Funktionstyp.",
+    "position_partial": "Geben Sie beide Koordinaten der Position an oder keine.",
+    "power_invalid": "Geben Sie eine Leistung von 0 bis {{max}} W mit höchstens 2 Nachkommastellen ein.",
+    "zone_not_found": "Diese Zone existiert nicht mehr."
   },
   "network": {
     "unavailable": "Keine Verbindung zum Server."
@@ -263,6 +271,14 @@
     "conflict_retry": "Jemand anderes hat dies gleichzeitig geändert. Bitte versuchen Sie es erneut.",
     "failed": "Die Anfrage ist fehlgeschlagen.",
     "not_found": "Nicht gefunden."
+  },
+  "room_template": {
+    "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
+    "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
+    "line_reference": "Ein Funktionstyp oder eine Lastart einer Zeile existiert nicht mehr. Laden Sie neu und versuchen Sie es erneut.",
+    "not_found": "Diese Raumvorlage existiert nicht mehr.",
+    "order_mismatch": "Die Raumvorlagen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diese Raumvorlage inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "server": {
     "busy": "Der Server ist ausgelastet. Bitte versuchen Sie es gleich noch einmal.",

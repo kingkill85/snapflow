@@ -24,6 +24,7 @@ export function LayersPanel({ placements, products, variants, layers, onLayers }
     <div className="space-y-5">
       <p className="text-xs text-muted">{t('layers.hint')}</p>
       <SwitchField label={t('layers.zones')} checked={!layers.zonesHidden} onChange={(e) => onLayers({ ...layers, zonesHidden: !e.target.checked })} />
+      <SwitchField label={t('layers.needs')} hint={t('layers.needsHint')} checked={!layers.needsHidden} onChange={(e) => onLayers({ ...layers, needsHidden: !e.target.checked })} />
       {types.length > 0 && (
         <fieldset className="space-y-2">
           <legend className="mb-1 text-sm font-semibold">{t('layers.productTypes')}</legend>

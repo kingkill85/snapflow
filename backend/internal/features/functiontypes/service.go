@@ -29,6 +29,7 @@ type FunctionType struct {
 	// (lights, sockets: yes; blinds, inputs: no).
 	AllowsCircuit bool        `json:"allowsCircuit" doc:"Several needs of this function may share one channel (a circuit)"`
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds" doc:"The load types a need of this function may have; empty = any"`
+	IsActive      bool        `json:"isActive" doc:"Inactive: kept on existing needs (with a warning), not chosen for new ones"`
 	CreatedAt     time.Time   `json:"createdAt"`
 	UpdatedAt     time.Time   `json:"updatedAt"`
 }
@@ -38,6 +39,7 @@ type FunctionTypeInput struct {
 	Name          i18n.Text   `json:"name" doc:"Display name per locale; \"en\" is required"`
 	AllowsCircuit *bool       `json:"allowsCircuit,omitempty" doc:"Several needs may share one channel (default false); on update, left out keeps the stored value (D294)"`
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)"`
+	IsActive      *bool       `json:"isActive,omitempty" doc:"Default true; on update, left out keeps the stored value (D294)"`
 }
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -120,7 +122,8 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 	var row store.FunctionType
 	err := s.inTx(ctx, func(q *store.Queries) error {
 		var err error
-		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name, AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit})
+		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name,
+			AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit, IsActive: in.IsActive == nil || *in.IsActive})
 		if err != nil {
 			return err
 		}
@@ -145,15 +148,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 	err := s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		// Left-out flags keep the stored values (D294).
-		allowsCircuit := in.AllowsCircuit
-		if allowsCircuit == nil {
+		allowsCircuit, isActive := in.AllowsCircuit, in.IsActive
+		if allowsCircuit == nil || isActive == nil {
 			current, err := q.GetFunctionType(ctx, id)
 			if err != nil {
 				return err
 			}
-			allowsCircuit = &current.AllowsCircuit
+			if allowsCircuit == nil {
+				allowsCircuit = &current.AllowsCircuit
+			}
+			if isActive == nil {
+				isActive = &current.IsActive
+			}
 		}
-		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name, AllowsCircuit: *allowsCircuit})
+		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name,
+			AllowsCircuit: *allowsCircuit, IsActive: *isActive})
 		if err != nil || in.LoadTypeIDs == nil {
 			return err
 		}
@@ -220,9 +229,10 @@ func mapErr(err error, key ...string) error {
 		return apperr.Conflict("function_type.key_taken", "key already exists").With("key", key[0])
 	}
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-		// Output kinds serve the function type (function_type_load_types
-		// cascades; an unknown load type is caught in setLoadTypes).
-		return apperr.Conflict("function_type.in_use", "output kinds still serve this function type")
+		// Output kinds serve the function type, needs or room templates use
+		// it (function_type_load_types cascades; an unknown load type is
+		// caught in setLoadTypes).
+		return apperr.Conflict("function_type.in_use", "output kinds, needs or room templates still use this function type")
 	}
 	return err
 }
@@ -246,5 +256,5 @@ func fromRow(r store.FunctionType, loadTypes []uuid.UUID) FunctionType {
 		loadTypes = []uuid.UUID{}
 	}
 	return FunctionType{ID: r.ID, Key: r.Key, Name: r.Name, AllowsCircuit: r.AllowsCircuit, LoadTypeIDs: loadTypes,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+		IsActive: r.IsActive, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }

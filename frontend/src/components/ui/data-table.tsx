@@ -75,7 +75,8 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
         hasMedia ? 'max-md:col-start-2' : 'max-md:col-span-2',
       )
     }
-    return 'max-md:col-span-2 max-md:grid max-md:grid-cols-[minmax(6rem,2fr)_minmax(0,3fr)] max-md:items-baseline max-md:gap-3 max-md:text-left'
+    // Full width on a phone, also for a column sized to its content on wider screens (`w-px`, e.g. Position).
+    return 'max-md:col-span-2 max-md:grid max-md:w-auto max-md:grid-cols-[minmax(6rem,2fr)_minmax(0,3fr)] max-md:items-baseline max-md:gap-3 max-md:text-left'
   }
   return (
     <div className={cn('relative', !flat && 'rounded-control border border-line bg-surface max-md:border-0 max-md:bg-transparent')}>

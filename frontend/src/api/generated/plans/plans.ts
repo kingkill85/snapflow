@@ -32,7 +32,8 @@ import type {
   PlanContentInput,
   PlanLock,
   PlanOrder,
-  UpdatePlanBody
+  UpdatePlanBody,
+  VersionNeeds
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -321,7 +322,7 @@ export const useUpdatePlan = <TError = ErrorType<Error>,
       return useMutation(getUpdatePlanMutationOptions(options), queryClient);
     }
     /**
- * @summary Get a plan's zones and placements
+ * @summary Get a plan's zones, placements and needs
  */
 export const getPlanContent = (
     id: string,
@@ -392,7 +393,7 @@ export function useGetPlanContent<TData = Awaited<ReturnType<typeof getPlanConte
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a plan's zones and placements
+ * @summary Get a plan's zones, placements and needs
  */
 
 export function useGetPlanContent<TData = Awaited<ReturnType<typeof getPlanContent>>, TError = ErrorType<Error>>(
@@ -413,8 +414,8 @@ export function useGetPlanContent<TData = Awaited<ReturnType<typeof getPlanConte
 
 
 /**
- * Saves the whole content in one transaction and returns it with the computed zone of every placement and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
- * @summary Replace a plan's zones and placements
+ * Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
+ * @summary Replace a plan's zones, placements and needs
  */
 export const savePlanContent = (
     id: string,
@@ -469,7 +470,7 @@ const {mutation: mutationOptions} = options ?
     export type SavePlanContentMutationVariables = {id: string;data: BodyType<NonReadonly<PlanContentInput>>}
 
     /**
- * @summary Replace a plan's zones and placements
+ * @summary Replace a plan's zones, placements and needs
  */
 export const useSavePlanContent = <TError = ErrorType<Error>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePlanContent>>, TError,SavePlanContentMutationVariables, TContext>, }
@@ -717,6 +718,99 @@ export const useLockPlan = <TError = ErrorType<Error>,
       return useMutation(getLockPlanMutationOptions(options), queryClient);
     }
     /**
+ * Every need of the version's plans, grouped by plan and zone, with totals per function type and load type.
+ * @summary Get the needs of a version by plan and zone
+ */
+export const getVersionNeeds = (
+    versionId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<VersionNeeds>(
+      {url: `/api/versions/${versionId}/needs`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetVersionNeedsQueryKey = (versionId: string,) => {
+    return [
+    `/api/versions/${versionId}/needs`
+    ] as const;
+    }
+
+
+export const getGetVersionNeedsQueryOptions = <TData = Awaited<ReturnType<typeof getVersionNeeds>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVersionNeedsQueryKey(versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVersionNeeds>>> = ({ signal }) => getVersionNeeds(versionId, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetVersionNeedsQueryResult = NonNullable<Awaited<ReturnType<typeof getVersionNeeds>>>
+export type GetVersionNeedsQueryError = ErrorType<Error>
+
+
+export function useGetVersionNeeds<TData = Awaited<ReturnType<typeof getVersionNeeds>>, TError = ErrorType<Error>>(
+ versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVersionNeeds>>,
+          TError,
+          Awaited<ReturnType<typeof getVersionNeeds>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVersionNeeds<TData = Awaited<ReturnType<typeof getVersionNeeds>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVersionNeeds>>,
+          TError,
+          Awaited<ReturnType<typeof getVersionNeeds>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVersionNeeds<TData = Awaited<ReturnType<typeof getVersionNeeds>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the needs of a version by plan and zone
+ */
+
+export function useGetVersionNeeds<TData = Awaited<ReturnType<typeof getVersionNeeds>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVersionNeeds>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetVersionNeedsQueryOptions(versionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * In their order, without content.
  * @summary List the plans of a version
  */

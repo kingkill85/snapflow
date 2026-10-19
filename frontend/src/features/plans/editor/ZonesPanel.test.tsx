@@ -32,14 +32,14 @@ const now = [placement(1), placement(2)]
 
 describe('ZonesPanel', () => {
   it('says when there are no zones', () => {
-    renderWithProviders(<ZonesPanel zones={[]} saved={[]} placements={[]} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={vi.fn()} />)
+    renderWithProviders(<ZonesPanel zones={[]} saved={[]} placements={[]} needs={[]} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={vi.fn()} />)
     expect(screen.getByText('No zones yet.')).toBeInTheDocument()
   })
 
   it('lists zones with saved counts and a live estimate when they differ; a click selects', async () => {
     const onSelect = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<ZonesPanel zones={zones} saved={saved} placements={now} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={onSelect} />)
+    renderWithProviders(<ZonesPanel zones={zones} saved={saved} placements={now} needs={[]} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={onSelect} />)
 
     expect(screen.getByTestId(`zone-count-${zones[0].id}`)).toHaveTextContent('2 devices(now ≈ 1)')
     expect(screen.getByTestId(`zone-count-${zones[1].id}`)).toHaveTextContent('0 devices(now ≈ 1)')
@@ -48,14 +48,14 @@ describe('ZonesPanel', () => {
   })
 
   it('shows no estimate when it matches the saved count', () => {
-    renderWithProviders(<ZonesPanel zones={zones} saved={saved} placements={[placement(1)]} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={vi.fn()} />)
+    renderWithProviders(<ZonesPanel zones={zones} saved={saved} placements={[placement(1)]} needs={[]} selection={[]} layers={allVisible()} onLayers={vi.fn()} onSelect={vi.fn()} />)
     expect(screen.getByTestId(`zone-count-${zones[1].id}`)).toHaveTextContent(/^0 devices$/)
   })
 
   it('hides and shows single zones and all zones', async () => {
     const onLayers = vi.fn()
     const user = userEvent.setup()
-    const { rerender } = renderWithProviders(<ZonesPanel zones={zones} saved={[]} placements={[]} selection={[]} layers={allVisible()} onLayers={onLayers} onSelect={vi.fn()} />)
+    const { rerender } = renderWithProviders(<ZonesPanel zones={zones} saved={[]} placements={[]} needs={[]} selection={[]} layers={allVisible()} onLayers={onLayers} onSelect={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Hide Zone 1' }))
     let layers = onLayers.mock.calls.at(-1)?.[0] as Layers
@@ -68,7 +68,7 @@ describe('ZonesPanel', () => {
     expect(layers.hiddenZones.size).toBe(0)
 
     // With all hidden: showing one hides only the others; "Show all" shows everything.
-    rerender(<ZonesPanel zones={zones} saved={[]} placements={[]} selection={[]} layers={{ ...allVisible(), zonesHidden: true }} onLayers={onLayers} onSelect={vi.fn()} />)
+    rerender(<ZonesPanel zones={zones} saved={[]} placements={[]} needs={[]} selection={[]} layers={{ ...allVisible(), zonesHidden: true }} onLayers={onLayers} onSelect={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Zone 1' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Show Zone 1' }))
     layers = onLayers.mock.calls.at(-1)?.[0] as Layers

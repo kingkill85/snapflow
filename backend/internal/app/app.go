@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
+	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/clientip"
@@ -39,6 +40,10 @@ type Deps struct {
 	// online rate is stale (0: the default, 7).
 	ExchangeRates          *exchangerate.Client
 	ExchangeRateMaxAgeDays int
+	// PlanCopiers are extra plan copiers (plans.Service.OnCopyPlans), run
+	// after those of the features; tests use it to see the plan id map of a
+	// version copy.
+	PlanCopiers []plans.PlanCopier
 }
 
 // New returns the router with all API routes and the huma API for tests.

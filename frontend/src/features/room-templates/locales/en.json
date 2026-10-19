@@ -1,0 +1,48 @@
+{
+  "title": "Room templates",
+  "description": "Typical needs of a room (lights, blinds, sockets, pushbuttons), applied to a zone in the floorplan editor in one step.",
+  "empty": "No room templates yet.",
+  "new": "New room template",
+  "edit": "Edit room template",
+  "deleteTitle": "Delete room template",
+  "deleteMessage": "Delete \"{{name}}\"? Plans that used it keep their needs.",
+  "moveUp": "Move {{name}} up",
+  "moveDown": "Move {{name}} down",
+  "lineCount_one": "{{count}} line",
+  "lineCount_other": "{{count}} lines",
+  "field": {
+    "key": "Key",
+    "keyHint": "e.g. living_room_comfort",
+    "name": "Name",
+    "equipmentLevel": "Equipment level",
+    "equipmentLevelHint": "Optional, e.g. \"Basic\" or \"Comfort\".",
+    "lines": "Lines",
+    "linesHint": "Each line becomes a need of the zone.",
+    "status": "Status",
+    "active": "Active",
+    "activeHint": "Inactive templates cannot be applied in the editor."
+  },
+  "line": {
+    "title": "Line {{n}}",
+    "add": "Add line",
+    "functionType": "Function type",
+    "quantity": "Quantity",
+    "powerW": "Power per unit (W)",
+    "powerWHint": "Leave empty when unknown.",
+    "loadType": "Load type",
+    "noLoadType": "None",
+    "label": "Label",
+    "labelHint": "e.g. Ceiling, Window",
+    "choose": "Choose …",
+    "inactiveOption": "{{name}} (inactive)",
+    "inactiveReference": "Uses an inactive function type or load type. Choose an active one before saving.",
+    "warning": {
+      "function_type_inactive": "Inactive function type: this line is skipped when the template is applied.",
+      "load_type_inactive": "Inactive load type: this line is skipped when the template is applied.",
+      "load_type_not_allowed": "The function type no longer allows this load type: this line is skipped when the template is applied."
+    }
+  },
+  "skipped_one": "{{count}} line skipped",
+  "skipped_other": "{{count}} lines skipped",
+  "skippedHint": "Lines with an inactive function type or load type are skipped when the template is applied."
+}

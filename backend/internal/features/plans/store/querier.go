@@ -23,16 +23,21 @@ type Querier interface {
 	// CreatePlan adds a plan after the version's last one (the caller holds the
 	// project's lock).
 	CreatePlan(ctx context.Context, arg CreatePlanParams) (uuid.UUID, error)
+	DeleteNeeds(ctx context.Context, planID uuid.UUID) error
 	DeletePlacements(ctx context.Context, planID uuid.UUID) error
 	DeletePlan(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteZones(ctx context.Context, planID uuid.UUID) error
 	GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error)
+	// InsertNeeds inserts the needs of a JSON array (one statement for up to
+	// 2000 needs).
+	InsertNeeds(ctx context.Context, arg InsertNeedsParams) error
 	// InsertPlacements inserts the placements of a JSON array (one statement for
 	// up to 2000 placements).
 	InsertPlacements(ctx context.Context, arg InsertPlacementsParams) error
 	// InsertZones inserts the zones of a JSON array (one statement for up to
 	// 200 zones).
 	InsertZones(ctx context.Context, arg InsertZonesParams) error
+	ListNeeds(ctx context.Context, planID uuid.UUID) ([]PlanNeed, error)
 	ListPlacements(ctx context.Context, planID uuid.UUID) ([]PlanPlacement, error)
 	// Every query of this feature runs in database.InScope: row-level security
 	// limits it to the tenants the caller may see.
@@ -54,6 +59,8 @@ type Querier interface {
 	// clock tick) and sets the scale.
 	TouchContent(ctx context.Context, arg TouchContentParams) (time.Time, error)
 	UpdatePlan(ctx context.Context, arg UpdatePlanParams) error
+	// VersionNeeds returns the needs of a version's plans (the needs summary).
+	VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

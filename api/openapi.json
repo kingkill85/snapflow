@@ -2018,6 +2018,10 @@
           "id": {
             "type": "string"
           },
+          "isActive": {
+            "description": "Inactive: kept on existing needs (with a warning), not chosen for new ones",
+            "type": "boolean"
+          },
           "key": {
             "description": "Stable identifier, lower snake case",
             "examples": [
@@ -2050,6 +2054,7 @@
           "name",
           "allowsCircuit",
           "loadTypeIds",
+          "isActive",
           "createdAt",
           "updatedAt"
         ],
@@ -2069,6 +2074,10 @@
           },
           "allowsCircuit": {
             "description": "Several needs may share one channel (default false); on update, left out keeps the stored value (D294)",
+            "type": "boolean"
+          },
+          "isActive": {
+            "description": "Default true; on update, left out keeps the stored value (D294)",
             "type": "boolean"
           },
           "key": {
@@ -2122,6 +2131,22 @@
         },
         "required": [
           "items"
+        ],
+        "type": "object"
+      },
+      "FunctionTypeTotal": {
+        "additionalProperties": false,
+        "properties": {
+          "functionType": {
+            "$ref": "#/components/schemas/NeedRef"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NeedTotals"
+          }
+        },
+        "required": [
+          "functionType",
+          "totals"
         ],
         "type": "object"
       },
@@ -3939,6 +3964,22 @@
         ],
         "type": "object"
       },
+      "LoadTypeTotal": {
+        "additionalProperties": false,
+        "properties": {
+          "loadType": {
+            "$ref": "#/components/schemas/NullableNeedRef"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NeedTotals"
+          }
+        },
+        "required": [
+          "loadType",
+          "totals"
+        ],
+        "type": "object"
+      },
       "LoadTypeUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -4297,6 +4338,72 @@
         ],
         "type": "object"
       },
+      "NeedRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
+      "NeedTotals": {
+        "additionalProperties": false,
+        "properties": {
+          "powerW": {
+            "description": "Sum of quantity × power per unit of the needs with a power, exact, a decimal string with 2 decimals (\"0.00\" for none)",
+            "examples": [
+              "420.50"
+            ],
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units (sum of quantities)",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity",
+          "powerW"
+        ],
+        "type": "object"
+      },
+      "NeedWarning": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "need_function_type_inactive",
+              "need_outside_zones",
+              "need_load_type_not_allowed"
+            ],
+            "type": "string"
+          },
+          "needId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "needId",
+          "code"
+        ],
+        "type": "object"
+      },
       "NullableBOMAmounts": {
         "additionalProperties": false,
         "properties": {
@@ -4492,6 +4599,32 @@
           "deleted",
           "inactive",
           "outdated"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableNeedRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
         ],
         "type": [
           "object",
@@ -4953,6 +5086,10 @@
           "name": {
             "type": "string"
           },
+          "needCount": {
+            "format": "int64",
+            "type": "integer"
+          },
           "placementCount": {
             "format": "int64",
             "type": "integer"
@@ -4993,6 +5130,7 @@
           "image",
           "zoneCount",
           "placementCount",
+          "needCount",
           "createdAt",
           "updatedAt",
           "contentUpdatedAt",
@@ -5036,6 +5174,19 @@
             "format": "date-time",
             "type": "string"
           },
+          "needWarnings": {
+            "items": {
+              "$ref": "#/components/schemas/NeedWarning"
+            },
+            "type": "array"
+          },
+          "needs": {
+            "description": "In order (per zone in the order of this list)",
+            "items": {
+              "$ref": "#/components/schemas/PlanNeed"
+            },
+            "type": "array"
+          },
           "placements": {
             "description": "In draw order",
             "items": {
@@ -5074,7 +5225,9 @@
           "scale",
           "zones",
           "placements",
-          "warnings"
+          "needs",
+          "warnings",
+          "needWarnings"
         ],
         "type": "object"
       },
@@ -5095,10 +5248,24 @@
             "format": "date-time",
             "type": "string"
           },
+          "needs": {
+            "description": "In order (the array order is stored); at most 2000. Left out (or null) keeps the stored needs (D294), dropping those of deleted zones",
+            "items": {
+              "$ref": "#/components/schemas/PlanNeedInput"
+            },
+            "type": "array"
+          },
           "placements": {
             "description": "In draw order (the array order is stored); at most 2000",
             "items": {
               "$ref": "#/components/schemas/PlanPlacementInput"
+            },
+            "type": "array"
+          },
+          "restoredNeedIds": {
+            "description": "Needs of this save that come back from content saved before (undo/redo in the editor): like a stored need they keep an inactive function type or load type (D343)",
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -5187,6 +5354,159 @@
           "name",
           "expiresAt",
           "mine"
+        ],
+        "type": "object"
+      },
+      "PlanNeed": {
+        "additionalProperties": false,
+        "properties": {
+          "functionTypeId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the plan, kept across saves and version copies",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "loadTypeId": {
+            "description": "null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string with exactly 2 decimals; null for unknown",
+            "examples": [
+              "7.50"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "1-100; n means n separate loads",
+            "format": "int32",
+            "type": "integer"
+          },
+          "x": {
+            "description": "Load symbol position in image pixels (with y); null for a need without symbol",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "zoneId": {
+            "description": "The zone; for a load symbol the smallest zone containing it (computed on every save), null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "zoneId",
+          "functionTypeId",
+          "quantity",
+          "powerW",
+          "loadTypeId",
+          "label",
+          "note",
+          "x",
+          "y"
+        ],
+        "type": "object"
+      },
+      "PlanNeedInput": {
+        "additionalProperties": false,
+        "properties": {
+          "functionTypeId": {
+            "description": "An active function type (an inactive one is kept on a stored or restored need with a warning)",
+            "type": "string"
+          },
+          "id": {
+            "description": "Generated by the client; unique within the plan, kept across saves and version copies",
+            "type": "string"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "loadTypeId": {
+            "description": "One of the function type's allowed load types (any when it lists none); null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "description": "At most 500 characters; empty for none",
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string 0-100000 with at most 2 decimals; null for unknown",
+            "examples": [
+              "7.5"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "1-100; n means n separate loads",
+            "format": "int32",
+            "type": "integer"
+          },
+          "x": {
+            "description": "Load symbol position in image pixels (with y), inside the image; null for a need without symbol",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "zoneId": {
+            "description": "Without a position: the zone (required, a zone of the same content). With a position: computed by the backend (the smallest zone containing it, null for none), the value sent is ignored",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "zoneId",
+          "functionTypeId",
+          "quantity",
+          "powerW",
+          "loadTypeId",
+          "label",
+          "note",
+          "x",
+          "y"
         ],
         "type": "object"
       },
@@ -7335,6 +7655,339 @@
         ],
         "type": "object"
       },
+      "RoomTemplate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/RoomTemplate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "equipmentLevel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Optional equipment level (\"Basic\", \"Comfort\"); {} for none",
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "examples": [
+              "living_comfort"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "In order",
+            "items": {
+              "$ref": "#/components/schemas/RoomTemplateLine"
+            },
+            "type": "array"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "description": "Send it back as expectedUpdatedAt when updating",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "equipmentLevel",
+          "sortOrder",
+          "isActive",
+          "lines",
+          "createdAt",
+          "updatedAt",
+          "can"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/RoomTemplateInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "equipmentLevel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none",
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "living_comfort"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "At most 100",
+            "items": {
+              "$ref": "#/components/schemas/RoomTemplateLineInput"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "isActive",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateLine": {
+        "additionalProperties": false,
+        "properties": {
+          "functionTypeId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "loadTypeId": {
+            "description": "null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string with exactly 2 decimals; null for unknown",
+            "examples": [
+              "7.50"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "warnings": {
+            "description": "Why the line cannot be applied as it is (the editor skips such lines)",
+            "items": {
+              "enum": [
+                "function_type_inactive",
+                "load_type_inactive",
+                "load_type_not_allowed"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "functionTypeId",
+          "quantity",
+          "powerW",
+          "loadTypeId",
+          "label",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateLineInput": {
+        "additionalProperties": false,
+        "properties": {
+          "functionTypeId": {
+            "description": "An active function type (an inactive one is kept when the stored template has a line with it, D345)",
+            "type": "string"
+          },
+          "label": {
+            "description": "At most 100 characters; empty for none",
+            "type": "string"
+          },
+          "loadTypeId": {
+            "description": "An active load type the function type allows (any when it lists none); null for none. Kept when the stored template has a line with the same function type and load type (D345)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string 0-100000 with at most 2 decimals; null for unknown",
+            "examples": [
+              "7.5"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "1-100",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "functionTypeId",
+          "quantity",
+          "powerW",
+          "loadTypeId",
+          "label"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/RoomTemplateList.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoomTemplate"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/RoomTemplateOrder.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ids": {
+            "description": "Every id, in the new order",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "RoomTemplateUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/RoomTemplateUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "equipmentLevel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none",
+            "type": "object"
+          },
+          "expectedUpdatedAt": {
+            "description": "updatedAt as last read; if it changed since, the update fails with room_template.stale",
+            "format": "date-time",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Lower snake case, 1-64 characters",
+            "examples": [
+              "living_comfort"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "At most 100",
+            "items": {
+              "$ref": "#/components/schemas/RoomTemplateLineInput"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "At most 100 characters; \"en\" is required",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "key",
+          "name",
+          "isActive",
+          "lines"
+        ],
+        "type": "object"
+      },
       "SnapshotCategory": {
         "additionalProperties": false,
         "properties": {
@@ -7382,6 +8035,115 @@
           "name",
           "abbreviation",
           "color"
+        ],
+        "type": "object"
+      },
+      "SummaryNeed": {
+        "additionalProperties": false,
+        "properties": {
+          "functionType": {
+            "$ref": "#/components/schemas/NeedRef"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "loadType": {
+            "$ref": "#/components/schemas/NullableNeedRef",
+            "description": "null for none"
+          },
+          "note": {
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string with 2 decimals; null for unknown",
+            "examples": [
+              "7.50"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "symbol": {
+            "description": "Drawn as a load symbol on the plan",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "functionType",
+          "loadType",
+          "quantity",
+          "powerW",
+          "label",
+          "note",
+          "symbol"
+        ],
+        "type": "object"
+      },
+      "SummaryPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NeedTotals"
+          },
+          "zones": {
+            "description": "Zones with needs, in draw order; no zone last",
+            "items": {
+              "$ref": "#/components/schemas/SummaryZone"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "planId",
+          "name",
+          "zones",
+          "totals"
+        ],
+        "type": "object"
+      },
+      "SummaryZone": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The zone's name; empty for no zone",
+            "type": "string"
+          },
+          "needs": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryNeed"
+            },
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NeedTotals"
+          },
+          "zoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "zoneId",
+          "name",
+          "needs",
+          "totals"
         ],
         "type": "object"
       },
@@ -7969,6 +8731,51 @@
           "name",
           "price",
           "isActive"
+        ],
+        "type": "object"
+      },
+      "VersionNeeds": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/VersionNeeds.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "functionTypes": {
+            "description": "Totals per function type, by key",
+            "items": {
+              "$ref": "#/components/schemas/FunctionTypeTotal"
+            },
+            "type": "array"
+          },
+          "loadTypes": {
+            "description": "Totals per load type, in load type order; without load type last",
+            "items": {
+              "$ref": "#/components/schemas/LoadTypeTotal"
+            },
+            "type": "array"
+          },
+          "plans": {
+            "description": "Plans with needs, in plan order",
+            "items": {
+              "$ref": "#/components/schemas/SummaryPlan"
+            },
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NeedTotals"
+          }
+        },
+        "required": [
+          "plans",
+          "functionTypes",
+          "loadTypes",
+          "totals"
         ],
         "type": "object"
       }
@@ -10947,13 +11754,13 @@
             "description": "Error"
           }
         },
-        "summary": "Get a plan's zones and placements",
+        "summary": "Get a plan's zones, placements and needs",
         "tags": [
           "plans"
         ]
       },
       "put": {
-        "description": "Saves the whole content in one transaction and returns it with the computed zone of every placement and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+        "description": "Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
         "operationId": "savePlanContent",
         "parameters": [
           {
@@ -10998,7 +11805,7 @@
             "description": "Error"
           }
         },
-        "summary": "Replace a plan's zones and placements",
+        "summary": "Replace a plan's zones, placements and needs",
         "tags": [
           "plans"
         ]
@@ -12586,6 +13393,257 @@
         ]
       }
     },
+    "/api/room-templates": {
+      "get": {
+        "description": "In order (sortOrder, then key). Needs projects.read or catalog.read.",
+        "operationId": "listRoomTemplates",
+        "parameters": [
+          {
+            "description": "Also list inactive templates",
+            "explode": false,
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "description": "Also list inactive templates",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomTemplateList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List room templates",
+        "tags": [
+          "room-templates"
+        ]
+      },
+      "post": {
+        "operationId": "createRoomTemplate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomTemplateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomTemplate"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a room template",
+        "tags": [
+          "room-templates"
+        ]
+      }
+    },
+    "/api/room-templates/order": {
+      "put": {
+        "description": "ids must list every template (active or not) exactly once.",
+        "operationId": "reorderRoomTemplates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomTemplateOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomTemplateList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the order of room templates",
+        "tags": [
+          "room-templates"
+        ]
+      }
+    },
+    "/api/room-templates/{id}": {
+      "delete": {
+        "operationId": "deleteRoomTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a room template",
+        "tags": [
+          "room-templates"
+        ]
+      },
+      "get": {
+        "operationId": "getRoomTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomTemplate"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a room template",
+        "tags": [
+          "room-templates"
+        ]
+      },
+      "put": {
+        "description": "Replaces the lines. Fails with 409 room_template.stale if it changed since expectedUpdatedAt.",
+        "operationId": "updateRoomTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomTemplate"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a room template",
+        "tags": [
+          "room-templates"
+        ]
+      }
+    },
     "/api/tenants": {
       "get": {
         "operationId": "listTenants",
@@ -13694,6 +14752,49 @@
         "summary": "Change a manual line",
         "tags": [
           "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/needs": {
+      "get": {
+        "description": "Every need of the version's plans, grouped by plan and zone, with totals per function type and load type.",
+        "operationId": "getVersionNeeds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionNeeds"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the needs of a version by plan and zone",
+        "tags": [
+          "plans"
         ]
       }
     },

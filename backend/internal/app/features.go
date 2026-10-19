@@ -15,6 +15,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/features/proposals"
+	"github.com/kingkill85/snapflow/backend/internal/features/roomtemplates"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
@@ -40,11 +41,13 @@ func newCore(db *pgxpool.Pool) core {
 func registerFeatures(api huma.API, deps Deps, c core) {
 	tenants.Register(api, c.tenants)
 	users.Register(api, c.users, deps.Cookies)
-	functiontypes.Register(api, functiontypes.NewService(deps.DB))
+	functionTypeSvc := functiontypes.NewService(deps.DB)
+	functiontypes.Register(api, functionTypeSvc)
 	productTypes := producttypes.NewService(deps.DB)
 	producttypes.Register(api, productTypes)
 	capSvc := capabilities.NewService(deps.DB)
 	capabilities.Register(api, capSvc)
+	roomtemplates.Register(api, roomtemplates.NewService(deps.DB, functionTypeSvc, capSvc))
 	cats := categories.NewService(deps.DB, capSvc)
 	capSvc.OnFieldUsage(cats.FieldUsers)
 	categories.Register(api, cats)
@@ -62,8 +65,11 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	}
 	c.tenants.UseProjects(projectSvc)
 	projects.Register(api, projectSvc)
-	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users)
+	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users, functionTypeSvc, capSvc)
 	projectSvc.OnCopyVersion(planSvc.CopyVersion)
+	for _, c := range deps.PlanCopiers {
+		planSvc.OnCopyPlans(c)
+	}
 	plans.Register(api, planSvc)
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)

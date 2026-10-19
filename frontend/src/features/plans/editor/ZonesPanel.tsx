@@ -1,11 +1,12 @@
 import { Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import type { PlanPlacement, PlanZone } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement, PlanZone } from '@/api/generated/model'
 import { Button, IconButton } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 import type { Layers } from './layers'
+import { needCounts } from './needs'
 import { zoneCounts } from './zones'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   saved: PlanPlacement[]
   /** The placements now (live estimate). */
   placements: PlanPlacement[]
+  /** The needs now (counted per zone, symbols where they lie). */
+  needs: PlanNeed[]
   selection: string[]
   layers: Layers
   onLayers: (layers: Layers) => void
@@ -21,10 +24,11 @@ type Props = {
 }
 
 /** The Zones tab: every zone with colour, name and device count; show/hide per zone and all; a click selects. */
-export function ZonesPanel({ zones, saved, placements, selection, layers, onLayers, onSelect }: Props) {
+export function ZonesPanel({ zones, saved, placements, needs, selection, layers, onLayers, onSelect }: Props) {
   const { t } = useTranslation('plans')
   if (zones.length === 0) return <p className="text-sm text-muted">{t('zones.empty')}</p>
   const counts = zoneCounts(saved, placements, zones)
+  const needsPerZone = needCounts(needs, zones)
   const anyHidden = layers.zonesHidden || layers.hiddenZones.size > 0
   return (
     <div className="space-y-3">
@@ -45,9 +49,14 @@ export function ZonesPanel({ zones, saved, placements, selection, layers, onLaye
               <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" disabled={hidden} onClick={() => onSelect(z.id)}>
                 <span className="truncate">{z.name}</span>
               </Button>
-              <span className="text-sm tabular-nums text-muted" title={t('zones.countTitle')} data-testid={`zone-count-${z.id}`}>
-                {t('zones.count', { count: savedCount })}
-                {estimate !== savedCount && <span className="ml-1">{t('zones.estimate', { count: estimate })}</span>}
+              <span className="text-right text-sm tabular-nums text-muted">
+                <span className="block" title={t('zones.countTitle')} data-testid={`zone-count-${z.id}`}>
+                  {t('zones.count', { count: savedCount })}
+                  {estimate !== savedCount && <span className="ml-1">{t('zones.estimate', { count: estimate })}</span>}
+                </span>
+                <span className="block" data-testid={`zone-needs-${z.id}`}>
+                  {t('needs.count', { count: needsPerZone.get(z.id) ?? 0 })}
+                </span>
               </span>
               <IconButton
                 label={hidden ? t('zones.show', { name: z.name }) : t('zones.hide', { name: z.name })}

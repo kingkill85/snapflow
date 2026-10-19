@@ -176,6 +176,15 @@ func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (uuid.UU
 	return id, err
 }
 
+const deleteNeeds = `-- name: DeleteNeeds :exec
+DELETE FROM plan_needs WHERE plan_id = $1
+`
+
+func (q *Queries) DeleteNeeds(ctx context.Context, planID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteNeeds, planID)
+	return err
+}
+
 const deletePlacements = `-- name: DeletePlacements :exec
 DELETE FROM plan_placements WHERE plan_id = $1
 `
@@ -209,7 +218,8 @@ func (q *Queries) DeleteZones(ctx context.Context, planID uuid.UUID) error {
 const getPlan = `-- name: GetPlan :one
 SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
-    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count
+    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.id = $1
 `
@@ -232,6 +242,7 @@ type GetPlanRow struct {
 	ContentUpdatedAt time.Time
 	ZoneCount        int64
 	PlacementCount   int64
+	NeedCount        int64
 }
 
 func (q *Queries) GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error) {
@@ -255,8 +266,32 @@ func (q *Queries) GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error)
 		&i.ContentUpdatedAt,
 		&i.ZoneCount,
 		&i.PlacementCount,
+		&i.NeedCount,
 	)
 	return i, err
+}
+
+const insertNeeds = `-- name: InsertNeeds :exec
+INSERT INTO plan_needs (tenant_id, plan_id, id, function_type_id, quantity, power_w, load_type_id, label, note, x, y,
+    zone_id, position)
+SELECT $1::uuid, $2::uuid, r.id, r.function_type_id, r.quantity, r.power_w,
+    r.load_type_id, r.label, r.note, r.x, r.y, r.zone_id, r.position
+FROM jsonb_to_recordset($3::jsonb)
+    AS r (id uuid, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid, label text,
+          note text, x double precision, y double precision, zone_id uuid, position integer)
+`
+
+type InsertNeedsParams struct {
+	TenantID uuid.UUID
+	PlanID   uuid.UUID
+	Rows     []byte
+}
+
+// InsertNeeds inserts the needs of a JSON array (one statement for up to
+// 2000 needs).
+func (q *Queries) InsertNeeds(ctx context.Context, arg InsertNeedsParams) error {
+	_, err := q.db.Exec(ctx, insertNeeds, arg.TenantID, arg.PlanID, arg.Rows)
+	return err
 }
 
 const insertPlacements = `-- name: InsertPlacements :exec
@@ -301,6 +336,44 @@ type InsertZonesParams struct {
 func (q *Queries) InsertZones(ctx context.Context, arg InsertZonesParams) error {
 	_, err := q.db.Exec(ctx, insertZones, arg.TenantID, arg.PlanID, arg.Rows)
 	return err
+}
+
+const listNeeds = `-- name: ListNeeds :many
+SELECT plan_id, id, tenant_id, function_type_id, quantity, power_w, load_type_id, label, note, x, y, zone_id, position FROM plan_needs WHERE plan_id = $1 ORDER BY position
+`
+
+func (q *Queries) ListNeeds(ctx context.Context, planID uuid.UUID) ([]PlanNeed, error) {
+	rows, err := q.db.Query(ctx, listNeeds, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PlanNeed{}
+	for rows.Next() {
+		var i PlanNeed
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.TenantID,
+			&i.FunctionTypeID,
+			&i.Quantity,
+			&i.PowerW,
+			&i.LoadTypeID,
+			&i.Label,
+			&i.Note,
+			&i.X,
+			&i.Y,
+			&i.ZoneID,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPlacements = `-- name: ListPlacements :many
@@ -348,7 +421,8 @@ const listPlans = `-- name: ListPlans :many
 
 SELECT p.id, p.tenant_id, p.version_id, p.kind, p.name, p.position, p.image_file_id, p.image_width, p.image_height, p.scale, p.lock_user_id, p.lock_expires_at, p.created_at, p.updated_at, p.content_updated_at,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
-    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count
+    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.version_id = $1
 ORDER BY p.position, p.id
@@ -372,6 +446,7 @@ type ListPlansRow struct {
 	ContentUpdatedAt time.Time
 	ZoneCount        int64
 	PlacementCount   int64
+	NeedCount        int64
 }
 
 // Every query of this feature runs in database.InScope: row-level security
@@ -403,6 +478,7 @@ func (q *Queries) ListPlans(ctx context.Context, versionID uuid.UUID) ([]ListPla
 			&i.ContentUpdatedAt,
 			&i.ZoneCount,
 			&i.PlacementCount,
+			&i.NeedCount,
 		); err != nil {
 			return nil, err
 		}
@@ -631,4 +707,57 @@ func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) error {
 		arg.ImageHeight,
 	)
 	return err
+}
+
+const versionNeeds = `-- name: VersionNeeds :many
+SELECT n.plan_id, n.id, n.function_type_id, n.quantity, n.power_w, n.load_type_id, n.label, n.note,
+    (n.x IS NOT NULL)::boolean AS symbol, n.zone_id
+FROM plan_needs n JOIN plans p ON p.id = n.plan_id
+WHERE p.version_id = $1
+ORDER BY n.plan_id, n.position
+`
+
+type VersionNeedsRow struct {
+	PlanID         uuid.UUID
+	ID             uuid.UUID
+	FunctionTypeID uuid.UUID
+	Quantity       int32
+	PowerW         *string
+	LoadTypeID     *uuid.UUID
+	Label          string
+	Note           string
+	Symbol         bool
+	ZoneID         *uuid.UUID
+}
+
+// VersionNeeds returns the needs of a version's plans (the needs summary).
+func (q *Queries) VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error) {
+	rows, err := q.db.Query(ctx, versionNeeds, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VersionNeedsRow{}
+	for rows.Next() {
+		var i VersionNeedsRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.FunctionTypeID,
+			&i.Quantity,
+			&i.PowerW,
+			&i.LoadTypeID,
+			&i.Label,
+			&i.Note,
+			&i.Symbol,
+			&i.ZoneID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

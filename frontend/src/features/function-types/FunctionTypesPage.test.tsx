@@ -17,6 +17,7 @@ const dimmer: FunctionType = {
   name: { en: 'Dimmer', de: 'Dimmer' },
   allowsCircuit: false,
   loadTypeIds: [],
+  isActive: true,
   createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-18T10:00:00Z',
 }
@@ -82,7 +83,7 @@ describe('FunctionTypesPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id] })
+    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true })
     expect(await screen.findByText('dimmer')).toBeInTheDocument()
   })
 
@@ -109,7 +110,33 @@ describe('FunctionTypesPage', () => {
     await user.type(key, 'dimming')
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
 
-    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id] }))
+    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true }))
+  })
+
+  it('shows the status and deactivates with the Active switch (the last field)', async () => {
+    let sent: unknown
+    server.use(
+      loadTypes(),
+      http.get('/api/function-types', () => HttpResponse.json({ items: [dimmer, { ...dimmer, id: 'x2', key: 'blind', name: { en: 'Blind' }, isActive: false }] })),
+      http.put('/api/function-types/:id', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json(dimmer)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    expect(await screen.findByText('Inactive')).toBeInTheDocument()
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    const switches = within(dialog).getAllByRole('switch')
+    const active = within(dialog).getByRole('switch', { name: /^active/i })
+    expect(switches[switches.length - 1]).toBe(active)
+    expect(active).toBeChecked()
+    await user.click(active)
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(sent).toMatchObject({ key: 'dimmer', isActive: false }))
   })
 
   it('validates the key before sending', async () => {

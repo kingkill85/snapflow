@@ -7,22 +7,38 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PlanContent, Project } from '@/api/generated/model'
 import { problem, villa } from '@/features/projects/test-fixtures'
 import { renderRoutes } from '@/test/render'
+import { chooseOption } from '@/test/select'
 import { server } from '@/test/server'
 
 import { editorPath, editorRoute } from '../paths'
 import { getGetPlanContentQueryKey, getGetPlanQueryKey } from '@/api/generated/plans/plans'
 import { getGetProjectQueryKey } from '@/api/generated/projects/projects'
 
-import { catalog, content, placement, plan, projectId, versionId, zigbeeId } from '../test-fixtures'
+import { catalog, content, functionTypes, loadTypes, pid, placement, plan, projectId, roomTemplate, versionId, zigbeeId } from '../test-fixtures'
+import { newNeed } from './needs'
 import { PlanEditorPage } from './PlanEditorPage'
 
 // Konva needs a real canvas: the page is tested with a stand-in that places
 // at a fixed point and shows what the canvas would draw.
 vi.mock('./PlanCanvas', () => ({
   productDragType: 'application/x-snapflow-product',
-  PlanCanvas: (props: { document: { placements: unknown[] }; editable: boolean; onPlace: (p: { x: number; y: number }) => void }) => (
-    <div data-testid="plan-canvas" data-count={props.document.placements.length} data-editable={String(props.editable)}>
-      <span role="button" tabIndex={0} onClick={() => props.onPlace({ x: 300, y: 200 })}>
+  PlanCanvas: (props: {
+    document: { placements: unknown[]; needs: unknown[] }
+    editable: boolean
+    tool: string
+    layers: { needsHidden: boolean }
+    onPlace: (p: { x: number; y: number }) => void
+    onPlaceNeed: (p: { x: number; y: number }) => void
+  }) => (
+    <div
+      data-testid="plan-canvas"
+      data-count={props.document.placements.length}
+      data-needs={props.document.needs.length}
+      data-tool={props.tool}
+      data-needs-hidden={String(props.layers.needsHidden)}
+      data-editable={String(props.editable)}
+    >
+      <span role="button" tabIndex={0} onClick={() => (props.tool === 'placeNeed' ? props.onPlaceNeed({ x: 120, y: 80 }) : props.onPlace({ x: 300, y: 200 }))}>
         place here
       </span>
     </div>
@@ -44,6 +60,9 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
     http.get('/api/plans/:id/content', () => HttpResponse.json(c)),
     http.get('/api/projects/:id', () => HttpResponse.json(p)),
     http.get('/api/variants', () => HttpResponse.json({ items: catalog, total: catalog.length })),
+    http.get('/api/function-types', () => HttpResponse.json({ items: functionTypes })),
+    http.get('/api/load-types', () => HttpResponse.json({ items: loadTypes })),
+    http.get('/api/room-templates', () => HttpResponse.json({ items: [roomTemplate(1)] })),
     http.post('/api/plans/:id/lock', ({ request }) => {
       const force = new URL(request.url).searchParams.get('force') === 'true'
       locks.push(force ? 'force' : 'take')
@@ -53,9 +72,9 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
     }),
     http.delete('/api/plans/:id/lock', () => new HttpResponse(null, { status: 204 })),
     http.put('/api/plans/:id/content', async ({ request }) => {
-      const body = (await request.json()) as { placements: unknown[] }
+      const body = (await request.json()) as { placements: unknown[]; needs: unknown[] }
       saved.push(body)
-      return HttpResponse.json({ ...c, contentUpdatedAt: '2026-10-18T10:01:00Z', placements: body.placements })
+      return HttpResponse.json({ ...c, contentUpdatedAt: '2026-10-18T10:01:00Z', placements: body.placements, needs: body.needs })
     }),
   )
   return { saved, locks }
@@ -240,4 +259,122 @@ describe('PlanEditorPage', () => {
     await user.click(within(await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })).getByRole('button', { name: 'Leave page' }))
     expect(await screen.findByRole('heading', { name: 'Project page' })).toBeInTheDocument()
   })
+
+  it('places a load symbol with the Place need tool (last used or first active function) and hides symbols with the Needs layer', async () => {
+    const { saved } = serve()
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+
+    await user.click(screen.getByRole('button', { name: 'Place need' }))
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-tool', 'placeNeed')
+    expect(screen.getByRole('button', { name: 'Place need' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('Click on the plan to place the need symbol; Esc cancels.')).toBeInTheDocument()
+    // The first active function type is preselected.
+    const select = await screen.findByRole('combobox', { name: 'Function type of the next symbol' })
+    await waitFor(() => expect(select).toHaveTextContent('Dimmable light'))
+    await chooseOption(user, select, 'Blind')
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+
+    // Placed, selected (inspector) and back to Select.
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '1')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-tool', 'select')
+    const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })
+    expect(within(inspector).getByText('Need symbol')).toBeInTheDocument()
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ needs: [{ functionTypeId: functionTypes[1].id, x: 120, y: 80, quantity: 1, zoneId: null }] })
+
+    // The next time the last used one is chosen.
+    await user.click(screen.getByRole('button', { name: 'Place need' }))
+    expect(screen.getByRole('combobox', { name: 'Function type of the next symbol' })).toHaveTextContent('Blind')
+    await user.keyboard('{Escape}')
+
+    await user.click(screen.getByRole('tab', { name: 'Layers' }))
+    await user.click(screen.getByRole('switch', { name: /Need symbols/ }))
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs-hidden', 'true')
+  })
+
+  it('hides the tool overlays while the plan is read-only', async () => {
+    serve({ lockHeld: true })
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'false'))
+    expect(screen.queryByRole('combobox', { name: 'Function type of the next symbol' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Esc cancels/)).not.toBeInTheDocument()
+  })
+
+  it('duplicates placements and symbols in one step, skipping symbols with an inactive function type', async () => {
+    const symbolOk = { ...need(1), x: 100, y: 100, zoneId: null }
+    const symbolOld = { ...need(2), functionTypeId: functionTypes[2].id, x: 200, y: 100, zoneId: null }
+    const { saved } = serve({ content: content({ placements: [placement(1)], needs: [symbolOk, symbolOld] }) })
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+
+    await user.keyboard('{Control>}a{/Control}')
+    await user.keyboard('{Control>}d{/Control}')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-count', '2')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '3')
+    expect(screen.getByText('1 need symbol was not copied: its function type or load type is inactive.')).toBeInTheDocument()
+
+    // One undo step takes back the placement and the symbol.
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-count', '1')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '2')
+    expect(screen.queryByText(/was not copied/)).not.toBeInTheDocument()
+
+    // Copy and paste works the same way.
+    await user.keyboard('{Control>}a{/Control}{Control>}c{/Control}{Control>}v{/Control}')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '3')
+    expect(screen.getByText('1 need symbol was not copied: its function type or load type is inactive.')).toBeInTheDocument()
+    await waitFor(() => expect(saved.length).toBeGreaterThanOrEqual(1))
+  })
+
+  it('sends a need that undo brings back after a saved delete as restored', async () => {
+    const old = { ...need(2), functionTypeId: functionTypes[2].id, x: 200, y: 100, zoneId: null }
+    const { saved } = serve({ content: content({ needs: [old] }) })
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+
+    await user.keyboard('{Control>}a{/Control}{Delete}')
+    expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '0')
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ needs: [], restoredNeedIds: [] })
+    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(saved).toHaveLength(2))
+    expect(saved[1]).toMatchObject({ needs: [{ id: old.id }], restoredNeedIds: [old.id] })
+  })
+
+  it('names a need in the list of items that could not be saved', async () => {
+    serve({ content: content({ needs: [{ ...need(1), quantity: 2, powerW: '7.50', x: 100, y: 100, zoneId: null }] }) })
+    server.use(
+      http.put('/api/plans/:id/content', () => problem(422, { code: 'validation.failed', fields: [{ location: 'body.needs[0].functionTypeId', code: 'need.function_type_inactive' }] })),
+    )
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+    await user.click(screen.getByRole('button', { name: /Motion sensor/ }))
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+    expect(await screen.findByText('1 item could not be saved:', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '2 × Dimmable light · 7.5 W' })).toBeInTheDocument()
+  })
+
+  it('says how many needs a deleted zone took along', async () => {
+    const z = { id: pid(950), name: 'Living', color: '#3b82f6', opacity: 0.25, points: [[0, 0], [100, 0], [100, 100], [0, 100]] }
+    serve({ content: content({ zones: [z], needs: [{ ...need(1), zoneId: z.id }, { ...need(2), zoneId: z.id }] }) })
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+    await user.click(screen.getByRole('tab', { name: 'Zones' }))
+    await user.click(within(screen.getByRole('tabpanel', { name: 'Zones' })).getByRole('button', { name: 'Living' }))
+    const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })
+    await user.click(within(inspector).getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('2 needs were removed with their zone (Undo brings them back).')).toBeInTheDocument()
+  })
 })
+
+/** A need of the fixtures' first function type. */
+const need = (n: number) => ({ ...newNeed(functionTypes[0].id, null), id: pid(1300 + n) })

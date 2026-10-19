@@ -5,11 +5,11 @@ SELECT * FROM function_types ORDER BY key;
 SELECT * FROM function_types WHERE id = $1;
 
 -- name: CreateFunctionType :one
-INSERT INTO function_types (key, name, allows_circuit) VALUES ($1, $2, $3)
+INSERT INTO function_types (key, name, allows_circuit, is_active) VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: UpdateFunctionType :one
-UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, updated_at = now()
+UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

@@ -1,24 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type Konva from 'konva'
-import { ArrowLeft, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, CircleDot, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useBlocker, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
+import type { NeedWarning, Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
 import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { type Point, useViewport, type Viewport } from '@/canvas'
-import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
+import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, SelectField, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
 import { defaultPlacementSize, imageAspect, paletteProducts, useCatalogVariants } from './catalog'
-import { documentOf, type PlanDocument, toContentInput } from './document'
-import { editorReducer, initEditor } from './editor-state'
+import { documentOf, isSymbol, type PlanDocument, toContentInput } from './document'
+import { copyItems } from './copies'
+import { type EditorAction, editorReducer, initEditor } from './editor-state'
 import { canRedo, canUndo } from './history'
 import { CalibrateDialog } from './CalibrateDialog'
 import { scaleBar } from './calibration'
@@ -27,14 +28,16 @@ import { Inspector } from './Inspector'
 import { allVisible, type Layers, visibleIds } from './layers'
 import { LayersPanel } from './LayersPanel'
 import { LockBanner } from './LockBanner'
+import { maxNeeds, newNeed, symbolIcon, symbolLetter, usableForNewNeed } from './needs'
+import { useNeedCatalog, useNeedText } from './need-catalog'
 import { Palette } from './Palette'
-import { type ActiveVertex, PlanCanvas, type Tool } from './PlanCanvas'
+import { type ActiveVertex, PlanCanvas, type SymbolLook, type Tool } from './PlanCanvas'
 import { newPlacement } from './placements'
 import { SaveIndicator } from './SaveIndicator'
-import { saveErrorsByItem } from './save-errors'
+import { itemName, saveErrorsByItem, selectionFor } from './save-errors'
 import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
-import { useShortcuts } from './use-shortcuts'
+import { type CopyItems, useShortcuts } from './use-shortcuts'
 import { ZonesPanel } from './ZonesPanel'
 import { saveOnUnload } from '../api'
 
@@ -118,8 +121,24 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const lock = usePlanLock(plan.id, mayEdit, { beforeRelease: () => flushRef.current(), onPageHide: () => pageHideRef.current() })
   const editable = lock.state.status === 'mine'
 
-  const [state, dispatch] = useReducer(editorReducer, documentOf(content), initEditor)
+  const [state, dispatchEditor] = useReducer(editorReducer, documentOf(content), initEditor)
   const doc = state.history.present
+  // A notice of the last change (symbols not copied, needs removed with a zone, the needs limit); the next change clears it.
+  const [notice, setNotice] = useState<string | null>(null)
+  const docRef = useRef(doc)
+  useEffect(() => {
+    docRef.current = doc
+  })
+  /** Every change goes through here: removing zones reports the needs they take along. */
+  const dispatch = useCallback((action: EditorAction) => {
+    if (action.type === 'change' || action.type === 'undo' || action.type === 'redo') setNotice(null)
+    if (action.type === 'change' && action.action.type === 'remove') {
+      const ids = new Set(action.action.ids)
+      const taken = docRef.current.needs.filter((n) => !ids.has(n.id) && !isSymbol(n) && n.zoneId !== null && ids.has(n.zoneId)).length
+      if (taken > 0) setNotice(t('notice.zoneNeeds', { count: taken }))
+    }
+    dispatchEditor(action)
+  }, [t])
   const [tool, setTool] = useState<Tool>('select')
   const [tab, setTab] = useState<PanelTab>('products')
   const [armed, setArmed] = useState<string | null>(null)
@@ -135,9 +154,23 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   // What the last load or save returned: the content version to send back, warnings and zone assignments.
   const [server, setServer] = useState(content)
   const contentVersion = useRef(content.contentUpdatedAt)
+  // Every need id received from the server in this session: sent back as restoredNeedIds while in the document (undo of a saved delete).
+  const serverNeedIds = useRef(new Set((content.needs ?? []).map((n) => n.id)))
+  const remember = (needs: { id: string }[] | undefined) => {
+    for (const n of needs ?? []) serverNeedIds.current.add(n.id)
+  }
   const [saveErrors, setSaveErrors] = useState<Map<string, string[]>>(new Map())
 
   const variantsById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants])
+  const needCatalog = useNeedCatalog()
+  // The function type of the next load symbol ("Place need" tool): the last one used while active, else the first active one.
+  const [needFunction, setNeedFunction] = useState<string>('')
+  const activeFunctions = needCatalog.functionTypes.filter((f) => f.isActive)
+  const placeFunction = activeFunctions.some((f) => f.id === needFunction) ? needFunction : (activeFunctions[0]?.id ?? '')
+  const symbolLooks = useMemo(
+    () => new Map<string, SymbolLook>(needCatalog.functionTypes.map((f) => [f.id, { icon: symbolIcon(f.key), letter: symbolLetter(localize(f.name)) }])),
+    [needCatalog.functionTypes, localize],
+  )
   const products = useMemo(() => paletteProducts(variants, project.productTypeIds), [variants, project.productTypeIds])
   /** Hiding a layer also drops its items from the selection (hidden items cannot be handled). */
   const changeLayers = (next: Layers) => {
@@ -152,11 +185,19 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     return map
   }, [server.warnings])
 
+  const needWarnings = useMemo(() => {
+    const map = new Map<string, NeedWarning[]>()
+    for (const w of server.needWarnings ?? []) map.set(w.needId, [...(map.get(w.needId) ?? []), w])
+    return map
+  }, [server.needWarnings])
+  const needWarningIds = useMemo(() => new Set(needWarnings.keys()), [needWarnings])
+
   const save = useCallback(
     async (snapshot: PlanDocument) => {
       try {
-        const saved = await savePlanContent(plan.id, toContentInput(snapshot, contentVersion.current))
+        const saved = await savePlanContent(plan.id, toContentInput(snapshot, contentVersion.current, serverNeedIds.current))
         contentVersion.current = saved.contentUpdatedAt
+        remember(saved.needs)
         setServer(saved)
         setSaveErrors(new Map())
         // The plan cards show counts: refreshed when the project page shows them again (also after a save on leave).
@@ -166,13 +207,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         setSaveErrors(byItem)
         const first = byItem.keys().next().value
         if (first) {
-          dispatch({ type: 'select', ids: [first] })
+          dispatch({ type: 'select', ids: [selectionFor(first, snapshot)] })
           setTab('inspector')
         }
         throw e
       }
     },
-    [plan.id, plan.versionId, errorMessage, queryClient],
+    [plan.id, plan.versionId, errorMessage, queryClient, dispatch],
   )
   const autosave = useAutosave({ document: doc, save, enabled: editable })
 
@@ -181,7 +222,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     // Tab closed or reloaded with pending changes: one last keepalive save (D215).
     pageHideRef.current = () => {
       const pending = editable ? autosave.pending() : undefined
-      return pending !== undefined && saveOnUnload(plan.id, toContentInput(pending, contentVersion.current))
+      return pending !== undefined && saveOnUnload(plan.id, toContentInput(pending, contentVersion.current, serverNeedIds.current))
     }
   })
   useEffect(() => {
@@ -218,12 +259,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const reload = useCallback(async () => {
     const fresh = await queryClient.fetchQuery({ queryKey: getGetPlanContentQueryKey(plan.id), queryFn: () => getPlanContent(plan.id), staleTime: 0 })
     contentVersion.current = fresh.contentUpdatedAt
+    remember(fresh.needs)
     setServer(fresh)
     setSaveErrors(new Map())
     const next = documentOf(fresh)
     dispatch({ type: 'load', document: next })
     autosave.reset(next)
-  }, [queryClient, plan.id, autosave])
+  }, [queryClient, plan.id, autosave, dispatch])
 
   // Regaining the lock after someone else had it: their changes first.
   const hadOther = useRef(false)
@@ -235,12 +277,25 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     }
   }, [lock.state.status, reload])
 
+  /** Duplicate, paste and alt-drag: one step; symbols a new need cannot have are skipped, the needs limit refuses it all. */
+  const copy: CopyItems = (source, dx, dy) => {
+    const result = copyItems(doc, source, dx, dy, plan.image, (n) => usableForNewNeed(n, needCatalog.functionTypeById, needCatalog.loadTypeById))
+    if (result.action) dispatch({ type: 'change', action: result.action, select: [...result.placements.map((p) => p.id), ...result.needs.map((n) => n.id)] })
+    if (result.overLimit) setNotice(t('needs.limit', { max: maxNeeds }))
+    else if (result.skipped > 0) setNotice(t('notice.copySkipped', { count: result.skipped }))
+    return result
+  }
+
   useShortcuts({
+    onCopy: copy,
     state,
     dispatch,
     editable,
     image: plan.image,
-    onEscape: () => setArmed(null),
+    onEscape: () => {
+      setArmed(null)
+      if (tool === 'placeNeed') setTool('select')
+    },
     selectable: () => visibleIds(state.history.present, layers, variantsById),
   })
 
@@ -259,6 +314,21 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   const selectedPlacements = doc.placements.filter((p) => state.selection.includes(p.id))
   const selectedZones = doc.zones.filter((z) => state.selection.includes(z.id))
+  const selectedNeeds = doc.needs.filter((n) => isSymbol(n) && state.selection.includes(n.id))
+
+  /** "Place need": a load symbol of the chosen function type where the plan was clicked; back to Select. */
+  const placeNeed = (point: Point) => {
+    if (!placeFunction) return
+    if (doc.needs.length + 1 > maxNeeds) {
+      setNotice(t('needs.limit', { max: maxNeeds }))
+      return
+    }
+    setNeedFunction(placeFunction)
+    const need = newNeed(placeFunction, null, point, plan.image)
+    dispatch({ type: 'change', action: { type: 'addNeeds', needs: [need] }, select: [need.id] })
+    setTool('select')
+    setTab('inspector')
+  }
 
   const [exporting, setExporting] = useState(false)
   const exportPng = () => {
@@ -276,6 +346,14 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     void png.then((blob) => download(blob, name))
   }
   const errorIds = useMemo(() => new Set(saveErrors.keys()), [saveErrors])
+  const needText = useNeedText(needCatalog)
+  const itemNames = {
+    need: needText,
+    placement: (p: PlanDocument['placements'][number]) => {
+      const v = p.variantId ? variantsById.get(p.variantId) : undefined
+      return p.label || (v && localize(v.productName)) || undefined
+    },
+  }
 
   const canvas = (
     <PlanCanvas
@@ -295,6 +373,10 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       placing={armed !== null}
       onPlace={(point, productId) => void place(point, productId)}
       layers={layers}
+      symbolLooks={symbolLooks}
+      needWarningIds={needWarningIds}
+      onPlaceNeed={placeNeed}
+      onCopy={copy}
       resizeAll={resizeAll}
       activeVertex={activeVertex}
       onActiveVertex={setActiveVertex}
@@ -308,10 +390,27 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     <div className="relative h-full w-full">
       {canvas}
       {doc.scale !== null && <ScaleBar scale={doc.scale} viewport={viewport} />}
-      {wide && toolHint(tool, t) && (
+      {/* The tools' overlays only while the plan can be edited. */}
+      {wide && editable && toolHint(tool, t, placeFunction !== '') && (
         <p aria-live="polite" className="pointer-events-none absolute top-2 left-1/2 max-w-[90%] -translate-x-1/2 rounded-control border border-line bg-surface/90 px-2 py-1 text-xs">
-          {toolHint(tool, t)}
+          {toolHint(tool, t, placeFunction !== '')}
         </p>
+      )}
+      {wide && editable && tool === 'placeNeed' && (
+        // The function type is chosen first, then the spot.
+        <div className="absolute top-12 left-1/2 w-72 max-w-[90%] -translate-x-1/2 rounded-control border border-line bg-surface p-2 shadow-sm">
+          {activeFunctions.length > 0 ? (
+            <SelectField
+              label={t('needs.placeFunction')}
+              value={placeFunction}
+              placeholder={t('needs.functionType')}
+              options={activeFunctions.map((f) => ({ value: f.id, label: localize(f.name) }))}
+              onValueChange={setNeedFunction}
+            />
+          ) : (
+            <p className="text-sm text-muted">{t('needs.noFunctionTypes')}</p>
+          )}
+        </div>
       )}
     </div>
   )
@@ -365,6 +464,14 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           }
         />
       )}
+      {notice && (
+        <div className="flex items-start gap-1">
+          <div className="min-w-0 flex-1">
+            <Notice tone="warning">{notice}</Notice>
+          </div>
+          <IconButton label={tc('action.close')} icon={<X />} onClick={() => setNotice(null)} />
+        </div>
+      )}
       {autosave.status === 'failed' && saveErrors.size === 0 && <ErrorMessage error={autosave.error} />}
       {saveErrors.size > 0 && (
         <div role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -376,11 +483,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
                   size="sm"
                   variant="secondary"
                   onClick={() => {
-                    dispatch({ type: 'select', ids: [id] })
+                    dispatch({ type: 'select', ids: [selectionFor(id, doc)] })
                     setTab('inspector')
                   }}
                 >
-                  {itemName(id, doc, variantsById, localize) ?? t('save.item', { n: i + 1 })}
+                  {itemName(id, doc, itemNames) ?? t('save.item', { n: i + 1 })}
                 </Button>
               </li>
             ))}
@@ -410,6 +517,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
               zones={doc.zones}
               saved={server.placements}
               placements={doc.placements}
+              needs={doc.needs}
               selection={state.selection}
               layers={layers}
               onLayers={changeLayers}
@@ -431,6 +539,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           zones={doc.zones}
           saved={server.placements}
           placements={doc.placements}
+          needs={doc.needs}
           selection={state.selection}
           layers={layers}
           onLayers={changeLayers}
@@ -453,6 +562,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <Inspector
           placements={selectedPlacements}
           zones={selectedZones}
+          needs={selectedNeeds}
+          allNeeds={doc.needs}
+          allZones={doc.zones}
+          needCatalog={needCatalog}
+          needWarnings={needWarnings}
           allPlacements={doc.placements}
           image={plan.image}
           resizeAll={resizeAll}
@@ -481,6 +595,17 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <IconButton label={t('toolbar.pan')} icon={<Hand />} aria-pressed={tool === 'pan'} className={cn(tool === 'pan' && 'bg-canvas text-primary')} onClick={() => setTool('pan')} />
         <IconButton label={t('toolbar.zoneRect')} icon={<Square />} aria-pressed={tool === 'zoneRect'} disabled={!editable} className={cn(tool === 'zoneRect' && 'bg-canvas text-primary')} onClick={() => setTool('zoneRect')} />
         <IconButton label={t('toolbar.zonePolygon')} icon={<Hexagon />} aria-pressed={tool === 'zonePolygon'} disabled={!editable} className={cn(tool === 'zonePolygon' && 'bg-canvas text-primary')} onClick={() => setTool('zonePolygon')} />
+        <IconButton
+          label={t('toolbar.placeNeed')}
+          icon={<CircleDot />}
+          aria-pressed={tool === 'placeNeed'}
+          disabled={!editable}
+          className={cn(tool === 'placeNeed' && 'bg-canvas text-primary')}
+          onClick={() => {
+            setTool('placeNeed')
+            setArmed(null)
+          }}
+        />
         <IconButton label={t('toolbar.calibrate')} icon={<Ruler />} aria-pressed={tool === 'calibrate'} disabled={!editable} className={cn(tool === 'calibrate' && 'bg-canvas text-primary')} onClick={() => setTool('calibrate')} />
         <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
         {zoomControls}
@@ -509,8 +634,9 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   )
 }
 
-/** What the active drawing tool expects (announced, and shown over the canvas). */
-function toolHint(tool: Tool, t: (key: 'tools.zoneRect' | 'tools.zonePolygon' | 'tools.calibrate') => string) {
+/** What the active drawing tool expects (announced, and shown over the canvas); Place need first asks for its function type. */
+function toolHint(tool: Tool, t: (key: 'tools.zoneRect' | 'tools.zonePolygon' | 'tools.calibrate' | 'tools.placeNeed' | 'tools.placeNeedChoose') => string, hasFunction: boolean) {
+  if (tool === 'placeNeed') return t(hasFunction ? 'tools.placeNeed' : 'tools.placeNeedChoose')
   return tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate' ? t(`tools.${tool}`) : undefined
 }
 
@@ -534,15 +660,6 @@ function knownPlacements(queryClient: ReturnType<typeof useQueryClient>, plan: P
     .getQueriesData<PlanContent>({ predicate: (q) => typeof q.queryKey[0] === 'string' && q.queryKey[0].endsWith('/content') })
     .flatMap(([, data]) => (data && data.planId !== plan.id ? data.placements : []))
   return [...others, ...doc.placements]
-}
-
-function itemName(id: string, doc: PlanDocument, variants: Map<string, VariantSearchItem>, localize: ReturnType<typeof useLocalized>) {
-  const p = doc.placements.find((x) => x.id === id)
-  if (p) {
-    const v = p.variantId ? variants.get(p.variantId) : undefined
-    return p.label || (v && localize(v.productName)) || undefined
-  }
-  return doc.zones.find((z) => z.id === id)?.name
 }
 
 /** Phones: the placed products with their counts. */

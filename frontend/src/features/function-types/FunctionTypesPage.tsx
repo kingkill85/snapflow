@@ -10,7 +10,7 @@ import {
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
 import { useCan } from '@/app/session'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
+import { Badge, Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { FunctionTypeFormDialog } from './FunctionTypeFormDialog'
@@ -77,6 +77,12 @@ export function FunctionTypesPage() {
           columns={[
             { header: t('field.key'), cell: (ft) => <code className="text-xs">{ft.key}</code> },
             { header: t('field.name'), cell: (ft) => localized(ft.name), mobile: 'title' },
+            {
+              header: t('field.status'),
+              cell: (ft) => (
+                <Badge variant={ft.isActive ? 'success' : 'neutral'}>{ft.isActive ? tCommon('status.active') : tCommon('status.inactive')}</Badge>
+              ),
+            },
           ]}
           actions={canWrite ? rowActions : undefined}
           empty={<EmptyState title={t('empty')} action={createButton} />}

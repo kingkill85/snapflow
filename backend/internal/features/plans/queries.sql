@@ -4,7 +4,8 @@
 -- name: ListPlans :many
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
-    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count
+    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.version_id = $1
 ORDER BY p.position, p.id;
@@ -12,7 +13,8 @@ ORDER BY p.position, p.id;
 -- name: GetPlan :one
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
-    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count
+    (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
 FROM plans p
 WHERE p.id = $1;
 
@@ -89,6 +91,31 @@ FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
     AS r (id uuid, variant_id uuid, catalog_variant_id uuid, x double precision, y double precision, width double precision,
           height double precision, rotation double precision, label text, existing boolean,
           addon_variant_ids uuid[], instance_values jsonb, zone_id uuid, position integer);
+
+-- name: ListNeeds :many
+SELECT * FROM plan_needs WHERE plan_id = $1 ORDER BY position;
+
+-- name: DeleteNeeds :exec
+DELETE FROM plan_needs WHERE plan_id = $1;
+
+-- InsertNeeds inserts the needs of a JSON array (one statement for up to
+-- 2000 needs).
+-- name: InsertNeeds :exec
+INSERT INTO plan_needs (tenant_id, plan_id, id, function_type_id, quantity, power_w, load_type_id, label, note, x, y,
+    zone_id, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.function_type_id, r.quantity, r.power_w,
+    r.load_type_id, r.label, r.note, r.x, r.y, r.zone_id, r.position
+FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
+    AS r (id uuid, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid, label text,
+          note text, x double precision, y double precision, zone_id uuid, position integer);
+
+-- VersionNeeds returns the needs of a version's plans (the needs summary).
+-- name: VersionNeeds :many
+SELECT n.plan_id, n.id, n.function_type_id, n.quantity, n.power_w, n.load_type_id, n.label, n.note,
+    (n.x IS NOT NULL)::boolean AS symbol, n.zone_id
+FROM plan_needs n JOIN plans p ON p.id = n.plan_id
+WHERE p.version_id = $1
+ORDER BY n.plan_id, n.position;
 
 -- CopyPlan copies a plan's row into another version (version copy): a new
 -- id, the same image file, no lock.

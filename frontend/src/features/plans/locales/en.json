@@ -2,7 +2,7 @@
   "title": "Plans",
   "add": "Add plan",
   "empty": "No plans yet.",
-  "counts": "Products: {{products}} · Zones: {{zones}}",
+  "counts": "Products: {{products}} · Zones: {{zones}} · Needs: {{needs}}",
   "lockedBy": "Being edited by {{name}}",
   "moveLeft": "Move {{name}} left",
   "moveRight": "Move {{name}} right",
@@ -46,7 +46,8 @@
     "zoneRect": "Draw rectangle zone",
     "zonePolygon": "Draw polygon zone",
     "calibrate": "Calibrate scale",
-    "export": "Export PNG"
+    "export": "Export PNG",
+    "placeNeed": "Place need"
   },
   "panel": {
     "label": "Plan panel",
@@ -88,7 +89,7 @@
     "noMatch": "No products match the search."
   },
   "inspector": {
-    "none": "Select a product or zone on the plan to see its details.",
+    "none": "Select a product, zone or need symbol on the plan to see its details.",
     "many_one": "{{count}} item selected.",
     "many_other": "{{count}} items selected.",
     "product": "Product",
@@ -113,7 +114,8 @@
     "instanceValues": "Values of this device",
     "resizeAll": "Resize all of this product",
     "resizeAllHint_one": "Size changes apply to the {{count}} placement of this product on the plan",
-    "resizeAllHint_other": "Size changes apply to all {{count}} placements of this product on the plan"
+    "resizeAllHint_other": "Size changes apply to all {{count}} placements of this product on the plan",
+    "manyDetailNeeds": "Products: {{products}} · Zones: {{zones}} · Need symbols: {{needs}}"
   },
   "warning": {
     "variant_deleted": "This product was deleted from the catalog.",
@@ -148,13 +150,17 @@
   "tools": {
     "zoneRect": "Drag a rectangle on the plan.",
     "zonePolygon": "Click the corners. Double-click, Enter or a click on the first corner closes the zone; Esc cancels.",
-    "calibrate": "Click two points whose real distance you know; Esc cancels."
+    "calibrate": "Click two points whose real distance you know; Esc cancels.",
+    "placeNeed": "Click on the plan to place the need symbol; Esc cancels.",
+    "placeNeedChoose": "Choose the function type of the symbol, then click on the plan; Esc cancels."
   },
   "layers": {
     "hint": "Hidden items are not shown, selectable or exported. This view is not saved.",
     "zones": "Zones",
     "productTypes": "Product types",
-    "categories": "Categories"
+    "categories": "Categories",
+    "needs": "Need symbols",
+    "needsHint": "Needs placed as symbols on the plan"
   },
   "calibrate": {
     "title": "Calibrate scale",
@@ -166,5 +172,56 @@
   },
   "scale": {
     "bar": "Scale: the bar is {{label}}"
+  },
+  "needs": {
+    "title": "Needs",
+    "empty": "No needs yet.",
+    "add": "Add need",
+    "addHint": "Choose a function type to add a need to this zone.",
+    "functionType": "Function type",
+    "quantity": "Quantity",
+    "power": "Power per unit",
+    "powerHint": "In W, e.g. 7.5; empty if unknown",
+    "loadType": "Load type",
+    "noLoadType": "None",
+    "label": "Label",
+    "note": "Note",
+    "edit": "Edit {{name}}",
+    "delete": "Delete {{name}}",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "done": "Done",
+    "applyTemplate": "Apply template",
+    "applyTemplateHint": "Adds the template's lines as needs of this zone.",
+    "noTemplates": "No active room templates.",
+    "applied_one": "{{count}} need added from “{{name}}”.",
+    "applied_other": "{{count}} needs added from “{{name}}”.",
+    "skipped_one": "{{count}} line was skipped: its function type or load type is inactive.",
+    "skipped_other": "{{count}} lines were skipped: their function type or load type is inactive.",
+    "symbol": "Need symbol",
+    "symbolsHint_one": "Plus {{count}} need symbol in this zone (edit it on the plan).",
+    "symbolsHint_other": "Plus {{count}} need symbols in this zone (edit them on the plan).",
+    "count_one": "{{count}} need",
+    "count_other": "{{count}} needs",
+    "inactive": "{{name}} (inactive)",
+    "unknown": "Unknown function type",
+    "placeFunction": "Function type of the next symbol",
+    "noFunctionTypes": "There are no active function types in the catalog.",
+    "zoneOfSymbol": "Zone",
+    "noZone": "Outside every zone",
+    "limit": "A plan can have at most {{max}} needs: nothing was added."
+  },
+  "needWarning": {
+    "need_function_type_inactive": "The function type is inactive in the catalog.",
+    "need_outside_zones": "The symbol lies outside every zone.",
+    "need_load_type_not_allowed": "The function type no longer allows this load type."
+  },
+  "needUnits_one": "{{count}} unit",
+  "needUnits_other": "{{count}} units",
+  "notice": {
+    "copySkipped_one": "{{count}} need symbol was not copied: its function type or load type is inactive.",
+    "copySkipped_other": "{{count}} need symbols were not copied: their function type or load type is inactive.",
+    "zoneNeeds_one": "{{count}} need was removed with its zone (Undo brings it back).",
+    "zoneNeeds_other": "{{count}} needs were removed with their zone (Undo brings them back)."
   }
 }

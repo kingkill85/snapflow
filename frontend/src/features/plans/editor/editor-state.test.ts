@@ -5,7 +5,7 @@ import { applyDocumentAction, type PlanDocument, toContentInput } from './docume
 import { editorReducer, initEditor } from './editor-state'
 import { canRedo, canUndo, commit, historyLimit, initHistory, redo, undo } from './history'
 
-const doc = (n = 2): PlanDocument => ({ scale: null, zones: [], placements: Array.from({ length: n }, (_, i) => placement(i + 1)) })
+const doc = (n = 2): PlanDocument => ({ scale: null, zones: [], placements: Array.from({ length: n }, (_, i) => placement(i + 1)), needs: [] })
 
 describe('plan document', () => {
   it('returns the same document when nothing changes', () => {

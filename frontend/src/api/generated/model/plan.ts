@@ -22,6 +22,7 @@ export interface Plan {
   /** The live edit lock, null when nobody holds it */
   lock: NullablePlanLock | null;
   name: string;
+  needCount: number;
   placementCount: number;
   /** Order within the version, 1 first */
   position: number;

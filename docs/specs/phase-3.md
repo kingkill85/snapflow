@@ -64,11 +64,34 @@ Backend: CRUD/validation, meanings with parameters, capability computation (empt
 
 ---
 
-## 3b – Zone needs (outline, detailed at the start of 3b)
-- Needs per zone (stored with the plan content or as their own table per zone): function type, quantity, power per unit (W), load type, label/note; quantity n = n needs (each needs its own channel or shares one as a circuit later).
-- Room templates (catalog configuration): name, optional equipment level, list of need lines; applying adds lines (no hidden link, research Q6).
-- Editor: the zone inspector gets a "Needs" section (add line, apply template, edit, delete); the Zones tab shows needs per zone; optional load symbols placed on the plan (a need with a position, drawn as an icon; zone from position).
-- BOM unaffected (needs are not products). Version copy copies needs.
+## 3b – Zone needs
+
+What a room needs (D186): lights, blinds, sockets, pushbuttons — not catalog products, never in the BOM. Entered per zone in the floorplan editor, fast through room templates; optionally drawn as load symbols on the plan.
+
+### Model
+- **Needs are part of the plan content** (saved with zones and placements in `PUT /api/plans/{id}/content`, same lock, stale check, undo/redo and autosave as 2b). Table `plan_needs` (tenant-owned, RLS, composite keys like `plan_zones`): `id` (client uuid), `plan_id`, `zone_id` (nullable), `function_type_id`, `quantity` (1–100), `power_w` (`numeric(9,2)`, ≥ 0, ≤ 100000, optional; a decimal string in the API, D341), `load_type_id` (optional; must be one of the function type's allowed load types when that list is not empty), `label` (≤ 100), `note` (≤ 500), `x`/`y` (optional: set = a load symbol on the plan), `position` (order).
+  - A need without a position belongs to the zone given by `zone_id` (required then). A need with a position is a **load symbol**: its zone is computed by the backend like placements (centre in the smallest containing zone), `zone_id` from the client is ignored; outside every zone = "no zone" (reported, not an error).
+  - Quantity n means n separate needs for the later connection (each needs a channel or shares one as a circuit if the function type allows it, 3d).
+- **Room templates** (catalog configuration, `catalog.write`; read for everyone with `projects.read`): key, translatable name, optional equipment level text (e.g. "Basic", "Comfort"), position, active, lines [{function type, quantity, power W, load type, label}]. Seed none.
+- Validation per need (field errors at `body.needs[i].…`): function type exists and is active (inactive kept for existing rows with a warning), load type allowed, numbers in range, zone exists in the same content. Limit 2000 needs per plan.
+- Warnings in the content response: `need_function_type_inactive`, `need_outside_zones` (symbol), `need_load_type_not_allowed` (after a function type change).
+- Version copy copies needs, keeping their ids (D339). Project read-only rules as 2b.
+
+### API
+- Content GET/PUT gain `needs[]`.
+- `GET/POST/PUT/DELETE /api/room-templates[/{id}]`, `PUT /api/room-templates/order`.
+- `GET /api/versions/{versionId}/needs` → all needs of the version grouped by plan → zone (with zone names, function type, totals per function type), for the version overview now and for 3d later.
+
+### Editor (frontend)
+- Zone inspector: a **Needs** section — rows "3 × Dimmable light · 60 W · LED · Ceiling", add (inline row or small dialog: function type select, quantity, power W (D144 decimals), load type select filtered by the function type, label, note), edit, delete, reorder, **Apply template** (select of active room templates → adds its lines, one undo step).
+- Zones tab: per zone a needs summary ("7 needs") next to the device count.
+- **Load symbols**: a toolbar tool "Place need" (choose function type, then click on the plan); drawn as a small round icon with a short function-type mark (letter or icon from a small fixed icon set per function type key; fallback initial), label below; select/move/delete/duplicate like placements; inspector shows the need fields; hidden with a new "Needs" layer switch.
+- Version page: a read-only **Needs** overview in the BOM tab or a new sub-section ("Needs by room": plan → zone → lines, totals per function type) — decide and record.
+- Catalog: **Room templates** page (list, editor with lines repeater, reorder, active).
+- en + de texts, design-system components.
+
+### Tests
+Backend: content save/load with needs (validation, warnings, symbol zone computation, limits), templates CRUD, version needs summary, version copy, RLS on `plan_needs`. Frontend: needs section, template apply (one undo step), symbol tool, layers, templates page. E2E: create a template, open a plan, apply it to a zone, add a need, place a load symbol in another zone, reload shows everything, the version needs overview lists them.
 
 ## 3c – Distribution boards (outline)
 - Plan kind `board` (architecture "Plan kind"): a board belongs to a version, has a name and optionally an enclosure product (rows × TE per row) — else free rails (rows and TE entered).
@@ -78,6 +101,7 @@ Backend: CRUD/validation, meanings with parameters, capability computation (empt
 - BOM: board modules contribute BOM lines like placements (plan kind `BOMLines`).
 
 ## 3d – Connections and checks (outline)
+- **Data model (D340)**: connections live in their own table keyed by `(plan_id, need_id)` plus a unit count `units ≥ 1`, with a foreign key to `plans` only (never to `plan_needs`); not yet connected = quantity − Σ units; a circuit = several (need, units) rows on one channel when the function type `allowsCircuit`. A floorplan content save never touches connections; the checks engine reports dangling connections (need removed, more units than quantity, function type or load type no longer served), so an undo of a need delete restores its connections. Need ids are stable across saves (client uuids) and the version copy keeps need, zone and placement ids (D339); the connections feature copies its rows with the plan id map of `plans.Service.OnCopyPlans`.
 - Connections: each need (or circuit of needs) → one channel (board module + channel number), or a floorplan device that supplies channels in the room (Zigbee in-wall dimmer). Valid when the output kind serves the function type and the limits hold (per load type, minimum load, module total); blind → blind output or a relay pair used as blind (mixed use per pair).
 - Auto-connect: never adds products; preview summary ("14 will be connected, 3 cannot: no free blind output"), one-step undo, pinned manual connections untouched, deterministic order (floor → zone → need order → board order → channel; prefer the same board, fill a module before the next).
 - Checks engine (backend, plan kinds `Supplies`/`Demands`/`Checks`): rooms covered, unconnected needs, overloads (channel, module), free channels per board and kind, bus current used vs supplied per line (unknown currents reported), devices per line, rail space per row and board, wireless places per gateway, "many end devices, no router"; reserve thresholds (amber / red).

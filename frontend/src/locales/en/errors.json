@@ -103,7 +103,7 @@
     "type": "Only JPEG, PNG and WebP images are accepted."
   },
   "function_type": {
-    "in_use": "Output kinds still serve this function type.",
+    "in_use": "This function type is still used by output kinds, needs or room templates.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "load_type_duplicate": "This load type is listed twice.",
@@ -162,12 +162,20 @@
     "target_unknown": "This target does not exist."
   },
   "load_type": {
-    "in_use": "This load type is still used by function types or catalog fields.",
+    "in_use": "This load type is still used by function types, catalog fields, needs or room templates.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "not_found": "This load type no longer exists.",
     "order_mismatch": "The load types have changed in the meantime. Please reload and try again.",
     "stale": "Someone else changed this load type in the meantime. Reload it and make your changes again."
+  },
+  "need": {
+    "function_type_inactive": "This function type is no longer active. Choose another one.",
+    "load_type_inactive": "This load type is no longer active. Choose another one.",
+    "load_type_not_allowed": "This load type does not fit the function type.",
+    "position_partial": "Give both coordinates of the position, or neither.",
+    "power_invalid": "Enter a power of 0 to {{max}} W with at most 2 decimals.",
+    "zone_not_found": "This zone no longer exists."
   },
   "network": {
     "unavailable": "No connection to the server."
@@ -263,6 +271,14 @@
     "conflict_retry": "Someone else changed this at the same time. Please try again.",
     "failed": "The request failed.",
     "not_found": "Not found."
+  },
+  "room_template": {
+    "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
+    "key_taken": "The key \"{{key}}\" is already used.",
+    "line_reference": "A function type or load type of a line no longer exists. Reload and try again.",
+    "not_found": "This room template no longer exists.",
+    "order_mismatch": "The room templates have changed in the meantime. Please reload and try again.",
+    "stale": "Someone else changed this room template in the meantime. Reload it and make your changes again."
   },
   "server": {
     "busy": "The server is busy. Please try again in a moment.",
