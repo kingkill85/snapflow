@@ -221,8 +221,7 @@ func validateNeeds(cat needCatalog, in []PlanNeedInput, stored []PlanNeed, resto
 		case !zoneIDs[*n.ZoneID]:
 			add(loc+".zoneId", "need.zone_not_found", "no such zone in this content")
 		}
-		out[i] = PlanNeed{ID: n.ID, ZoneID: n.ZoneID, FunctionTypeID: n.FunctionTypeID, Quantity: n.Quantity, PowerW: n.PowerW,
-			LoadTypeID: n.LoadTypeID, Label: n.Label, Note: n.Note, X: n.X, Y: n.Y}
+		out[i] = PlanNeed(n)
 	}
 	return out, errs
 }

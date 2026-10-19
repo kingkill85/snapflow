@@ -168,8 +168,7 @@ type PlanNeed struct {
 
 // input is the need as it would be sent back unchanged.
 func (n PlanNeed) input() PlanNeedInput {
-	return PlanNeedInput{ID: n.ID, ZoneID: n.ZoneID, FunctionTypeID: n.FunctionTypeID, Quantity: n.Quantity, PowerW: n.PowerW,
-		LoadTypeID: n.LoadTypeID, Label: n.Label, Note: n.Note, X: n.X, Y: n.Y}
+	return PlanNeedInput(n)
 }
 
 // NeedWarningCode says what is wrong with a need. Warnings never block a

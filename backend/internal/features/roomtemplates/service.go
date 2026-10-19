@@ -92,10 +92,10 @@ type RoomTemplate struct {
 }
 
 type RoomTemplateInput struct {
-	Key            string             `json:"key" doc:"Lower snake case, 1-64 characters" example:"living_comfort"`
-	Name           i18n.Text          `json:"name" doc:"At most 100 characters; \"en\" is required"`
-	EquipmentLevel i18n.Text          `json:"equipmentLevel,omitempty" doc:"At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none"`
-	IsActive       bool               `json:"isActive"`
+	Key            string                  `json:"key" doc:"Lower snake case, 1-64 characters" example:"living_comfort"`
+	Name           i18n.Text               `json:"name" doc:"At most 100 characters; \"en\" is required"`
+	EquipmentLevel i18n.Text               `json:"equipmentLevel,omitempty" doc:"At most 50 characters per locale; \"en\" is required unless empty; left out or {} for none"`
+	IsActive       bool                    `json:"isActive"`
 	Lines          []RoomTemplateLineInput `json:"lines" maxItems:"100" doc:"At most 100"`
 }
 
