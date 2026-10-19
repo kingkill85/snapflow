@@ -1340,3 +1340,197 @@ func (q *Queries) VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]Vers
 	}
 	return items, nil
 }
+
+const wiringModules = `-- name: WiringModules :many
+SELECT m.plan_id, m.id, m.row_id, m.offset_te::float8 AS offset_te, m.variant_id, m.label
+FROM board_modules m JOIN plans p ON p.id = m.plan_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position
+`
+
+type WiringModulesRow struct {
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	RowID     uuid.UUID
+	OffsetTe  float64
+	VariantID *uuid.UUID
+	Label     string
+}
+
+func (q *Queries) WiringModules(ctx context.Context, versionID uuid.UUID) ([]WiringModulesRow, error) {
+	rows, err := q.db.Query(ctx, wiringModules, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WiringModulesRow{}
+	for rows.Next() {
+		var i WiringModulesRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.RowID,
+			&i.OffsetTe,
+			&i.VariantID,
+			&i.Label,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const wiringPlacements = `-- name: WiringPlacements :many
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.zone_id, pp.label
+FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
+WHERE p.version_id = $1
+ORDER BY pp.plan_id, pp.position
+`
+
+type WiringPlacementsRow struct {
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	VariantID *uuid.UUID
+	ZoneID    *uuid.UUID
+	Label     string
+}
+
+func (q *Queries) WiringPlacements(ctx context.Context, versionID uuid.UUID) ([]WiringPlacementsRow, error) {
+	rows, err := q.db.Query(ctx, wiringPlacements, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WiringPlacementsRow{}
+	for rows.Next() {
+		var i WiringPlacementsRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.VariantID,
+			&i.ZoneID,
+			&i.Label,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const wiringPlans = `-- name: WiringPlans :many
+SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY position, id
+`
+
+type WiringPlansRow struct {
+	ID       uuid.UUID
+	Name     string
+	Kind     string
+	Position int32
+}
+
+// What the wiring feature (step 3d: connections, checks) reads of a
+// version, through WiringData.
+func (q *Queries) WiringPlans(ctx context.Context, versionID uuid.UUID) ([]WiringPlansRow, error) {
+	rows, err := q.db.Query(ctx, wiringPlans, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WiringPlansRow{}
+	for rows.Next() {
+		var i WiringPlansRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Kind,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const wiringRows = `-- name: WiringRows :many
+SELECT r.plan_id, r.id, r.position, r.capacity_te::float8 AS capacity_te
+FROM board_rows r JOIN plans p ON p.id = r.plan_id
+WHERE p.version_id = $1
+ORDER BY r.plan_id, r.position
+`
+
+type WiringRowsRow struct {
+	PlanID     uuid.UUID
+	ID         uuid.UUID
+	Position   int32
+	CapacityTe float64
+}
+
+func (q *Queries) WiringRows(ctx context.Context, versionID uuid.UUID) ([]WiringRowsRow, error) {
+	rows, err := q.db.Query(ctx, wiringRows, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WiringRowsRow{}
+	for rows.Next() {
+		var i WiringRowsRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.Position,
+			&i.CapacityTe,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const wiringZones = `-- name: WiringZones :many
+SELECT z.plan_id, z.id, z.name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY z.plan_id, z.position
+`
+
+type WiringZonesRow struct {
+	PlanID uuid.UUID
+	ID     uuid.UUID
+	Name   string
+}
+
+func (q *Queries) WiringZones(ctx context.Context, versionID uuid.UUID) ([]WiringZonesRow, error) {
+	rows, err := q.db.Query(ctx, wiringZones, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WiringZonesRow{}
+	for rows.Next() {
+		var i WiringZonesRow
+		if err := rows.Scan(&i.PlanID, &i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

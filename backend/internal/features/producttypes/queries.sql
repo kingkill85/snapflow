@@ -15,8 +15,8 @@ SELECT pg_advisory_xact_lock(sqlc.arg(lock_key)::bigint);
 -- creates never get the same sort order).
 -- name: CreateProductType :one
 INSERT INTO product_types (key, name, abbreviation, color, is_active, default_bus_current_ma, reserve_percent, bus_devices_max,
-    topology, default_wireless_places_used, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
+    topology, default_wireless_places_used, nominal_voltage, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, (SELECT coalesce(max(sort_order), 0) + 1 FROM product_types))
 RETURNING *;
 
 -- UpdateProductType changes the type only if nobody else has since it was
@@ -26,7 +26,7 @@ RETURNING *;
 UPDATE product_types
 SET key = $2, name = $3, abbreviation = $4, color = $5, is_active = $6,
     default_bus_current_ma = $7, reserve_percent = $8, bus_devices_max = $9,
-    topology = $10, default_wireless_places_used = $11,
+    topology = $10, default_wireless_places_used = $11, nominal_voltage = $12,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;

@@ -3,15 +3,28 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import type { Networks } from '@/api/generated/model'
+import type { Checks, Networks } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { NetworksTab } from './NetworksTab'
-import { emptyNetworks, firstFloor, gatewayFirst, knx, lineOne, lineTwo, networks, readOnlyNetworks, versionId } from './test-fixtures'
+import { emptyNetworks, firstFloor, gatewayFirst, gatewayGround, knx, lineOne, lineTwo, networks, readOnlyNetworks, versionId } from './test-fixtures'
 
-function serve(data: Networks) {
-  server.use(http.get('/api/versions/:versionId/networks', () => HttpResponse.json(data)))
+const noChecks: Checks = {
+  versionId,
+  counts: { errors: 0, warnings: 0, infos: 0, units: 0, connectedUnits: 0, zonesWithNeeds: 0, zonesCovered: 0 },
+  zones: [],
+  boards: [],
+  busLines: [],
+  gateways: [],
+  findings: [],
+}
+
+function serve(data: Networks, checks: Checks = noChecks) {
+  server.use(
+    http.get('/api/versions/:versionId/networks', () => HttpResponse.json(data)),
+    http.get('/api/versions/:versionId/checks', () => HttpResponse.json(checks)),
+  )
 }
 
 /** Records the bodies of PUT …/network-assignments. */
@@ -166,5 +179,33 @@ describe('NetworksTab', () => {
     serve(emptyNetworks)
     renderWithProviders(<NetworksTab versionId={versionId} />)
     expect(await screen.findByText('No bus or wireless devices on the plans of this version yet.')).toBeInTheDocument()
+  })
+
+  it('shows the reserve statuses of lines and gateways from the checks and scrolls to a linked line', async () => {
+    serve(networks, {
+      ...noChecks,
+      busLines: [
+        { busLineId: lineOne.id, name: 'KNX 1', productTypeId: knx.id, reservePercent: 20, currentUsedMa: 612, currentDefaultMa: 0, currentSuppliedMa: 640, unknownCurrentCount: 0, currentStatus: 'amber', devices: 2, devicesStatus: 'unknown' },
+      ],
+      gateways: [
+        { planId: gatewayGround.planId, itemId: gatewayGround.itemId, label: '', productName: null, productTypeId: knx.id, reservePercent: 10, placesUsed: 1, placesSupplied: 50, unknownCount: 0, devices: 1, routers: 0, status: 'ok' },
+      ],
+    })
+    const scrolled: string[] = []
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.id)
+    }
+    renderWithProviders(<NetworksTab versionId={versionId} />, { route: `/?tab=networks#line-${lineOne.id}` })
+
+    const line = await screen.findByTestId(`bus-line-${lineOne.id}`)
+    expect(line).toHaveAttribute('id', `line-${lineOne.id}`)
+    expect(await within(line).findByText('Near limit')).toBeInTheDocument()
+    expect(within(line).getByText('Unknown')).toBeInTheDocument()
+    expect(within(line).getByText('reserve 20 %')).toBeInTheDocument()
+    expect(within(screen.getByTestId(`bus-line-${lineTwo.id}`)).queryByText('Near limit')).not.toBeInTheDocument()
+    const gateway = document.getElementById(`gateway-${gatewayGround.itemId}`)!
+    expect(within(gateway).getByText('OK')).toBeInTheDocument()
+    expect(within(gateway).getByText('reserve 10 %')).toBeInTheDocument()
+    await waitFor(() => expect(scrolled).toContain(`line-${lineOne.id}`))
   })
 })

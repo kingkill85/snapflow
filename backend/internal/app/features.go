@@ -20,6 +20,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/users"
+	"github.com/kingkill85/snapflow/backend/internal/features/wiring"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx"
 	// scaffold:imports
@@ -72,7 +73,9 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 		planSvc.OnCopyPlans(c)
 	}
 	plans.Register(api, planSvc)
-	networks.Register(api, networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes))
+	networkSvc := networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes)
+	networks.Register(api, networkSvc)
+	wiring.Register(api, wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc))
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,

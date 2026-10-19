@@ -30,6 +30,8 @@ export interface ProductType {
   key: string;
   /** Display name per locale */
   name: ProductTypeName;
+  /** Nominal voltage (V) of the system's devices: converts the W of needs into A for limits in A (3d) */
+  nominalVoltage: number;
   /** Capacity kept in reserve: amber above 100 − reserve %, red when exceeded */
   reservePercent: number;
   /** Position in the catalog, 1 first */

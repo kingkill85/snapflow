@@ -16,4 +16,6 @@ export interface LoadTypeUpdate {
   key: string;
   /** At most 100 characters; "en" is required */
   name: LoadTypeUpdateName;
+  /** 0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value */
+  powerFactor?: number;
 }

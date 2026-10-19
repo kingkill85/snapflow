@@ -72,5 +72,12 @@
     "unknown": "Unbekannt",
     "unassigned": "Ohne Gateway",
     "unassignedNotice": "Diese Geräte haben kein Gateway: Fügen Sie einem Plan ein Gateway dieses Systems hinzu."
+  },
+  "checks": {
+    "current": "Busstrom",
+    "devices": "Geräte",
+    "places": "Plätze",
+    "reserve": "Reserve {{reserve}} %",
+    "label": "Prüfungen"
   }
 }

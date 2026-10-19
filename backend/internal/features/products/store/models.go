@@ -89,6 +89,24 @@ type CategoryFieldLink struct {
 	FieldKey   string
 }
 
+type Connection struct {
+	ID                  uuid.UUID
+	TenantID            uuid.UUID
+	VersionID           uuid.UUID
+	NeedPlanID          uuid.UUID
+	NeedID              uuid.UUID
+	Units               int32
+	TargetPlanID        uuid.UUID
+	TargetItemID        uuid.UUID
+	OutputKindID        uuid.UUID
+	ChannelNo           int32
+	AltBaseOutputKindID *uuid.UUID
+	AltGroup            *int32
+	Pinned              bool
+	BatchID             *uuid.UUID
+	CreatedAt           time.Time
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -188,13 +206,14 @@ type ImportRun struct {
 }
 
 type LoadType struct {
-	ID        uuid.UUID
-	Key       string
-	Name      i18n.Text
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          uuid.UUID
+	Key         string
+	Name        i18n.Text
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	PowerFactor string
 }
 
 type NetworkAssignment struct {
@@ -325,6 +344,7 @@ type ProductType struct {
 	BusDevicesMax             *int32
 	Topology                  string
 	DefaultWirelessPlacesUsed *int32
+	NominalVoltage            int32
 }
 
 type ProductVariant struct {

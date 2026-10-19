@@ -32,6 +32,8 @@ type Props = {
   armed: string | null
   /** The width a dragged palette product would have (preview); undefined when unknown. */
   productWidth: (productId: string) => number
+  /** Used and total channels of a module (from the wiring view); undefined: unknown or none. */
+  channelUse?: (moduleId: string) => { used: number; total: number } | undefined
 }
 
 type Preview = { rowId: string; offsetTe: number; width: number } | null
@@ -42,7 +44,7 @@ type Preview = { rowId: string; offsetTe: number; width: number } | null
  * nearest free gap, 0.5 TE grid), arrows move the focused module, Delete
  * removes it. Everything else (undo, copy, ...) is in the page's shortcuts.
  */
-export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorIds, editable, dispatch, onPlace, armed, productWidth }: Props) {
+export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorIds, editable, dispatch, onPlace, armed, productWidth, channelUse }: Props) {
   const { t } = useTranslation('plans')
   const separator = useDecimalSeparator()
   const ref = useRef<HTMLDivElement>(null)
@@ -210,6 +212,7 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
                         failed={errorIds.has(m.id)}
                         editable={editable}
                         te={te}
+                        channels={channelUse?.(m.id)}
                         onSelect={(add) => dispatch(add ? { type: 'toggleSelect', ids: [m.id] } : { type: 'select', ids: [m.id] })}
                         onKeyDown={(e) => moduleKey(e, m)}
                         onDragStart={() => {
@@ -238,16 +241,18 @@ type BoxProps = {
   failed: boolean
   editable: boolean
   te: (n: number) => string
+  channels?: { used: number; total: number }
   onSelect: (add: boolean) => void
   onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void
   onDragStart: () => void
 }
 
-function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, failed, editable, te, onSelect, onKeyDown, onDragStart }: BoxProps) {
+function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, failed, editable, te, channels, onSelect, onKeyDown, onDragStart }: BoxProps) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const name = variant ? localize(variant.productName) : t('inspector.deleted')
-  const label = [name, m.label, t('board.moduleWidth', { width: te(width) }), m.existing ? t('existing.badge') : '', warned ? t('board.hasWarnings') : ''].filter(Boolean).join(', ')
+  const usage = channels && channels.total > 0 ? channels : undefined
+  const label = [name, m.label, t('board.moduleWidth', { width: te(width) }), usage ? t('board.channelUseLabel', usage) : '', m.existing ? t('existing.badge') : '', warned ? t('board.hasWarnings') : ''].filter(Boolean).join(', ')
   return (
     <div
       role="button"
@@ -281,6 +286,11 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
       <span className="mt-auto flex items-center gap-0.5 truncate text-muted tabular-nums">
         {warned && <TriangleAlert aria-hidden="true" className="size-3 shrink-0 text-warning" />}
         {t('board.moduleWidth', { width: te(width) })}
+        {usage && width * pxPerTe >= 40 && (
+          <span data-testid="channel-use" className={cn('ml-1', usage.used >= usage.total ? 'text-warning' : 'text-success')}>
+            {t('board.channelUse', usage)}
+          </span>
+        )}
         {variant?.productType.abbreviation && width * pxPerTe >= 72 && <span className="ml-auto">{variant.productType.abbreviation}</span>}
       </span>
     </div>

@@ -87,6 +87,13 @@ type Querier interface {
 	UpdatePlan(ctx context.Context, arg UpdatePlanParams) error
 	// VersionNeeds returns the needs of a version's plans (the needs summary).
 	VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error)
+	WiringModules(ctx context.Context, versionID uuid.UUID) ([]WiringModulesRow, error)
+	WiringPlacements(ctx context.Context, versionID uuid.UUID) ([]WiringPlacementsRow, error)
+	// What the wiring feature (step 3d: connections, checks) reads of a
+	// version, through WiringData.
+	WiringPlans(ctx context.Context, versionID uuid.UUID) ([]WiringPlansRow, error)
+	WiringRows(ctx context.Context, versionID uuid.UUID) ([]WiringRowsRow, error)
+	WiringZones(ctx context.Context, versionID uuid.UUID) ([]WiringZonesRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

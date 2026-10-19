@@ -17,3 +17,4 @@ export * from './room-templates/room-templates';
 export * from './system/system';
 export * from './tenants/tenants';
 export * from './users/users';
+export * from './wiring/wiring';

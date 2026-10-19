@@ -14,13 +14,13 @@ ORDER BY sort_order, key;
 SELECT * FROM load_types WHERE id = $1;
 
 -- name: CreateLoadType :one
-INSERT INTO load_types (key, name, is_active, sort_order)
-VALUES ($1, $2, $3, (SELECT coalesce(max(sort_order), 0) + 1 FROM load_types))
+INSERT INTO load_types (key, name, is_active, power_factor, sort_order)
+VALUES ($1, $2, $3, sqlc.arg(power_factor)::numeric, (SELECT coalesce(max(sort_order), 0) + 1 FROM load_types))
 RETURNING *;
 
 -- name: UpdateLoadType :one
 UPDATE load_types
-SET key = $2, name = $3, is_active = $4,
+SET key = $2, name = $3, is_active = $4, power_factor = coalesce(sqlc.narg(power_factor)::numeric, power_factor),
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;

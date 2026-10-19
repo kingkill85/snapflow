@@ -278,12 +278,11 @@
     "noRoom": "Dort ist kein freier Platz dafür.",
     "copyRefused_one": "{{count}} Gerät fand keinen freien Platz und wurde nicht kopiert.",
     "copyRefused_other": "{{count}} Geräte fanden keinen freien Platz und wurden nicht kopiert.",
-    "position": "{{width}} TE bei {{offset}} TE",
+    "position": "{{width}} TE breit · bei {{offset}} TE",
     "row": "Reihe",
     "capabilities": "Eigenschaften",
     "channel_one": "{{count}} × {{kind}}",
     "channel_other": "{{count}} × {{kind}}",
-    "connectionsLater": "Das Verbinden von Bedarfen mit den Kanälen folgt in einem späteren Schritt.",
     "phoneHint": "Verteiler werden auf größeren Bildschirmen bearbeitet. Hier können Sie den Verteiler ansehen.",
     "paletteHint": "Ziehen Sie ein Produkt auf eine Hutschiene, oder klicken Sie es und dann die Schiene an (oder fokussieren Sie die Schiene und drücken Sie Enter).",
     "armedHint": "Klicken Sie auf eine Schiene, um das Produkt im nächsten freien Platz zu setzen. Esc bricht ab.",
@@ -292,6 +291,24 @@
     "enclosureExistingHint": "Der Kunde hat es schon: Es steht nicht in der Stückliste.",
     "enclosureDeleted": "Das Gehäuse wurde aus dem Katalog gelöscht. Es bleibt am Verteiler (und in der Stückliste wie zuletzt gespeichert), bis Sie es entfernen.",
     "removeEnclosure": "Gehäuse entfernen",
-    "enclosureRemoved": "Das gelöschte Gehäuse wird beim nächsten Speichern entfernt."
+    "enclosureRemoved": "Das gelöschte Gehäuse wird beim nächsten Speichern entfernt.",
+    "channels": "Kanäle",
+    "channelsFree": "{{kind}}: {{free}} von {{total}} frei",
+    "channelsAfterSave": "Die Kanäle können verbunden werden, sobald das Gerät gespeichert ist.",
+    "channelsLoading": "Kanäle werden geladen…",
+    "connectNeed": "Bedarf verbinden",
+    "connectNeedTo": "Bedarf mit {{channel}} verbinden",
+    "connUnits_one": "{{count}} Einheit",
+    "connUnits_other": "{{count}} Einheiten",
+    "channelFree": "Frei",
+    "channelUse": "{{used}}/{{total}} K.",
+    "channelUseLabel": "{{used}} von {{total}} Kanälen belegt",
+    "channelTotals": "Freie Kanäle: {{list}}",
+    "connPower": "{{power}} W",
+    "channelAlternative": "aus anderen Kanälen"
+  },
+  "connections": {
+    "unsaved": "Verbindungen nach dem nächsten Speichern",
+    "label": "Verbindungen von {{name}}"
   }
 }

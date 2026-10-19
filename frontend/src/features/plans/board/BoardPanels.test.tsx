@@ -56,6 +56,8 @@ function Harness({ initial, panel, selection = [], enclosureDeleted = false }: {
       errors={new Map()}
       editable
       dispatch={dispatch}
+      versionId="v1"
+      planId="b1"
       onNotice={(text) => {
         notices.push(text)
       }}
@@ -134,10 +136,9 @@ describe('module inspector', () => {
     const user = userEvent.setup()
     renderWithProviders(<Harness initial={start([module('m1', r1, 2)])} panel="inspector" selection={['m1']} />)
     expect(screen.getByText('Actuator')).toBeInTheDocument()
-    expect(screen.getByText('4 TE at 2 TE')).toBeInTheDocument()
+    expect(screen.getByText('4 TE wide · at 2 TE')).toBeInTheDocument()
     const capabilities = screen.getByRole('region', { name: 'Capabilities' })
     expect(await within(capabilities).findByText('8 × Relay output')).toBeInTheDocument()
-    expect(within(capabilities).getByText(/comes in a later step/)).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Label'), 'Q1')
     expect(seen.doc!.modules[0].label).toBe('Q1')

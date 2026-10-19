@@ -1,8 +1,10 @@
 import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router'
 
-import type { AssignmentInput, BusLineNetwork, BusMember, BusSystem, Gateway, Networks, WirelessDevice, WirelessSystem } from '@/api/generated/model'
+import type { AssignmentInput, BusLineNetwork, Checks, BusMember, BusSystem, Gateway, Networks, WirelessDevice, WirelessSystem } from '@/api/generated/model'
+import { useGetChecks } from '@/api/generated/wiring/wiring'
 import { useDeleteBusLine, useGetNetworks, useReorderBusLines, useSetNetworkAssignments } from '@/api/generated/networks/networks'
 import {
   Badge,
@@ -20,6 +22,7 @@ import {
   Select,
   TypeBadge,
 } from '@/components/ui'
+import { StatusChip } from '@/features/checks'
 import { useLocalized } from '@/i18n/localized'
 
 import { LineDialog } from './LineDialog'
@@ -29,6 +32,24 @@ import { useRefreshNetworks } from './refresh'
 const everyVisit = { staleTime: 0, refetchOnMount: 'always' } as const
 
 type Item = BusMember | WirelessDevice | Gateway
+
+/** The version's checks (step 3d): reserve statuses of lines and gateways; undefined while loading. */
+const ChecksContext = createContext<Checks | undefined>(undefined)
+
+/** Status chips with their captions ("Bus current OK"), the reserve after them. */
+function StatusLine({ items, reserve }: { items: { label: string; status: string }[]; reserve: number }) {
+  const { t } = useTranslation('networks')
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+      {items.map((i) => (
+        <span key={i.label} className="flex items-center gap-1">
+          {i.label} <StatusChip status={i.status} />
+        </span>
+      ))}
+      <span>{t('checks.reserve', { reserve })}</span>
+    </p>
+  )
+}
 
 /** "Product Variant · Label, Plan": names a device in accessible names. */
 function useDeviceName() {
@@ -58,6 +79,14 @@ export function NetworksTab({ versionId }: { versionId: string }) {
   const refresh = useRefreshNetworks(versionId)
   const assign = useSetNetworkAssignments()
   const reorder = useReorderBusLines()
+  const checks = useGetChecks(versionId, { query: everyVisit })
+  // Links from the Checks tab (#line-<id>, #gateway-<itemId>): scroll there once the content is shown.
+  const { hash } = useLocation()
+  const loaded = query.isSuccess
+  useEffect(() => {
+    if (!loaded || !hash) return
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView?.({ block: 'start' })
+  }, [loaded, hash])
 
   if (query.isError) return <ErrorMessage error={query.error} />
   if (query.isPending) return <Loading />
@@ -100,7 +129,8 @@ export function NetworksTab({ versionId }: { versionId: string }) {
     : null
 
   return (
-    <div className="space-y-6">
+    <ChecksContext.Provider value={checks.data}>
+      <div className="space-y-6">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">{t('overview.title')}</h2>
         <p className="text-sm text-muted">{t('overview.description')}</p>
@@ -115,7 +145,8 @@ export function NetworksTab({ versionId }: { versionId: string }) {
       {data.wirelessSystems.map((system) => (
         <WirelessSystemSection key={system.productType.id} system={system} actions={actions} />
       ))}
-    </div>
+      </div>
+    </ChecksContext.Provider>
   )
 }
 
@@ -232,8 +263,9 @@ function LineBlock({ line, lines, first, last, actions, onEdit, onDelete }: Line
   const { t } = useTranslation('networks')
   const { t: tCommon } = useTranslation()
   const pinned = line.members.some((m) => m.pinned)
+  const check = useContext(ChecksContext)?.busLines.find((b) => b.busLineId === line.id)
   return (
-    <div className="space-y-2" data-testid={`bus-line-${line.id}`}>
+    <div className="scroll-mt-20 space-y-2" id={`line-${line.id}`} data-testid={`bus-line-${line.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-line pb-2">
         <div className="min-w-0 space-y-0.5">
           <h3 className="font-medium break-words">{line.name}</h3>
@@ -242,6 +274,15 @@ function LineBlock({ line, lines, first, last, actions, onEdit, onDelete }: Line
             {line.devicesMax == null ? t('bus.devices', { count: line.deviceCount }) : t('bus.devicesOfMax', { count: line.deviceCount, max: line.devicesMax })} · {t('bus.current', { used: line.busCurrentUsedMa, supplied: line.busCurrentSuppliedMa })}
             {line.unknownCurrentCount > 0 && <> · {t('bus.unknownCurrent', { count: line.unknownCurrentCount })}</>}
           </p>
+          {check && (
+            <StatusLine
+              reserve={check.reservePercent}
+              items={[
+                { label: t('checks.current'), status: check.currentStatus },
+                { label: t('checks.devices'), status: check.devicesStatus },
+              ]}
+            />
+          )}
         </div>
         {actions && (
           <div className="flex flex-wrap items-center gap-2">
@@ -335,22 +376,27 @@ function WirelessSystemSection({ system, actions }: { system: WirelessSystem; ac
   const localize = useLocalized()
   const names = useDeviceName()
   const name = localize(system.productType.name)
+  const checks = useContext(ChecksContext)
   return (
     <Section title={name} description={t('wireless.systemDescription')}>
       <SystemHeader system={system.productType} />
       <ol aria-label={name} className="space-y-6">
-        {system.gateways.map((gateway) => (
-          <li key={`${gateway.planId}:${gateway.itemId}`} className="space-y-2">
+        {system.gateways.map((gateway) => {
+          const check = checks?.gateways.find((g) => g.planId === gateway.planId && g.itemId === gateway.itemId)
+          return (
+          <li key={`${gateway.planId}:${gateway.itemId}`} id={`gateway-${gateway.itemId}`} className="scroll-mt-20 space-y-2">
             <div className="space-y-0.5 border-b border-line pb-2">
               <h3 className="font-medium break-words">{names.gateway(gateway, system.gateways)}</h3>
               <p className="text-sm text-muted tabular-nums">
                 {t('wireless.places', { used: gateway.wirelessPlacesUsed, supplied: gateway.wirelessPlacesSupplied })}
                 {gateway.unknownPlacesCount > 0 && <> · {t('wireless.unknownPlaces', { count: gateway.unknownPlacesCount })}</>}
               </p>
+              {check && <StatusLine reserve={check.reservePercent} items={[{ label: t('checks.places'), status: check.status }]} />}
             </div>
             <DeviceTable label={names.gateway(gateway, system.gateways)} devices={gateway.devices} gateways={system.gateways} gateway={gateway} actions={actions} />
           </li>
-        ))}
+          )
+        })}
       </ol>
       {system.unassigned.length > 0 && (
         <div className="space-y-2">

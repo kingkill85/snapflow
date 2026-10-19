@@ -258,3 +258,32 @@ ORDER BY m.plan_id, m.position;
 
 -- name: NetworkPlans :many
 SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY position, id;
+
+-- What the wiring feature (step 3d: connections, checks) reads of a
+-- version, through WiringData.
+-- name: WiringPlans :many
+SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY position, id;
+
+-- name: WiringZones :many
+SELECT z.plan_id, z.id, z.name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY z.plan_id, z.position;
+
+-- name: WiringPlacements :many
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.zone_id, pp.label
+FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
+WHERE p.version_id = $1
+ORDER BY pp.plan_id, pp.position;
+
+-- name: WiringRows :many
+SELECT r.plan_id, r.id, r.position, r.capacity_te::float8 AS capacity_te
+FROM board_rows r JOIN plans p ON p.id = r.plan_id
+WHERE p.version_id = $1
+ORDER BY r.plan_id, r.position;
+
+-- name: WiringModules :many
+SELECT m.plan_id, m.id, m.row_id, m.offset_te::float8 AS offset_te, m.variant_id, m.label
+FROM board_modules m JOIN plans p ON p.id = m.plan_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position;

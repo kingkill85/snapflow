@@ -5,6 +5,8 @@ import type { PlanNeed, PlanPlacement, PlanZone } from '@/api/generated/model'
 import { Button, IconButton } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
+import { ZoneStatusBadge } from './connections'
+import { usePlanWiring } from './plan-wiring'
 import type { Layers } from './layers'
 import { needCounts } from './needs'
 import { zoneCounts } from './zones'
@@ -26,6 +28,7 @@ type Props = {
 /** The Zones tab: every zone with colour, name and device count; show/hide per zone and all; a click selects. */
 export function ZonesPanel({ zones, saved, placements, needs, selection, layers, onLayers, onSelect }: Props) {
   const { t } = useTranslation('plans')
+  const wiring = usePlanWiring()
   if (zones.length === 0) return <p className="text-sm text-muted">{t('zones.empty')}</p>
   const counts = zoneCounts(saved, placements, zones)
   const needsPerZone = needCounts(needs, zones)
@@ -57,6 +60,11 @@ export function ZonesPanel({ zones, saved, placements, needs, selection, layers,
                 <span className="block" data-testid={`zone-needs-${z.id}`}>
                   {t('needs.count', { count: needsPerZone.get(z.id) ?? 0 })}
                 </span>
+                {wiring && (
+                  <span className="block" data-testid={`zone-status-${z.id}`}>
+                    <ZoneStatusBadge status={wiring.zoneStatus.get(z.id)} />
+                  </span>
+                )}
               </span>
               <IconButton
                 label={hidden ? t('zones.show', { name: z.name }) : t('zones.hide', { name: z.name })}

@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -133,7 +135,8 @@ func (s *Service) CreateLoadType(ctx context.Context, in LoadTypeInput) (LoadTyp
 		if err := q.LockOrder(ctx, loadTypeOrderLock); err != nil {
 			return err
 		}
-		row, err = q.CreateLoadType(ctx, store.CreateLoadTypeParams{Key: in.Key, Name: in.Name, IsActive: in.IsActive})
+		row, err = q.CreateLoadType(ctx, store.CreateLoadTypeParams{Key: in.Key, Name: in.Name, IsActive: in.IsActive,
+			PowerFactor: powerFactorText(in.PowerFactor, "1.00")})
 		return err
 	})
 	if err != nil {
@@ -154,7 +157,7 @@ func (s *Service) UpdateLoadType(ctx context.Context, id uuid.UUID, in LoadTypeU
 	err = s.inTx(ctx, func(q *store.Queries) error {
 		var err error
 		row, err = q.UpdateLoadType(ctx, store.UpdateLoadTypeParams{ID: id, Key: in.Key, Name: in.Name, IsActive: in.IsActive,
-			ExpectedUpdatedAt: in.ExpectedUpdatedAt})
+			PowerFactor: pfOrNil(in.PowerFactor), ExpectedUpdatedAt: in.ExpectedUpdatedAt})
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -192,15 +195,42 @@ func validateLoadType(in LoadTypeInput) (LoadTypeInput, error) {
 	var errs []apperr.FieldError
 	errs = append(errs, checkKey(in.Key, "load_type")...)
 	in.Name, errs = checkName(in.Name, "body.name", errs)
+	if in.PowerFactor != nil {
+		pf := math.Round(*in.PowerFactor*100) / 100
+		if pf < 0.1 || pf > 1 || math.IsNaN(pf) {
+			errs = append(errs, apperr.Field("body.powerFactor", "validation.range", "0.10-1.00").With("min", 0.1).With("max", 1))
+		}
+		in.PowerFactor = &pf
+	}
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
 }
 
+// powerFactorText is a power factor as the numeric column takes it.
+func powerFactorText(pf *float64, fallback string) string {
+	if pf == nil {
+		return fallback
+	}
+	return strconv.FormatFloat(*pf, 'f', 2, 64)
+}
+
+func pfOrNil(pf *float64) *string {
+	if pf == nil {
+		return nil
+	}
+	v := powerFactorText(pf, "")
+	return &v
+}
+
 func loadTypeOut(actor auth.Actor, r store.LoadType) LoadType {
 	write := actor.Can(auth.PermCatalogWrite)
-	return LoadType{ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
+	pf, err := strconv.ParseFloat(r.PowerFactor, 64)
+	if err != nil {
+		pf = 1
+	}
+	return LoadType{ID: r.ID, Key: r.Key, Name: r.Name, PowerFactor: pf, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Can: auth.Actions{Update: write, Delete: write}}
 }
 

@@ -87,6 +87,27 @@
     "product_type_not_in_project": "Das Projekt verwendet dieses System nicht. Fügen Sie es zuerst dem Projekt hinzu.",
     "devices_max_invalid": "Geben Sie eine Zahl von 1 bis {{max}} ein oder lassen Sie das Feld leer."
   },
+  "connection": {
+    "not_found": "Diese Verbindung existiert nicht mehr.",
+    "changed": "Die Version wurde inzwischen geändert. Neu laden und erneut versuchen.",
+    "disconnect_target": "Wählen Sie einen Bedarf oder einen Kanal zum Trennen.",
+    "need_not_found": "Dieser Bedarf existiert nicht mehr.",
+    "target_not_found": "Dieses Gerät ist auf keinem Plan dieser Version mehr.",
+    "channel_not_found": "Dieses Gerät hat keinen solchen Kanal.",
+    "function_not_served": "Dieser Kanal kann die Funktion des Bedarfs nicht bedienen.",
+    "motor_mismatch": "Der Ausgang treibt „{{motorType}}“-Motoren; der Bedarf hat einen „{{needMotorType}}“-Motor.",
+    "units_exceeded": "Mehr Einheiten verbunden ({{units}}) als der Bedarf hat ({{quantity}}).",
+    "channel_conflict": "Dieser Kanal teilt seine Ausgänge mit einem anderen Kanal, der bereits belegt ist.",
+    "circuit_not_allowed": "Dieser Kanal nimmt nur eine Einheit auf: Stromkreise sind nur für Bedarfe derselben Funktion erlaubt, die Stromkreise zulässt.",
+    "channel_overload_w": "Der Kanal ist überlastet: {{loadW}} W von {{limitW}} W ({{utilisationPercent}} %).",
+    "channel_overload_a": "Der Kanal ist überlastet: {{currentA}} A von {{limitA}} A ({{utilisationPercent}} %).",
+    "module_overload_w": "Das Gerät ist überlastet: insgesamt {{loadW}} W von {{limitW}} W.",
+    "module_overload_a": "Das Gerät ist überlastet: insgesamt {{currentA}} A von {{limitA}} A.",
+    "candidates_target": "Wählen Sie einen Bedarf oder einen Kanal."
+  },
+  "auto_connect": {
+    "changed": "Die Version hat sich seit der Vorschau geändert. Erneut Vorschau anzeigen."
+  },
   "catalog_field": {
     "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",

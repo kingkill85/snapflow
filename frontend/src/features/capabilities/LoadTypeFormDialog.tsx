@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { ApiError } from '@/api/client'
+import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { getListLoadTypesQueryKey, useCreateLoadType, useUpdateLoadType } from '@/api/generated/load-types/load-types'
 import type { LoadType, LoadTypeInput } from '@/api/generated/model'
 import {
@@ -35,24 +36,33 @@ const schema = z.object({
     max: 100,
     required: errorKey('validation.required'),
   }),
+  // 0.10–1.00 with at most 2 decimals (D407): converts W into A.
+  powerFactor: z
+    .string()
+    .refine((v) => {
+      const p = parseDecimal(v)
+      return p !== undefined && /^\d+(\.\d{1,2})?$/.test(p) && Number(p) >= 0.1 && Number(p) <= 1
+    }, errorKey('validation.range', { min: 0.1, max: 1 })),
   isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
 
 const fields = {
-  ...apiFields<FormValues>(['key', 'isActive']),
+  ...apiFields<FormValues>(['key', 'powerFactor', 'isActive']),
   ...translatableApiFields('name'),
 }
 
-const toFormValues = (item: LoadType | null): FormValues => ({
+const toFormValues = (item: LoadType | null, separator: ',' | '.'): FormValues => ({
   key: item?.key ?? '',
   name: toTranslatable(item?.name),
+  powerFactor: formatDecimal((item?.powerFactor ?? 1).toFixed(2), separator),
   isActive: item?.isActive ?? true,
 })
 
 const toInput = (v: FormValues): LoadTypeInput => ({
   key: v.key,
   name: fromTranslatable(v.name),
+  powerFactor: Number(parseDecimal(v.powerFactor)),
   isActive: v.isActive,
 })
 
@@ -64,18 +74,19 @@ type Props = {
   onSaved: () => Promise<unknown>
 }
 
-/** Creates or edits a load type (LED, halogen, …): key, name, active. */
+/** Creates or edits a load type (LED, halogen, …): key, name, power factor, active. */
 export function LoadTypeFormDialog({ open, onOpenChange, item, onSaved }: Props) {
   const { t } = useTranslation('capabilities')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
   const queryClient = useQueryClient()
+  const separator = useDecimalSeparator()
   const create = useCreateLoadType()
   const update = useUpdateLoadType()
   const mutation = item ? update : create
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: toFormValues(item),
+    defaultValues: toFormValues(item, separator),
   })
   const { errors } = form.formState
   const { reset } = form
@@ -84,10 +95,10 @@ export function LoadTypeFormDialog({ open, onOpenChange, item, onSaved }: Props)
 
   useEffect(() => {
     if (!open) return
-    reset(toFormValues(item))
+    reset(toFormValues(item, separator))
     resetCreate()
     resetUpdate()
-  }, [open, item, reset, resetCreate, resetUpdate])
+  }, [open, item, separator, reset, resetCreate, resetUpdate])
 
   const submit = form.handleSubmit(async (values) => {
     const data = toInput(values)
@@ -148,6 +159,15 @@ export function LoadTypeFormDialog({ open, onOpenChange, item, onSaved }: Props)
         {...form.register('key')}
       />
       <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
+      <Field
+        label={t('loadTypes.powerFactor')}
+        hint={t('loadTypes.powerFactorHint')}
+        required
+        inputMode="decimal"
+        autoComplete="off"
+        error={fieldError(errors.powerFactor?.message)}
+        {...form.register('powerFactor')}
+      />
       <SwitchField label={t('field.active')} hint={t('loadTypes.activeHint')} {...form.register('isActive')} />
     </FormDialog>
   )

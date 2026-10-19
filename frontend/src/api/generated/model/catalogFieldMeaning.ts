@@ -16,6 +16,7 @@ export const CatalogFieldMeaning = {
   channel_limit_w: 'channel_limit_w',
   channel_limit_a: 'channel_limit_a',
   channel_min_load_w: 'channel_min_load_w',
+  channel_voltage: 'channel_voltage',
   module_total_a: 'module_total_a',
   module_total_w: 'module_total_w',
   bus_current_used_ma: 'bus_current_used_ma',

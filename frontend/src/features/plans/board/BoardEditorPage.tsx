@@ -2,15 +2,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useBlocker, useParams } from 'react-router'
+import { Link, useBlocker, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { BoardContent, BoardWarning, Capabilities, Plan, Project, VariantSearchItem } from '@/api/generated/model'
+import type { BoardContent, BoardStatus, BoardWarning, Capabilities, Plan, Project, VariantSearchItem } from '@/api/generated/model'
 import { getBoardContent, getGetBoardContentQueryKey, getListPlansQueryKey, saveBoardContent, useGetBoardContent, useGetPlan } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
+import { useGetChecks } from '@/api/generated/wiring/wiring'
 import { isModKey, isTypingTarget } from '@/canvas'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
+import { boardStatus, itemKey, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -31,6 +33,7 @@ import {
   boardDocumentOf,
   boardPaletteProducts,
   boardUsed,
+  channelUse,
   copyModules,
   enclosureVariants,
   fittedBySave,
@@ -113,15 +116,47 @@ function BoardEditor({ plan, content, project, variants }: Props) {
   const lock = usePlanLock(plan.id, mayEdit, { beforeRelease: () => flushRef.current(), onPageHide: () => pageHideRef.current() })
   const editable = lock.state.status === 'mine'
 
-  const [state, dispatchEditor] = useReducer(boardReducer, boardDocumentOf(content), initBoard)
+  // ?select=<moduleId> (links from the Checks tab): opens with that module selected in the inspector.
+  const [params, setParams] = useSearchParams()
+  const selectParam = params.get('select')
+  const [state, dispatchEditor] = useReducer(boardReducer, boardDocumentOf(content), (d) => {
+    const init = initBoard(d)
+    return selectParam && d.modules.some((m) => m.id === selectParam) ? { ...init, selection: [selectParam] } : init
+  })
   const doc = state.history.present
   const [notice, setNotice] = useState<string | null>(null)
   const dispatch = useCallback((action: BoardEditorAction) => {
     if (action.type === 'change' || action.type === 'undo' || action.type === 'redo') setNotice(null)
     dispatchEditor(action)
   }, [])
-  const [tab, setTab] = useState<PanelTab>('products')
+  const [tab, setTab] = useState<PanelTab>(() => (state.selection.length > 0 ? 'inspector' : 'products'))
   const [armed, setArmed] = useState<string | null>(null)
+
+  // Connections and checks (step 3d): version data, refreshed after each save.
+  const wiring = useWiringModel(plan.versionId)
+  const checks = useGetChecks(plan.versionId)
+  const refreshWiring = useRefreshWiring(plan.versionId)
+  const boardCheck = checks.data?.boards.find((b) => b.planId === plan.id)
+  const channelUseOf = useCallback(
+    (moduleId: string) => {
+      const item = wiring.items.get(itemKey(plan.id, moduleId))
+      return item ? channelUse(item.channels) : undefined
+    },
+    [wiring.items, plan.id],
+  )
+
+  // The ?select= param is used once (above), then dropped.
+  useEffect(() => {
+    if (!selectParam) return
+    setParams(
+      (p) => {
+        const out = new URLSearchParams(p)
+        out.delete('select')
+        return out
+      },
+      { replace: true },
+    )
+  }, [selectParam, setParams])
 
   const [server, setServer] = useState(content)
   const contentVersion = useRef(content.contentUpdatedAt)
@@ -151,6 +186,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         const fitted = fittedBySave(snapshot, saved)
         if (fitted) dispatch({ type: 'adopt', from: snapshot, document: fitted })
         void queryClient.invalidateQueries({ queryKey: getListPlansQueryKey(plan.versionId) })
+        void refreshWiring()
       } catch (e) {
         const byItem = boardErrorsByModule(e, snapshot, (f) => errorMessage(new ApiError({ status: 422, code: f.code, params: f.params })))
         setSaveErrors(byItem)
@@ -162,7 +198,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         throw e
       }
     },
-    [plan.id, plan.versionId, errorMessage, queryClient, dispatch],
+    [plan.id, plan.versionId, errorMessage, queryClient, dispatch, refreshWiring],
   )
   const autosave = useAutosave({ document: doc, save, enabled: editable })
 
@@ -381,6 +417,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         if (action.type === 'select' && action.ids.length > 0) setTab('inspector')
       }}
       onPlace={place}
+      channelUse={channelUseOf}
       armed={armed}
       productWidth={productWidth}
     />
@@ -432,6 +469,9 @@ function BoardEditor({ plan, content, project, variants }: Props) {
           editable={editable}
           dispatch={dispatch}
           onNotice={setNotice}
+          versionId={plan.versionId}
+          planId={plan.id}
+          wiring={wiring}
         />
       ),
     },
@@ -450,6 +490,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
           {totals}
           {overfull && ` · ${t('board.overflow')}`}
         </span>
+        {boardCheck && <BoardCheck check={boardCheck} kindName={wiring.kindName} />}
         <span className="flex-1" />
         {editable ? <SaveIndicator status={autosave.status} onRetry={() => void autosave.retry()} /> : <span className="text-sm text-muted">{t('editor.viewOnly')}</span>}
       </div>
@@ -461,5 +502,17 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         </aside>
       </div>
     </div>
+  )
+}
+
+/** The board's checks in the header: TE with the reserve status and the free channels per kind (step 3d). */
+function BoardCheck({ check, kindName }: { check: BoardStatus; kindName: (id: string) => string }) {
+  const { t } = useTranslation('plans')
+  const list = check.channels.map((c) => `${kindName(c.outputKindId)}${c.alternative ? ` (${t('board.channelAlternative')})` : ''} ${c.free}/${c.total}`).join(', ')
+  return (
+    <span data-testid="board-check" className="flex items-center gap-2 text-sm text-muted">
+      <StatusChip status={boardStatus(check)} />
+      {list && <span className="hidden truncate lg:inline">{t('board.channelTotals', { list })}</span>}
+    </span>
   )
 }

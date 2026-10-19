@@ -18,7 +18,9 @@
     "edit": "Edit load type",
     "deleteTitle": "Delete load type",
     "keyHint": "e.g. led, halogen, ac_motor",
-    "activeHint": "Inactive load types cannot be chosen for new needs."
+    "activeHint": "Inactive load types cannot be chosen for new needs.",
+    "powerFactor": "Power factor",
+    "powerFactorHint": "Converts the power of needs (W) into current (A) for limits in A: I = P / (V · power factor). LED about 0.9, motors about 0.7, resistive loads 1."
   },
   "outputKinds": {
     "title": "Output kinds",
@@ -85,6 +87,7 @@
     "channel_limit_w": "Max. load per channel (W)",
     "channel_limit_a": "Max. current per channel (A)",
     "channel_min_load_w": "Min. load per channel (W)",
+    "channel_voltage": "Switched voltage per channel (V)",
     "module_total_a": "Max. current of the module (A)",
     "module_total_w": "Max. load of the module (W)",
     "bus_current_used_ma": "Bus current used (mA)",

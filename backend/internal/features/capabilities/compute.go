@@ -53,6 +53,7 @@ type ChannelCapability struct {
 	LimitsW       []Limit   `json:"limitsW" doc:"Max W per channel by load type"`
 	LimitsA       []Limit   `json:"limitsA" doc:"Max A per channel; one without a load type applies to any load"`
 	MinLoadsW     []Limit   `json:"minLoadsW" doc:"Minimum load per channel (W); one without a load type applies to any load"`
+	VoltageV      *float64  `json:"voltageV,omitempty" doc:"Voltage the channels switch (channel_voltage); absent = the product type's nominal voltage"`
 	// Alternatives: the kinds these channels can act as, Per channels as
 	// one (fixed groups 1..Per, Per+1..2*Per, ...), at most Max of them;
 	// only kinds the product opts in to (alternative_allowed, D303). The
@@ -162,6 +163,7 @@ func Compute(reg Registry, in Input) Capabilities {
 	type channelData struct {
 		count                 *float64
 		limitW, limitA, minW  limits
+		voltage               *float64
 		alternativeAllowed    bool
 		alternativeAllowedSet bool
 	}
@@ -241,6 +243,10 @@ func Compute(reg Registry, in Input) Capabilities {
 			ch(deref0(f.OutputKindID)).limitA.add(f.LoadTypeID, n)
 		case MeaningChannelMinLoadW:
 			ch(deref0(f.OutputKindID)).minW.add(f.LoadTypeID, n)
+		case MeaningChannelVoltage:
+			if n > 0 {
+				setOnce(&ch(deref0(f.OutputKindID)).voltage, n)
+			}
 		case MeaningModuleTotalA:
 			setOnce(&out.ModuleTotalA, n)
 		case MeaningModuleTotalW:
@@ -283,7 +289,7 @@ func Compute(reg Registry, in Input) Capabilities {
 		}
 		count := int(math.Floor(*c.count))
 		cc := ChannelCapability{OutputKindID: k.ID, OutputKindKey: k.Key, Count: count,
-			LimitsW: c.limitW.list(reg), LimitsA: c.limitA.list(reg), MinLoadsW: c.minW.list(reg),
+			LimitsW: c.limitW.list(reg), LimitsA: c.limitA.list(reg), MinLoadsW: c.minW.list(reg), VoltageV: c.voltage,
 			Alternatives: []ChannelAlternative{}}
 		for _, target := range reg.OutputKinds {
 			t := channels[target.ID]

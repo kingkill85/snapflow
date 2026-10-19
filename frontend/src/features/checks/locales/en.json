@@ -1,0 +1,199 @@
+{
+  "finding": {
+    "need_unconnected": "{{need}}: {{missing}} of {{quantity}} not connected",
+    "need_not_found": "A connection on {{channel}} belongs to a need that no longer exists",
+    "target_not_found": "{{need}} is connected to a device that no longer exists",
+    "channel_not_found": "{{need}} is connected to {{channel}}, which the device no longer has",
+    "function_not_served": "{{channel}} cannot serve {{need}}",
+    "motor_mismatch": "{{need}}: {{needMotor}} motor on {{channel}}, which drives {{motor}} motors",
+    "units_exceeded": "{{need}}: {{units}} units connected, only {{quantity}} needed",
+    "channel_conflict": "{{channel}} uses output {{baseChannel}}, which another channel uses too",
+    "circuit_not_allowed": "{{channel}}: {{units}} units on one channel, but they may not share a circuit",
+    "channel_overload_w": "{{channel}}: {{loadW}} W connected, at most {{limitW}} W ({{utilisationPercent}} % of the limit)",
+    "channel_overload_w_mixed": "{{channel}}: {{loadW}} W of mixed loads, {{utilisationPercent}} % of what the channel takes for this mix",
+    "channel_overload_a": "{{channel}}: {{currentA}} A at {{voltage}} V connected, at most {{limitA}} A ({{utilisationPercent}} % of the limit)",
+    "channel_overload_a_mixed": "{{channel}}: {{currentA}} A of mixed loads at {{voltage}} V, {{utilisationPercent}} % of what the channel takes for this mix",
+    "module_overload_w": "{{item}}: {{loadW}} W in total ({{loadType}}), at most {{limitW}} W",
+    "module_overload_a": "{{item}}: {{currentA}} A in total at {{voltage}} V, at most {{limitA}} A",
+    "limit_unknown": "{{channel}}: no limit known for {{loadType}}",
+    "min_load": "{{channel}}: {{loadW}} W is below the minimum load of {{minW}} W",
+    "power_unknown": "{{channel}}: no power entered for {{need}}, so the channel's limits cannot be checked",
+    "board_over_capacity": "{{board}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
+    "board_row_over_capacity": "{{board}}, row {{row}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
+    "bus_line_no_power_supply": "{{name}}: no power supply",
+    "bus_line_current_exceeded": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used, more than supplied",
+    "bus_line_current_reserve": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used (reserve {{reservePercent}} %)",
+    "bus_line_devices_exceeded": "{{name}}: {{devices}} devices, at most {{max}}",
+    "bus_line_devices_reserve": "{{name}}: {{devices}} of {{max}} devices (reserve {{reservePercent}} %)",
+    "bus_current_unknown": "{{item}}: bus current unknown",
+    "bus_device_unassigned": "{{item}} is on no bus line",
+    "wireless_no_gateway": "{{item}} has no gateway",
+    "gateway_places_reserve": "{{label}}: {{used}} of {{supplied}} places used (reserve {{reservePercent}} %)",
+    "gateway_places_exceeded": "{{label}}: {{used}} of {{supplied}} places used, more than it has",
+    "gateway_no_router": "{{label}}: {{devices}} devices and no router (advised from {{threshold}} end devices)",
+    "network_assignment_dangling": "{{item}} is assigned to {{target}}",
+    "unknown": "Check {{code}}"
+  },
+  "reason": {
+    "no_channel_serves": "No channel serves {{functionType}}",
+    "no_free_channel": "No free channel for {{functionType}}",
+    "limits_exceeded": "No free channel fits (power, current or motor type)"
+  },
+  "fallback": {
+    "need": "A need",
+    "item": "A device",
+    "channel": "a channel",
+    "board": "A board",
+    "loadType": "this load type",
+    "allLoads": "all loads",
+    "functionType": "this function"
+  },
+  "motor": {
+    "ac": "AC",
+    "dc": "DC"
+  },
+  "status": {
+    "ok": "OK",
+    "amber": "Near limit",
+    "red": "Exceeded",
+    "unknown": "Unknown"
+  },
+  "zoneStatus": {
+    "covered": "Covered",
+    "partial": "{{connected}}/{{units}}",
+    "missing": "Not connected",
+    "none": "No needs"
+  },
+  "severity": {
+    "error": "Errors",
+    "warning": "Warnings",
+    "info": "Notes"
+  },
+  "channel": {
+    "text": "{{item}} · {{kind}} {{no}} ({{plan}})",
+    "short": "{{kind}} {{no}}",
+    "alternative": "from {{baseKind}} {{from}}–{{to}}",
+    "blocked": "Taken by another channel"
+  },
+  "need": {
+    "text_one": "{{count}} × {{name}}",
+    "text_other": "{{count}} × {{name}}",
+    "noZone": "Outside every zone"
+  },
+  "connection": {
+    "line": "{{units}} × → {{channel}}",
+    "disconnect": "Disconnect",
+    "disconnectFrom": "Disconnect {{name}}",
+    "connect": "Connect…",
+    "connectNeed": "Connect {{name}}…",
+    "none": "Not connected",
+    "warnings": "Connected with a warning: {{text}}"
+  },
+  "connect": {
+    "titleNeed": "Connect {{need}}",
+    "titleChannel": "Connect a need to {{channel}}",
+    "descriptionNeed": "Channels that can take this need, devices in its zone first.",
+    "descriptionChannel": "Needs with unconnected units this channel can take.",
+    "fitting": "Possible connections",
+    "units_one": "{{count}} unit",
+    "units_other": "{{count}} units",
+    "inZone": "In this zone",
+    "circuit": "Joins a circuit",
+    "connect": "Connect",
+    "connectTo": "Connect to {{name}}",
+    "notPossible_one": "{{count}} not possible:",
+    "notPossible_other": "{{count}} not possible:",
+    "more_one": "and {{count}} more",
+    "more_other": "and {{count}} more",
+    "complete": "All units of this need are connected.",
+    "noNeeds": "No unconnected need can use this channel."
+  },
+  "tab": {
+    "title": "Checks",
+    "description": "Whether every need is connected and every board, bus line and gateway stays within its limits."
+  },
+  "overview": {
+    "zones": "Zones covered",
+    "zonesValue": "{{covered}} / {{total}}",
+    "allCovered": "All covered",
+    "notAllCovered": "Not all covered",
+    "noNeeds": "No needs",
+    "unconnected": "Unconnected units",
+    "unitsOf": "{{connected}} of {{total}} connected",
+    "findings": "Findings",
+    "findingsValue": "Errors: {{errors}} · Warnings: {{warnings}}",
+    "board": "Board {{name}}",
+    "te": "{{used}} of {{capacity}} TE used",
+    "row": "Row {{row}}: {{used}} of {{capacity}} TE",
+    "channels": "{{kind}}: {{free}} of {{total}} free",
+    "channelsAlternative": "{{kind}} (from other channels): {{free}} of {{total}} free",
+    "busLine": "Bus line {{name}}",
+    "current": "{{used}} of {{supplied}} mA (reserve {{reserve}} %)",
+    "devicesOf": "{{devices}} of {{max}} devices",
+    "devices_one": "{{count}} device",
+    "devices_other": "{{count}} devices",
+    "unknownCurrent_one": "{{count}} device with unknown bus current",
+    "unknownCurrent_other": "{{count}} devices with unknown bus current",
+    "gateway": "Gateway {{name}}",
+    "places": "{{used}} of {{supplied}} places (reserve {{reserve}} %)",
+    "gatewayDevices_one": "{{count}} device, {{routers}} routers",
+    "gatewayDevices_other": "{{count}} devices, {{routers}} routers",
+    "toFix": "To fix",
+    "toReview": "To review",
+    "allClear": "All clear"
+  },
+  "findings": {
+    "title": "Findings",
+    "count": "Errors: {{errors}} · Warnings: {{warnings}} · Notes: {{infos}}",
+    "none": "Nothing to report.",
+    "open": "Open",
+    "openFor": "Open: {{text}}",
+    "unconnected_one": "{{count}} need has units that are not connected (listed under Unconnected needs)",
+    "unconnected_other": "{{count}} needs have units that are not connected (listed under Unconnected needs)"
+  },
+  "area": {
+    "needs": "Needs",
+    "connections": "Connections",
+    "boards": "Boards",
+    "networks": "Networks"
+  },
+  "unconnected": {
+    "title": "Unconnected needs",
+    "description_one": "{{count}} need with units that are not connected yet.",
+    "description_other": "{{count}} needs with units that are not connected yet.",
+    "none": "Every need is connected.",
+    "openPlan": "Open floorplan",
+    "connected": "{{connected}} of {{quantity}} connected"
+  },
+  "auto": {
+    "open": "Auto-connect…",
+    "title": "Auto-connect",
+    "description": "Connects unconnected units to free channels: devices in the room first, then the boards in order. Existing connections stay as they are.",
+    "scope": "Needs",
+    "scopeAll": "All unconnected needs",
+    "scopeZones": "Needs of selected zones",
+    "zones": "Zones",
+    "preview": "Preview",
+    "apply": "Apply",
+    "back": "Change scope",
+    "nothing": "Nothing to connect.",
+    "failures": "Needs that cannot be connected",
+    "unitsLeft_one": "{{count}} unit",
+    "unitsLeft_other": "{{count}} units",
+    "changed": "The version changed since the preview. This is the new preview.",
+    "applied_one": "Auto-connect made {{count}} connection.",
+    "applied_other": "Auto-connect made {{count}} connections.",
+    "undo": "Undo auto-connect",
+    "undone_one": "Auto-connect undone: {{count}} connection removed.",
+    "undone_other": "Auto-connect undone: {{count}} connections removed.",
+    "summary_one": "{{count}} unit will be connected.",
+    "summary_other": "{{count}} units will be connected.",
+    "summaryWithFailures_one": "{{count}} unit will be connected, {{failed}} cannot:",
+    "summaryWithFailures_other": "{{count}} units will be connected, {{failed}} cannot:"
+  },
+  "dangling": {
+    "bus_line": "a bus line that no longer exists",
+    "gateway": "a gateway that no longer exists",
+    "other": "a network that no longer exists"
+  }
+}

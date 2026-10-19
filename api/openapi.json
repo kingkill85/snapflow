@@ -355,6 +355,181 @@
         ],
         "type": "object"
       },
+      "AutoConnectApply": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AutoConnectApply.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedChecksum": {
+            "description": "checksum of the preview; anything changed since → 409 auto_connect.changed",
+            "type": "string"
+          },
+          "needIds": {
+            "description": "scope needs",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "zones",
+              "needs"
+            ],
+            "type": "string"
+          },
+          "zoneIds": {
+            "description": "scope zones",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "expectedChecksum",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "AutoConnectPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AutoConnectPreview.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "checksum": {
+            "description": "Send it back with apply",
+            "type": "string"
+          },
+          "connectedUnits": {
+            "description": "Units the planned connections take",
+            "format": "int64",
+            "type": "integer"
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedConnection"
+            },
+            "type": "array"
+          },
+          "needs": {
+            "description": "Needs in scope with unconnected units",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unconnectable": {
+            "items": {
+              "$ref": "#/components/schemas/Unconnectable"
+            },
+            "type": "array"
+          },
+          "units": {
+            "description": "Their unconnected units",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connections",
+          "unconnectable",
+          "needs",
+          "units",
+          "connectedUnits",
+          "checksum"
+        ],
+        "type": "object"
+      },
+      "AutoConnectResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AutoConnectResult.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "batchId": {
+            "description": "Undo with DELETE …/auto-connect/{batchId}; null when nothing was connected",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/Connection"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "batchId",
+          "connections"
+        ],
+        "type": "object"
+      },
+      "AutoConnectScope": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/AutoConnectScope.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "needIds": {
+            "description": "scope needs",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "zones",
+              "needs"
+            ],
+            "type": "string"
+          },
+          "zoneIds": {
+            "description": "scope zones",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "type": "object"
+      },
       "BOM": {
         "additionalProperties": false,
         "properties": {
@@ -1125,6 +1300,58 @@
         ],
         "type": "object"
       },
+      "BoardStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "format": "double",
+            "type": "number"
+          },
+          "channels": {
+            "description": "Native kinds in output kind order, then alternatives",
+            "items": {
+              "$ref": "#/components/schemas/ChannelUse"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowUse"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "TE: red over capacity, amber above 100 − 20 % (the default reserve)",
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "usedTe": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "planId",
+          "name",
+          "channels",
+          "rows",
+          "usedTe",
+          "capacityTe",
+          "status"
+        ],
+        "type": "object"
+      },
       "BoardWarning": {
         "additionalProperties": false,
         "properties": {
@@ -1381,6 +1608,86 @@
         ],
         "type": "object"
       },
+      "BusLineStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "busLineId": {
+            "type": "string"
+          },
+          "currentDefaultMa": {
+            "description": "Part of currentUsedMa from the system's default",
+            "format": "double",
+            "type": "number"
+          },
+          "currentStatus": {
+            "description": "unknown: no power supply",
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "currentSuppliedMa": {
+            "format": "double",
+            "type": "number"
+          },
+          "currentUsedMa": {
+            "description": "Known currents, defaults included",
+            "format": "double",
+            "type": "number"
+          },
+          "devices": {
+            "description": "Members (power supplies included)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "devicesMax": {
+            "description": "The line's devicesMax, else the system's busDevicesMax; absent = not checked",
+            "format": "int32",
+            "type": "integer"
+          },
+          "devicesStatus": {
+            "description": "unknown: no limit",
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "reservePercent": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "unknownCurrentCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "busLineId",
+          "name",
+          "productTypeId",
+          "reservePercent",
+          "currentUsedMa",
+          "currentDefaultMa",
+          "currentSuppliedMa",
+          "unknownCurrentCount",
+          "currentStatus",
+          "devices",
+          "devicesStatus"
+        ],
+        "type": "object"
+      },
       "BusLineUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -1526,6 +1833,146 @@
           "lines",
           "unassigned"
         ],
+        "type": "object"
+      },
+      "Candidate": {
+        "additionalProperties": false,
+        "properties": {
+          "channelNo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "free": {
+            "description": "The channel holds nothing and no base channel is used",
+            "type": "boolean"
+          },
+          "inZone": {
+            "description": "A device placed in the need's zone",
+            "type": "boolean"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "problem": {
+            "$ref": "#/components/schemas/CandidateWhy",
+            "description": "Why one unit cannot go there"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "type": "string"
+          },
+          "units": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needPlanId",
+          "needId",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo",
+          "units",
+          "free",
+          "inZone"
+        ],
+        "type": "object"
+      },
+      "CandidateWhy": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "params"
+        ],
+        "type": "object"
+      },
+      "Candidates": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Candidates.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "description": "Channels serving the need's function type (need mode: in-zone devices first, then boards, then other devices) or needs the channel's kind serves with missing units (channel mode)",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "description": "Why no candidate fits (absent when one does): complete = nothing missing",
+            "enum": [
+              "complete",
+              "no_channel_serves",
+              "no_free_channel",
+              "limits_exceeded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "CandidatesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CandidatesInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "description": "With needId: every connection of the need",
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "description": "With targetItemId, outputKindId, channelNo: every connection of the channel",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Capabilities": {
@@ -1770,6 +2217,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -1895,6 +2343,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -2023,6 +2472,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -2514,6 +2964,11 @@
           },
           "outputKindKey": {
             "type": "string"
+          },
+          "voltageV": {
+            "description": "Voltage the channels switch (channel_voltage); absent = the product type's nominal voltage",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
@@ -2524,6 +2979,440 @@
           "limitsA",
           "minLoadsW",
           "alternatives"
+        ],
+        "type": "object"
+      },
+      "ChannelInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "alternative": {
+            "description": "Made of base channels of another kind (D303)",
+            "type": "boolean"
+          },
+          "baseFrom": {
+            "description": "First base channel",
+            "format": "int64",
+            "type": "integer"
+          },
+          "baseKindKey": {
+            "description": "The kind of the base channels",
+            "type": "string"
+          },
+          "baseTo": {
+            "description": "Last base channel",
+            "format": "int64",
+            "type": "integer"
+          },
+          "blocked": {
+            "description": "No connection of its own, but a base channel is used by another channel",
+            "type": "boolean"
+          },
+          "channelNo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "connectionIds": {
+            "description": "Its connections in creation order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "outputKindKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "outputKindKey",
+          "channelNo",
+          "alternative",
+          "baseKindKey",
+          "baseFrom",
+          "baseTo",
+          "blocked",
+          "connectionIds"
+        ],
+        "type": "object"
+      },
+      "ChannelUse": {
+        "additionalProperties": false,
+        "properties": {
+          "alternative": {
+            "description": "Channels made of other kinds' channels (D303): total = groups possible, free = groups whose channels are all free",
+            "type": "boolean"
+          },
+          "free": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "outputKindKey": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "used": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "outputKindKey",
+          "alternative",
+          "total",
+          "used",
+          "free"
+        ],
+        "type": "object"
+      },
+      "CheckCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "errors": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "infos": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "units": {
+            "description": "Units of all needs",
+            "format": "int64",
+            "type": "integer"
+          },
+          "warnings": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "zonesCovered": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "zonesWithNeeds": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "errors",
+          "warnings",
+          "infos",
+          "units",
+          "connectedUnits",
+          "zonesWithNeeds",
+          "zonesCovered"
+        ],
+        "type": "object"
+      },
+      "Checks": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Checks.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "boards": {
+            "description": "In plan order",
+            "items": {
+              "$ref": "#/components/schemas/BoardStatus"
+            },
+            "type": "array"
+          },
+          "busLines": {
+            "description": "In line order",
+            "items": {
+              "$ref": "#/components/schemas/BusLineStatus"
+            },
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CheckCounts"
+          },
+          "findings": {
+            "description": "Errors, then warnings, then infos; within a severity in a fixed order",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array"
+          },
+          "gateways": {
+            "description": "In plan and item order",
+            "items": {
+              "$ref": "#/components/schemas/GatewayStatus"
+            },
+            "type": "array"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "zones": {
+            "description": "Every zone of every floorplan in plan and zone order; needs outside zones as zoneId null last per plan",
+            "items": {
+              "$ref": "#/components/schemas/ZoneStatus"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "versionId",
+          "counts",
+          "zones",
+          "boards",
+          "busLines",
+          "gateways",
+          "findings"
+        ],
+        "type": "object"
+      },
+      "Connection": {
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "description": "The auto-connect run that made it; null by hand",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channelNo": {
+            "description": "1..count of the kind on the item: native channels first, then the alternative groups (D303)",
+            "format": "int32",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "pinned": {
+            "description": "Made or changed by hand; auto-connect never moves it",
+            "type": "boolean"
+          },
+          "targetItemId": {
+            "description": "The module or placement id",
+            "type": "string"
+          },
+          "targetPlanId": {
+            "description": "The board (module) or floorplan (device) plan",
+            "type": "string"
+          },
+          "units": {
+            "description": "Units of the need on this channel (1-100)",
+            "format": "int32",
+            "type": "integer"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "versionId",
+          "needPlanId",
+          "needId",
+          "units",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo",
+          "pinned",
+          "batchId",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "ConnectionActions": {
+        "additionalProperties": false,
+        "properties": {
+          "update": {
+            "description": "Connect, change, disconnect, auto-connect (projects.write, project active)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "update"
+        ],
+        "type": "object"
+      },
+      "ConnectionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ConnectionInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "type": "string"
+          },
+          "units": {
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needPlanId",
+          "needId",
+          "units",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo"
+        ],
+        "type": "object"
+      },
+      "ConnectionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ConnectionResult.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/Connection"
+          },
+          "warnings": {
+            "description": "limit_unknown, min_load",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "connection",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "ConnectionUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/ConnectionUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "type": "string"
+          },
+          "units": {
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "units",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo"
+        ],
+        "type": "object"
+      },
+      "Connections": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Connections.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ConnectionActions"
+          },
+          "items": {
+            "description": "In creation order",
+            "items": {
+              "$ref": "#/components/schemas/Connection"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "can"
         ],
         "type": "object"
       },
@@ -2592,6 +3481,42 @@
           "recent",
           "onlineKnown"
         ],
+        "type": "object"
+      },
+      "DisconnectInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/DisconnectInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "description": "With needId: every connection of the need",
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "description": "With targetItemId, outputKindId, channelNo: every connection of the channel",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Error": {
@@ -2882,6 +3807,38 @@
         ],
         "type": "object"
       },
+      "Finding": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "See the checks codes (e.g. need_unconnected, channel_overload_w, bus_line_current_exceeded)",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "description": "Values for the translated message",
+            "type": "object"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/Refs"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "refs",
+          "params"
+        ],
+        "type": "object"
+      },
       "FunctionType": {
         "additionalProperties": false,
         "properties": {
@@ -3116,6 +4073,81 @@
           "variantName",
           "modelNumber",
           "existing"
+        ],
+        "type": "object"
+      },
+      "GatewayStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "devices": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "placesSupplied": {
+            "format": "double",
+            "type": "number"
+          },
+          "placesUsed": {
+            "format": "double",
+            "type": "number"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "null: the variant no longer exists",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "reservePercent": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "routers": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "unknownCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "planId",
+          "itemId",
+          "label",
+          "productName",
+          "productTypeId",
+          "reservePercent",
+          "placesUsed",
+          "placesSupplied",
+          "unknownCount",
+          "devices",
+          "routers",
+          "status"
         ],
         "type": "object"
       },
@@ -4609,6 +5641,75 @@
         ],
         "type": "object"
       },
+      "ItemInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "description": "Output kind order, native channels first, then alternatives",
+            "items": {
+              "$ref": "#/components/schemas/ChannelInfo"
+            },
+            "type": "array"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "null: the variant no longer exists",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "productName",
+          "variantName",
+          "zoneId",
+          "channels"
+        ],
+        "type": "object"
+      },
       "ItemSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -4850,6 +5951,11 @@
             },
             "type": "object"
           },
+          "powerFactor": {
+            "description": "0.10-1.00; converts W into A for limits in A: I = P / (V · PF)",
+            "format": "double",
+            "type": "number"
+          },
           "sortOrder": {
             "format": "int32",
             "type": "integer"
@@ -4864,6 +5970,7 @@
           "id",
           "key",
           "name",
+          "powerFactor",
           "sortOrder",
           "isActive",
           "createdAt",
@@ -4900,6 +6007,11 @@
             },
             "description": "At most 100 characters; \"en\" is required",
             "type": "object"
+          },
+          "powerFactor": {
+            "description": "0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
@@ -4982,6 +6094,11 @@
             },
             "description": "At most 100 characters; \"en\" is required",
             "type": "object"
+          },
+          "powerFactor": {
+            "description": "0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
@@ -5304,6 +6421,69 @@
           "loadTypeRequired",
           "types",
           "options"
+        ],
+        "type": "object"
+      },
+      "NeedInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "description": "Σ units of its connections (may exceed the quantity: a finding)",
+            "format": "int32",
+            "type": "integer"
+          },
+          "functionTypeId": {
+            "type": "string"
+          },
+          "functionTypeKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Per unit, decimal string",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "zoneId": {
+            "description": "null: outside every zone",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zoneName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "planName",
+          "needId",
+          "zoneId",
+          "zoneName",
+          "label",
+          "functionTypeId",
+          "functionTypeKey",
+          "quantity",
+          "connectedUnits",
+          "powerW"
         ],
         "type": "object"
       },
@@ -6843,6 +8023,44 @@
         ],
         "type": "object"
       },
+      "PlannedConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "channelNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "type": "string"
+          },
+          "units": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needPlanId",
+          "needId",
+          "units",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo"
+        ],
+        "type": "object"
+      },
       "PreviewDocument": {
         "additionalProperties": false,
         "properties": {
@@ -7487,6 +8705,11 @@
             "description": "Display name per locale",
             "type": "object"
           },
+          "nominalVoltage": {
+            "description": "Nominal voltage (V) of the system's devices: converts the W of needs into A for limits in A (3d)",
+            "format": "int32",
+            "type": "integer"
+          },
           "reservePercent": {
             "description": "Capacity kept in reserve: amber above 100 − reserve %, red when exceeded",
             "format": "int32",
@@ -7520,6 +8743,7 @@
           "isActive",
           "reservePercent",
           "topology",
+          "nominalVoltage",
           "createdAt",
           "updatedAt",
           "can"
@@ -7583,6 +8807,11 @@
             },
             "description": "Display name per locale (at most 100 characters); \"en\" is required",
             "type": "object"
+          },
+          "nominalVoltage": {
+            "description": "1-1000 V; default 230; on update, left out keeps the stored value (D294)",
+            "format": "int32",
+            "type": "integer"
           },
           "reservePercent": {
             "description": "0-90; default 20; on update, left out keeps the stored value (D294)",
@@ -7753,6 +8982,11 @@
             },
             "description": "Display name per locale (at most 100 characters); \"en\" is required",
             "type": "object"
+          },
+          "nominalVoltage": {
+            "description": "1-1000 V; default 230; on update, left out keeps the stored value (D294)",
+            "format": "int32",
+            "type": "integer"
           },
           "reservePercent": {
             "description": "0-90; default 20; on update, left out keeps the stored value (D294)",
@@ -8635,6 +9869,67 @@
         ],
         "type": "object"
       },
+      "Refs": {
+        "additionalProperties": false,
+        "properties": {
+          "busLineId": {
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "connectionIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "planId": {
+            "description": "The floorplan of the zone or need",
+            "type": "string"
+          },
+          "targetPlanId": {
+            "description": "The board or floorplan of the item (module, device, gateway)",
+            "type": "string"
+          },
+          "zoneId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Removed": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Removed.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "removed": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "type": "object"
+      },
       "RequiredAddon": {
         "additionalProperties": false,
         "properties": {
@@ -9062,6 +10357,45 @@
         ],
         "type": "object"
       },
+      "RowUse": {
+        "additionalProperties": false,
+        "properties": {
+          "capacityTe": {
+            "format": "double",
+            "type": "number"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rowId": {
+            "type": "string"
+          },
+          "status": {
+            "description": "TE of the row: red over capacity (board_row_over_capacity), amber above 100 − 20 %",
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "usedTe": {
+            "description": "Modules' widths (unknown width = 1 TE)",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rowId",
+          "position",
+          "usedTe",
+          "capacityTe",
+          "status"
+        ],
+        "type": "object"
+      },
       "SnapshotCategory": {
         "additionalProperties": false,
         "properties": {
@@ -9366,6 +10700,43 @@
         },
         "required": [
           "items"
+        ],
+        "type": "object"
+      },
+      "Unconnectable": {
+        "additionalProperties": false,
+        "properties": {
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "description": "functionTypeKey",
+            "type": "object"
+          },
+          "reason": {
+            "enum": [
+              "no_channel_serves",
+              "no_free_channel",
+              "limits_exceeded"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "description": "Units left unconnected",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needPlanId",
+          "needId",
+          "units",
+          "reason",
+          "params"
         ],
         "type": "object"
       },
@@ -9984,6 +11355,98 @@
           "productType",
           "gateways",
           "unassigned"
+        ],
+        "type": "object"
+      },
+      "Wiring": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Wiring.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ConnectionActions"
+          },
+          "connections": {
+            "description": "In creation order",
+            "items": {
+              "$ref": "#/components/schemas/Connection"
+            },
+            "type": "array"
+          },
+          "items": {
+            "description": "Items with channels in plan order (placements, then modules by row and offset)",
+            "items": {
+              "$ref": "#/components/schemas/ItemInfo"
+            },
+            "type": "array"
+          },
+          "needs": {
+            "description": "In plan, zone and need order",
+            "items": {
+              "$ref": "#/components/schemas/NeedInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "needs",
+          "connections",
+          "can"
+        ],
+        "type": "object"
+      },
+      "ZoneStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "description": "Connected units, at most each need's quantity",
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "status": {
+            "description": "none: the zone has no needs",
+            "enum": [
+              "covered",
+              "partial",
+              "missing",
+              "none"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "description": "Units of the zone's needs",
+            "format": "int64",
+            "type": "integer"
+          },
+          "zoneId": {
+            "description": "null: needs outside every zone",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "planId",
+          "zoneId",
+          "name",
+          "units",
+          "connectedUnits",
+          "status"
         ],
         "type": "object"
       }
@@ -15673,6 +17136,163 @@
         ]
       }
     },
+    "/api/versions/{versionId}/auto-connect/apply": {
+      "post": {
+        "description": "Makes the previewed connections as one batch; 409 auto_connect.changed when anything changed since the preview.",
+        "operationId": "applyAutoConnect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoConnectApply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoConnectResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Apply auto-connect",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/auto-connect/preview": {
+      "post": {
+        "operationId": "previewAutoConnect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoConnectScope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoConnectPreview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Preview auto-connect",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/auto-connect/{batchId}": {
+      "delete": {
+        "description": "Removes the connections still from the batch (changed ones left it).",
+        "operationId": "undoAutoConnect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batchId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Removed"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Undo an auto-connect batch",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
     "/api/versions/{versionId}/boards": {
       "post": {
         "description": "A plan of kind board after the version's last plan: with an enclosure of known size its rows (enclosureRows x enclosureTePerRow), else the rows given.",
@@ -16118,6 +17738,351 @@
         "summary": "Update snapshots from the catalog",
         "tags": [
           "bom"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/checks": {
+      "get": {
+        "description": "Zone coverage, board channels and TE, bus lines, gateways and the findings; computed on demand.",
+        "operationId": "getChecks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checks"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Evaluate a version",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/connections": {
+      "get": {
+        "operationId": "listConnections",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Connections"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the connections of a version",
+        "tags": [
+          "wiring"
+        ]
+      },
+      "post": {
+        "description": "Pinned. A broken rule is a 422 field error connection.\u003ccode\u003e; warnings (limit_unknown, min_load) come with the result.",
+        "operationId": "createConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionResult"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Connect units of a need to a channel",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/connections/candidates": {
+      "post": {
+        "description": "Give a need (needPlanId, needId) or a channel (targetPlanId, targetItemId, outputKindId, channelNo). Each candidate has the units it takes or the first rule it breaks. Read-only: allowed on completed projects.",
+        "operationId": "connectionCandidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidatesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidates"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Channels a need can be connected to, or needs a channel can take",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/connections/disconnect": {
+      "post": {
+        "operationId": "disconnect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisconnectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Removed"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove every connection of a need or of a channel",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/connections/{id}": {
+      "delete": {
+        "operationId": "deleteConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a connection",
+        "tags": [
+          "wiring"
+        ]
+      },
+      "put": {
+        "description": "The connection becomes pinned and leaves its auto-connect batch.",
+        "operationId": "updateConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change the units of a connection or move it to another channel",
+        "tags": [
+          "wiring"
         ]
       }
     },
@@ -16987,6 +18952,49 @@
         "summary": "Preview the totals of the documents a generation would write",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/wiring": {
+      "get": {
+        "description": "The data the editors and the Checks tab show connections with (labels, channel numbering D387).",
+        "operationId": "getWiring",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wiring"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Channels of every item and needs with their connections",
+        "tags": [
+          "wiring"
         ]
       }
     }

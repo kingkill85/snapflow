@@ -96,6 +96,7 @@ export const loadType = (n: number, over: Partial<LoadType> = {}): LoadType => (
   key: `load_${n}`,
   name: { en: n === 1 ? 'LED' : `Load ${n}` },
   isActive: true,
+  powerFactor: 1,
   sortOrder: n,
   can: { update: true, delete: true },
   createdAt: at,

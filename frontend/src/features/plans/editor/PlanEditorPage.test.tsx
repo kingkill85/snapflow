@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { PlanContent, Project } from '@/api/generated/model'
+import type { Checks, OutputKind, PlanContent, Project, Wiring } from '@/api/generated/model'
 import { problem, villa } from '@/features/projects/test-fixtures'
 import { renderRoutes } from '@/test/render'
 import { chooseOption } from '@/test/select'
@@ -48,11 +48,23 @@ vi.mock('./PlanCanvas', () => ({
 const project: Project = { ...villa, id: projectId, productTypeIds: [zigbeeId] }
 const lock = { userId: 'me', name: 'Admin', expiresAt: '2026-10-18T10:02:00Z', mine: true }
 
-type Serve = { project?: Project; content?: PlanContent; lockHeld?: boolean }
+type Serve = { project?: Project; content?: PlanContent; lockHeld?: boolean; wiring?: Wiring; checks?: Checks }
+
+const emptyWiring: Wiring = { items: [], needs: [], connections: [], can: { update: true } }
+const emptyChecks: Checks = {
+  versionId,
+  counts: { errors: 0, warnings: 0, infos: 0, units: 0, connectedUnits: 0, zonesWithNeeds: 0, zonesCovered: 0 },
+  zones: [],
+  boards: [],
+  busLines: [],
+  gateways: [],
+  findings: [],
+}
 
 /** The editor's endpoints; returns what was saved and how the lock was taken. */
-function serve({ project: p = project, content: c = content(), lockHeld = false }: Serve = {}) {
+function serve({ project: p = project, content: c = content(), lockHeld = false, wiring = emptyWiring, checks = emptyChecks }: Serve = {}) {
   const saved: unknown[] = []
+  const deleted: string[] = []
   const locks: string[] = []
   let held = lockHeld
   server.use(
@@ -63,6 +75,13 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
     http.get('/api/function-types', () => HttpResponse.json({ items: functionTypes })),
     http.get('/api/load-types', () => HttpResponse.json({ items: loadTypes })),
     http.get('/api/room-templates', () => HttpResponse.json({ items: [roomTemplate(1)] })),
+    http.get('/api/versions/:v/wiring', () => HttpResponse.json(wiring)),
+    http.get('/api/versions/:v/checks', () => HttpResponse.json(checks)),
+    http.get('/api/output-kinds', () => HttpResponse.json({ items: [outputKind] })),
+    http.delete('/api/versions/:v/connections/:id', ({ params }) => {
+      deleted.push(String(params.id))
+      return new HttpResponse(null, { status: 204 })
+    }),
     http.post('/api/plans/:id/lock', ({ request }) => {
       const force = new URL(request.url).searchParams.get('force') === 'true'
       locks.push(force ? 'force' : 'take')
@@ -77,16 +96,16 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
       return HttpResponse.json({ ...c, contentUpdatedAt: '2026-10-18T10:01:00Z', placements: body.placements, needs: body.needs })
     }),
   )
-  return { saved, locks }
+  return { saved, locks, deleted }
 }
 
-const open = (prepare?: (client: QueryClient) => void) =>
+const open = (prepare?: (client: QueryClient) => void, query = '') =>
   renderRoutes(
     [
       { path: `/${editorRoute}`, element: <PlanEditorPage /> },
       { path: '/projects/:id/versions/:versionId', element: <h1>Project page</h1> },
     ],
-    { route: editorPath(projectId, versionId, plan(1).id), prepare },
+    { route: editorPath(projectId, versionId, plan(1).id) + query, prepare },
   )
 
 describe('PlanEditorPage', () => {
@@ -385,7 +404,98 @@ describe('PlanEditorPage', () => {
     await user.click(within(inspector).getByRole('button', { name: 'Delete' }))
     expect(screen.getByText('2 needs were removed with their zone (Undo brings them back).')).toBeInTheDocument()
   })
+
+  describe('connections (3d)', () => {
+    const z = { id: pid(950), name: 'Living', color: '#3b82f6', opacity: 0.25, points: [[0, 0], [100, 0], [100, 100], [0, 100]] }
+    const board = pid(600)
+    const module = pid(601)
+    const wired = (connected: number): Wiring => ({
+      items: [
+        {
+          planId: board,
+          planName: 'Main board',
+          planKind: 'board',
+          itemId: module,
+          label: 'D1',
+          productName: { en: 'Dimmer' },
+          variantName: { en: '2-fold' },
+          zoneId: null,
+          channels: [
+            { outputKindId: outputKind.id, outputKindKey: 'dimmer_output', channelNo: 1, alternative: false, baseKindKey: 'dimmer_output', baseFrom: 1, baseTo: 1, blocked: false, connectionIds: connected ? [pid(700)] : [] },
+          ],
+        },
+      ],
+      needs: [
+        { planId: plan(1).id, planName: 'Ground', needId: pid(1301), zoneId: z.id, zoneName: 'Living', label: '', functionTypeId: functionTypes[0].id, functionTypeKey: 'dimmable_light', quantity: 3, connectedUnits: connected, powerW: null },
+      ],
+      connections: connected
+        ? [{ id: pid(700), versionId, needPlanId: plan(1).id, needId: pid(1301), units: connected, targetPlanId: board, targetItemId: module, outputKindId: outputKind.id, channelNo: 1, pinned: true, batchId: null, createdAt: '2026-10-18T10:00:00Z' }]
+        : [],
+      can: { update: true },
+    })
+    const checked = (connected: number): Checks => ({
+      ...emptyChecks,
+      zones: [{ planId: plan(1).id, zoneId: z.id, name: 'Living', units: 3, connectedUnits: connected, status: connected === 0 ? 'missing' : connected < 3 ? 'partial' : 'covered' }],
+    })
+
+    it('shows the zone status in the Zones tab and the need connections with Disconnect', async () => {
+      const { deleted } = serve({ content: content({ zones: [z], needs: [{ ...need(1), zoneId: z.id, quantity: 3 }] }), wiring: wired(2), checks: checked(2) })
+      const user = userEvent.setup()
+      open()
+      await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+      await user.click(screen.getByRole('tab', { name: 'Zones' }))
+      expect(await within(screen.getByTestId(`zone-status-${z.id}`)).findByText('2/3')).toBeInTheDocument()
+
+      await user.click(within(screen.getByRole('tabpanel', { name: 'Zones' })).getByRole('button', { name: 'Living' }))
+      const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })
+      expect(within(inspector).getByText('2 × → D1 · Dimmer output 1 (Main board)')).toBeInTheDocument()
+      await user.click(within(inspector).getByRole('button', { name: 'Disconnect 2 × → D1 · Dimmer output 1 (Main board)' }))
+      await waitFor(() => expect(deleted).toEqual([pid(700)]))
+    })
+
+    it('opens the connect picker for a need with unconnected units', async () => {
+      serve({ content: content({ zones: [z], needs: [{ ...need(1), zoneId: z.id, quantity: 3 }] }), wiring: wired(0), checks: checked(0) })
+      server.use(
+        http.post('/api/versions/:v/connections/candidates', () =>
+          HttpResponse.json({
+            items: [{ needPlanId: plan(1).id, needId: pid(1301), targetPlanId: board, targetItemId: module, outputKindId: outputKind.id, channelNo: 1, units: 3, free: true, inZone: false }],
+          }),
+        ),
+      )
+      const user = userEvent.setup()
+      const { router } = open(undefined, `?select=${pid(1301)}`)
+      // ?select= of a need without position selects its zone and opens the inspector.
+      const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
+      expect(await within(inspector).findByText('Not connected')).toBeInTheDocument()
+      // The deep link is removed from the URL once applied (replace, D404).
+      await waitFor(() => expect(router.state.location.search).toBe(''))
+      expect(router.state.historyAction).toBe('REPLACE')
+      await user.click(within(inspector).getByRole('button', { name: /^Connect 3 × Dimmable light/ }))
+      const dialog = await screen.findByRole('dialog')
+      expect(await within(dialog).findByText('D1 · Dimmer output 1 (Main board)')).toBeInTheDocument()
+      expect(within(dialog).getByText('3 units')).toBeInTheDocument()
+    })
+
+    it('says a need not saved yet gets its connections after the save', async () => {
+      serve({ content: content({ zones: [z], needs: [{ ...need(1), zoneId: z.id }] }), wiring: emptyWiring })
+      open(undefined, `?select=${z.id}`)
+      const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
+      expect(await within(inspector).findByText('Connections after the next save')).toBeInTheDocument()
+    })
+  })
 })
+
+const outputKind: OutputKind = {
+  id: pid(1500),
+  key: 'dimmer_output',
+  name: { en: 'Dimmer output' },
+  isActive: true,
+  functionTypeIds: [pid(1001)],
+  alternatives: [],
+  createdAt: '2026-10-18T10:00:00Z',
+  updatedAt: '2026-10-18T10:00:00Z',
+  can: { update: true, delete: true },
+} as unknown as OutputKind
 
 /** A need of the fixtures' first function type. */
 const need = (n: number) => ({ ...newNeed(functionTypes[0].id, null), id: pid(1300 + n) })

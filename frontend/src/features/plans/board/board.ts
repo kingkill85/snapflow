@@ -1,4 +1,4 @@
-import type { BoardContent, BoardContentInput, BoardModule, Capabilities, VariantSearchItem } from '@/api/generated/model'
+import type { BoardContent, BoardContentInput, BoardModule, Capabilities, ChannelInfo, VariantSearchItem } from '@/api/generated/model'
 
 import { type PaletteProduct, paletteProducts } from '../editor/catalog'
 
@@ -332,4 +332,9 @@ export function newModule(variantId: string, rowId: string, offsetTe: number): B
 /** The board palette: available products of the project's types whose effective mounting is board or both; enclosures are chosen on the Board tab instead. */
 export function boardPaletteProducts(variants: VariantSearchItem[], productTypeIds: string[]): PaletteProduct[] {
   return paletteProducts(variants.filter((v) => onBoard(v.capabilities) && enclosureSize(v.capabilities) === null), productTypeIds)
+}
+
+/** Used (holds a connection or a base channel taken by another channel) and total channels of an item. */
+export function channelUse(channels: Pick<ChannelInfo, 'connectionIds' | 'blocked'>[]) {
+  return { used: channels.filter((c) => c.connectionIds.length > 0 || c.blocked).length, total: channels.length }
 }

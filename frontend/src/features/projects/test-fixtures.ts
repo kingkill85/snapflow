@@ -19,6 +19,7 @@ export const zigbee: ProductType = {
   name: { en: 'Zigbee' },
   abbreviation: 'ZB',
   reservePercent: 20,
+  nominalVoltage: 230,
   topology: 'wireless',
   color: '#1f6feb',
   sortOrder: 1,

@@ -141,6 +141,20 @@ selected symbol gets `NeedInspector`. Warnings come from `server.needWarnings`. 
 (`needCounts`, live, D334). The version's needs overview is `features/needs` (D335), room templates
 `features/room-templates` (D336).
 
+## Connections (3d)
+
+Connections are version data (no plan lock, D388). `PlanEditorPage` wraps the editor in `PlanWiringProvider`
+(`editor/connections.tsx`, context in `editor/plan-wiring.ts`): the wiring model and connect picker of
+`features/checks`, the zone statuses of `GET /checks` for this plan, one `ConnectDialog`. The Zones tab shows each
+zone's status (`ZoneStatusBadge`), the canvas a badge under the zone name ("✓", "2/5", "!", `zoneBadge`; light
+colours per D221, `chrome`, so not in the PNG export). Need rows in the zone inspector and the symbol inspector show
+`NeedConnections`: "2 × → D1 · Dimmer output 1 (Main board)" with Disconnect, and "Connect…" while units are missing
+(hidden without `can.update`); a need not saved yet says its connections come after the save. Each successful
+autosave refreshes the wiring view and checks. `?select=<zone, placement or need id>` (links from the Checks tab)
+selects the item once (a need without position selects its zone), opens the inspector and drops the param.
+Findings name items from the wiring view, else from the finding's `label` / `productName` params (items without
+channels, D412).
+
 ## Tests
 
 Vitest: `PlansSection.test.tsx` (list, dialogs), `editor/PlanEditorPage.test.tsx` (MSW; the Konva canvas
@@ -187,3 +201,7 @@ by mounting, keyboard placement and move, undo, autosave, read-only, wrong kind,
 board card in `PlansSection.test.tsx`. E2E: `e2e/specs/boards.spec.ts` (enclosure, drag from the palette, totals, keyboard
 move, undo/redo, reload, BOM lines, Networks: second bus line, gateway reassignment, reload), `boards-visual.spec.ts`
 (`make e2e-visual`). The Networks tab lives in `features/networks` (tests in `NetworksTab.test.tsx`).
+
+### Board connections (3d)
+
+The board inspector's Channels section (`board/ModuleChannels.tsx`) lists a module's logical channels from the version's wiring view (`useWiringModel` in `features/checks`, numbering D387: native first, then alternatives with their base channels; blocked = a base channel used by another channel), each with its connected needs (need, plan · zone, units, power), Disconnect and "Connect a need" (`ConnectDialog`, channel mode). Connections are version data (no lock; `can.update`). Modules show "used/total ch" (`channelUse` in `board.ts`); the header shows the board's TE reserve status and free channels per kind from the checks. Wiring and checks are refetched after each board save. `?select=<moduleId>` opens the editor with that module in the inspector (links from the Checks tab, D404).

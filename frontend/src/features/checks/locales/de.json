@@ -1,0 +1,199 @@
+{
+  "finding": {
+    "need_unconnected": "{{need}}: {{missing}} von {{quantity}} nicht angeschlossen",
+    "need_not_found": "Eine Verbindung an {{channel}} gehört zu einem Bedarf, den es nicht mehr gibt",
+    "target_not_found": "{{need}} ist an ein Gerät angeschlossen, das es nicht mehr gibt",
+    "channel_not_found": "{{need}} ist an {{channel}} angeschlossen, den das Gerät nicht mehr hat",
+    "function_not_served": "{{channel}} kann {{need}} nicht bedienen",
+    "motor_mismatch": "{{need}}: {{needMotor}}-Motor an {{channel}}, der {{motor}}-Motoren ansteuert",
+    "units_exceeded": "{{need}}: {{units}} Einheiten angeschlossen, nur {{quantity}} benötigt",
+    "channel_conflict": "{{channel}} nutzt Ausgang {{baseChannel}}, den auch ein anderer Kanal nutzt",
+    "circuit_not_allowed": "{{channel}}: {{units}} Einheiten an einem Kanal, die keinen gemeinsamen Stromkreis haben dürfen",
+    "channel_overload_w": "{{channel}}: {{loadW}} W angeschlossen, höchstens {{limitW}} W ({{utilisationPercent}} % der Grenze)",
+    "channel_overload_w_mixed": "{{channel}}: {{loadW}} W gemischter Lasten, {{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt",
+    "channel_overload_a": "{{channel}}: {{currentA}} A bei {{voltage}} V angeschlossen, höchstens {{limitA}} A ({{utilisationPercent}} % der Grenze)",
+    "channel_overload_a_mixed": "{{channel}}: {{currentA}} A gemischter Lasten bei {{voltage}} V, {{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt",
+    "module_overload_w": "{{item}}: {{loadW}} W gesamt ({{loadType}}), höchstens {{limitW}} W",
+    "module_overload_a": "{{item}}: {{currentA}} A gesamt bei {{voltage}} V, höchstens {{limitA}} A",
+    "limit_unknown": "{{channel}}: kein Grenzwert für {{loadType}} bekannt",
+    "min_load": "{{channel}}: {{loadW}} W liegen unter der Mindestlast von {{minW}} W",
+    "power_unknown": "{{channel}}: Für {{need}} ist keine Leistung eingetragen, die Grenzwerte des Kanals können nicht geprüft werden",
+    "board_over_capacity": "{{board}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
+    "board_row_over_capacity": "{{board}}, Reihe {{row}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
+    "bus_line_no_power_supply": "{{name}}: keine Spannungsversorgung",
+    "bus_line_current_exceeded": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt, mehr als versorgt",
+    "bus_line_current_reserve": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt (Reserve {{reservePercent}} %)",
+    "bus_line_devices_exceeded": "{{name}}: {{devices}} Geräte, höchstens {{max}}",
+    "bus_line_devices_reserve": "{{name}}: {{devices}} von {{max}} Geräten (Reserve {{reservePercent}} %)",
+    "bus_current_unknown": "{{item}}: Busstrom unbekannt",
+    "bus_device_unassigned": "{{item}} ist keiner Buslinie zugeordnet",
+    "wireless_no_gateway": "{{item}} hat kein Gateway",
+    "gateway_places_reserve": "{{label}}: {{used}} von {{supplied}} Plätzen belegt (Reserve {{reservePercent}} %)",
+    "gateway_places_exceeded": "{{label}}: {{used}} von {{supplied}} Plätzen belegt, mehr als vorhanden",
+    "gateway_no_router": "{{label}}: {{devices}} Geräte und kein Router (empfohlen ab {{threshold}} Endgeräten)",
+    "network_assignment_dangling": "{{item}} ist {{target}} zugeordnet",
+    "unknown": "Prüfung {{code}}"
+  },
+  "reason": {
+    "no_channel_serves": "Kein Kanal bedient „{{functionType}}“",
+    "no_free_channel": "Kein freier Kanal für „{{functionType}}“",
+    "limits_exceeded": "Kein freier Kanal passt (Leistung, Strom oder Motortyp)"
+  },
+  "fallback": {
+    "need": "Ein Bedarf",
+    "item": "Ein Gerät",
+    "channel": "ein Kanal",
+    "board": "Ein Verteiler",
+    "loadType": "diese Lastart",
+    "allLoads": "alle Lasten",
+    "functionType": "diese Funktion"
+  },
+  "motor": {
+    "ac": "AC",
+    "dc": "DC"
+  },
+  "status": {
+    "ok": "OK",
+    "amber": "Nahe am Limit",
+    "red": "Überschritten",
+    "unknown": "Unbekannt"
+  },
+  "zoneStatus": {
+    "covered": "Versorgt",
+    "partial": "{{connected}}/{{units}}",
+    "missing": "Nicht angeschlossen",
+    "none": "Kein Bedarf"
+  },
+  "severity": {
+    "error": "Fehler",
+    "warning": "Warnungen",
+    "info": "Hinweise"
+  },
+  "channel": {
+    "text": "{{item}} · {{kind}} {{no}} ({{plan}})",
+    "short": "{{kind}} {{no}}",
+    "alternative": "aus {{baseKind}} {{from}}–{{to}}",
+    "blocked": "Von einem anderen Kanal belegt"
+  },
+  "need": {
+    "text_one": "{{count}} × {{name}}",
+    "text_other": "{{count}} × {{name}}",
+    "noZone": "Außerhalb aller Zonen"
+  },
+  "connection": {
+    "line": "{{units}} × → {{channel}}",
+    "disconnect": "Trennen",
+    "disconnectFrom": "{{name}} trennen",
+    "connect": "Verbinden…",
+    "connectNeed": "{{name}} verbinden…",
+    "none": "Nicht verbunden",
+    "warnings": "Mit Warnung verbunden: {{text}}"
+  },
+  "connect": {
+    "titleNeed": "{{need}} verbinden",
+    "titleChannel": "Bedarf mit {{channel}} verbinden",
+    "descriptionNeed": "Kanäle, die diesen Bedarf aufnehmen können, Geräte in seiner Zone zuerst.",
+    "descriptionChannel": "Bedarfe mit offenen Einheiten, die dieser Kanal aufnehmen kann.",
+    "fitting": "Mögliche Verbindungen",
+    "units_one": "{{count}} Einheit",
+    "units_other": "{{count}} Einheiten",
+    "inZone": "In dieser Zone",
+    "circuit": "Teil eines Stromkreises",
+    "connect": "Verbinden",
+    "connectTo": "Mit {{name}} verbinden",
+    "notPossible_one": "{{count}} nicht möglich:",
+    "notPossible_other": "{{count}} nicht möglich:",
+    "more_one": "und {{count}} weitere",
+    "more_other": "und {{count}} weitere",
+    "complete": "Alle Einheiten dieses Bedarfs sind verbunden.",
+    "noNeeds": "Kein offener Bedarf kann diesen Kanal nutzen."
+  },
+  "tab": {
+    "title": "Prüfungen",
+    "description": "Ob jeder Bedarf verbunden ist und jeder Verteiler, jede Buslinie und jedes Gateway innerhalb der Grenzen bleibt."
+  },
+  "overview": {
+    "zones": "Abgedeckte Zonen",
+    "zonesValue": "{{covered}} / {{total}}",
+    "allCovered": "Alle abgedeckt",
+    "notAllCovered": "Nicht alle abgedeckt",
+    "noNeeds": "Keine Bedarfe",
+    "unconnected": "Nicht verbundene Einheiten",
+    "unitsOf": "{{connected}} von {{total}} verbunden",
+    "findings": "Befunde",
+    "findingsValue": "Fehler: {{errors}} · Warnungen: {{warnings}}",
+    "board": "Verteiler {{name}}",
+    "te": "{{used}} von {{capacity}} TE belegt",
+    "row": "Reihe {{row}}: {{used}} von {{capacity}} TE",
+    "channels": "{{kind}}: {{free}} von {{total}} frei",
+    "channelsAlternative": "{{kind}} (aus anderen Kanälen): {{free}} von {{total}} frei",
+    "busLine": "Buslinie {{name}}",
+    "current": "{{used}} von {{supplied}} mA (Reserve {{reserve}} %)",
+    "devicesOf": "{{devices}} von {{max}} Geräten",
+    "devices_one": "{{count}} Gerät",
+    "devices_other": "{{count}} Geräte",
+    "unknownCurrent_one": "{{count}} Gerät mit unbekanntem Busstrom",
+    "unknownCurrent_other": "{{count}} Geräte mit unbekanntem Busstrom",
+    "gateway": "Gateway {{name}}",
+    "places": "{{used}} von {{supplied}} Plätzen (Reserve {{reserve}} %)",
+    "gatewayDevices_one": "{{count}} Gerät, {{routers}} Router",
+    "gatewayDevices_other": "{{count}} Geräte, {{routers}} Router",
+    "toFix": "Zu beheben",
+    "toReview": "Zu prüfen",
+    "allClear": "Alles in Ordnung"
+  },
+  "findings": {
+    "title": "Befunde",
+    "count": "Fehler: {{errors}} · Warnungen: {{warnings}} · Hinweise: {{infos}}",
+    "none": "Nichts zu melden.",
+    "open": "Öffnen",
+    "openFor": "Öffnen: {{text}}",
+    "unconnected_one": "{{count}} Bedarf hat nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
+    "unconnected_other": "{{count}} Bedarfe haben nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)"
+  },
+  "area": {
+    "needs": "Bedarfe",
+    "connections": "Verbindungen",
+    "boards": "Verteiler",
+    "networks": "Netzwerke"
+  },
+  "unconnected": {
+    "title": "Nicht verbundene Bedarfe",
+    "description_one": "{{count}} Bedarf mit noch nicht verbundenen Einheiten.",
+    "description_other": "{{count}} Bedarfe mit noch nicht verbundenen Einheiten.",
+    "none": "Jeder Bedarf ist verbunden.",
+    "openPlan": "Grundriss öffnen",
+    "connected": "{{connected}} von {{quantity}} verbunden"
+  },
+  "auto": {
+    "open": "Automatisch verbinden…",
+    "title": "Automatisch verbinden",
+    "description": "Verbindet offene Einheiten mit freien Kanälen: zuerst Geräte im Raum, dann die Verteiler der Reihe nach. Bestehende Verbindungen bleiben unverändert.",
+    "scope": "Bedarfe",
+    "scopeAll": "Alle offenen Bedarfe",
+    "scopeZones": "Bedarfe ausgewählter Zonen",
+    "zones": "Zonen",
+    "preview": "Vorschau",
+    "apply": "Übernehmen",
+    "back": "Auswahl ändern",
+    "nothing": "Nichts zu verbinden.",
+    "failures": "Bedarfe, die nicht verbunden werden können",
+    "unitsLeft_one": "{{count}} Einheit",
+    "unitsLeft_other": "{{count}} Einheiten",
+    "changed": "Die Version wurde seit der Vorschau geändert. Dies ist die neue Vorschau.",
+    "applied_one": "Automatisch {{count}} Verbindung angelegt.",
+    "applied_other": "Automatisch {{count}} Verbindungen angelegt.",
+    "undo": "Automatisches Verbinden rückgängig",
+    "undone_one": "Rückgängig gemacht: {{count}} Verbindung entfernt.",
+    "undone_other": "Rückgängig gemacht: {{count}} Verbindungen entfernt.",
+    "summary_one": "{{count}} Einheit wird verbunden.",
+    "summary_other": "{{count}} Einheiten werden verbunden.",
+    "summaryWithFailures_one": "{{count}} Einheit wird verbunden, {{failed}} nicht:",
+    "summaryWithFailures_other": "{{count}} Einheiten werden verbunden, {{failed}} nicht:"
+  },
+  "dangling": {
+    "bus_line": "einer Buslinie, die es nicht mehr gibt",
+    "gateway": "einem Gateway, das es nicht mehr gibt",
+    "other": "einem Netzwerk, das es nicht mehr gibt"
+  }
+}
