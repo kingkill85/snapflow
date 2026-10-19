@@ -224,7 +224,7 @@ describe('BoardEditorPage', () => {
       }),
     )
     const user = userEvent.setup()
-    open(`?select=${m}`)
+    const { router } = open(`?select=${m}`)
 
     // Module badge (used = connected or taken by an alternative) and the header check.
     expect(await screen.findByRole('button', { name: /D1, 2 TE, 3 of 4 channels used/ })).toBeInTheDocument()
@@ -234,6 +234,9 @@ describe('BoardEditorPage', () => {
     const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
     const channels = await within(inspector).findByRole('region', { name: 'Channels' })
     expect(within(channels).getByText('Relay output: 0 of 2 free')).toBeInTheDocument()
+    // The deep link selected the module once and is removed from the URL (replace, D404).
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+    expect(router.state.historyAction).toBe('REPLACE')
     expect(within(channels).getByText('from Relay output 1–2')).toBeInTheDocument()
     expect(within(channels).getByText('Dimmer output: 1 of 1 free')).toBeInTheDocument()
     expect(within(channels).getByText('3 × Switched light · Spots')).toBeInTheDocument()

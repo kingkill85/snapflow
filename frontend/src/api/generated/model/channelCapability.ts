@@ -19,4 +19,6 @@ export interface ChannelCapability {
   minLoadsW: Limit[];
   outputKindId: string;
   outputKindKey: string;
+  /** Voltage the channels switch (channel_voltage); absent = the product type's nominal voltage */
+  voltageV?: number;
 }

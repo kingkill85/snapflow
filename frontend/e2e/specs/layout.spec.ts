@@ -362,6 +362,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
         }
       })
 
+      test('every version tab fits the screen', async ({ page, api }, testInfo) => {
+        await api.createProductType()
+        const project = await api.createProject({ name: unique('Villa Mustermann-Schmidt') })
+        for (const lang of ['en', 'de'] as const) {
+          await page.goto('/profile')
+          await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
+          for (const tab of ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'proposals']) {
+            await page.goto(`/projects/${project.id}?tab=${tab}`)
+            const tabs = page.getByRole('tablist').first()
+            const selected = tabs.getByRole('tab', { selected: true })
+            await expect(selected).toBeVisible()
+            await expect(page.getByText(lang === 'en' ? 'Loading…' : 'Wird geladen…')).toHaveCount(0)
+            await expectNoHorizontalOverflow(page)
+            // The tab list scrolls inside its own box; the selected tab is scrolled into view.
+            const [box, list] = [(await selected.boundingBox())!, (await tabs.boundingBox())!]
+            expect(box.x, `${tab}: selected tab left of the list`).toBeGreaterThanOrEqual(list.x - 1)
+            expect(box.x + box.width, `${tab}: selected tab right of the list`).toBeLessThanOrEqual(list.x + list.width + 1)
+            await screenshot(page, testInfo, `version-tab-${tab}-${viewport.name}-${colorScheme}-${lang}`)
+          }
+        }
+        await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
+      })
+
       test('the bill of materials and pricing fit the screen', async ({ page, api }, testInfo) => {
         const kind = await api.createKind({ name: { en: 'Switches with a rather long category name' } }, { abbreviation: 'ZB', color: '#1f6feb' })
         const product = await api.createProduct({ ...kind.ids, name: { en: 'Wall switch with a long product name' } })

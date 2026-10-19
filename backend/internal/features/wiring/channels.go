@@ -104,9 +104,7 @@ type Candidates struct {
 func itemChannels(sn *snapshot, it *Item) []ChannelKey {
 	var out []ChannelKey
 	for _, k := range sn.facts.kinds {
-		for no := 1; no <= slotCount(it, k.ID); no++ {
-			out = append(out, ChannelKey{Item: it.Key, Kind: k.ID, No: no})
-		}
+		out = append(out, kindChannels(it, k.ID)...)
 	}
 	return out
 }
@@ -125,7 +123,7 @@ func (s *Service) Wiring(ctx context.Context, versionID uuid.UUID) (Wiring, erro
 	out := Wiring{Items: []ItemInfo{}, Needs: []NeedInfo{}, Connections: make([]Connection, len(sn.conns)),
 		Can: ConnectionActions{Update: actor.Can(auth.PermProjectsWrite) && sn.ref.Writable()}}
 	for i, c := range sn.conns {
-		out.Connections[i] = connectionOut(c)
+		out.Connections[i] = connectionOut(c, st)
 	}
 	for _, p := range sn.data.Plans {
 		zoneName := map[uuid.UUID]string{}
@@ -151,8 +149,8 @@ func (s *Service) Wiring(ctx context.Context, versionID uuid.UUID) (Wiring, erro
 				for _, ch := range chs {
 					sl, _ := st.slot(ch)
 					conns := st.byChannel[ch]
-					ci := ChannelInfo{OutputKindID: ch.Kind, OutputKindKey: st.cat.KindKey[ch.Kind], ChannelNo: ch.No,
-						Alternative: sl.cap.OutputKindID != ch.Kind, BaseKindKey: st.cat.KindKey[sl.cap.OutputKindID],
+					ci := ChannelInfo{OutputKindID: ch.Kind, OutputKindKey: st.cat.KindKey[ch.Kind], ChannelNo: st.noOf(ch, 0),
+						Alternative: ch.Alternative(), BaseKindKey: st.cat.KindKey[sl.cap.OutputKindID],
 						BaseFrom: sl.first, BaseTo: sl.last, ConnectionIDs: ids(conns)}
 					ci.Blocked = len(conns) == 0 && st.busy(ch)
 					info.Channels = append(info.Channels, ci)
@@ -189,7 +187,8 @@ func (s *Service) Wiring(ctx context.Context, versionID uuid.UUID) (Wiring, erro
 }
 
 // tryUnits is the most units (up to max) of need n the channel takes
-// without an error, and the first error of one unit.
+// without an error, and the first error of one unit. More units never fix
+// a broken rule, so the most is found by binary search (D415).
 func tryUnits(st *state, n *Need, ch ChannelKey, max int32) (int32, *Problem) {
 	c := &Conn{ID: uuid.New(), Need: n.Key, Units: 1, Channel: ch}
 	st.add(c)
@@ -197,14 +196,18 @@ func tryUnits(st *state, n *Need, ch ChannelKey, max int32) (int32, *Problem) {
 	if p := firstError(st.problemsFor(c), c.ID); p != nil {
 		return 0, p
 	}
-	for c.Units < max {
-		c.Units++
-		if firstError(st.problemsFor(c), c.ID) != nil {
-			c.Units--
-			break
+	lo, hi := int32(1), max // lo fits
+	for lo < hi {
+		mid := lo + (hi-lo+1)/2
+		c.Units = mid
+		if firstError(st.problemsFor(c), c.ID) == nil {
+			lo = mid
+		} else {
+			hi = mid - 1
 		}
 	}
-	return c.Units, nil
+	c.Units = lo
+	return lo, nil
 }
 
 func missingOf(st *state, n *Need) int32 {
@@ -225,7 +228,7 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 	needMode := in.NeedPlanID != nil && in.NeedID != nil
 	channelMode := in.TargetPlanID != nil && in.TargetItemID != nil && in.OutputKindID != nil && in.ChannelNo != nil
 	if needMode == channelMode {
-		return Candidates{}, apperr.Invalid("body", "connection.disconnect_target", "give a need or a channel")
+		return Candidates{}, apperr.Invalid("body", "connection.candidates_target", "give a need or a channel")
 	}
 	sn, err := s.read(ctx, actor, versionID)
 	if err != nil {
@@ -236,7 +239,7 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 	add := func(n *Need, ch ChannelKey, missing int32, inZone bool) {
 		units, p := tryUnits(st, n, ch, missing)
 		c := Candidate{NeedPlanID: n.Key.PlanID, NeedID: n.Key.ID, TargetPlanID: ch.Item.PlanID, TargetItemID: ch.Item.ID,
-			OutputKindID: ch.Kind, ChannelNo: ch.No, Units: units, Free: !st.busy(ch), InZone: inZone}
+			OutputKindID: ch.Kind, ChannelNo: st.noOf(ch, 0), Units: units, Free: !st.busy(ch), InZone: inZone}
 		if p != nil {
 			c.Problem = &CandidateWhy{Code: p.Code, Params: p.Params}
 		}
@@ -261,13 +264,16 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 			}
 			return chs
 		}
+		// Devices placed in another zone are not offered (D413): a device
+		// switches the loads of its own room.
 		var room, boards, others []*Item
 		for _, p := range sn.data.Plans {
 			for _, pl := range p.Placements {
 				it := st.items[ItemKey{p.ID, pl.ID}]
-				if p.ID == n.Key.PlanID && n.ZoneID != nil && it.ZoneID != nil && *it.ZoneID == *n.ZoneID {
+				switch {
+				case p.ID == n.Key.PlanID && n.ZoneID != nil && it.ZoneID != nil && *it.ZoneID == *n.ZoneID:
 					room = append(room, it)
-				} else {
+				case it.ZoneID == nil:
 					others = append(others, it)
 				}
 			}
@@ -283,7 +289,7 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 			}
 		}
 	} else {
-		ch := ChannelKey{Item: ItemKey{*in.TargetPlanID, *in.TargetItemID}, Kind: *in.OutputKindID, No: int(*in.ChannelNo)}
+		ch := st.keyOf(ItemKey{*in.TargetPlanID, *in.TargetItemID}, *in.OutputKindID, int(*in.ChannelNo))
 		it := st.items[ch.Item]
 		if _, ok := st.slot(ch); !ok || it == nil || !it.HasVariant {
 			return Candidates{}, apperr.Invalid("body.channelNo", "connection.channel_not_found", "the channel does not exist")
@@ -298,8 +304,11 @@ func (s *Service) Candidates(ctx context.Context, versionID uuid.UUID, in Candid
 				if !st.cat.Served[ch.Kind][n.FunctionTypeID] {
 					continue
 				}
+				inZone := !it.Board && ch.Item.PlanID == p.ID && it.ZoneID != nil && n.ZoneID != nil && *it.ZoneID == *n.ZoneID
+				if !it.Board && it.ZoneID != nil && !inZone {
+					continue // a device in a zone takes only that zone's needs (D413)
+				}
 				if missing := missingOf(st, n); missing > 0 {
-					inZone := !it.Board && ch.Item.PlanID == p.ID && it.ZoneID != nil && n.ZoneID != nil && *it.ZoneID == *n.ZoneID
 					add(n, ch, missing, inZone)
 				}
 			}

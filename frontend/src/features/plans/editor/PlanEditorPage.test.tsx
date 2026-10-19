@@ -463,10 +463,13 @@ describe('PlanEditorPage', () => {
         ),
       )
       const user = userEvent.setup()
-      open(undefined, `?select=${pid(1301)}`)
+      const { router } = open(undefined, `?select=${pid(1301)}`)
       // ?select= of a need without position selects its zone and opens the inspector.
       const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
       expect(await within(inspector).findByText('Not connected')).toBeInTheDocument()
+      // The deep link is removed from the URL once applied (replace, D404).
+      await waitFor(() => expect(router.state.location.search).toBe(''))
+      expect(router.state.historyAction).toBe('REPLACE')
       await user.click(within(inspector).getByRole('button', { name: /^Connect 3 × Dimmable light/ }))
       const dialog = await screen.findByRole('dialog')
       expect(await within(dialog).findByText('D1 · Dimmer output 1 (Main board)')).toBeInTheDocument()

@@ -125,6 +125,7 @@ type RowUse struct {
 	Position   int32     `json:"position"`
 	UsedTE     float64   `json:"usedTe" doc:"Modules' widths (unknown width = 1 TE)"`
 	CapacityTE float64   `json:"capacityTe"`
+	Status     Status    `json:"status" enum:"ok,amber,red,unknown" doc:"TE of the row: red over capacity (board_row_over_capacity), amber above 100 − 20 %"`
 }
 
 // ChannelUse is the channels of one output kind on a board or item.

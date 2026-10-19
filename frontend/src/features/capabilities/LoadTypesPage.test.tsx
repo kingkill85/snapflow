@@ -12,7 +12,7 @@ import { translation } from '@/test/translatable'
 import { LoadTypesPage } from './LoadTypesPage'
 import { loadType, problem, readOnly } from './test-fixtures'
 
-const led = loadType({})
+const led = loadType({ powerFactor: 0.9 })
 const halogen = loadType({ id: '00000000-0000-4000-8000-0000000000a2', key: 'halogen', name: { en: 'Halogen' }, sortOrder: 2, isActive: false })
 
 function listHandler(all: () => LoadType[]) {
@@ -58,9 +58,17 @@ describe('LoadTypesPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New load type' })
     await u.type(within(dialog).getByLabelText('Key'), 'motor')
     await u.type(await translation(u, dialog, 'Name', 'en'), 'Motor')
+    const pf = within(dialog).getByLabelText(/Power factor/)
+    expect(pf).toHaveValue('1.00')
+    await u.clear(pf)
+    await u.type(pf, '1.5')
+    await u.click(within(dialog).getByRole('button', { name: 'Create' }))
+    expect(await within(dialog).findByText(/between 0.1 and 1/i)).toBeInTheDocument()
+    await u.clear(pf)
+    await u.type(pf, '0,7')
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(posted).toEqual({ key: 'motor', name: { en: 'Motor' }, isActive: true })
+    expect(posted).toEqual({ key: 'motor', name: { en: 'Motor' }, powerFactor: 0.7, isActive: true })
     expect(await screen.findByText('Motor')).toBeInTheDocument()
   })
 
@@ -81,7 +89,7 @@ describe('LoadTypesPage', () => {
     await u.clear(name)
     await u.type(name, 'LED lamps')
     await u.click(within(dialog).getByRole('button', { name: 'Update' }))
-    await waitFor(() => expect(sent).toEqual({ key: 'led', name: { en: 'LED lamps' }, isActive: true, expectedUpdatedAt: led.updatedAt }))
+    await waitFor(() => expect(sent).toEqual({ key: 'led', name: { en: 'LED lamps' }, powerFactor: 0.9, isActive: true, expectedUpdatedAt: led.updatedAt }))
   })
 
   it('shows why a load type in use cannot be deleted', async () => {

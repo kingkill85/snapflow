@@ -90,19 +90,21 @@ type CategoryFieldLink struct {
 }
 
 type Connection struct {
-	ID           uuid.UUID
-	TenantID     uuid.UUID
-	VersionID    uuid.UUID
-	NeedPlanID   uuid.UUID
-	NeedID       uuid.UUID
-	Units        int32
-	TargetPlanID uuid.UUID
-	TargetItemID uuid.UUID
-	OutputKindID uuid.UUID
-	ChannelNo    int32
-	Pinned       bool
-	BatchID      *uuid.UUID
-	CreatedAt    time.Time
+	ID                  uuid.UUID
+	TenantID            uuid.UUID
+	VersionID           uuid.UUID
+	NeedPlanID          uuid.UUID
+	NeedID              uuid.UUID
+	Units               int32
+	TargetPlanID        uuid.UUID
+	TargetItemID        uuid.UUID
+	OutputKindID        uuid.UUID
+	ChannelNo           int32
+	AltBaseOutputKindID *uuid.UUID
+	AltGroup            *int32
+	Pinned              bool
+	BatchID             *uuid.UUID
+	CreatedAt           time.Time
 }
 
 type File struct {
@@ -204,13 +206,14 @@ type ImportRun struct {
 }
 
 type LoadType struct {
-	ID        uuid.UUID
-	Key       string
-	Name      i18n.Text
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          uuid.UUID
+	Key         string
+	Name        i18n.Text
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	PowerFactor string
 }
 
 type NetworkAssignment struct {

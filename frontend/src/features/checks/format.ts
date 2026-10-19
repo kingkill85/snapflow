@@ -16,7 +16,7 @@ export type FindingNames = {
   item?: string
   /** The channel in words, e.g. "Dimmer D1 · ch 3 (Main board)". */
   channel?: string
-  /** The board (refs.targetPlanId) of board_over_capacity. */
+  /** The board (refs.targetPlanId) of board_over_capacity / board_row_over_capacity; else params.name. */
   board?: string
   /** The localized function type (params.functionTypeKey). */
   functionType?: string
@@ -60,7 +60,9 @@ export const findingCodes = [
   'module_overload_a',
   'limit_unknown',
   'min_load',
+  'power_unknown',
   'board_over_capacity',
+  'board_row_over_capacity',
   'bus_line_no_power_supply',
   'bus_line_current_exceeded',
   'bus_line_devices_exceeded',
@@ -72,6 +74,7 @@ export const findingCodes = [
   'gateway_places_reserve',
   'gateway_places_exceeded',
   'gateway_no_router',
+  'network_assignment_dangling',
 ] as const
 export type FindingCode = (typeof findingCodes)[number]
 
@@ -104,7 +107,8 @@ export function useFindingText() {
       item: names.item ?? label ?? t('fallback.item'),
       label: label ?? names.item ?? t('fallback.item'),
       channel: names.channel ?? t('fallback.channel'),
-      board: names.board ?? t('fallback.board'),
+      board: names.board ?? text(finding.params?.name) ?? t('fallback.board'),
+      target: t(`dangling.${finding.params?.kind === 'bus_line' || finding.params?.kind === 'gateway' ? finding.params.kind : 'other'}`),
       functionType: names.functionType ?? text(finding.params?.functionTypeKey) ?? t('fallback.functionType'),
       loadType:
         names.loadType ??
@@ -133,8 +137,8 @@ type Area = (typeof areas)[number]
 /** The area a finding belongs to (only for grouping the list). */
 export function areaOf(code: string): Area {
   if (code === 'need_unconnected' || code === 'units_exceeded') return 'needs'
-  if (code === 'board_over_capacity') return 'boards'
-  if (code.startsWith('bus_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
+  if (code.startsWith('board_')) return 'boards'
+  if (code.startsWith('bus_') || code.startsWith('network_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
   return 'connections'
 }
 

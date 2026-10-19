@@ -13,11 +13,11 @@ import (
 
 const copyConnections = `-- name: CopyConnections :exec
 INSERT INTO connections (tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id,
-    channel_no, pinned, batch_id, created_at)
+    channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at)
 SELECT $1::uuid, $2::uuid,
     ($3::jsonb ->> c.need_plan_id::text)::uuid, c.need_id, c.units,
-    ($3::jsonb ->> c.target_plan_id::text)::uuid, c.target_item_id, c.output_kind_id, c.channel_no, c.pinned, NULL,
-    c.created_at
+    ($3::jsonb ->> c.target_plan_id::text)::uuid, c.target_item_id, c.output_kind_id, c.channel_no,
+    c.alt_base_output_kind_id, c.alt_group, c.pinned, NULL, c.created_at
 FROM connections c
 WHERE c.version_id = $4::uuid
 `
@@ -43,23 +43,25 @@ func (q *Queries) CopyConnections(ctx context.Context, arg CopyConnectionsParams
 
 const createConnection = `-- name: CreateConnection :one
 INSERT INTO connections (tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id,
-    channel_no, pinned, batch_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, pinned, batch_id, created_at
+    channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at
 `
 
 type CreateConnectionParams struct {
-	TenantID     uuid.UUID
-	VersionID    uuid.UUID
-	NeedPlanID   uuid.UUID
-	NeedID       uuid.UUID
-	Units        int32
-	TargetPlanID uuid.UUID
-	TargetItemID uuid.UUID
-	OutputKindID uuid.UUID
-	ChannelNo    int32
-	Pinned       bool
-	BatchID      *uuid.UUID
+	TenantID            uuid.UUID
+	VersionID           uuid.UUID
+	NeedPlanID          uuid.UUID
+	NeedID              uuid.UUID
+	Units               int32
+	TargetPlanID        uuid.UUID
+	TargetItemID        uuid.UUID
+	OutputKindID        uuid.UUID
+	ChannelNo           int32
+	AltBaseOutputKindID *uuid.UUID
+	AltGroup            *int32
+	Pinned              bool
+	BatchID             *uuid.UUID
 }
 
 func (q *Queries) CreateConnection(ctx context.Context, arg CreateConnectionParams) (Connection, error) {
@@ -73,6 +75,8 @@ func (q *Queries) CreateConnection(ctx context.Context, arg CreateConnectionPara
 		arg.TargetItemID,
 		arg.OutputKindID,
 		arg.ChannelNo,
+		arg.AltBaseOutputKindID,
+		arg.AltGroup,
 		arg.Pinned,
 		arg.BatchID,
 	)
@@ -88,6 +92,8 @@ func (q *Queries) CreateConnection(ctx context.Context, arg CreateConnectionPara
 		&i.TargetItemID,
 		&i.OutputKindID,
 		&i.ChannelNo,
+		&i.AltBaseOutputKindID,
+		&i.AltGroup,
 		&i.Pinned,
 		&i.BatchID,
 		&i.CreatedAt,
@@ -114,33 +120,6 @@ func (q *Queries) DeleteBatch(ctx context.Context, arg DeleteBatchParams) (int64
 	return result.RowsAffected(), nil
 }
 
-const deleteChannelConnections = `-- name: DeleteChannelConnections :execrows
-DELETE FROM connections
-WHERE version_id = $1 AND target_plan_id = $2 AND target_item_id = $3 AND output_kind_id = $4 AND channel_no = $5
-`
-
-type DeleteChannelConnectionsParams struct {
-	VersionID    uuid.UUID
-	TargetPlanID uuid.UUID
-	TargetItemID uuid.UUID
-	OutputKindID uuid.UUID
-	ChannelNo    int32
-}
-
-func (q *Queries) DeleteChannelConnections(ctx context.Context, arg DeleteChannelConnectionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteChannelConnections,
-		arg.VersionID,
-		arg.TargetPlanID,
-		arg.TargetItemID,
-		arg.OutputKindID,
-		arg.ChannelNo,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const deleteConnection = `-- name: DeleteConnection :execrows
 DELETE FROM connections WHERE version_id = $1 AND id = $2
 `
@@ -152,6 +131,25 @@ type DeleteConnectionParams struct {
 
 func (q *Queries) DeleteConnection(ctx context.Context, arg DeleteConnectionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteConnection, arg.VersionID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteConnections = `-- name: DeleteConnections :execrows
+DELETE FROM connections WHERE version_id = $1 AND id = ANY($2::uuid[])
+`
+
+type DeleteConnectionsParams struct {
+	VersionID uuid.UUID
+	Ids       []uuid.UUID
+}
+
+// DeleteConnections removes connections by id (a channel's, resolved in
+// memory: alternative channels are identified by base kind and group, D410).
+func (q *Queries) DeleteConnections(ctx context.Context, arg DeleteConnectionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteConnections, arg.VersionID, arg.Ids)
 	if err != nil {
 		return 0, err
 	}
@@ -177,7 +175,7 @@ func (q *Queries) DeleteNeedConnections(ctx context.Context, arg DeleteNeedConne
 }
 
 const getConnection = `-- name: GetConnection :one
-SELECT id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, pinned, batch_id, created_at FROM connections WHERE version_id = $1 AND id = $2
+SELECT id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at FROM connections WHERE version_id = $1 AND id = $2
 `
 
 type GetConnectionParams struct {
@@ -199,6 +197,8 @@ func (q *Queries) GetConnection(ctx context.Context, arg GetConnectionParams) (C
 		&i.TargetItemID,
 		&i.OutputKindID,
 		&i.ChannelNo,
+		&i.AltBaseOutputKindID,
+		&i.AltGroup,
 		&i.Pinned,
 		&i.BatchID,
 		&i.CreatedAt,
@@ -208,11 +208,12 @@ func (q *Queries) GetConnection(ctx context.Context, arg GetConnectionParams) (C
 
 const insertConnections = `-- name: InsertConnections :exec
 INSERT INTO connections (tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id,
-    channel_no, pinned, batch_id, created_at)
+    channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at)
 SELECT $1::uuid, $2::uuid, r.need_plan_id, r.need_id, r.units, r.target_plan_id, r.target_item_id,
-    r.output_kind_id, r.channel_no, false, $3::uuid, now() + (r.ord * interval '1 microsecond')
+    r.output_kind_id, r.channel_no, r.alt_base_output_kind_id, r.alt_group, false, $3::uuid,
+    now() + (r.ord * interval '1 microsecond')
 FROM jsonb_to_recordset($4::jsonb) AS r (need_plan_id uuid, need_id uuid, units integer, target_plan_id uuid,
-    target_item_id uuid, output_kind_id uuid, channel_no integer, ord integer)
+    target_item_id uuid, output_kind_id uuid, channel_no integer, alt_base_output_kind_id uuid, alt_group integer, ord integer)
 `
 
 type InsertConnectionsParams struct {
@@ -235,7 +236,7 @@ func (q *Queries) InsertConnections(ctx context.Context, arg InsertConnectionsPa
 }
 
 const listConnections = `-- name: ListConnections :many
-SELECT id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, pinned, batch_id, created_at FROM connections WHERE version_id = $1 ORDER BY created_at, id
+SELECT id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at FROM connections WHERE version_id = $1 ORDER BY created_at, id
 `
 
 func (q *Queries) ListConnections(ctx context.Context, versionID uuid.UUID) ([]Connection, error) {
@@ -258,6 +259,8 @@ func (q *Queries) ListConnections(ctx context.Context, versionID uuid.UUID) ([]C
 			&i.TargetItemID,
 			&i.OutputKindID,
 			&i.ChannelNo,
+			&i.AltBaseOutputKindID,
+			&i.AltGroup,
 			&i.Pinned,
 			&i.BatchID,
 			&i.CreatedAt,
@@ -274,19 +277,22 @@ func (q *Queries) ListConnections(ctx context.Context, versionID uuid.UUID) ([]C
 
 const updateConnection = `-- name: UpdateConnection :one
 UPDATE connections
-SET units = $3, target_plan_id = $4, target_item_id = $5, output_kind_id = $6, channel_no = $7, pinned = true, batch_id = NULL
+SET units = $3, target_plan_id = $4, target_item_id = $5, output_kind_id = $6, channel_no = $7, alt_base_output_kind_id = $8,
+    alt_group = $9, pinned = true, batch_id = NULL
 WHERE version_id = $1 AND id = $2
-RETURNING id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, pinned, batch_id, created_at
+RETURNING id, tenant_id, version_id, need_plan_id, need_id, units, target_plan_id, target_item_id, output_kind_id, channel_no, alt_base_output_kind_id, alt_group, pinned, batch_id, created_at
 `
 
 type UpdateConnectionParams struct {
-	VersionID    uuid.UUID
-	ID           uuid.UUID
-	Units        int32
-	TargetPlanID uuid.UUID
-	TargetItemID uuid.UUID
-	OutputKindID uuid.UUID
-	ChannelNo    int32
+	VersionID           uuid.UUID
+	ID                  uuid.UUID
+	Units               int32
+	TargetPlanID        uuid.UUID
+	TargetItemID        uuid.UUID
+	OutputKindID        uuid.UUID
+	ChannelNo           int32
+	AltBaseOutputKindID *uuid.UUID
+	AltGroup            *int32
 }
 
 // UpdateConnection moves a connection or changes its units; a change by hand
@@ -300,6 +306,8 @@ func (q *Queries) UpdateConnection(ctx context.Context, arg UpdateConnectionPara
 		arg.TargetItemID,
 		arg.OutputKindID,
 		arg.ChannelNo,
+		arg.AltBaseOutputKindID,
+		arg.AltGroup,
 	)
 	var i Connection
 	err := row.Scan(
@@ -313,6 +321,8 @@ func (q *Queries) UpdateConnection(ctx context.Context, arg UpdateConnectionPara
 		&i.TargetItemID,
 		&i.OutputKindID,
 		&i.ChannelNo,
+		&i.AltBaseOutputKindID,
+		&i.AltGroup,
 		&i.Pinned,
 		&i.BatchID,
 		&i.CreatedAt,

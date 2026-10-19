@@ -96,7 +96,7 @@ func variantIDs(data plans.WiringData) []uuid.UUID {
 
 func (s *Service) facts(ctx context.Context, ids []uuid.UUID) (facts, error) {
 	f := facts{cat: Catalog{Served: map[uuid.UUID]map[uuid.UUID]bool{}, KindOrder: map[uuid.UUID]int{}, KindKey: map[uuid.UUID]string{},
-		Circuit: map[uuid.UUID]bool{}, FunctionKey: map[uuid.UUID]string{}, LoadTypeKey: map[uuid.UUID]string{}},
+		Circuit: map[uuid.UUID]bool{}, FunctionKey: map[uuid.UUID]string{}, LoadTypeKey: map[uuid.UUID]string{}, PowerFactor: map[uuid.UUID]float64{}},
 		caps: map[uuid.UUID]capabilities.Capabilities{}, types: map[uuid.UUID]producttypes.ProductType{}}
 	var err error
 	if f.variants, err = s.products.BOMVariants(ctx, ids); err != nil {
@@ -129,7 +129,7 @@ func (s *Service) facts(ctx context.Context, ids []uuid.UUID) (facts, error) {
 		return f, err
 	}
 	for _, l := range lts {
-		f.cat.LoadTypeKey[l.ID] = l.Key
+		f.cat.LoadTypeKey[l.ID], f.cat.PowerFactor[l.ID] = l.Key, l.PowerFactor
 	}
 	types, err := s.types.List(ctx, true)
 	if err != nil {
@@ -184,8 +184,12 @@ func build(f *facts, data plans.WiringData, conns []store.Connection) *state {
 				if c, ok := f.caps[*it.VariantID]; ok {
 					item.HasVariant, item.Caps = true, c
 				}
-				if v, ok := f.variants[*it.VariantID]; ok && v.ProductType.NominalVoltage > 0 {
-					item.Voltage = float64(v.ProductType.NominalVoltage)
+				if v, ok := f.variants[*it.VariantID]; ok {
+					pn := v.ProductName
+					item.ProductName = &pn
+					if v.ProductType.NominalVoltage > 0 {
+						item.Voltage = float64(v.ProductType.NominalVoltage)
+					}
 				}
 			}
 			items[k] = item
@@ -204,15 +208,52 @@ func build(f *facts, data plans.WiringData, conns []store.Connection) *state {
 	return st
 }
 
+// connOf is a stored connection: an alternative channel by its base kind
+// and group, a native one by its number (D410).
 func connOf(c store.Connection) *Conn {
-	return &Conn{ID: c.ID, Need: NeedKey{c.NeedPlanID, c.NeedID}, Units: c.Units,
-		Channel: ChannelKey{Item: ItemKey{c.TargetPlanID, c.TargetItemID}, Kind: c.OutputKindID, No: int(c.ChannelNo)},
-		Pinned:  c.Pinned, BatchID: c.BatchID}
+	ch := ChannelKey{Item: ItemKey{c.TargetPlanID, c.TargetItemID}, Kind: c.OutputKindID, No: int(c.ChannelNo)}
+	if c.AltBaseOutputKindID != nil && c.AltGroup != nil {
+		ch.Base, ch.No = *c.AltBaseOutputKindID, int(*c.AltGroup)
+	}
+	return &Conn{ID: c.ID, Need: NeedKey{c.NeedPlanID, c.NeedID}, Units: c.Units, Channel: ch, Pinned: c.Pinned, BatchID: c.BatchID,
+		StoredNo: int(c.ChannelNo)}
 }
 
-func connectionOut(c store.Connection) Connection {
+// altOf are the stored identity fields of a channel.
+func altOf(ch ChannelKey) (*uuid.UUID, *int32) {
+	if !ch.Alternative() {
+		return nil, nil
+	}
+	b, g := ch.Base, int32(ch.No)
+	return &b, &g
+}
+
+// noOf is the display number of a channel on the item's current
+// capabilities; stored is shown when it no longer resolves.
+func (s *state) noOf(ch ChannelKey, stored int) int {
+	if no, ok := channelNoOf(s.items[ch.Item], ch); ok {
+		return no
+	}
+	if stored > 0 {
+		return stored
+	}
+	return ch.No
+}
+
+// keyOf resolves a channel given by display number.
+func (s *state) keyOf(item ItemKey, kind uuid.UUID, no int) ChannelKey {
+	return channelKeyOf(s.items[item], item, kind, no)
+}
+
+// connectionOut is a stored connection; with a state its channel number
+// is the current display number (D410).
+func connectionOut(c store.Connection, st *state) Connection {
+	no := c.ChannelNo
+	if st != nil {
+		no = int32(st.noOf(connOf(c).Channel, int(c.ChannelNo)))
+	}
 	return Connection{ID: c.ID, VersionID: c.VersionID, NeedPlanID: c.NeedPlanID, NeedID: c.NeedID, Units: c.Units,
-		TargetPlanID: c.TargetPlanID, TargetItemID: c.TargetItemID, OutputKindID: c.OutputKindID, ChannelNo: c.ChannelNo,
+		TargetPlanID: c.TargetPlanID, TargetItemID: c.TargetItemID, OutputKindID: c.OutputKindID, ChannelNo: no,
 		Pinned: c.Pinned, BatchID: c.BatchID, CreatedAt: c.CreatedAt}
 }
 
@@ -289,27 +330,20 @@ func errNotFound() *apperr.Error { return apperr.NotFound("connection.not_found"
 
 // ---------------------------------------------------------------- connections
 
-// List returns the connections of a version.
+// List returns the connections of a version (channel numbers on the
+// current catalog, D410).
 func (s *Service) List(ctx context.Context, versionID uuid.UUID) (Connections, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
 		return Connections{}, err
 	}
-	var rows []store.Connection
-	var ref projects.VersionRef
-	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
-		if ref, err = s.projects.ReadVersion(ctx, tx, versionID); err != nil {
-			return err
-		}
-		rows, err = q.ListConnections(ctx, versionID)
-		return err
-	})
+	sn, err := s.read(ctx, actor, versionID)
 	if err != nil {
 		return Connections{}, err
 	}
-	out := Connections{Items: make([]Connection, len(rows)), Can: ConnectionActions{Update: actor.Can(auth.PermProjectsWrite) && ref.Writable()}}
-	for i, r := range rows {
-		out.Items[i] = connectionOut(r)
+	out := Connections{Items: make([]Connection, len(sn.conns)), Can: ConnectionActions{Update: actor.Can(auth.PermProjectsWrite) && sn.ref.Writable()}}
+	for i, r := range sn.conns {
+		out.Items[i] = connectionOut(r, sn.st)
 	}
 	return out, nil
 }
@@ -343,7 +377,7 @@ func refuse(st *state, c *Conn) ([]Finding, error) {
 	warnings := []Finding{}
 	for _, p := range problems {
 		if p.Severity == SeverityWarning && slices.Contains(p.Conns, c.ID) {
-			warnings = append(warnings, findingOf(p))
+			warnings = append(warnings, findingOf(st, p))
 		}
 	}
 	return warnings, nil
@@ -360,21 +394,23 @@ func (s *Service) Connect(ctx context.Context, versionID uuid.UUID, in Connectio
 	}
 	var out ConnectionResult
 	err = s.write(ctx, actor, versionID, func(tx pgx.Tx, q *store.Queries, sn *snapshot) error {
-		c := &Conn{ID: uuid.New(), Need: NeedKey{in.NeedPlanID, in.NeedID}, Units: in.Units, Pinned: true,
-			Channel: ChannelKey{Item: ItemKey{in.TargetPlanID, in.TargetItemID}, Kind: in.OutputKindID, No: int(in.ChannelNo)}}
+		ch := sn.st.keyOf(ItemKey{in.TargetPlanID, in.TargetItemID}, in.OutputKindID, int(in.ChannelNo))
+		c := &Conn{ID: uuid.New(), Need: NeedKey{in.NeedPlanID, in.NeedID}, Units: in.Units, Pinned: true, Channel: ch}
 		sn.st.add(c)
 		warnings, err := refuse(sn.st, c)
 		if err != nil {
 			return err
 		}
+		base, group := altOf(ch)
 		row, err := q.CreateConnection(ctx, store.CreateConnectionParams{
 			TenantID: sn.ref.TenantID, VersionID: versionID, NeedPlanID: in.NeedPlanID, NeedID: in.NeedID, Units: in.Units,
-			TargetPlanID: in.TargetPlanID, TargetItemID: in.TargetItemID, OutputKindID: in.OutputKindID, ChannelNo: in.ChannelNo, Pinned: true,
+			TargetPlanID: in.TargetPlanID, TargetItemID: in.TargetItemID, OutputKindID: in.OutputKindID, ChannelNo: in.ChannelNo,
+			AltBaseOutputKindID: base, AltGroup: group, Pinned: true,
 		})
 		if err != nil {
 			return mapFK(err)
 		}
-		out = ConnectionResult{Connection: connectionOut(row), Warnings: warnings}
+		out = ConnectionResult{Connection: connectionOut(row, sn.st), Warnings: warnings}
 		return nil
 	})
 	return out, err
@@ -402,22 +438,24 @@ func (s *Service) Update(ctx context.Context, versionID, id uuid.UUID, in Connec
 			return errNotFound()
 		}
 		sn.st.remove(old)
-		c := &Conn{ID: id, Need: old.Need, Units: in.Units, Pinned: true,
-			Channel: ChannelKey{Item: ItemKey{in.TargetPlanID, in.TargetItemID}, Kind: in.OutputKindID, No: int(in.ChannelNo)}}
+		ch := sn.st.keyOf(ItemKey{in.TargetPlanID, in.TargetItemID}, in.OutputKindID, int(in.ChannelNo))
+		c := &Conn{ID: id, Need: old.Need, Units: in.Units, Pinned: true, Channel: ch}
 		sn.st.add(c)
 		warnings, err := refuse(sn.st, c)
 		if err != nil {
 			return err
 		}
+		base, group := altOf(ch)
 		row, err := q.UpdateConnection(ctx, store.UpdateConnectionParams{VersionID: versionID, ID: id, Units: in.Units,
-			TargetPlanID: in.TargetPlanID, TargetItemID: in.TargetItemID, OutputKindID: in.OutputKindID, ChannelNo: in.ChannelNo})
+			TargetPlanID: in.TargetPlanID, TargetItemID: in.TargetItemID, OutputKindID: in.OutputKindID, ChannelNo: in.ChannelNo,
+			AltBaseOutputKindID: base, AltGroup: group})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errNotFound()
 		}
 		if err != nil {
 			return mapFK(err)
 		}
-		out = ConnectionResult{Connection: connectionOut(row), Warnings: warnings}
+		out = ConnectionResult{Connection: connectionOut(row, sn.st), Warnings: warnings}
 		return nil
 	})
 	return out, err
@@ -456,16 +494,26 @@ func (s *Service) Disconnect(ctx context.Context, versionID uuid.UUID, in Discon
 		return Removed{}, apperr.Invalid("body", "connection.disconnect_target", "give a need (needPlanId, needId) or a channel (targetPlanId, targetItemId, outputKindId, channelNo)")
 	}
 	var n int64
-	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		if _, err := s.projects.WriteVersion(ctx, tx, versionID, true); err != nil {
-			return err
-		}
-		if need {
+	if need {
+		err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
+			if _, err := s.projects.WriteVersion(ctx, tx, versionID, true); err != nil {
+				return err
+			}
 			n, err = q.DeleteNeedConnections(ctx, store.DeleteNeedConnectionsParams{VersionID: versionID, NeedPlanID: *in.NeedPlanID, NeedID: *in.NeedID})
 			return err
+		})
+		return Removed{Removed: n}, err
+	}
+	// A channel is resolved on the current catalog (alternatives by base
+	// kind and group, D410).
+	err = s.write(ctx, actor, versionID, func(tx pgx.Tx, q *store.Queries, sn *snapshot) error {
+		ch := sn.st.keyOf(ItemKey{*in.TargetPlanID, *in.TargetItemID}, *in.OutputKindID, int(*in.ChannelNo))
+		conns := sn.st.byChannel[ch]
+		if len(conns) == 0 {
+			return nil
 		}
-		n, err = q.DeleteChannelConnections(ctx, store.DeleteChannelConnectionsParams{VersionID: versionID, TargetPlanID: *in.TargetPlanID,
-			TargetItemID: *in.TargetItemID, OutputKindID: *in.OutputKindID, ChannelNo: *in.ChannelNo})
+		var err error
+		n, err = q.DeleteConnections(ctx, store.DeleteConnectionsParams{VersionID: versionID, Ids: ids(conns)})
 		return err
 	})
 	return Removed{Removed: n}, err

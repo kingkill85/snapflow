@@ -18,7 +18,9 @@
     "edit": "Lastart bearbeiten",
     "deleteTitle": "Lastart löschen",
     "keyHint": "z. B. led, halogen, ac_motor",
-    "activeHint": "Inaktive Lastarten können für neue Bedarfe nicht gewählt werden."
+    "activeHint": "Inaktive Lastarten können für neue Bedarfe nicht gewählt werden.",
+    "powerFactor": "Leistungsfaktor",
+    "powerFactorHint": "Rechnet die Leistung von Bedarfen (W) in Strom (A) um, für Grenzen in A: I = P / (U · Leistungsfaktor). LED etwa 0,9, Motoren etwa 0,7, ohmsche Lasten 1."
   },
   "outputKinds": {
     "title": "Ausgangsarten",
@@ -85,6 +87,7 @@
     "channel_limit_w": "Max. Last je Kanal (W)",
     "channel_limit_a": "Max. Strom je Kanal (A)",
     "channel_min_load_w": "Min. Last je Kanal (W)",
+    "channel_voltage": "Schaltspannung je Kanal (V)",
     "module_total_a": "Max. Strom des Moduls (A)",
     "module_total_w": "Max. Last des Moduls (W)",
     "bus_current_used_ma": "Verbrauchter Busstrom (mA)",

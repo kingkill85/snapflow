@@ -9,13 +9,15 @@
     "units_exceeded": "{{need}}: {{units}} Einheiten angeschlossen, nur {{quantity}} benötigt",
     "channel_conflict": "{{channel}} nutzt Ausgang {{baseChannel}}, den auch ein anderer Kanal nutzt",
     "circuit_not_allowed": "{{channel}}: {{units}} Einheiten an einem Kanal, die keinen gemeinsamen Stromkreis haben dürfen",
-    "channel_overload_w": "{{channel}}: {{loadW}} W angeschlossen, höchstens {{limitW}} W",
-    "channel_overload_a": "{{channel}}: {{currentA}} A bei {{voltage}} V angeschlossen, höchstens {{limitA}} A",
+    "channel_overload_w": "{{channel}}: {{loadW}} W angeschlossen, höchstens {{limitW}} W ({{utilisationPercent}} % der Grenze)",
+    "channel_overload_a": "{{channel}}: {{currentA}} A bei {{voltage}} V angeschlossen, höchstens {{limitA}} A ({{utilisationPercent}} % der Grenze)",
     "module_overload_w": "{{item}}: {{loadW}} W gesamt ({{loadType}}), höchstens {{limitW}} W",
     "module_overload_a": "{{item}}: {{currentA}} A gesamt bei {{voltage}} V, höchstens {{limitA}} A",
     "limit_unknown": "{{channel}}: kein Grenzwert für {{loadType}} bekannt",
     "min_load": "{{channel}}: {{loadW}} W liegen unter der Mindestlast von {{minW}} W",
+    "power_unknown": "{{channel}}: Die Leistung von {{need}} ist unbekannt, die Grenzwerte werden nicht geprüft (Mindestlast übersprungen)",
     "board_over_capacity": "{{board}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
+    "board_row_over_capacity": "{{board}}, Reihe {{row}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
     "bus_line_no_power_supply": "{{name}}: keine Spannungsversorgung",
     "bus_line_current_exceeded": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt, mehr als versorgt",
     "bus_line_current_reserve": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt (Reserve {{reservePercent}} %)",
@@ -27,6 +29,7 @@
     "gateway_places_reserve": "{{label}}: {{used}} von {{supplied}} Plätzen belegt (Reserve {{reservePercent}} %)",
     "gateway_places_exceeded": "{{label}}: {{used}} von {{supplied}} Plätzen belegt, mehr als vorhanden",
     "gateway_no_router": "{{label}}: {{devices}} Geräte und kein Router (empfohlen ab {{threshold}} Endgeräten)",
+    "network_assignment_dangling": "{{item}} ist {{target}} zugeordnet",
     "unknown": "Prüfung {{code}}"
   },
   "reason": {
@@ -119,6 +122,7 @@
     "findingsValue": "Fehler: {{errors}} · Warnungen: {{warnings}}",
     "board": "Verteiler {{name}}",
     "te": "{{used}} von {{capacity}} TE belegt",
+    "row": "Reihe {{row}}: {{used}} von {{capacity}} TE",
     "channels": "{{kind}}: {{free}} von {{total}} frei",
     "channelsAlternative": "{{kind}} (aus anderen Kanälen): {{free}} von {{total}} frei",
     "busLine": "Buslinie {{name}}",
@@ -179,5 +183,10 @@
     "summary_other": "{{count}} Einheiten werden verbunden.",
     "summaryWithFailures_one": "{{count}} Einheit wird verbunden, {{failed}} nicht:",
     "summaryWithFailures_other": "{{count}} Einheiten werden verbunden, {{failed}} nicht:"
+  },
+  "dangling": {
+    "bus_line": "einer Buslinie, die es nicht mehr gibt",
+    "gateway": "einem Gateway, das es nicht mehr gibt",
+    "other": "einem Netzwerk, das es nicht mehr gibt"
   }
 }

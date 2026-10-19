@@ -99,10 +99,11 @@
     "units_exceeded": "More units connected ({{units}}) than the need has ({{quantity}}).",
     "channel_conflict": "This channel shares its outputs with another channel that is already in use.",
     "circuit_not_allowed": "This channel can take only one unit: circuits are only allowed for needs of the same function that allows circuits.",
-    "channel_overload_w": "The channel is overloaded: {{loadW}} W of {{limitW}} W.",
-    "channel_overload_a": "The channel is overloaded: {{currentA}} A of {{limitA}} A.",
+    "channel_overload_w": "The channel is overloaded: {{loadW}} W of {{limitW}} W ({{utilisationPercent}} %).",
+    "channel_overload_a": "The channel is overloaded: {{currentA}} A of {{limitA}} A ({{utilisationPercent}} %).",
     "module_overload_w": "The device is overloaded: {{loadW}} W of {{limitW}} W in total.",
-    "module_overload_a": "The device is overloaded: {{currentA}} A of {{limitA}} A in total."
+    "module_overload_a": "The device is overloaded: {{currentA}} A of {{limitA}} A in total.",
+    "candidates_target": "Choose a need or a channel."
   },
   "auto_connect": {
     "changed": "The version changed since the preview. Preview again."

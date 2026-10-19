@@ -18,8 +18,10 @@ type Querier interface {
 	// DeleteBatch undoes an auto-connect run: only rows still from the batch
 	// (a row changed by hand left it and is pinned).
 	DeleteBatch(ctx context.Context, arg DeleteBatchParams) (int64, error)
-	DeleteChannelConnections(ctx context.Context, arg DeleteChannelConnectionsParams) (int64, error)
 	DeleteConnection(ctx context.Context, arg DeleteConnectionParams) (int64, error)
+	// DeleteConnections removes connections by id (a channel's, resolved in
+	// memory: alternative channels are identified by base kind and group, D410).
+	DeleteConnections(ctx context.Context, arg DeleteConnectionsParams) (int64, error)
 	DeleteNeedConnections(ctx context.Context, arg DeleteNeedConnectionsParams) (int64, error)
 	GetConnection(ctx context.Context, arg GetConnectionParams) (Connection, error)
 	// InsertConnections inserts the connections of a JSON array (an

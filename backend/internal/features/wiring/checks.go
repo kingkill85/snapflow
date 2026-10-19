@@ -28,6 +28,8 @@ const (
 	CodeGatewayPlacesOver      = "gateway_places_exceeded"
 	CodeGatewayNoRouter        = "gateway_no_router"
 	CodeBoardOverCapacity      = "board_over_capacity"
+	CodeBoardRowOverCapacity   = "board_row_over_capacity"
+	CodeAssignmentDangling     = "network_assignment_dangling"
 	RouterThreshold            = 20
 	defaultBoardReservePercent = 20
 )
@@ -46,7 +48,7 @@ func statusOf(used, supplied float64, reserve int32) Status {
 	return StatusOK
 }
 
-func findingOf(p Problem) Finding {
+func findingOf(st *state, p Problem) Finding {
 	f := Finding{Severity: p.Severity, Code: p.Code, Params: p.Params, Refs: Refs{ConnectionIDs: p.Conns}}
 	if f.Params == nil {
 		f.Params = map[string]any{}
@@ -56,7 +58,7 @@ func findingOf(p Problem) Finding {
 		f.Refs.PlanID, f.Refs.NeedID = &pl, &id
 	}
 	if p.Channel != nil {
-		pl, it, k, no := p.Channel.Item.PlanID, p.Channel.Item.ID, p.Channel.Kind, p.Channel.No
+		pl, it, k, no := p.Channel.Item.PlanID, p.Channel.Item.ID, p.Channel.Kind, st.noOf(*p.Channel, 0)
 		f.Refs.TargetPlanID, f.Refs.ItemID, f.Refs.OutputKindID, f.Refs.ChannelNo = &pl, &it, &k, &no
 	}
 	if p.Item != nil {
@@ -66,7 +68,12 @@ func findingOf(p Problem) Finding {
 	return f
 }
 
-func itemFinding(sev Severity, code string, planID, itemID uuid.UUID, params map[string]any) Finding {
+// itemFinding is a finding about an item, named by its label and product
+// (D412).
+func itemFinding(st *state, sev Severity, code string, planID, itemID uuid.UUID, params map[string]any) Finding {
+	if it := st.items[ItemKey{planID, itemID}]; it != nil {
+		params = itemParams(it, params)
+	}
 	return Finding{Severity: sev, Code: code, Refs: Refs{TargetPlanID: &planID, ItemID: &itemID}, Params: params}
 }
 
@@ -98,9 +105,16 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 		Findings: []Finding{}}
 	var findings []Finding
 
-	// Connection validity (dangling, overloads, circuits, limits).
+	// Connection validity (dangling, overloads, circuits, limits); zones
+	// count only connections without errors (D412).
+	broken := map[uuid.UUID]bool{}
 	for _, p := range st.evaluate() {
-		findings = append(findings, findingOf(p))
+		findings = append(findings, findingOf(st, p))
+		if p.Severity == SeverityError {
+			for _, id := range p.Conns {
+				broken[id] = true
+			}
+		}
 	}
 
 	// Zones and unconnected needs.
@@ -111,13 +125,23 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 		type acc struct{ units, connected int64 }
 		byZone := map[uuid.UUID]*acc{}
 		var none *acc
+		zoneExists := map[uuid.UUID]bool{}
+		for _, z := range p.Zones {
+			zoneExists[z.ID] = true
+		}
 		for _, n := range p.Needs {
 			k := NeedKey{p.ID, n.ID}
-			connected := int64(0)
+			// connected: every connection (need_unconnected); good: only
+			// those without errors (zone coverage, D412).
+			connected, good := int64(0), int64(0)
 			for _, c := range st.byNeed[k] {
 				connected += int64(c.Units)
+				if !broken[c.ID] {
+					good += int64(c.Units)
+				}
 			}
 			connected = min(connected, int64(n.Quantity))
+			good = min(good, int64(n.Quantity))
 			a := none
 			if n.ZoneID != nil {
 				a = byZone[*n.ZoneID]
@@ -132,12 +156,17 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 				a = none
 			}
 			a.units += int64(n.Quantity)
-			a.connected += connected
+			a.connected += good
 			out.Counts.Units += int64(n.Quantity)
-			out.Counts.ConnectedUnits += connected
+			out.Counts.ConnectedUnits += good
 			if missing := int64(n.Quantity) - connected; missing > 0 {
 				pl, id := p.ID, n.ID
-				f := Finding{Severity: SeverityWarning, Code: CodeNeedUnconnected, Refs: Refs{PlanID: &pl, NeedID: &id, ZoneID: n.ZoneID},
+				// A need of a zone that no longer exists links to the plan.
+				var zone *uuid.UUID
+				if n.ZoneID != nil && zoneExists[*n.ZoneID] {
+					zone = n.ZoneID
+				}
+				f := Finding{Severity: SeverityWarning, Code: CodeNeedUnconnected, Refs: Refs{PlanID: &pl, NeedID: &id, ZoneID: zone},
 					Params: map[string]any{"missing": missing, "quantity": n.Quantity, "functionTypeKey": st.cat.FunctionKey[n.FunctionTypeID], "label": n.Label}}
 				findings = append(findings, f)
 			}
@@ -229,14 +258,10 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 				if u == nil {
 					continue
 				}
-				nativeCount := 0
-				for _, c := range it.Caps.Channels {
-					if c.OutputKindID == k.ID {
-						nativeCount += c.Count
+				for _, ch := range kindChannels(it, k.ID) {
+					if !ch.Alternative() {
+						continue
 					}
-				}
-				for no := nativeCount + 1; no <= slotCount(it, k.ID); no++ {
-					ch := ChannelKey{Item: it.Key, Kind: k.ID, No: no}
 					switch {
 					case len(st.byChannel[ch]) > 0:
 						u.Used++
@@ -257,9 +282,19 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 				b.Channels = append(b.Channels, *u)
 			}
 		}
-		for _, r := range p.Rows {
+		// Each row on its own: modules cannot overflow into another row
+		// (D412).
+		for i, r := range p.Rows {
 			used := float64(int(rowUse[r.ID]*10+0.5)) / 10
-			b.Rows = append(b.Rows, RowUse{RowID: r.ID, Position: r.Position, UsedTE: used, CapacityTE: r.CapacityTE})
+			ru := RowUse{RowID: r.ID, Position: r.Position, UsedTE: used, CapacityTE: r.CapacityTE,
+				Status: statusOf(used, r.CapacityTE, defaultBoardReservePercent)}
+			if used > r.CapacityTE+1e-9 {
+				ru.Status = StatusRed
+				pl := p.ID
+				findings = append(findings, Finding{Severity: SeverityError, Code: CodeBoardRowOverCapacity, Refs: Refs{TargetPlanID: &pl},
+					Params: map[string]any{"name": p.Name, "row": i + 1, "usedTe": used, "capacityTe": r.CapacityTE}})
+			}
+			b.Rows = append(b.Rows, ru)
 			b.UsedTE += used
 			b.CapacityTE += r.CapacityTE
 		}
@@ -267,7 +302,7 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 		if b.Status == StatusRed {
 			pl := p.ID
 			findings = append(findings, Finding{Severity: SeverityError, Code: CodeBoardOverCapacity, Refs: Refs{TargetPlanID: &pl},
-				Params: map[string]any{"usedTe": b.UsedTE, "capacityTe": b.CapacityTE}})
+				Params: map[string]any{"name": p.Name, "usedTe": b.UsedTE, "capacityTe": b.CapacityTE}})
 		}
 		out.Boards = append(out.Boards, b)
 	}
@@ -304,10 +339,14 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 			continue
 		}
 		c := it.Caps
+		if m.Dangling != "" {
+			findings = append(findings, itemFinding(st, SeverityWarning, CodeAssignmentDangling, m.PlanID, m.ItemID,
+				map[string]any{"kind": m.Dangling}))
+		}
 		switch {
 		case m.Topology == networks.TopologyBus:
 			if m.LineID == nil {
-				findings = append(findings, itemFinding(SeverityWarning, CodeBusDeviceUnassigned, m.PlanID, m.ItemID, map[string]any{}))
+				findings = append(findings, itemFinding(st, SeverityWarning, CodeBusDeviceUnassigned, m.PlanID, m.ItemID, map[string]any{}))
 				continue
 			}
 			i, ok := lineIndex[*m.LineID]
@@ -328,14 +367,14 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 				}
 			case !psu:
 				l.UnknownCurrentCount++
-				f := itemFinding(SeverityWarning, CodeBusCurrentUnknown, m.PlanID, m.ItemID, map[string]any{})
+				f := itemFinding(st, SeverityWarning, CodeBusCurrentUnknown, m.PlanID, m.ItemID, map[string]any{})
 				id := *m.LineID
 				f.Refs.BusLineID = &id
 				findings = append(findings, f)
 			}
 		case m.Topology == networks.TopologyWireless && !m.Gateway:
 			if m.GatewayPlanID == nil {
-				findings = append(findings, itemFinding(SeverityWarning, CodeWirelessNoGateway, m.PlanID, m.ItemID, map[string]any{}))
+				findings = append(findings, itemFinding(st, SeverityWarning, CodeWirelessNoGateway, m.PlanID, m.ItemID, map[string]any{}))
 				continue
 			}
 			i, ok := gwIndex[ItemKey{*m.GatewayPlanID, *m.GatewayItemID}]
@@ -386,12 +425,12 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 		params := map[string]any{"used": g.PlacesUsed, "supplied": g.PlacesSupplied, "reservePercent": g.ReservePercent, "label": g.Label}
 		switch g.Status {
 		case StatusRed:
-			findings = append(findings, itemFinding(SeverityError, CodeGatewayPlacesOver, g.PlanID, g.ItemID, params))
+			findings = append(findings, itemFinding(st, SeverityError, CodeGatewayPlacesOver, g.PlanID, g.ItemID, params))
 		case StatusAmber:
-			findings = append(findings, itemFinding(SeverityWarning, CodeGatewayPlacesHigh, g.PlanID, g.ItemID, params))
+			findings = append(findings, itemFinding(st, SeverityWarning, CodeGatewayPlacesHigh, g.PlanID, g.ItemID, params))
 		}
 		if g.Devices-g.Routers >= RouterThreshold && g.Routers == 0 {
-			findings = append(findings, itemFinding(SeverityWarning, CodeGatewayNoRouter, g.PlanID, g.ItemID,
+			findings = append(findings, itemFinding(st, SeverityWarning, CodeGatewayNoRouter, g.PlanID, g.ItemID,
 				map[string]any{"devices": g.Devices, "threshold": RouterThreshold, "label": g.Label}))
 		}
 	}

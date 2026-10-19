@@ -2217,6 +2217,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -2342,6 +2343,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -2470,6 +2472,7 @@
               "channel_limit_w",
               "channel_limit_a",
               "channel_min_load_w",
+              "channel_voltage",
               "module_total_a",
               "module_total_w",
               "bus_current_used_ma",
@@ -2961,6 +2964,11 @@
           },
           "outputKindKey": {
             "type": "string"
+          },
+          "voltageV": {
+            "description": "Voltage the channels switch (channel_voltage); absent = the product type's nominal voltage",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
@@ -5932,6 +5940,11 @@
             },
             "type": "object"
           },
+          "powerFactor": {
+            "description": "0.10-1.00; converts W into A for limits in A: I = P / (V · PF)",
+            "format": "double",
+            "type": "number"
+          },
           "sortOrder": {
             "format": "int32",
             "type": "integer"
@@ -5946,6 +5959,7 @@
           "id",
           "key",
           "name",
+          "powerFactor",
           "sortOrder",
           "isActive",
           "createdAt",
@@ -5982,6 +5996,11 @@
             },
             "description": "At most 100 characters; \"en\" is required",
             "type": "object"
+          },
+          "powerFactor": {
+            "description": "0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
@@ -6064,6 +6083,11 @@
             },
             "description": "At most 100 characters; \"en\" is required",
             "type": "object"
+          },
+          "powerFactor": {
+            "description": "0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [

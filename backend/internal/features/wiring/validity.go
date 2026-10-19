@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
+	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 // Severity of a problem or finding.
@@ -39,6 +40,7 @@ const (
 	CodeMinLoad           = "min_load"
 	CodeModuleOverloadW   = "module_overload_w"
 	CodeModuleOverloadA   = "module_overload_a"
+	CodePowerUnknown      = "power_unknown"
 )
 
 // Load type keys of motors (seeded, D310): a blind output's motorType must
@@ -51,12 +53,20 @@ type NeedKey struct{ PlanID, ID uuid.UUID }
 // ItemKey identifies a placement or board module.
 type ItemKey struct{ PlanID, ID uuid.UUID }
 
-// ChannelKey identifies a channel: an item's output kind and number (D378).
+// ChannelKey identifies a logical channel of an item (D378, D410): a
+// native channel by its kind and number (Base = uuid.Nil), an alternative
+// channel (D303) by its kind, the kind whose channels it uses (Base) and its
+// group number. Display numbers (channelNo in the API) are derived from the
+// item's current capabilities (channelNoOf, channelKeyOf, D387).
 type ChannelKey struct {
 	Item ItemKey
 	Kind uuid.UUID
+	Base uuid.UUID
 	No   int
 }
+
+// Alternative reports whether the channel is an alternative group.
+func (k ChannelKey) Alternative() bool { return k.Base != uuid.Nil }
 
 // Catalog are the catalog facts the rules need.
 type Catalog struct {
@@ -69,6 +79,15 @@ type Catalog struct {
 	Circuit     map[uuid.UUID]bool
 	FunctionKey map[uuid.UUID]string
 	LoadTypeKey map[uuid.UUID]string
+	// PowerFactor per load type (W -> A, D407); missing = 1.
+	PowerFactor map[uuid.UUID]float64
+}
+
+func (c *Catalog) powerFactor(lt uuid.UUID) float64 {
+	if pf, ok := c.PowerFactor[lt]; ok && pf > 0 {
+		return pf
+	}
+	return 1
 }
 
 // Need is a need with its facts.
@@ -94,6 +113,8 @@ type Item struct {
 	Voltage float64
 	ZoneID  *uuid.UUID
 	Label   string
+	// ProductName of its variant (findings name items without channels).
+	ProductName *i18n.Text
 }
 
 // Conn is a connection.
@@ -104,6 +125,9 @@ type Conn struct {
 	Channel ChannelKey
 	Pinned  bool
 	BatchID *uuid.UUID
+	// StoredNo is the channel number stored with it (shown when the
+	// channel no longer resolves).
+	StoredNo int
 }
 
 // Problem is a broken rule. Conns are the connections involved; Need,
@@ -126,34 +150,57 @@ type slot struct {
 	first, last int
 }
 
-// slotOf resolves a channel of an item: native channels are numbered first
-// (1..count); then the alternative groups of each channel kind that offers
-// the kind, in channel (output kind) order, group k using base channels
-// (k−1)·per+1..k·per.
-func slotOf(it *Item, kind uuid.UUID, no int) (slot, bool) {
-	if it == nil || no < 1 {
+// slotOf resolves a channel of an item: a native channel is the channel
+// No of its kind; an alternative group k of the base kind's channels uses
+// base channels (k−1)·per+1..k·per (D303, D410).
+func slotOf(it *Item, ch ChannelKey) (slot, bool) {
+	if it == nil || ch.No < 1 {
 		return slot{}, false
 	}
 	for _, c := range it.Caps.Channels {
-		if c.OutputKindID == kind {
-			if no <= c.Count {
-				return slot{cap: c, first: no, last: no}, true
+		if !ch.Alternative() {
+			if c.OutputKindID == ch.Kind && ch.No <= c.Count {
+				return slot{cap: c, first: ch.No, last: ch.No}, true
 			}
-			no -= c.Count
+			continue
+		}
+		if c.OutputKindID != ch.Base {
+			continue
+		}
+		for _, a := range c.Alternatives {
+			if a.OutputKindID == ch.Kind && a.Per >= 1 && ch.No <= a.Max {
+				return slot{cap: c, first: (ch.No-1)*a.Per + 1, last: ch.No * a.Per}, true
+			}
+		}
+	}
+	return slot{}, false
+}
+
+// kindChannels lists the channels of one kind on an item in display order:
+// native first (1..count), then the alternative groups of every channel
+// kind that offers the kind, in output kind order (D387).
+func kindChannels(it *Item, kind uuid.UUID) []ChannelKey {
+	if it == nil {
+		return nil
+	}
+	var out []ChannelKey
+	for _, c := range it.Caps.Channels {
+		if c.OutputKindID == kind {
+			for no := 1; no <= c.Count; no++ {
+				out = append(out, ChannelKey{Item: it.Key, Kind: kind, No: no})
+			}
 		}
 	}
 	for _, c := range it.Caps.Channels {
 		for _, a := range c.Alternatives {
-			if a.OutputKindID != kind || a.Per < 1 {
-				continue
+			if a.OutputKindID == kind && a.Per >= 1 {
+				for g := 1; g <= a.Max; g++ {
+					out = append(out, ChannelKey{Item: it.Key, Kind: kind, Base: c.OutputKindID, No: g})
+				}
 			}
-			if no <= a.Max {
-				return slot{cap: c, first: (no-1)*a.Per + 1, last: no * a.Per}, true
-			}
-			no -= a.Max
 		}
 	}
-	return slot{}, false
+	return out
 }
 
 // slotCount is how many channels of kind an item offers (native and as an
@@ -165,12 +212,37 @@ func slotCount(it *Item, kind uuid.UUID) int {
 			n += c.Count
 		}
 		for _, a := range c.Alternatives {
-			if a.OutputKindID == kind {
+			if a.OutputKindID == kind && a.Per >= 1 {
 				n += a.Max
 			}
 		}
 	}
 	return n
+}
+
+// channelKeyOf resolves a display number (1..slotCount) of a kind; a
+// number beyond them is a native channel that does not exist.
+func channelKeyOf(it *Item, key ItemKey, kind uuid.UUID, no int) ChannelKey {
+	if it != nil && no >= 1 {
+		if chs := kindChannels(it, kind); no <= len(chs) {
+			return chs[no-1]
+		}
+	}
+	return ChannelKey{Item: key, Kind: kind, No: no}
+}
+
+// channelNoOf is the display number of a channel (false: it does not
+// exist on the item's current capabilities).
+func channelNoOf(it *Item, ch ChannelKey) (int, bool) {
+	if _, ok := slotOf(it, ch); !ok {
+		return 0, false
+	}
+	for i, k := range kindChannels(it, ch.Kind) {
+		if k == ch {
+			return i + 1, true
+		}
+	}
+	return 0, false
 }
 
 // physKey is one base channel of an item.
@@ -203,7 +275,7 @@ func (s *state) slot(ch ChannelKey) (slot, bool) {
 	if sl, ok := s.slots[ch]; ok {
 		return sl, true
 	}
-	sl, ok := slotOf(s.items[ch.Item], ch.Kind, ch.No)
+	sl, ok := slotOf(s.items[ch.Item], ch)
 	if ok {
 		s.slots[ch] = sl
 	}
@@ -227,9 +299,13 @@ func (s *state) add(c *Conn) {
 }
 
 func (s *state) remove(c *Conn) {
+	// Searched from the end: trials remove the connection they just added
+	// (D415). The order of s.conns is kept.
 	del := func(list []*Conn) []*Conn {
-		if i := slices.Index(list, c); i >= 0 {
-			return slices.Delete(list, i, i+1)
+		for i := len(list) - 1; i >= 0; i-- {
+			if list[i] == c {
+				return slices.Delete(list, i, i+1)
+			}
 		}
 		return list
 	}
@@ -277,7 +353,8 @@ func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 // connProblems are the rules of one connection on its own: the need and
 // target exist, the channel exists, its kind serves the need's function
-// type, the motor type matches.
+// type, the motor type matches (an alternative channel, e.g. a relay pair
+// used as a blind output, without motorType drives AC motors, D414).
 func (s *state) connProblems(c *Conn) []Problem {
 	p := func(code string) []Problem {
 		ch := c.Channel
@@ -297,10 +374,14 @@ func (s *state) connProblems(c *Conn) []Problem {
 	if !s.cat.Served[c.Channel.Kind][n.FunctionTypeID] {
 		return p(CodeFunctionNotServed)
 	}
-	if n.LoadTypeID != nil && it.Caps.MotorType != "" {
-		if m, ok := motorOf[s.cat.LoadTypeKey[*n.LoadTypeID]]; ok && m != it.Caps.MotorType {
+	motor := it.Caps.MotorType
+	if motor == "" && c.Channel.Alternative() {
+		motor = "ac"
+	}
+	if n.LoadTypeID != nil && motor != "" {
+		if m, ok := motorOf[s.cat.LoadTypeKey[*n.LoadTypeID]]; ok && m != motor {
 			out := p(CodeMotorMismatch)
-			out[0].Params = map[string]any{"motorType": it.Caps.MotorType, "needMotorType": m}
+			out[0].Params = map[string]any{"motorType": motor, "needMotorType": m}
 			return out
 		}
 	}
@@ -339,41 +420,153 @@ func limitFor(limits []capabilities.Limit, present []uuid.UUID, lowest bool) (va
 	return value, ok, unknown
 }
 
-// load sums units × power of connections: total W (known powers),
-// whether every power is known, and the load types present (uuid.Nil for
-// a need without load type) in first-seen order; byType is W per load type.
-func (s *state) load(conns []*Conn) (totalW float64, allKnown bool, present []uuid.UUID, byType map[uuid.UUID]float64) {
-	allKnown = true
-	byType = map[uuid.UUID]float64{}
-	var cw int64
+// limitOf is the limit that applies to one load type: the lowest of its
+// own limits and the limits without a load type (D408).
+func limitOf(limits []capabilities.Limit, lt uuid.UUID) (float64, bool) {
+	value, ok := 0.0, false
+	for _, l := range limits {
+		if l.LoadTypeID == nil || (lt != uuid.Nil && *l.LoadTypeID == lt) {
+			if !ok || l.Value < value {
+				value, ok = l.Value, true
+			}
+		}
+	}
+	return value, ok
+}
+
+// usage is a load against limits per load type: Σ (load of a type ÷ the
+// limit of that type) ≤ 1 (D408). unknown are the present types without a
+// limit (when there are limits at all).
+type usage struct {
+	load, utilisation float64
+	limited           []uuid.UUID
+	single            float64 // the limit when only one type is limited
+	unknown           []uuid.UUID
+}
+
+func usageOf(limits []capabilities.Limit, types []uuid.UUID, byType map[uuid.UUID]float64) usage {
+	var u usage
+	if len(limits) == 0 {
+		return u
+	}
+	for _, t := range types {
+		lim, ok := limitOf(limits, t)
+		if !ok {
+			u.unknown = append(u.unknown, t)
+			continue
+		}
+		v := byType[t]
+		u.limited = append(u.limited, t)
+		u.load += v
+		u.single = lim
+		switch {
+		case lim > 0:
+			u.utilisation += v / lim
+		case v > 0:
+			u.utilisation += 100 // a limit of 0 with load: far over
+		}
+	}
+	return u
+}
+
+func (u usage) over() bool { return len(u.limited) > 0 && u.utilisation > 1+1e-9 }
+
+// params of an overload: the load, the limit (for several load types the
+// effective limit of the mix: load ÷ utilisation) and the utilisation %.
+func (u usage) params(loadKey, limitKey string) map[string]any {
+	limit := u.single
+	if len(u.limited) > 1 && u.utilisation > 0 {
+		limit = round2(u.load / u.utilisation)
+	}
+	return map[string]any{loadKey: round2(u.load), limitKey: limit, "utilisationPercent": math.Round(u.utilisation*1000) / 10}
+}
+
+// loadSum is the load of connections that are valid on their own.
+type loadSum struct {
+	totalW  float64
+	types   []uuid.UUID           // present load types (uuid.Nil: none), first seen
+	byTypeW map[uuid.UUID]float64 // known W per type
+	byTypeA map[uuid.UUID]float64 // known A per type (W ÷ (V · PF))
+	unknown []*Conn               // power unknown
+	dcNoV   bool                  // a DC motor on a channel without own voltage
+}
+
+// isDC: a DC motor need (load type dc_motor) or a channel of an item whose
+// motors are DC.
+func (s *state) isDC(n *Need, it *Item) bool {
+	if n.LoadTypeID != nil && s.cat.LoadTypeKey[*n.LoadTypeID] == "dc_motor" {
+		return true
+	}
+	return it.Caps.MotorType == "dc"
+}
+
+// loadOf sums connections: W per load type, A per load type with the
+// channel's voltage (channel_voltage, else the product type's nominal
+// voltage) and the load type's power factor (D407).
+func (s *state) loadOf(conns []*Conn) loadSum {
+	ls := loadSum{byTypeW: map[uuid.UUID]float64{}, byTypeA: map[uuid.UUID]float64{}}
 	for _, c := range conns {
 		n := s.needs[c.Need]
-		if n == nil {
+		it := s.items[c.Channel.Item]
+		sl, ok := s.slot(c.Channel)
+		if n == nil || it == nil || !ok {
 			continue
 		}
 		lt := uuid.Nil
 		if n.LoadTypeID != nil {
 			lt = *n.LoadTypeID
 		}
-		if !slices.Contains(present, lt) {
-			present = append(present, lt)
+		if !slices.Contains(ls.types, lt) {
+			ls.types = append(ls.types, lt)
 		}
 		if n.PowerCW == nil {
-			allKnown = false
+			ls.unknown = append(ls.unknown, c)
 			continue
 		}
-		v := int64(c.Units) * *n.PowerCW
-		cw += v
-		byType[lt] += float64(v) / 100
+		w := float64(int64(c.Units)**n.PowerCW) / 100
+		ls.totalW += w
+		ls.byTypeW[lt] += w
+		v := it.Voltage
+		if sl.cap.VoltageV != nil {
+			v = *sl.cap.VoltageV
+		} else if s.isDC(n, it) {
+			ls.dcNoV = true
+			continue
+		}
+		if v > 0 {
+			ls.byTypeA[lt] += w / (v * s.cat.powerFactor(lt))
+		}
 	}
-	return float64(cw) / 100, allKnown, present, byType
+	return ls
+}
+
+// validLoads are the connections that are valid on their own (a need that
+// is gone or not served, a missing channel or a motor mismatch is
+// reported per connection and carries no load).
+func (s *state) validLoads(conns []*Conn) []*Conn {
+	var out []*Conn
+	for _, c := range conns {
+		if len(s.connProblems(c)) == 0 {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func (s *state) unknownParams(lt uuid.UUID) map[string]any {
+	params := map[string]any{}
+	if lt != uuid.Nil {
+		params["loadTypeKey"] = s.cat.LoadTypeKey[lt]
+	}
+	return params
 }
 
 // channelProblems are the rules of one channel: alternatives and their
 // base channels are not used both ways (D303); a circuit only when every
 // need allows circuits and they share the function type (else one need
-// unit); the W limit per load type (several load types: the strictest that
-// applies), the A limit via the nominal voltage, the minimum load.
+// unit); the W and A limits per load type (several load types: Σ load ÷
+// limit ≤ 1, D408; A via the channel voltage and power factor, D407), the
+// minimum load; unknown powers or limits are warnings.
 func (s *state) channelProblems(ch ChannelKey) []Problem {
 	conns := s.byChannel[ch]
 	if len(conns) == 0 {
@@ -413,70 +606,115 @@ func (s *state) channelProblems(ch ChannelKey) []Problem {
 	if units > 1 && !circuit {
 		p(SeverityError, CodeCircuitNotAllowed, map[string]any{"units": units})
 	}
-	// Loads count the connections that are valid on their own (a need
-	// that is gone or not served is reported per connection).
-	var loads []*Conn
-	for _, c := range conns {
-		if n := s.needs[c.Need]; n != nil && s.cat.Served[ch.Kind][n.FunctionTypeID] {
-			loads = append(loads, c)
-		}
-	}
+	loads := s.validLoads(conns)
 	if len(loads) == 0 {
 		return out
 	}
-	totalW, allKnown, present, _ := s.load(loads)
-	if lim, ok, unknown := limitFor(sl.cap.LimitsW, present, true); ok || len(unknown) > 0 {
-		for _, lt := range unknown {
-			params := map[string]any{}
-			if lt != uuid.Nil {
-				params["loadTypeKey"] = s.cat.LoadTypeKey[lt]
+	ls := s.loadOf(loads)
+	uw := usageOf(sl.cap.LimitsW, ls.types, ls.byTypeW)
+	for _, lt := range uw.unknown {
+		p(SeverityWarning, CodeLimitUnknown, s.unknownParams(lt))
+	}
+	if uw.over() {
+		p(SeverityError, CodeChannelOverloadW, uw.params("loadW", "limitW"))
+	}
+	if len(sl.cap.LimitsA) > 0 {
+		ua := usageOf(sl.cap.LimitsA, ls.types, ls.byTypeA)
+		for _, lt := range ua.unknown {
+			if !slices.Contains(uw.unknown, lt) {
+				p(SeverityWarning, CodeLimitUnknown, s.unknownParams(lt))
 			}
-			p(SeverityWarning, CodeLimitUnknown, params)
 		}
-		if ok && totalW > lim+1e-9 {
-			p(SeverityError, CodeChannelOverloadW, map[string]any{"loadW": round2(totalW), "limitW": lim})
+		if ls.dcNoV {
+			p(SeverityWarning, CodeLimitUnknown, map[string]any{"loadTypeKey": "dc_motor"})
+		}
+		if ua.over() {
+			params := ua.params("currentA", "limitA")
+			v := it.Voltage
+			if sl.cap.VoltageV != nil {
+				v = *sl.cap.VoltageV
+			}
+			params["voltage"] = v
+			p(SeverityError, CodeChannelOverloadA, params)
 		}
 	}
-	if lim, ok, _ := limitFor(sl.cap.LimitsA, present, true); ok && it.Voltage > 0 {
-		if a := totalW / it.Voltage; a > lim+1e-9 {
-			p(SeverityError, CodeChannelOverloadA, map[string]any{"currentA": round2(a), "limitA": lim, "voltage": it.Voltage})
-		}
+	if lim, ok, _ := limitFor(sl.cap.MinLoadsW, ls.types, false); ok && len(ls.unknown) == 0 && ls.totalW < lim-1e-9 {
+		p(SeverityWarning, CodeMinLoad, map[string]any{"loadW": round2(ls.totalW), "minW": lim})
 	}
-	if lim, ok, _ := limitFor(sl.cap.MinLoadsW, present, false); ok && allKnown && totalW < lim-1e-9 {
-		p(SeverityWarning, CodeMinLoad, map[string]any{"loadW": round2(totalW), "minW": lim})
+	// A power that is not known cannot be checked against the limits
+	// (and the minimum load is skipped): one warning per connection (D408).
+	limited := len(sl.cap.LimitsW) > 0 || len(sl.cap.LimitsA) > 0 || len(sl.cap.MinLoadsW) > 0 ||
+		len(it.Caps.ModuleTotalsW) > 0 || it.Caps.ModuleTotalA != nil
+	if limited {
+		for _, c := range ls.unknown {
+			c2, nk := ch, c.Need
+			label := ""
+			if n := s.needs[c.Need]; n != nil {
+				label = n.Label
+			}
+			out = append(out, Problem{Severity: SeverityWarning, Code: CodePowerUnknown, Conns: []uuid.UUID{c.ID}, Need: &nk, Channel: &c2,
+				Params: map[string]any{"label": label}})
+		}
 	}
 	return out
 }
 
-// itemProblems are the module totals: W per load type (a total without
-// load type: all load) and A via the nominal voltage.
+// itemParams name an item in findings (D412).
+func itemParams(it *Item, params map[string]any) map[string]any {
+	params["label"] = it.Label
+	if it.ProductName != nil {
+		params["productName"] = *it.ProductName
+	}
+	return params
+}
+
+// itemProblems are the module totals over the connections valid on their
+// own: W per load type (a total without load type: all load; a need
+// without load type against totals that are all per load type:
+// limit_unknown, D408) and A (channel voltage, power factor, D407).
 func (s *state) itemProblems(key ItemKey) []Problem {
-	conns := s.byItem[key]
 	it := s.items[key]
-	if len(conns) == 0 || it == nil {
+	if it == nil || len(s.byItem[key]) == 0 || (len(it.Caps.ModuleTotalsW) == 0 && it.Caps.ModuleTotalA == nil) {
+		return nil
+	}
+	conns := s.validLoads(s.byItem[key])
+	if len(conns) == 0 {
 		return nil
 	}
 	var out []Problem
-	p := func(code string, params map[string]any) {
+	p := func(sev Severity, code string, params map[string]any) {
 		k := key
-		out = append(out, Problem{Severity: SeverityError, Code: code, Conns: ids(conns), Item: &k, Params: params})
+		out = append(out, Problem{Severity: sev, Code: code, Conns: ids(conns), Item: &k, Params: itemParams(it, params)})
 	}
-	totalW, _, _, byType := s.load(conns)
+	ls := s.loadOf(conns)
+	anyTotal := false
 	for _, l := range it.Caps.ModuleTotalsW {
-		w := totalW
+		w := ls.totalW
 		params := map[string]any{"limitW": l.Value}
 		if l.LoadTypeID != nil {
-			w = byType[*l.LoadTypeID]
+			w = ls.byTypeW[*l.LoadTypeID]
 			params["loadTypeKey"] = s.cat.LoadTypeKey[*l.LoadTypeID]
+		} else {
+			anyTotal = true
 		}
 		if w > l.Value+1e-9 {
 			params["loadW"] = round2(w)
-			p(CodeModuleOverloadW, params)
+			p(SeverityError, CodeModuleOverloadW, params)
 		}
 	}
-	if it.Caps.ModuleTotalA != nil && it.Voltage > 0 {
-		if a := totalW / it.Voltage; a > *it.Caps.ModuleTotalA+1e-9 {
-			p(CodeModuleOverloadA, map[string]any{"currentA": round2(a), "limitA": *it.Caps.ModuleTotalA, "voltage": it.Voltage})
+	if len(it.Caps.ModuleTotalsW) > 0 && !anyTotal && slices.Contains(ls.types, uuid.Nil) {
+		p(SeverityWarning, CodeLimitUnknown, map[string]any{})
+	}
+	if it.Caps.ModuleTotalA != nil {
+		a := 0.0
+		for _, v := range ls.byTypeA {
+			a += v
+		}
+		if ls.dcNoV {
+			p(SeverityWarning, CodeLimitUnknown, map[string]any{"loadTypeKey": "dc_motor"})
+		}
+		if a > *it.Caps.ModuleTotalA+1e-9 {
+			p(SeverityError, CodeModuleOverloadA, map[string]any{"currentA": round2(a), "limitA": *it.Caps.ModuleTotalA, "voltage": it.Voltage})
 		}
 	}
 	return out

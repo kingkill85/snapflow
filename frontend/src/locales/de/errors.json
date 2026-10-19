@@ -99,10 +99,11 @@
     "units_exceeded": "Mehr Einheiten verbunden ({{units}}) als der Bedarf hat ({{quantity}}).",
     "channel_conflict": "Dieser Kanal teilt seine Ausgänge mit einem anderen Kanal, der bereits belegt ist.",
     "circuit_not_allowed": "Dieser Kanal nimmt nur eine Einheit auf: Stromkreise sind nur für Bedarfe derselben Funktion erlaubt, die Stromkreise zulässt.",
-    "channel_overload_w": "Der Kanal ist überlastet: {{loadW}} W von {{limitW}} W.",
-    "channel_overload_a": "Der Kanal ist überlastet: {{currentA}} A von {{limitA}} A.",
+    "channel_overload_w": "Der Kanal ist überlastet: {{loadW}} W von {{limitW}} W ({{utilisationPercent}} %).",
+    "channel_overload_a": "Der Kanal ist überlastet: {{currentA}} A von {{limitA}} A ({{utilisationPercent}} %).",
     "module_overload_w": "Das Gerät ist überlastet: insgesamt {{loadW}} W von {{limitW}} W.",
-    "module_overload_a": "Das Gerät ist überlastet: insgesamt {{currentA}} A von {{limitA}} A."
+    "module_overload_a": "Das Gerät ist überlastet: insgesamt {{currentA}} A von {{limitA}} A.",
+    "candidates_target": "Wählen Sie einen Bedarf oder einen Kanal."
   },
   "auto_connect": {
     "changed": "Die Version hat sich seit der Vorschau geändert. Erneut Vorschau anzeigen."

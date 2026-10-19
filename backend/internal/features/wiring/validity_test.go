@@ -35,6 +35,7 @@ func newFixture() fixture {
 		Circuit:     map[uuid.UUID]bool{f.light: true, f.socket: true},
 		FunctionKey: map[uuid.UUID]string{f.light: "light", f.socket: "socket", f.blindFn: "blind"},
 		LoadTypeKey: map[uuid.UUID]string{f.led: "led", f.halogen: "halogen", f.acMotor: "ac_motor", f.dcMotor: "dc_motor"},
+		PowerFactor: map[uuid.UUID]float64{f.led: 0.9, f.acMotor: 0.7, f.dcMotor: 0.7},
 	}
 	return f
 }
@@ -80,8 +81,9 @@ func (f fixture) item(id int, caps capabilities.Capabilities) *Item {
 	return &Item{Key: ItemKey{f.board, uuid.NewSHA1(uuid.Nil, []byte{100 + byte(id)})}, Board: true, HasVariant: true, Caps: caps, Voltage: 230}
 }
 
+// conn connects units of n to channel no (display number) of a kind.
 func conn(n *Need, it *Item, kind uuid.UUID, no int, units int32) *Conn {
-	return &Conn{ID: uuid.New(), Need: n.Key, Units: units, Channel: ChannelKey{Item: it.Key, Kind: kind, No: no}}
+	return &Conn{ID: uuid.New(), Need: n.Key, Units: units, Channel: channelKeyOf(it, it.Key, kind, no)}
 }
 
 func codes(ps []Problem) []string {
@@ -104,6 +106,22 @@ func TestValidity(t *testing.T) {
 	dimTotals := f.item(3, totals)
 	noVariant := f.item(4, capabilities.Capabilities{})
 	noVariant.HasVariant = false
+	// Relays without motorType: their pairs drive AC motors (D414).
+	plainRelCaps := f.relayCaps()
+	plainRelCaps.MotorType = ""
+	plainRel := f.item(5, plainRelCaps)
+	// DC blind actuator without and with a channel voltage (D407).
+	dcCaps := f.relayCaps()
+	dcCaps.MotorType = "dc"
+	dcRel := f.item(6, dcCaps)
+	dc24Caps := f.relayCaps()
+	dc24Caps.MotorType = "dc"
+	dc24Caps.Channels[0].VoltageV = ptr(24.0)
+	dc24Rel := f.item(7, dc24Caps)
+	// Module totals only per load type (LED 500 W).
+	perTypeCaps := f.relayCaps()
+	perTypeCaps.ModuleTotalsW = []capabilities.Limit{lim(&f.led, 500)}
+	perType := f.item(8, perTypeCaps)
 
 	ledA := f.need(1, f.light, 3, w(50), &f.led)
 	ledB := f.need(2, f.light, 2, w(60), &f.led)
@@ -115,8 +133,10 @@ func TestValidity(t *testing.T) {
 	tiny := f.need(8, f.light, 1, w(2), &f.led)
 	heavy := f.need(9, f.light, 1, w(2400), nil)
 	unknownPower := f.need(10, f.light, 1, nil, &f.led)
-	allNeeds := []*Need{ledA, ledB, halo, socket, blindAC, blindDC, unknownLT, tiny, heavy, unknownPower}
-	allItems := []*Item{dim, rel, dimTotals, noVariant}
+	motorLight := f.need(11, f.light, 1, w(1700), &f.acMotor) // 7.4 A at PF 1, 10.6 A at 0.7
+	dcBlind := f.need(12, f.blindFn, 1, w(50), &f.dcMotor)
+	allNeeds := []*Need{ledA, ledB, halo, socket, blindAC, blindDC, unknownLT, tiny, heavy, unknownPower, motorLight, dcBlind}
+	allItems := []*Item{dim, rel, dimTotals, noVariant, plainRel, dcRel, dc24Rel, perType}
 
 	cases := []tcase{
 		{name: "valid circuit of one need", conns: []*Conn{conn(ledA, dim, f.dimmer, 1, 3)}},
@@ -131,26 +151,36 @@ func TestValidity(t *testing.T) {
 		{name: "circuit of two needs of a circuit function type", conns: []*Conn{conn(ledA, dim, f.dimmer, 1, 1), conn(ledB, dim, f.dimmer, 1, 1)}},
 		{name: "circuit across function types refused", conns: []*Conn{conn(ledA, rel, f.relay, 1, 1), conn(socket, rel, f.relay, 1, 1)},
 			want: []string{CodeCircuitNotAllowed}},
-		{name: "blind: one unit per channel", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 2)}, want: []string{CodeCircuitNotAllowed}},
+		{name: "blind: one unit per channel", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 2)}, want: []string{CodeCircuitNotAllowed, CodePowerUnknown}},
 		{name: "units above quantity", conns: []*Conn{conn(ledB, dim, f.dimmer, 1, 1), conn(ledB, dim, f.dimmer, 2, 2)}, want: []string{CodeUnitsExceeded}},
 		{name: "W limit per load type exceeded", conns: []*Conn{conn(ledA, dim, f.dimmer, 1, 3), conn(ledB, dim, f.dimmer, 1, 1)},
 			want: []string{CodeChannelOverloadW}}, // 150 + 60 > 200
 		{name: "W limit of the load type", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1)}}, // 250 <= 300 halogen
-		{name: "mixed load types take the strictest limit", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1), conn(tiny, dim, f.dimmer, 1, 1)},
-			want: []string{CodeChannelOverloadW}}, // 252 > min(200, 300)
+		{name: "mixed load types within Σ load ÷ limit", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1), conn(tiny, dim, f.dimmer, 1, 1)}}, // 250/300 + 2/200 = 0.84
+		{name: "mixed load types over Σ load ÷ limit", conns: []*Conn{conn(halo, dim, f.dimmer, 1, 1), conn(ledB, dim, f.dimmer, 1, 1)},
+			want: []string{CodeChannelOverloadW}}, // 250/300 + 60/200 = 1.13
 		{name: "no limit for the load type is a warning", conns: []*Conn{conn(unknownLT, dim, f.dimmer, 1, 1)}, want: []string{CodeLimitUnknown}},
 		{name: "minimum load not reached is a warning", conns: []*Conn{conn(tiny, dim, f.dimmer, 1, 1)}, want: []string{CodeMinLoad}},
-		{name: "minimum load not judged with unknown power", conns: []*Conn{conn(unknownPower, dim, f.dimmer, 1, 1)}},
+		{name: "minimum load not judged with unknown power", conns: []*Conn{conn(unknownPower, dim, f.dimmer, 1, 1)}, want: []string{CodePowerUnknown}},
+		{name: "A limit with the power factor", conns: []*Conn{conn(motorLight, rel, f.relay, 1, 1)}, want: []string{CodeChannelOverloadA}},
+		{name: "DC motor without channel voltage: limit unknown", conns: []*Conn{conn(dcBlind, dcRel, f.blind, 1, 1)}, want: []string{CodeLimitUnknown}},
+		{name: "DC motor with channel voltage", conns: []*Conn{conn(dcBlind, dc24Rel, f.blind, 1, 1)}}, // 50 / 24 / 0.7 = 3 A
+		{name: "relay pair without motorType is AC", conns: []*Conn{conn(dcBlind, plainRel, f.blind, 1, 1)}, want: []string{CodeMotorMismatch}},
+		{name: "need without load type against per-type module totals", conns: []*Conn{conn(socket, perType, f.relay, 1, 1)}, want: []string{CodeLimitUnknown}},
+		{name: "module totals count only valid connections", conns: []*Conn{conn(ledA, dimTotals, f.dimmer, 1, 3), conn(socket, dimTotals, f.dimmer, 2, 1)},
+			want: []string{CodeFunctionNotServed}}, // 250 W and 1.2 A only with the socket
+		{name: "power unknown against module totals", conns: []*Conn{conn(unknownPower, dimTotals, f.dimmer, 1, 1)}, want: []string{CodePowerUnknown}},
 		{name: "A limit via the nominal voltage", conns: []*Conn{conn(heavy, rel, f.relay, 1, 1)}, want: []string{CodeChannelOverloadA}}, // 2400/230 > 10
 		{name: "module total W", conns: []*Conn{conn(ledA, dimTotals, f.dimmer, 1, 3), conn(ledB, dimTotals, f.dimmer, 2, 2)},
 			want: []string{CodeModuleOverloadA, CodeModuleOverloadW}}, // 270 W > 250; 1.17 A > 1
-		{name: "motor type matches", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 1)}},
+		{name: "motor type matches", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 1)}, want: []string{CodePowerUnknown}},
 		{name: "motor type mismatch", conns: []*Conn{conn(blindDC, rel, f.blind, 1, 1)}, want: []string{CodeMotorMismatch}},
 		{name: "alternative and base on the same pair", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 1), conn(socket, rel, f.relay, 2, 1)},
-			want: []string{CodeChannelConflict, CodeChannelConflict}},
-		{name: "alternative and base on different pairs", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 1), conn(socket, rel, f.relay, 3, 1)}},
+			want: []string{CodeChannelConflict, CodeChannelConflict, CodePowerUnknown}},
+		{name: "alternative and base on different pairs", conns: []*Conn{conn(blindAC, rel, f.blind, 1, 1), conn(socket, rel, f.relay, 3, 1)},
+			want: []string{CodePowerUnknown}},
 		{name: "second alternative channel uses relays 3 and 4", conns: []*Conn{conn(blindAC, rel, f.blind, 2, 1), conn(socket, rel, f.relay, 4, 1)},
-			want: []string{CodeChannelConflict, CodeChannelConflict}},
+			want: []string{CodeChannelConflict, CodeChannelConflict, CodePowerUnknown}},
 		{name: "alternative channel out of range", conns: []*Conn{conn(blindAC, rel, f.blind, 3, 1)}, want: []string{CodeChannelNotFound}},
 	}
 	for _, tc := range cases {
@@ -210,11 +240,11 @@ func TestSlotNumbering(t *testing.T) {
 	if n := slotCount(it, f.blind); n != 4 {
 		t.Fatalf("blind slots %d, want 4", n)
 	}
-	sl, ok := slotOf(it, f.blind, 2)
+	sl, ok := slotOf(it, channelKeyOf(it, it.Key, f.blind, 2))
 	if !ok || sl.cap.OutputKindID != f.blind || sl.first != 2 {
 		t.Fatalf("native slot: %+v", sl)
 	}
-	sl, ok = slotOf(it, f.blind, 4)
+	sl, ok = slotOf(it, channelKeyOf(it, it.Key, f.blind, 4))
 	if !ok || sl.cap.OutputKindID != f.relay || sl.first != 3 || sl.last != 4 {
 		t.Fatalf("alternative slot: %+v", sl)
 	}

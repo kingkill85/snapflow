@@ -15,6 +15,7 @@ export const loadType = (over: Partial<LoadType>): LoadType => ({
   name: { en: 'LED' },
   sortOrder: 1,
   isActive: true,
+  powerFactor: 1,
   ...over,
 })
 

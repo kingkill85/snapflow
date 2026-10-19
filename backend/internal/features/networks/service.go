@@ -402,6 +402,10 @@ type Member struct {
 	GatewayPlanID, GatewayItemID *uuid.UUID
 	// Pinned: the line or gateway is an explicit assignment.
 	Pinned bool
+	// Dangling: an explicit assignment that no longer applies ("bus_line":
+	// the line is gone or of another system; "gateway": the gateway is
+	// gone or of another system); the default applies instead (D411).
+	Dangling string
 	// item is the view's data of the item.
 	item item
 }
@@ -435,14 +439,21 @@ func (st state) members() []Member {
 			if assigned && a.BusLineID != nil && lineSystem[*a.BusLineID] == it.system {
 				id := *a.BusLineID
 				m.LineID, m.Pinned = &id, true
-			} else if id, ok := firstLine[it.system]; ok {
-				m.LineID = &id
+			} else {
+				if assigned && a.BusLineID != nil {
+					m.Dangling = "bus_line"
+				}
+				if id, ok := firstLine[it.system]; ok {
+					m.LineID = &id
+				}
 			}
 		case it.topo == TopologyWireless && !it.gateway:
 			if assigned && a.GatewayPlanID != nil && a.GatewayItemID != nil {
 				if sys, ok := gwSystem[[2]uuid.UUID{*a.GatewayPlanID, *a.GatewayItemID}]; ok && sys == it.system {
 					p, i := *a.GatewayPlanID, *a.GatewayItemID
 					m.GatewayPlanID, m.GatewayItemID, m.Pinned = &p, &i, true
+				} else {
+					m.Dangling = "gateway"
 				}
 			}
 			if !m.Pinned {

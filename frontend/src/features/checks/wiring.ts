@@ -33,6 +33,10 @@ export type ChannelRef = { targetPlanId: string; targetItemId: string; outputKin
  * name (label, else product), a channel ("Dimmer D1 · Dimmer output 3 (Main board)"), a need ("2 × Light ·
  * Spots") and the names a finding's text needs.
  */
+/** A translatable text in finding params ({ en, de? }). */
+const isText = (v: unknown): v is Record<string, string> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as Record<string, unknown>).en === 'string'
+
 export function useWiringModel(versionId: string, enabled = true) {
   const query = useGetWiring(versionId, { query: { enabled } })
   const kinds = useListOutputKinds({ includeInactive: true })
@@ -92,14 +96,21 @@ export function useWiringModel(versionId: string, enabled = true) {
       const ltKey = typeof f.params?.loadTypeKey === 'string' ? f.params.loadTypeKey : undefined
       const lt = ltKey ? ltByKey.get(ltKey) : undefined
       const ft = ftKey ? ftByKey.get(ftKey) : undefined
+      // Items without channels (gateways, bus devices) and boards without channel modules are not in the
+      // wiring view: the API names them in params (label, productName, name).
+      const p = f.params ?? {}
+      const paramLabel = typeof p.label === 'string' ? p.label.trim() : ''
+      const paramProduct = isText(p.productName) ? localize(p.productName) : ''
+      const paramItem = f.refs.itemId ? paramLabel || paramProduct || undefined : undefined
+      const paramBoard = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : undefined
       return {
         need: need ? `${needText(need)} (${needPlace(need)})` : undefined,
-        item: item ? `${itemName(item)} (${item.planName})` : undefined,
+        item: item ? `${itemName(item)} (${item.planName})` : paramItem,
         channel:
           r.targetPlanId && r.itemId && r.outputKindId && r.channelNo != null
             ? channelText({ targetPlanId: r.targetPlanId, targetItemId: r.itemId, outputKindId: r.outputKindId, channelNo: r.channelNo })
             : undefined,
-        board: r.targetPlanId ? data.items.find((i) => i.planId === r.targetPlanId)?.planName : undefined,
+        board: (r.targetPlanId ? data.items.find((i) => i.planId === r.targetPlanId)?.planName : undefined) ?? paramBoard,
         functionType: ft ? localize(ft.name) : undefined,
         loadType: lt ? localize(lt.name) : undefined,
       }

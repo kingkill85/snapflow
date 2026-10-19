@@ -92,19 +92,25 @@ func (q *Queries) CreateCatalogField(ctx context.Context, arg CreateCatalogField
 }
 
 const createLoadType = `-- name: CreateLoadType :one
-INSERT INTO load_types (key, name, is_active, sort_order)
-VALUES ($1, $2, $3, (SELECT coalesce(max(sort_order), 0) + 1 FROM load_types))
-RETURNING id, key, name, sort_order, is_active, created_at, updated_at
+INSERT INTO load_types (key, name, is_active, power_factor, sort_order)
+VALUES ($1, $2, $3, $4::numeric, (SELECT coalesce(max(sort_order), 0) + 1 FROM load_types))
+RETURNING id, key, name, sort_order, is_active, created_at, updated_at, power_factor
 `
 
 type CreateLoadTypeParams struct {
-	Key      string
-	Name     i18n.Text
-	IsActive bool
+	Key         string
+	Name        i18n.Text
+	IsActive    bool
+	PowerFactor string
 }
 
 func (q *Queries) CreateLoadType(ctx context.Context, arg CreateLoadTypeParams) (LoadType, error) {
-	row := q.db.QueryRow(ctx, createLoadType, arg.Key, arg.Name, arg.IsActive)
+	row := q.db.QueryRow(ctx, createLoadType,
+		arg.Key,
+		arg.Name,
+		arg.IsActive,
+		arg.PowerFactor,
+	)
 	var i LoadType
 	err := row.Scan(
 		&i.ID,
@@ -114,6 +120,7 @@ func (q *Queries) CreateLoadType(ctx context.Context, arg CreateLoadTypeParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PowerFactor,
 	)
 	return i, err
 }
@@ -234,7 +241,7 @@ func (q *Queries) GetCatalogField(ctx context.Context, id uuid.UUID) (CatalogFie
 }
 
 const getLoadType = `-- name: GetLoadType :one
-SELECT id, key, name, sort_order, is_active, created_at, updated_at FROM load_types WHERE id = $1
+SELECT id, key, name, sort_order, is_active, created_at, updated_at, power_factor FROM load_types WHERE id = $1
 `
 
 func (q *Queries) GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, error) {
@@ -248,6 +255,7 @@ func (q *Queries) GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, erro
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PowerFactor,
 	)
 	return i, err
 }
@@ -382,7 +390,7 @@ func (q *Queries) ListCatalogFields(ctx context.Context) ([]CatalogField, error)
 
 const listLoadTypes = `-- name: ListLoadTypes :many
 
-SELECT id, key, name, sort_order, is_active, created_at, updated_at FROM load_types
+SELECT id, key, name, sort_order, is_active, created_at, updated_at, power_factor FROM load_types
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -405,6 +413,7 @@ func (q *Queries) ListLoadTypes(ctx context.Context, includeInactive bool) ([]Lo
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PowerFactor,
 		); err != nil {
 			return nil, err
 		}
@@ -763,10 +772,10 @@ func (q *Queries) UpdateCatalogField(ctx context.Context, arg UpdateCatalogField
 
 const updateLoadType = `-- name: UpdateLoadType :one
 UPDATE load_types
-SET key = $2, name = $3, is_active = $4,
+SET key = $2, name = $3, is_active = $4, power_factor = coalesce($5::numeric, power_factor),
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $5
-RETURNING id, key, name, sort_order, is_active, created_at, updated_at
+WHERE id = $1 AND updated_at = $6
+RETURNING id, key, name, sort_order, is_active, created_at, updated_at, power_factor
 `
 
 type UpdateLoadTypeParams struct {
@@ -774,6 +783,7 @@ type UpdateLoadTypeParams struct {
 	Key               string
 	Name              i18n.Text
 	IsActive          bool
+	PowerFactor       *string
 	ExpectedUpdatedAt time.Time
 }
 
@@ -783,6 +793,7 @@ func (q *Queries) UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) 
 		arg.Key,
 		arg.Name,
 		arg.IsActive,
+		arg.PowerFactor,
 		arg.ExpectedUpdatedAt,
 	)
 	var i LoadType
@@ -794,15 +805,16 @@ func (q *Queries) UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PowerFactor,
 	)
 	return i, err
 }
 
 const updateOutputKind = `-- name: UpdateOutputKind :one
 UPDATE output_kinds
-SET key = $2, name = $3, is_active = $4,
+SET key = $2, name = $3, is_active = $4, power_factor = coalesce($5::numeric, power_factor),
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $5
+WHERE id = $1 AND updated_at = $6
 RETURNING id, key, name, sort_order, is_active, created_at, updated_at
 `
 
@@ -811,6 +823,7 @@ type UpdateOutputKindParams struct {
 	Key               string
 	Name              i18n.Text
 	IsActive          bool
+	PowerFactor       *string
 	ExpectedUpdatedAt time.Time
 }
 
@@ -820,6 +833,7 @@ func (q *Queries) UpdateOutputKind(ctx context.Context, arg UpdateOutputKindPara
 		arg.Key,
 		arg.Name,
 		arg.IsActive,
+		arg.PowerFactor,
 		arg.ExpectedUpdatedAt,
 	)
 	var i OutputKind

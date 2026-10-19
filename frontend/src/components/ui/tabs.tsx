@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useId, useRef } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef } from 'react'
 
 import { cn } from '@/lib/cn'
 
@@ -24,6 +24,18 @@ export function Tabs<K extends string>({ label, tabs, value, onValueChange, clas
   const id = useId()
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const active = tabs.find((t) => t.key === value) ?? tabs[0]
+  const activeIndex = active ? tabs.indexOf(active) : -1
+
+  // On narrow screens the tab list scrolls inside its own box: keep the
+  // selected tab in view (e.g. opened by a ?tab= link).
+  useEffect(() => {
+    const el = refs.current[activeIndex]
+    const list = el?.parentElement
+    if (!el || !list || list.scrollWidth <= list.clientWidth) return
+    const left = el.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft
+    if (left < list.scrollLeft) list.scrollLeft = left
+    else if (left + el.offsetWidth > list.scrollLeft + list.clientWidth) list.scrollLeft = left + el.offsetWidth - list.clientWidth
+  }, [activeIndex])
 
   const onKeyDown = (e: KeyboardEvent, index: number) => {
     const last = tabs.length - 1

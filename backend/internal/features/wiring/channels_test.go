@@ -49,5 +49,5 @@ func TestWiringViewAndCandidates(t *testing.T) {
 	if c := decode[wiring.Candidates](t, api.Post(w.url("/connections/candidates"), cookie, needBody)); c.Reason != "complete" {
 		t.Fatalf("complete %+v", c)
 	}
-	want(t, api.Post(w.url("/connections/candidates"), cookie, map[string]any{}), http.StatusUnprocessableEntity, "connection.disconnect_target")
+	want(t, api.Post(w.url("/connections/candidates"), cookie, map[string]any{}), http.StatusUnprocessableEntity, "connection.candidates_target")
 }

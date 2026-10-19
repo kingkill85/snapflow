@@ -15,6 +15,8 @@ type LoadType struct {
 	ID        uuid.UUID    `json:"id"`
 	Key       string       `json:"key" example:"led"`
 	Name      i18n.Text    `json:"name"`
+	// PowerFactor converts W into A: I = P / (V · PF) (D407).
+	PowerFactor float64    `json:"powerFactor" doc:"0.10-1.00; converts W into A for limits in A: I = P / (V · PF)"`
 	SortOrder int32        `json:"sortOrder"`
 	IsActive  bool         `json:"isActive"`
 	CreatedAt time.Time    `json:"createdAt"`
@@ -23,9 +25,10 @@ type LoadType struct {
 }
 
 type LoadTypeInput struct {
-	Key      string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"led"`
-	Name     i18n.Text `json:"name" doc:"At most 100 characters; \"en\" is required"`
-	IsActive bool      `json:"isActive"`
+	Key         string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"led"`
+	Name        i18n.Text `json:"name" doc:"At most 100 characters; \"en\" is required"`
+	IsActive    bool      `json:"isActive"`
+	PowerFactor *float64  `json:"powerFactor,omitempty" doc:"0.10-1.00, two decimals; default 1.00; on update, left out keeps the stored value"`
 }
 
 type LoadTypeUpdate struct {
@@ -81,6 +84,9 @@ const (
 	MeaningChannelLimitW          Meaning = "channel_limit_w"
 	MeaningChannelLimitA          Meaning = "channel_limit_a"
 	MeaningChannelMinLoadW        Meaning = "channel_min_load_w"
+	// MeaningChannelVoltage (per output kind): the voltage the channels
+	// switch when it is not the product type's nominal voltage (D407).
+	MeaningChannelVoltage Meaning = "channel_voltage"
 	MeaningModuleTotalA           Meaning = "module_total_a"
 	MeaningModuleTotalW           Meaning = "module_total_w"
 	MeaningBusCurrentUsedMa       Meaning = "bus_current_used_ma"
@@ -124,6 +130,7 @@ var Meanings = []MeaningSpec{
 	{Meaning: MeaningChannelLimitW, OutputKind: true, LoadType: true, LoadTypeRequired: true, Types: numeric},
 	{Meaning: MeaningChannelLimitA, OutputKind: true, LoadType: true, Types: numeric},
 	{Meaning: MeaningChannelMinLoadW, OutputKind: true, LoadType: true, Types: numeric},
+	{Meaning: MeaningChannelVoltage, OutputKind: true, Types: numeric},
 	{Meaning: MeaningModuleTotalA, Types: numeric},
 	{Meaning: MeaningModuleTotalW, LoadType: true, Types: numeric},
 	{Meaning: MeaningBusCurrentUsedMa, Types: numeric},
@@ -167,7 +174,7 @@ type CatalogField struct {
 	Options     []attrschema.AttributeOption `json:"options" doc:"Allowed values of an enum field"`
 	EtimFeature string                       `json:"etimFeature,omitempty" doc:"ETIM feature code, informational" example:"EF000008"`
 	// Meaning empty = just information.
-	Meaning        Meaning     `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"What the value means for the checks; empty = just information"`
+	Meaning        Meaning     `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,channel_voltage,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"What the value means for the checks; empty = just information"`
 	OutputKindID   *uuid.UUID  `json:"outputKindId,omitempty" doc:"Parameter of the channel meanings"`
 	LoadTypeID     *uuid.UUID  `json:"loadTypeId,omitempty" doc:"Parameter of channel_limit_w (required) and channel_limit_a, channel_min_load_w, module_total_w (optional: empty = any load type)"`
 	ProductTypeIDs []uuid.UUID `json:"productTypeIds" doc:"The meaning applies only to products of these product types; empty = all"`
@@ -188,7 +195,7 @@ type CatalogFieldInput struct {
 	Unit           string                       `json:"unit,omitempty" doc:"Display only, at most 16 characters"`
 	Options        []attrschema.AttributeOption `json:"options,omitempty" doc:"Enum fields: the allowed values (at least one)"`
 	EtimFeature    string                       `json:"etimFeature,omitempty" maxLength:"20" doc:"ETIM feature code, e.g. EF000008"`
-	Meaning        Meaning                      `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"Leave out for just information"`
+	Meaning        Meaning                      `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,channel_voltage,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"Leave out for just information"`
 	OutputKindID   *uuid.UUID                   `json:"outputKindId,omitempty" doc:"Required by the channel meanings, else not allowed"`
 	LoadTypeID     *uuid.UUID                   `json:"loadTypeId,omitempty" doc:"Required by channel_limit_w, optional for channel_limit_a, channel_min_load_w and module_total_w, else not allowed"`
 	ProductTypeIDs []uuid.UUID                  `json:"productTypeIds,omitempty" maxItems:"200" doc:"Limit the meaning to these product types; empty = all"`

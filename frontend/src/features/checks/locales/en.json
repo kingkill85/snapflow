@@ -9,13 +9,15 @@
     "units_exceeded": "{{need}}: {{units}} units connected, only {{quantity}} needed",
     "channel_conflict": "{{channel}} uses output {{baseChannel}}, which another channel uses too",
     "circuit_not_allowed": "{{channel}}: {{units}} units on one channel, but they may not share a circuit",
-    "channel_overload_w": "{{channel}}: {{loadW}} W connected, at most {{limitW}} W",
-    "channel_overload_a": "{{channel}}: {{currentA}} A at {{voltage}} V connected, at most {{limitA}} A",
+    "channel_overload_w": "{{channel}}: {{loadW}} W connected, at most {{limitW}} W ({{utilisationPercent}} % of the limit)",
+    "channel_overload_a": "{{channel}}: {{currentA}} A at {{voltage}} V connected, at most {{limitA}} A ({{utilisationPercent}} % of the limit)",
     "module_overload_w": "{{item}}: {{loadW}} W in total ({{loadType}}), at most {{limitW}} W",
     "module_overload_a": "{{item}}: {{currentA}} A in total at {{voltage}} V, at most {{limitA}} A",
     "limit_unknown": "{{channel}}: no limit known for {{loadType}}",
     "min_load": "{{channel}}: {{loadW}} W is below the minimum load of {{minW}} W",
+    "power_unknown": "{{channel}}: the power of {{need}} is unknown, so its limits are not checked (minimum load skipped)",
     "board_over_capacity": "{{board}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
+    "board_row_over_capacity": "{{board}}, row {{row}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
     "bus_line_no_power_supply": "{{name}}: no power supply",
     "bus_line_current_exceeded": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used, more than supplied",
     "bus_line_current_reserve": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used (reserve {{reservePercent}} %)",
@@ -27,6 +29,7 @@
     "gateway_places_reserve": "{{label}}: {{used}} of {{supplied}} places used (reserve {{reservePercent}} %)",
     "gateway_places_exceeded": "{{label}}: {{used}} of {{supplied}} places used, more than it has",
     "gateway_no_router": "{{label}}: {{devices}} devices and no router (advised from {{threshold}} end devices)",
+    "network_assignment_dangling": "{{item}} is assigned to {{target}}",
     "unknown": "Check {{code}}"
   },
   "reason": {
@@ -119,6 +122,7 @@
     "findingsValue": "Errors: {{errors}} · Warnings: {{warnings}}",
     "board": "Board {{name}}",
     "te": "{{used}} of {{capacity}} TE used",
+    "row": "Row {{row}}: {{used}} of {{capacity}} TE",
     "channels": "{{kind}}: {{free}} of {{total}} free",
     "channelsAlternative": "{{kind}} (from other channels): {{free}} of {{total}} free",
     "busLine": "Bus line {{name}}",
@@ -179,5 +183,10 @@
     "summary_other": "{{count}} units will be connected.",
     "summaryWithFailures_one": "{{count}} unit will be connected, {{failed}} cannot:",
     "summaryWithFailures_other": "{{count}} units will be connected, {{failed}} cannot:"
+  },
+  "dangling": {
+    "bus_line": "a bus line that no longer exists",
+    "gateway": "a gateway that no longer exists",
+    "other": "a network that no longer exists"
   }
 }

@@ -32,8 +32,15 @@ describe('checks texts', () => {
     const unconnected = { code: 'need_unconnected', params: { missing: 2, quantity: 5, functionTypeKey: 'dimmable_light', label: 'Ceiling' } }
     expect(result.current(unconnected, { need: '5 × Dimmable light · Ceiling' })).toBe('5 × Dimmable light · Ceiling: 2 of 5 not connected')
     expect(result.current(unconnected)).toBe('Ceiling: 2 of 5 not connected')
-    expect(result.current({ code: 'channel_overload_w', params: { loadW: 450, limitW: 400 } })).toBe(
-      'a channel: 450 W connected, at most 400 W',
+    expect(result.current({ code: 'channel_overload_w', params: { loadW: 450, limitW: 400, utilisationPercent: 112.5 } })).toBe(
+      'a channel: 450 W connected, at most 400 W (112.5 % of the limit)',
+    )
+    // A device without channels is not in the wiring view: its label, else its product name from params.
+    expect(result.current({ code: 'board_row_over_capacity', params: { name: 'Sub board', row: 1, usedTe: 13, capacityTe: 12 } })).toBe(
+      'Sub board, row 1: 13 of 12 TE used, more than fits',
+    )
+    expect(result.current({ code: 'network_assignment_dangling', params: { label: 'GW 1', kind: 'bus_line' } })).toBe(
+      'GW 1 is assigned to a bus line that no longer exists',
     )
     expect(result.current({ code: 'motor_mismatch', params: { motorType: 'ac', needMotorType: 'dc' } }, { need: 'Blind', channel: 'ch 2' })).toBe(
       'Blind: DC motor on ch 2, which drives AC motors',

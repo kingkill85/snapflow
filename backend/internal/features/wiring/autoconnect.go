@@ -1,25 +1,35 @@
 package wiring
 
-// Auto-connect (spec 3d): connects the unconnected units of needs to free
-// channels, deterministically, never adding products and never touching
-// existing connections.
+// Auto-connect (spec 3d, D391 as amended by D409): connects the
+// unconnected units of needs to free channels, deterministically, never
+// adding products and never touching existing connections.
 //
-// Order of needs: plan order → zone order (needs outside every zone last)
-// → need order → unit. Targets of a need, in this order:
+// Order of needs: most constrained first — function types ranked by
+// scarcity (free serving channels ÷ missing units, lowest first), within a
+// rank plan order → zone order (needs outside every zone last) → need order
+// → unit. Targets of a need, in this order:
 //  1. for a function type that allows circuits: channels that already hold
 //     needs of the same plan, zone and function type (existing connections
 //     and this run's), in the order they were first used — the circuit is
 //     kept per zone and function type;
-//  2. free channels of the devices placed in the need's zone on its floorplan
-//     (placement order);
-//  3. free channels of the boards in plan order → modules by row and offset
-//     → output kind order → channel number (native channels before the
-//     alternative groups), so a module fills before the next.
+//  2. free channels of the devices placed in the need's zone on its floorplan;
+//  3. free board channels.
+//
+// Within 2 and 3 a unit takes the first channel by: native channels before
+// alternative groups; kinds serving fewer function types first (a relay
+// before a dimmer for a switch-only need); channels that do not break a
+// still-whole alternative group first (keeps relay pairs for blinds); then
+// the fill order (boards in plan order → modules by row and offset → output
+// kind order → channel number), so a module fills before the next.
 //
 // A channel is free when it holds no connection and none of its base
 // channels is used by another channel (D303). A unit goes to the first
 // target where the connection breaks no rule (validity errors; warnings do
 // not stop it); several units of a need on one channel are one connection.
+// Then a single-step repair: for each unit still unconnected, one
+// connection of this run that alone blocks a serving channel is moved to
+// another free channel serving its need, if both then fit. The result is
+// listed in need order.
 
 import (
 	"context"
@@ -50,6 +60,201 @@ type circuitKey struct {
 	ft   uuid.UUID
 }
 
+// needSig is what decides whether one unit of a need fits an empty channel:
+// a failure is remembered per (signature, channel) during the main pass,
+// where channels and items only get busier (D415).
+type needSig struct {
+	ft, lt uuid.UUID
+	power  int64 // -1: unknown
+}
+
+func sigOf(n *Need) needSig {
+	s := needSig{ft: n.FunctionTypeID, power: -1}
+	if n.LoadTypeID != nil {
+		s.lt = *n.LoadTypeID
+	}
+	if n.PowerCW != nil {
+		s.power = *n.PowerCW
+	}
+	return s
+}
+
+type failKey struct {
+	sig needSig
+	ch  ChannelKey
+}
+
+// prefList is a list of channels in preference order, cut into classes of
+// equal static rank (alternative, kinds served); cursor skips the busy
+// prefix of each class (main pass only: channels only get busier).
+type prefList struct {
+	chans   []ChannelKey
+	classes [][2]int
+	cursor  []int
+}
+
+// planner is one auto-connect run.
+type planner struct {
+	st       *state
+	fill     map[ChannelKey]int
+	made     []*Conn
+	run      map[uuid.UUID]bool // connections of this run
+	mine     map[NeedKey]map[ChannelKey]*Conn
+	failed   map[failKey]bool
+	circuits map[circuitKey][]ChannelKey
+	lists    map[string]*prefList
+}
+
+func keyOfCircuit(n *Need) circuitKey {
+	k := circuitKey{plan: n.Key.PlanID, ft: n.FunctionTypeID}
+	if n.ZoneID != nil {
+		k.zone = *n.ZoneID
+	}
+	return k
+}
+
+func (p *planner) addCircuit(n *Need, ch ChannelKey) {
+	k := keyOfCircuit(n)
+	if !slices.Contains(p.circuits[k], ch) {
+		p.circuits[k] = append(p.circuits[k], ch)
+	}
+}
+
+// prefer orders the channels serving ft (D409): native first, kinds
+// serving fewer function types first, then fill order.
+func (p *planner) prefer(name string, ft uuid.UUID, all []ChannelKey) *prefList {
+	if l, ok := p.lists[name]; ok {
+		return l
+	}
+	var chans []ChannelKey
+	for _, ch := range all {
+		if p.st.cat.Served[ch.Kind][ft] {
+			chans = append(chans, ch)
+		}
+	}
+	rank := func(ch ChannelKey) int {
+		r := len(p.st.cat.Served[ch.Kind])
+		if ch.Alternative() {
+			r += 1 << 20
+		}
+		return r
+	}
+	slices.SortStableFunc(chans, func(a, b ChannelKey) int {
+		if ra, rb := rank(a), rank(b); ra != rb {
+			return ra - rb
+		}
+		return p.fill[a] - p.fill[b]
+	})
+	l := &prefList{chans: chans}
+	for i := 0; i < len(chans); {
+		j := i
+		for j < len(chans) && rank(chans[j]) == rank(chans[i]) {
+			j++
+		}
+		l.classes = append(l.classes, [2]int{i, j})
+		l.cursor = append(l.cursor, i)
+		i = j
+	}
+	p.lists[name] = l
+	return l
+}
+
+// breaksGroup: a native channel whose base channel belongs to an
+// alternative group whose channels are all still free.
+func (p *planner) breaksGroup(ch ChannelKey) bool {
+	if ch.Alternative() {
+		return false
+	}
+	it := p.st.items[ch.Item]
+	for _, c := range it.Caps.Channels {
+		if c.OutputKindID != ch.Kind {
+			continue
+		}
+		for _, a := range c.Alternatives {
+			if a.Per < 1 {
+				continue
+			}
+			g := (ch.No-1)/a.Per + 1
+			if g > a.Max {
+				continue
+			}
+			whole := true
+			for b := (g-1)*a.Per + 1; b <= g*a.Per; b++ {
+				if len(p.st.phys[physKey{ch.Item, ch.Kind, b}]) > 0 {
+					whole = false
+					break
+				}
+			}
+			if whole {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// try puts one more unit of n on ch (its connection there grows).
+func (p *planner) try(n *Need, ch ChannelKey) bool {
+	st := p.st
+	mine := p.mine[n.Key]
+	if mine == nil {
+		mine = map[ChannelKey]*Conn{}
+		p.mine[n.Key] = mine
+	}
+	if c := mine[ch]; c != nil {
+		c.Units++
+		if firstError(st.problemsFor(c), c.ID) == nil {
+			return true
+		}
+		c.Units--
+		return false
+	}
+	c := &Conn{ID: uuid.New(), Need: n.Key, Units: 1, Channel: ch}
+	st.add(c)
+	if firstError(st.problemsFor(c), c.ID) == nil {
+		mine[ch] = c
+		p.made = append(p.made, c)
+		p.run[c.ID] = true
+		return true
+	}
+	st.remove(c)
+	return false
+}
+
+// pick places one unit of n on the best free channel of l.
+func (p *planner) pick(n *Need, l *prefList, sawServing, sawFree *bool) bool {
+	st := p.st
+	sig := sigOf(n)
+	if len(l.chans) > 0 {
+		*sawServing = true
+	}
+	for ci, cl := range l.classes {
+		i := l.cursor[ci]
+		for i < cl[1] && st.busy(l.chans[i]) {
+			i++
+		}
+		l.cursor[ci] = i
+		for pass := 0; pass < 2; pass++ {
+			for k := i; k < cl[1]; k++ {
+				ch := l.chans[k]
+				if st.busy(ch) || p.breaksGroup(ch) != (pass == 1) {
+					continue
+				}
+				*sawFree = true
+				fk := failKey{sig, ch}
+				if p.failed[fk] {
+					continue
+				}
+				if p.try(n, ch) {
+					return true
+				}
+				p.failed[fk] = true
+			}
+		}
+	}
+	return false
+}
+
 // plan computes the connections auto-connect makes on st (which it
 // changes) for the needs in scope.
 func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
@@ -72,90 +277,61 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 		}
 		return true
 	}
+	p := &planner{st: st, fill: map[ChannelKey]int{}, run: map[uuid.UUID]bool{}, mine: map[NeedKey]map[ChannelKey]*Conn{},
+		failed: map[failKey]bool{}, circuits: map[circuitKey][]ChannelKey{}, lists: map[string]*prefList{}}
 
-	// Board slots in target order, and slots of the devices in each zone.
-	itemSlots := func(it *Item) []ChannelKey {
-		var kinds []uuid.UUID
-		for _, k := range sn.facts.kinds {
-			if slotCount(it, k.ID) > 0 {
-				kinds = append(kinds, k.ID)
-			}
-		}
-		var out []ChannelKey
-		for _, k := range kinds {
-			for no := 1; no <= slotCount(it, k); no++ {
-				out = append(out, ChannelKey{Item: it.Key, Kind: k, No: no})
-			}
-		}
-		return out
-	}
+	// Board channels in fill order, and channels of the devices in each zone.
 	var boardSlots []ChannelKey
 	roomSlots := map[[2]uuid.UUID][]ChannelKey{}
-	for _, p := range sn.data.Plans {
-		for _, m := range p.Modules {
-			boardSlots = append(boardSlots, itemSlots(st.items[ItemKey{p.ID, m.ID}])...)
+	for _, pl := range sn.data.Plans {
+		for _, m := range pl.Modules {
+			for _, ch := range itemChannels(sn, st.items[ItemKey{pl.ID, m.ID}]) {
+				p.fill[ch] = len(p.fill)
+				boardSlots = append(boardSlots, ch)
+			}
 		}
-		for _, pl := range p.Placements {
-			if pl.ZoneID == nil {
+		for _, d := range pl.Placements {
+			if d.ZoneID == nil {
 				continue
 			}
-			k := [2]uuid.UUID{p.ID, *pl.ZoneID}
-			roomSlots[k] = append(roomSlots[k], itemSlots(st.items[ItemKey{p.ID, pl.ID}])...)
-		}
-	}
-	// Board slots serving a function type, with a cursor past the leading
-	// busy ones (channels only get busier during a run).
-	served := map[uuid.UUID][]ChannelKey{}
-	cursor := map[uuid.UUID]int{}
-	boardFor := func(ft uuid.UUID) []ChannelKey {
-		if list, ok := served[ft]; ok {
-			return list
-		}
-		list := []ChannelKey{}
-		for _, ch := range boardSlots {
-			if st.cat.Served[ch.Kind][ft] {
-				list = append(list, ch)
+			k := [2]uuid.UUID{pl.ID, *d.ZoneID}
+			for _, ch := range itemChannels(sn, st.items[ItemKey{pl.ID, d.ID}]) {
+				p.fill[ch] = len(p.fill)
+				roomSlots[k] = append(roomSlots[k], ch)
 			}
 		}
-		served[ft] = list
-		return list
+	}
+	boardFor := func(ft uuid.UUID) *prefList { return p.prefer("b"+ft.String(), ft, boardSlots) }
+	roomFor := func(n *Need) *prefList {
+		if n.ZoneID == nil {
+			return &prefList{}
+		}
+		return p.prefer("r"+n.Key.PlanID.String()+n.ZoneID.String()+n.FunctionTypeID.String(), n.FunctionTypeID,
+			roomSlots[[2]uuid.UUID{n.Key.PlanID, *n.ZoneID}])
 	}
 
 	// Circuits so far, from existing connections.
-	circuits := map[circuitKey][]ChannelKey{}
-	keyOf := func(n *Need) circuitKey {
-		k := circuitKey{plan: n.Key.PlanID, ft: n.FunctionTypeID}
-		if n.ZoneID != nil {
-			k.zone = *n.ZoneID
-		}
-		return k
-	}
-	addCircuit := func(n *Need, ch ChannelKey) {
-		k := keyOf(n)
-		if !slices.Contains(circuits[k], ch) {
-			circuits[k] = append(circuits[k], ch)
-		}
-	}
 	for _, c := range st.conns {
 		if n := st.needs[c.Need]; n != nil && st.cat.Circuit[n.FunctionTypeID] {
-			addCircuit(n, c.Channel)
+			p.addCircuit(n, c.Channel)
 		}
 	}
 
-	// Needs in order.
+	// Needs in plan → zone → need order (the display order).
 	type ordered struct {
 		n                 *Need
 		plan, zone, index int
+		missing           int32
 	}
 	var needs []ordered
-	for pi, p := range sn.data.Plans {
+	for pi, pl := range sn.data.Plans {
 		zoneIdx := map[uuid.UUID]int{}
-		for i, z := range p.Zones {
+		for i, z := range pl.Zones {
 			zoneIdx[z.ID] = i
 		}
-		for i, wn := range p.Needs {
-			n := st.needs[NeedKey{p.ID, wn.ID}]
-			zi := len(p.Zones)
+		for i, wn := range pl.Needs {
+			n := st.needs[NeedKey{pl.ID, wn.ID}]
+			zi := len(pl.Zones)
 			if n.ZoneID != nil {
 				if v, ok := zoneIdx[*n.ZoneID]; ok {
 					zi = v
@@ -173,123 +349,258 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 		}
 		return a.index - b.index
 	})
+	order := map[NeedKey]int{}
+	var todo []ordered
+	missingByFT := map[uuid.UUID]int64{}
+	for i, o := range needs {
+		order[o.n.Key] = i
+		if !inScope(o.n) {
+			continue
+		}
+		if o.missing = missingOf(st, o.n); o.missing > 0 {
+			todo = append(todo, o)
+			missingByFT[o.n.FunctionTypeID] += int64(o.missing)
+		}
+	}
+	// Scarcity per function type: free serving channels ÷ missing units.
+	var allSlots []ChannelKey
+	allSlots = append(allSlots, boardSlots...)
+	for _, pl := range sn.data.Plans {
+		for _, d := range pl.Placements {
+			if d.ZoneID != nil {
+				allSlots = append(allSlots, roomSlots[[2]uuid.UUID{pl.ID, *d.ZoneID}]...)
+			}
+		}
+	}
+	freeByFT := map[uuid.UUID]int64{}
+	seen := map[ChannelKey]bool{}
+	for _, ch := range allSlots {
+		if seen[ch] || st.busy(ch) {
+			continue
+		}
+		seen[ch] = true
+		for ft := range st.cat.Served[ch.Kind] {
+			if missingByFT[ft] > 0 {
+				freeByFT[ft]++
+			}
+		}
+	}
+	scarcity := func(ft uuid.UUID) float64 { return float64(freeByFT[ft]) / float64(missingByFT[ft]) }
+	slices.SortStableFunc(todo, func(a, b ordered) int {
+		sa, sb := scarcity(a.n.FunctionTypeID), scarcity(b.n.FunctionTypeID)
+		switch {
+		case sa < sb:
+			return -1
+		case sa > sb:
+			return 1
+		}
+		return 0
+	})
 
-	var made []*Conn
-	for _, o := range needs {
+	type left struct {
+		n                   *Need
+		missing, placed     int32
+		sawServing, sawFree bool
+	}
+	var lefts []*left
+	for _, o := range todo {
 		n := o.n
-		if !inScope(n) {
-			continue
-		}
-		have := int32(0)
-		for _, c := range st.byNeed[n.Key] {
-			have += c.Units
-		}
-		missing := n.Quantity - have
-		if missing <= 0 {
-			continue
-		}
 		out.Needs++
-		out.Units += int64(missing)
+		out.Units += int64(o.missing)
 		circuit := st.cat.Circuit[n.FunctionTypeID]
-		sawServing, sawFree := false, false
-		// mine: this run's connection of the need per channel.
-		mine := map[ChannelKey]*Conn{}
-		var last ChannelKey
-		try := func(ch ChannelKey) bool {
-			last = ch
-			if c := mine[ch]; c != nil {
-				c.Units++
-				if firstError(st.problemsFor(c), c.ID) == nil {
-					return true
-				}
-				c.Units--
-				return false
-			}
-			c := &Conn{ID: uuid.New(), Need: n.Key, Units: 1, Channel: ch}
-			st.add(c)
-			if firstError(st.problemsFor(c), c.ID) == nil {
-				mine[ch] = c
-				made = append(made, c)
-				return true
-			}
-			st.remove(c)
-			return false
-		}
-		free := func(ch ChannelKey) bool {
-			if !st.cat.Served[ch.Kind][n.FunctionTypeID] {
-				return false
-			}
-			sawServing = true
-			if st.busy(ch) {
-				return false
-			}
-			sawFree = true
-			return try(ch)
-		}
-		placed := int32(0)
-		for placed < missing {
+		l := &left{n: n, missing: o.missing}
+		for l.placed < l.missing {
 			ok := false
+			var at ChannelKey
 			if circuit {
-				for _, ch := range circuits[keyOf(n)] {
-					sawServing, sawFree = true, true
-					if try(ch) {
-						ok = true
-						break
-					}
-				}
-			}
-			if !ok && n.ZoneID != nil {
-				for _, ch := range roomSlots[[2]uuid.UUID{n.Key.PlanID, *n.ZoneID}] {
-					if free(ch) {
-						ok = true
+				for _, ch := range p.circuits[keyOfCircuit(n)] {
+					l.sawServing, l.sawFree = true, true
+					if p.try(n, ch) {
+						ok, at = true, ch
 						break
 					}
 				}
 			}
 			if !ok {
-				list := boardFor(n.FunctionTypeID)
-				if len(list) > 0 {
-					sawServing = true
-				}
-				i := cursor[n.FunctionTypeID]
-				for i < len(list) && st.busy(list[i]) {
-					i++
-				}
-				cursor[n.FunctionTypeID] = i
-				for ; i < len(list); i++ {
-					if free(list[i]) {
-						ok = true
-						break
-					}
+				before := len(p.made)
+				ok = p.pick(n, roomFor(n), &l.sawServing, &l.sawFree) || p.pick(n, boardFor(n.FunctionTypeID), &l.sawServing, &l.sawFree)
+				if ok {
+					at = lastChannel(p, n, before)
 				}
 			}
 			if !ok {
 				break
 			}
-			placed++
+			l.placed++
 			if circuit {
-				addCircuit(n, last)
+				p.addCircuit(n, at)
 			}
 		}
-		out.ConnectedUnits += int64(placed)
-		if placed < missing {
-			reason := ReasonLimitsExceeded
-			switch {
-			case !sawServing:
-				reason = ReasonNoChannelServes
-			case !sawFree:
-				reason = ReasonNoFreeChannel
+		if l.placed < l.missing {
+			lefts = append(lefts, l)
+		}
+		out.ConnectedUnits += int64(l.placed)
+	}
+
+	// Repair: move one connection of this run out of the way (D409). A
+	// signature that found no repair finds none until a repair succeeds.
+	noRepair := map[needSig]bool{}
+	for _, l := range lefts {
+		for l.placed < l.missing && !noRepair[sigOf(l.n)] {
+			if !p.repair(l.n, roomFor, boardFor) {
+				noRepair[sigOf(l.n)] = true
+				break
 			}
-			out.Unconnectable = append(out.Unconnectable, Unconnectable{NeedPlanID: n.Key.PlanID, NeedID: n.Key.ID, Units: missing - placed,
-				Reason: reason, Params: map[string]any{"functionTypeKey": st.cat.FunctionKey[n.FunctionTypeID], "label": n.Label}})
+			clear(noRepair)
+			l.placed++
+			out.ConnectedUnits++
 		}
 	}
-	for _, c := range made {
+	for _, l := range lefts {
+		if l.placed >= l.missing {
+			continue
+		}
+		reason := ReasonLimitsExceeded
+		switch {
+		case !l.sawServing:
+			reason = ReasonNoChannelServes
+		case !l.sawFree:
+			reason = ReasonNoFreeChannel
+		}
+		n := l.n
+		out.Unconnectable = append(out.Unconnectable, Unconnectable{NeedPlanID: n.Key.PlanID, NeedID: n.Key.ID, Units: l.missing - l.placed,
+			Reason: reason, Params: map[string]any{"functionTypeKey": st.cat.FunctionKey[n.FunctionTypeID], "label": n.Label}})
+	}
+	// Listed in need order.
+	slices.SortStableFunc(p.made, func(a, b *Conn) int { return order[a.Need] - order[b.Need] })
+	slices.SortStableFunc(out.Unconnectable, func(a, b Unconnectable) int {
+		return order[NeedKey{a.NeedPlanID, a.NeedID}] - order[NeedKey{b.NeedPlanID, b.NeedID}]
+	})
+	for _, c := range p.made {
 		out.Connections = append(out.Connections, PlannedConnection{NeedPlanID: c.Need.PlanID, NeedID: c.Need.ID, Units: c.Units,
-			TargetPlanID: c.Channel.Item.PlanID, TargetItemID: c.Channel.Item.ID, OutputKindID: c.Channel.Kind, ChannelNo: int32(c.Channel.No)})
+			TargetPlanID: c.Channel.Item.PlanID, TargetItemID: c.Channel.Item.ID, OutputKindID: c.Channel.Kind, ChannelNo: int32(st.noOf(c.Channel, 0))})
 	}
 	out.Checksum = checksum(sn.conns, out)
-	return out, made
+	return out, p.made
+}
+
+// lastChannel is the channel the last pick used: a new connection or a
+// grown one of the need.
+func lastChannel(p *planner, n *Need, before int) ChannelKey {
+	if len(p.made) > before {
+		return p.made[len(p.made)-1].Channel
+	}
+	// A grown connection: pick only takes free channels, so this does not
+	// happen; keep the zero key.
+	return ChannelKey{}
+}
+
+// blockers are the connections using a channel or one of its base
+// channels.
+func (p *planner) blockers(ch ChannelKey) []*Conn {
+	st := p.st
+	sl, ok := st.slot(ch)
+	if !ok {
+		return nil
+	}
+	var out []*Conn
+	add := func(c *Conn) {
+		if !slices.Contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	for _, c := range st.byChannel[ch] {
+		add(c)
+	}
+	for b := sl.first; b <= sl.last; b++ {
+		for other := range st.phys[physKey{ch.Item, sl.cap.OutputKindID, b}] {
+			for _, c := range st.byChannel[other] {
+				add(c)
+			}
+		}
+	}
+	return out
+}
+
+// repair places one unit of n on a serving channel that a single
+// connection of this run blocks, moving that connection to another free
+// channel serving its need (D409). The failure memory is cleared after a
+// move (items got lighter).
+func (p *planner) repair(n *Need, roomFor func(*Need) *prefList, boardFor func(uuid.UUID) *prefList) bool {
+	st := p.st
+	// Free channels a blocker's need could move to (the state is restored
+	// after every failed attempt, so they are computed once per call).
+	freeFor := map[*Need][]ChannelKey{}
+	targetsOf := func(bn *Need) []ChannelKey {
+		if t, ok := freeFor[bn]; ok {
+			return t
+		}
+		var t []ChannelKey
+		for _, ch := range slices.Concat(roomFor(bn).chans, boardFor(bn.FunctionTypeID).chans) {
+			if !st.busy(ch) {
+				t = append(t, ch)
+			}
+		}
+		freeFor[bn] = t
+		return t
+	}
+	for _, list := range []*prefList{roomFor(n), boardFor(n.FunctionTypeID)} {
+		for _, ch := range list.chans {
+			if !st.busy(ch) {
+				continue
+			}
+			bs := p.blockers(ch)
+			if len(bs) != 1 || !p.run[bs[0].ID] || bs[0].Need == n.Key {
+				continue
+			}
+			b := bs[0]
+			bn := st.needs[b.Need]
+			if bn == nil || len(targetsOf(bn)) == 0 {
+				continue
+			}
+			from := b.Channel
+			st.remove(b)
+			c := &Conn{ID: uuid.New(), Need: n.Key, Units: 1, Channel: ch}
+			st.add(c)
+			if firstError(st.problemsFor(c), c.ID) != nil {
+				st.remove(c)
+				st.add(b)
+				continue
+			}
+			moved := false
+			for _, ch2 := range targetsOf(bn) {
+				if ch2 == from || ch2 == ch || st.busy(ch2) {
+					continue
+				}
+				b.Channel = ch2
+				st.add(b)
+				if firstError(st.problemsFor(b), b.ID) == nil {
+					moved = true
+					break
+				}
+				st.remove(b)
+			}
+			if !moved {
+				b.Channel = from
+				st.remove(c)
+				st.add(b)
+				continue
+			}
+			if m := p.mine[b.Need]; m != nil {
+				delete(m, from)
+				m[b.Channel] = b
+			}
+			if p.mine[n.Key] == nil {
+				p.mine[n.Key] = map[ChannelKey]*Conn{}
+			}
+			p.mine[n.Key][ch] = c
+			p.made = append(p.made, c)
+			p.run[c.ID] = true
+			clear(p.failed)
+			return true
+		}
+	}
+	return false
 }
 
 // checksum identifies the input (existing connections) and the result of a
@@ -366,13 +677,17 @@ func (s *Service) Apply(ctx context.Context, versionID uuid.UUID, in AutoConnect
 			Units        int32     `json:"units"`
 			TargetPlanID uuid.UUID `json:"target_plan_id"`
 			TargetItemID uuid.UUID `json:"target_item_id"`
-			OutputKindID uuid.UUID `json:"output_kind_id"`
-			ChannelNo    int       `json:"channel_no"`
-			Ord          int       `json:"ord"`
+			OutputKindID uuid.UUID  `json:"output_kind_id"`
+			ChannelNo    int        `json:"channel_no"`
+			AltBase      *uuid.UUID `json:"alt_base_output_kind_id"`
+			AltGroup     *int32     `json:"alt_group"`
+			Ord          int        `json:"ord"`
 		}
 		rows := make([]row, len(made))
 		for i, c := range made {
-			rows[i] = row{c.Need.PlanID, c.Need.ID, c.Units, c.Channel.Item.PlanID, c.Channel.Item.ID, c.Channel.Kind, c.Channel.No, i}
+			base, group := altOf(c.Channel)
+			rows[i] = row{c.Need.PlanID, c.Need.ID, c.Units, c.Channel.Item.PlanID, c.Channel.Item.ID, c.Channel.Kind,
+				sn.st.noOf(c.Channel, 0), base, group, i}
 		}
 		data, err := json.Marshal(rows)
 		if err != nil {
@@ -389,7 +704,7 @@ func (s *Service) Apply(ctx context.Context, versionID uuid.UUID, in AutoConnect
 		}
 		for _, c := range all {
 			if c.BatchID != nil && *c.BatchID == batch {
-				out.Connections = append(out.Connections, connectionOut(c))
+				out.Connections = append(out.Connections, connectionOut(c, sn.st))
 			}
 		}
 		return nil

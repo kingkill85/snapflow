@@ -134,7 +134,7 @@ export const checks: Checks = {
   ],
   gateways: [],
   findings: [
-    { severity: 'error', code: 'channel_overload_w', refs: { targetPlanId: boardId, itemId: dimmer, outputKindId: dimmerKind, channelNo: 1, connectionIds: [id(70)] }, params: { loadW: 140, limitW: 100 } },
+    { severity: 'error', code: 'channel_overload_w', refs: { targetPlanId: boardId, itemId: dimmer, outputKindId: dimmerKind, channelNo: 1, connectionIds: [id(70)] }, params: { loadW: 140, limitW: 100, utilisationPercent: 140 } },
     { severity: 'warning', code: 'need_unconnected', refs: { planId: floorId, zoneId: living, needId: ceiling }, params: { missing: 1, quantity: 1, label: '' } },
     { severity: 'warning', code: 'bus_line_current_reserve', refs: { busLineId: lineId }, params: { name: 'KNX 1', usedMa: 612, suppliedMa: 640, reservePercent: 20 } },
   ],

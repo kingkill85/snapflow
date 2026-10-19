@@ -16,6 +16,8 @@ export interface LoadType {
   isActive: boolean;
   key: string;
   name: LoadTypeName;
+  /** 0.10-1.00; converts W into A for limits in A: I = P / (V · PF) */
+  powerFactor: number;
   sortOrder: number;
   /** Send it back as expectedUpdatedAt when updating */
   updatedAt: string;

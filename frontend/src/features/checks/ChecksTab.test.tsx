@@ -8,8 +8,9 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ChecksTab } from './ChecksTab'
-import { batchId, boardId, lineId, ceiling, dimmer, dimmerKind, floorId, kitchen, living, projectId, relay, relayKind, serveChecks, versionId, wiring } from './test-fixtures'
+import { batchId, boardId, checks, lineId, ceiling, dimmer, dimmerKind, floorId, kitchen, living, projectId, relay, relayKind, serveChecks, versionId, wiring } from './test-fixtures'
 
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const render = () => renderWithProviders(<ChecksTab projectId={projectId} versionId={versionId} />)
 
 const preview = (extra: Partial<AutoConnectPreview> = {}): AutoConnectPreview => ({
@@ -101,6 +102,61 @@ describe('ChecksTab', () => {
     await userEvent.click(within(section).getByRole('button', { name: 'Connect 1 × Light…' }))
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText('No channel serves Light')).toBeInTheDocument()
+  })
+
+  it('shows the reason and the refused candidates with their rule when nothing fits', async () => {
+    serveChecks()
+    const refused = (item: string, kindId: string, no: number, code: string, params: Record<string, unknown>) => ({
+      needPlanId: floorId,
+      needId: ceiling,
+      targetPlanId: boardId,
+      targetItemId: item,
+      outputKindId: kindId,
+      channelNo: no,
+      units: 0,
+      free: true,
+      inZone: false,
+      problem: { code, params },
+    })
+    server.use(
+      http.post('/api/versions/:versionId/connections/candidates', () =>
+        HttpResponse.json({
+          items: [refused(dimmer, dimmerKind, 2, 'channel_overload_w', { loadW: 250, limitW: 200, utilisationPercent: 125 }), refused(relay, relayKind, 1, 'channel_conflict', { baseChannel: 1 })],
+          reason: 'limits_exceeded',
+        } satisfies Candidates),
+      ),
+    )
+    render()
+    const section = await screen.findByRole('region', { name: 'Unconnected needs' })
+    await userEvent.click(within(section).getByRole('button', { name: 'Connect 1 × Light…' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText("The free channels' limits would be exceeded")).toBeInTheDocument()
+    expect(within(dialog).getByText('2 not possible:')).toBeInTheDocument()
+    expect(within(dialog).getByText(/D1 · Dimmer output 2 \(Main board\): 250 W connected, at most 200 W \(125 % of the limit\)/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Switch actuator · Relay output 1 \(Main board\): .*uses output 1/)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^Connect to / })).not.toBeInTheDocument()
+  })
+
+  it('names devices without channels and boards without channel modules from the finding params', async () => {
+    const sensor = '00000000-0000-4000-8000-000000000099'
+    serveChecks({
+      checks: {
+        ...checks,
+        findings: [
+          { severity: 'error', code: 'board_row_over_capacity', refs: { targetPlanId: id(12) }, params: { name: 'Sub board', row: 2, usedTe: 14, capacityTe: 12 } },
+          { severity: 'warning', code: 'bus_device_unassigned', refs: { targetPlanId: floorId, itemId: sensor }, params: { label: '', productName: { en: 'Presence sensor', de: 'Präsenzmelder' } } },
+          { severity: 'warning', code: 'network_assignment_dangling', refs: { targetPlanId: floorId, itemId: sensor }, params: { label: 'PIR 1', kind: 'gateway' } },
+        ],
+      },
+    })
+    render()
+    const findings = await screen.findByRole('region', { name: 'Findings' })
+    expect(within(findings).getByText('Sub board, row 2: 14 of 12 TE used, more than fits')).toBeInTheDocument()
+    expect(within(findings).getByText('Presence sensor is on no bus line')).toBeInTheDocument()
+    expect(within(findings).getByText('PIR 1 is assigned to a gateway that no longer exists')).toBeInTheDocument()
+    const links = within(findings).getAllByRole('link')
+    expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${sensor}`)
+    expect(links[2]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks`)
   })
 
   it('auto-connects with a preview, re-previews on 409 and undoes the batch', async () => {

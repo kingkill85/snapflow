@@ -177,7 +177,8 @@ func TestChecksSummaries(t *testing.T) {
 	v.conns = []store.Connection{
 		{ID: uuid.New(), NeedPlanID: f.floor, NeedID: n1, Units: 2, TargetPlanID: f.board, TargetItemID: dim, OutputKindID: f.dimmer, ChannelNo: 1},
 		// Dangling: the need is gone.
-		{ID: uuid.New(), NeedPlanID: f.floor, NeedID: uuid.New(), Units: 1, TargetPlanID: f.board, TargetItemID: rel, OutputKindID: f.blind, ChannelNo: 1},
+		{ID: uuid.New(), NeedPlanID: f.floor, NeedID: uuid.New(), Units: 1, TargetPlanID: f.board, TargetItemID: rel, OutputKindID: f.blind, ChannelNo: 1,
+			AltBaseOutputKindID: &f.relay, AltGroup: ptr(int32(1))},
 	}
 	sn := v.snapshot()
 	knx, zb := uuid.New(), uuid.New()
@@ -314,8 +315,9 @@ func TestPerformance(t *testing.T) {
 	}
 	// Apply the plan as stored connections and evaluate.
 	for _, c := range made {
+		base, group := altOf(c.Channel)
 		v.conns = append(v.conns, store.Connection{ID: c.ID, NeedPlanID: c.Need.PlanID, NeedID: c.Need.ID, Units: c.Units, TargetPlanID: c.Channel.Item.PlanID,
-			TargetItemID: c.Channel.Item.ID, OutputKindID: c.Channel.Kind, ChannelNo: int32(c.Channel.No)})
+			TargetItemID: c.Channel.Item.ID, OutputKindID: c.Channel.Kind, ChannelNo: int32(c.Channel.No), AltBaseOutputKindID: base, AltGroup: group})
 	}
 	start = time.Now()
 	c := evaluateChecks(v.snapshot(), nil, nil)

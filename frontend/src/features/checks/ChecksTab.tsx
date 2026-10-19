@@ -146,6 +146,14 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
       {checks.boards.map((b) => (
         <Card key={b.planId} title={t('overview.board', { name: b.name })} status={<StatusChip status={b.status} />}>
           <p className="text-sm">{t('overview.te', { used: b.usedTe, capacity: b.capacityTe })}</p>
+          {b.rows.map((r, i) =>
+            r.status === 'red' || r.status === 'amber' ? (
+              <p key={r.rowId} className="flex flex-wrap items-center gap-2 text-sm">
+                {t('overview.row', { row: i + 1, used: r.usedTe, capacity: r.capacityTe })}
+                <StatusChip status={r.status} />
+              </p>
+            ) : null,
+          )}
           <ul className="space-y-0.5 text-sm text-muted">
             {b.channels.map((ch) => (
               <li key={`${ch.outputKindId}/${ch.alternative}`}>
@@ -199,6 +207,7 @@ function Findings({
   if (checks.findings.length === 0) return <EmptyState title={t('findings.none')} />
   const linkOf = (f: Finding): string | null => {
     const r = f.refs
+    if (f.code === 'network_assignment_dangling') return `${versionPath(projectId, versionId)}?tab=networks`
     if (r.busLineId) return `${versionPath(projectId, versionId)}?tab=networks#line-${r.busLineId}`
     if (r.targetPlanId && r.itemId) {
       if (planKind.get(r.targetPlanId) === 'board') return `${boardPath(projectId, versionId, r.targetPlanId)}?select=${r.itemId}`
