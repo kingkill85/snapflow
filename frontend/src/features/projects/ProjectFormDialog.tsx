@@ -376,7 +376,7 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
             <RefreshCw aria-hidden="true" />
             {t('rate.fetch')}
           </Button>
-          {currencies.noOnlineRate(currency) && <Notice>{t('rate.noOnline', { currency })}</Notice>}
+          {currencies.noOnlineRate(currency) && <Notice tone="warning">{t('rate.noOnline', { currency })}</Notice>}
           <ErrorMessage error={fetchError} />
         </div>
       )}

@@ -63,7 +63,7 @@ function listPosition(input: HTMLElement, container: HTMLElement): CSSProperties
  * Home/End jump (while the list is open), Enter picks, Escape closes the list
  * (dialogs keep open: they pass keepDialogOnComboboxEscape), Tab picks the
  * highlighted option and moves on, as a native select does; closed, the input
- * shows the chosen option's label. The list is drawn in the surrounding dialog
+ * shows the chosen option's label (open, as the placeholder until one types). The list is drawn in the surrounding dialog
  * (or the body), positioned at the input, so a scrolling dialog body does not
  * clip it on phones.
  * Controlled: `value` + `onValueChange`; in a react-hook-form use FormComboboxField.
@@ -167,7 +167,8 @@ export function Combobox({ value, onValueChange, options, id, disabled, classNam
         aria-activedescendant={activeOption ? `${listId}-${active}` : undefined}
         autoComplete="off"
         disabled={disabled}
-        placeholder={placeholder}
+        // Open with an empty search, the chosen option stays visible as the placeholder (D283).
+        placeholder={open && selected ? selected.label : placeholder}
         className={cn(inputClass, 'pr-8')}
         value={open ? query : (selected?.label ?? '')}
         onChange={(e) => show(e.target.value)}

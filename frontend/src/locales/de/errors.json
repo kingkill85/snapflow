@@ -186,7 +186,7 @@
     "currency_format": "Geben Sie einen dreistelligen Währungscode wie EUR oder USD ein.",
     "currency_unknown": "„{{currency}}“ ist keine unterstützte Währung. Wählen Sie eine aus der Liste.",
     "exchange_rate": "Geben Sie einen Wechselkurs über 0 ein (bis zu 6 Nachkommastellen); für USD ist er 1.",
-    "exchange_rate_implausible": "Dieser Kurs weicht stark vom heutigen Online-Kurs von {{currency}} ab (1 USD = {{online}}): War er für die vorige Währung gedacht? Prüfen Sie ihn und speichern Sie erneut, um ihn zu behalten.",
+    "exchange_rate_implausible": "Dieser Kurs weicht stark vom heutigen Online-Kurs von {{currency}} ab (1 USD = {{online}} {{currency}}): War er für die vorige Währung gedacht? Prüfen Sie ihn und speichern Sie erneut, um ihn zu behalten.",
     "exchange_rate_usd": "USD-Projekte haben keinen Wechselkurs: Katalogpreise sind in USD.",
     "not_found": "Dieses Projekt existiert nicht mehr.",
     "product_type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",

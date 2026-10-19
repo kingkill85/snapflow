@@ -118,6 +118,7 @@ describe('API field errors', () => {
   it('shows limits in params as localized numbers, exactly', () => {
     expect(formatParams({ max: '9999999999.99', min: 100000 }, 'de')).toEqual({ max: '9.999.999.999,99', min: '100.000' })
     expect(formatParams({ max: '9999999999.99' }, 'en')).toEqual({ max: '9,999,999,999.99' })
+    expect(formatParams({ online: '278.5', currency: 'PKR' }, 'de')).toEqual({ online: '278,5', currency: 'PKR' })
     // Only limits: a SKU stays as it is.
     expect(formatParams({ sku: '12345' }, 'en')).toEqual({ sku: '12345' })
     const { result } = renderHook(() => useErrorMessage())

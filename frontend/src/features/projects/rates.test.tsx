@@ -186,7 +186,7 @@ describe('ProjectFormDialog exchange rate', () => {
     await user.clear(rate)
     await user.type(rate, '2,785')
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
-    expect(await within(dialog).findByText(/far off today's online rate of PKR \(1 USD = 278.5\)/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/far off today's online rate of PKR \(1 USD = 278.5 PKR\)/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(sent).toHaveLength(2))
     expect(sent[0]).not.toHaveProperty('exchangeRateConfirmed')
