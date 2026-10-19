@@ -9,6 +9,10 @@
   "field": {
     "key": "Key",
     "name": "Name",
-    "keyHint": "e.g. dimmer, switching, blind"
+    "keyHint": "e.g. dimmer, switching, blind",
+    "loadTypes": "Allowed load types",
+    "loadTypesHint": "The load types a need of this function may have. None ticked = any.",
+    "allowsCircuit": "Several needs may share one channel",
+    "allowsCircuitHint": "A circuit: e.g. lights and sockets yes, blinds and inputs no."
   }
 }

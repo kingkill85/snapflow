@@ -22,6 +22,13 @@
     "active": "Active",
     "activeHint": "Inactive product types are hidden from the catalog but keep their products.",
     "status": "Status",
-    "position": "Position"
+    "position": "Position",
+    "systemSettings": "System settings",
+    "defaultBusCurrentMa": "Default bus current",
+    "defaultBusCurrentMaHint": "Assumed for a bus device without its own value (e.g. KNX 10 mA). Empty = unknown.",
+    "reservePercent": "Reserve",
+    "reservePercentHint": "Capacity kept free: amber above 100 % − reserve, red when exceeded.",
+    "busDevicesMax": "Devices per line",
+    "busDevicesMaxHint": "Default maximum devices on one bus line. Empty = not checked."
   }
 }

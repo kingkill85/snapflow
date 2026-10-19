@@ -9,6 +9,10 @@
   "field": {
     "key": "Schlüssel",
     "name": "Name",
-    "keyHint": "z. B. dimmer, switching, blind"
+    "keyHint": "z. B. dimmer, switching, blind",
+    "loadTypes": "Erlaubte Lastarten",
+    "loadTypesHint": "Die Lastarten, die ein Bedarf dieser Funktion haben darf. Keine angehakt = alle.",
+    "allowsCircuit": "Mehrere Bedarfe dürfen sich einen Kanal teilen",
+    "allowsCircuitHint": "Ein Stromkreis: z. B. Licht und Steckdosen ja, Jalousien und Eingänge nein."
   }
 }

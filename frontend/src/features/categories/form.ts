@@ -5,8 +5,10 @@ import {
   AttributeDefinitionItemType,
   AttributeDefinitionScope,
   AttributeDefinitionType,
+  type CatalogField,
   type Category,
   type CategoryInput,
+  CategoryInputMounting,
   type InstanceAttributeDefinition,
 } from '@/api/generated/model'
 import { formatDecimal, parseDecimal } from '@/catalog/decimal'
@@ -76,6 +78,8 @@ const attribute = z
     max: z.string(),
     itemType: z.enum(AttributeDefinitionItemType),
     options: z.array(option),
+    /** The linked catalog field (D294): its type, unit and options apply; '' for none. */
+    fieldKey: z.string(),
   })
   .superRefine((a, ctx) => {
     if (a.copiedKey !== '' && a.key === a.copiedKey) {
@@ -158,6 +162,7 @@ export const formSchema = z.object({
   name: translatableSchema({ max: limits.name, required: errorKey('validation.required') }),
   description: translatableSchema({ max: limits.description }),
   isActive: z.boolean(),
+  mounting: z.enum(CategoryInputMounting),
   attributes: schemaList,
   instanceAttributes: schemaList,
 })
@@ -174,7 +179,7 @@ export type SchemaName = 'attributes' | 'instanceAttributes'
  */
 export function editorFields(v: FormValues): ApiFieldMap {
   const map: Record<string, string> = {}
-  Object.assign(map, { key: 'key' }, translatableApiFields('name'), translatableApiFields('description'))
+  Object.assign(map, { key: 'key', mounting: 'mounting' }, translatableApiFields('name'), translatableApiFields('description'))
   for (const schema of ['attributes', 'instanceAttributes'] as const) {
     map[schema] = `${schema}.root`
     v[schema].forEach((a, i) => {
@@ -183,7 +188,7 @@ export function editorFields(v: FormValues): ApiFieldMap {
         translatableApiFields(`${schema}[${i}].label`, `${schema}.${i}.label`),
         translatableApiFields(`${schema}[${i}].description`, `${schema}.${i}.description`),
       )
-      const leaves = ['key', 'type', 'unit']
+      const leaves = ['key', 'type', 'unit', 'fieldKey']
       if (schema === 'attributes') leaves.push('scope')
       if (a.type === 'list') leaves.push('itemType')
       if (hasBounds(a.type)) leaves.push('min', 'max')
@@ -214,6 +219,7 @@ export const emptyAttribute = (): AttributeValues => ({
   max: '',
   itemType: 'text',
   options: [],
+  fieldKey: '',
 })
 
 /** A copy of an attribute row; its key gets "_copy" and must be changed before saving. */
@@ -237,7 +243,20 @@ const toAttributeValues = (a: AttributeDefinition | InstanceAttributeDefinition,
   max: bound(a.max, separator),
   itemType: a.itemType ?? 'text',
   options: (a.options ?? []).map((o) => ({ key: o.key, label: toTranslatable(o.label) })),
+  fieldKey: a.fieldKey ?? '',
 })
+
+/** An attribute row linked to a catalog field: the field's type, unit and options (the server copies them too). */
+export const linkField = (a: AttributeValues, field: CatalogField | undefined): AttributeValues =>
+  field
+    ? {
+        ...a,
+        fieldKey: field.key,
+        type: field.type,
+        unit: field.unit ?? '',
+        options: field.options.map((o) => ({ key: o.key, label: toTranslatable(o.label) })),
+      }
+    : { ...a, fieldKey: '' }
 
 /** The form's values for a category, or for a new one; bounds show the UI language's decimal separator ("0,5"). */
 export function toFormValues(item: Category | null, separator: ',' | '.' = '.'): FormValues {
@@ -246,6 +265,7 @@ export function toFormValues(item: Category | null, separator: ',' | '.' = '.'):
     name: toTranslatable(item?.name),
     description: toTranslatable(item?.description),
     isActive: item?.isActive ?? true,
+    mounting: item?.mounting ?? 'floorplan',
     attributes: (item?.attributes ?? []).map((a) => toAttributeValues(a, separator)),
     instanceAttributes: (item?.instanceAttributes ?? []).map((a) => toAttributeValues(a, separator)),
   }
@@ -264,6 +284,7 @@ const toInstanceDefinition = (a: AttributeValues): InstanceAttributeDefinition =
     ...(hasBounds(a.type) && a.max.trim() ? { max: boundNumber(a.max) } : {}),
     ...(a.type === 'list' ? { itemType: a.itemType } : {}),
     ...(hasOptions(a.type, a.itemType) ? { options: a.options.map((o) => ({ key: o.key, label: fromTranslatable(o.label) })) } : {}),
+    ...(a.fieldKey ? { fieldKey: a.fieldKey } : {}),
   }
 }
 
@@ -277,6 +298,7 @@ export function toInput(v: FormValues): CategoryInput {
     name: fromTranslatable(v.name),
     ...(description ? { description } : {}),
     isActive: v.isActive,
+    mounting: v.mounting,
     attributes: v.attributes.map(toDefinition),
     instanceAttributes: v.instanceAttributes.map(toInstanceDefinition),
   }

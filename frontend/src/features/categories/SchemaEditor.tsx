@@ -3,10 +3,12 @@ import { type ReactNode, useId, useState } from 'react'
 import { type FieldPath, useFieldArray, type UseFormReturn, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
-import { AttributeDefinitionItemType, AttributeDefinitionScope, AttributeDefinitionType } from '@/api/generated/model'
+import { useListCatalogFields } from '@/api/generated/catalog-fields/catalog-fields'
+import { AttributeDefinitionItemType, AttributeDefinitionScope, AttributeDefinitionType, type CatalogField } from '@/api/generated/model'
 import {
   Button,
   CheckboxField,
+  ComboboxField,
   EmptyState,
   Field,
   FormSelectField,
@@ -19,7 +21,17 @@ import {
 } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { copyAttribute, emptyAttribute, emptyOption, type FormValues, hasBounds, hasOptions, type SchemaName, wholeBounds } from './form'
+import {
+  copyAttribute,
+  emptyAttribute,
+  emptyOption,
+  type FormValues,
+  hasBounds,
+  hasOptions,
+  linkField,
+  type SchemaName,
+  wholeBounds,
+} from './form'
 
 type Form = UseFormReturn<FormValues>
 
@@ -95,6 +107,8 @@ export function SchemaEditor({ form, name, readOnly, startCollapsed, errorRevisi
   const onDuplicate = (index: number) => add(index + 1, copyAttribute(form.getValues(`${name}.${index}`)))
 
   const listError = errorAt(name)
+  // Inactive fields stay listed: an attribute may still be linked to one.
+  const catalogFields = useListCatalogFields({ includeInactive: true }).data?.items ?? []
 
   return (
     <div className="space-y-4">
@@ -123,6 +137,7 @@ export function SchemaEditor({ form, name, readOnly, startCollapsed, errorRevisi
           name={name}
           index={index}
           readOnly={readOnly}
+          catalogFields={catalogFields}
           expanded={readOnly ? undefined : isOpen(field.id, index)}
           onExpandedChange={(open) => setOpen([field.id], open)}
           controls={
@@ -157,22 +172,45 @@ type AttributeRowProps = {
   name: SchemaName
   index: number
   readOnly: boolean
+  catalogFields: CatalogField[]
   /** Undefined: not collapsible (read-only). */
   expanded?: boolean
   onExpandedChange: (expanded: boolean) => void
   controls?: ReactNode
 }
 
-function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpandedChange, controls }: AttributeRowProps) {
+function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expanded, onExpandedChange, controls }: AttributeRowProps) {
   const { t } = useTranslation('categories')
   const localized = useLocalized()
   const errorAt = useErrorAt(form)
   const path = `${name}.${index}` as const
-  const [key, label, type, itemType, unit, required, scope] = useWatch({
+  const [key, label, type, itemType, unit, required, scope, fieldKey] = useWatch({
     control: form.control,
-    name: [`${path}.key`, `${path}.label`, `${path}.type`, `${path}.itemType`, `${path}.unit`, `${path}.required`, `${path}.scope`],
+    name: [
+      `${path}.key`,
+      `${path}.label`,
+      `${path}.type`,
+      `${path}.itemType`,
+      `${path}.unit`,
+      `${path}.required`,
+      `${path}.scope`,
+      `${path}.fieldKey`,
+    ],
   })
   const register = form.register
+  // A linked catalog field gives type, unit and options (D294); they are locked here.
+  const linked = catalogFields.find((f) => f.key === fieldKey)
+  const locked = fieldKey !== ''
+  const fieldOptions = [
+    { value: '', label: t('link.none') },
+    ...catalogFields.map((f) => ({ value: f.key, label: `${localized(f.label)} (${f.key})` })),
+    // A link to a field that is not listed (e.g. deleted since) stays visible.
+    ...(fieldKey && !linked ? [{ value: fieldKey, label: fieldKey }] : []),
+  ]
+  const onLink = (value: string) => {
+    const field = catalogFields.find((f) => f.key === value)
+    form.setValue(path, linkField(form.getValues(path), field), { shouldDirty: true })
+  }
 
   // Labels for min/max say what they limit for the chosen type.
   const boundsLabel = type === 'text' ? 'length' : type === 'list' ? 'items' : 'value'
@@ -184,6 +222,7 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
     title !== key.trim() ? key.trim() : '',
     t(`type.${type}`),
     unit.trim(),
+    fieldKey ? t('link.summary', { key: fieldKey }) : '',
     required ? t('field.required') : '',
     name === 'attributes' ? t(`scope.${scope}`) : '',
   ]
@@ -217,10 +256,29 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
         </div>
       </div>
       <div className="grid items-start gap-4 sm:grid-cols-3">
+        <ComboboxField
+          label={t('field.catalogField')}
+          hint={t('link.hint')}
+          value={fieldKey}
+          onValueChange={onLink}
+          options={fieldOptions}
+          disabled={readOnly}
+          error={errorAt(`${path}.fieldKey`)}
+        />
+        {locked && (
+          <div className="space-y-1.5 sm:col-span-2" data-testid="linked-meaning">
+            <p className="text-sm font-medium">{t('link.meaning')}</p>
+            <p className="text-sm text-muted">{linked?.meaning ? t(`meaning.${linked.meaning}`) : t('link.information')}</p>
+          </div>
+        )}
+      </div>
+      <div className="grid items-start gap-4 sm:grid-cols-3">
         <FormSelectField
           control={form.control}
           name={`${path}.type`}
           label={t('field.type')}
+          hint={locked ? t('link.locked') : undefined}
+          disabled={locked}
           options={Object.values(AttributeDefinitionType).map((v) => ({ value: v, label: t(`type.${v}`) }))}
           error={errorAt(`${path}.type`)}
         />
@@ -243,7 +301,13 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
             error={errorAt(`${path}.scope`)}
           />
         )}
-        <Field label={t('field.unit')} hint={t('field.unitHint')} error={errorAt(`${path}.unit`)} {...register(`${path}.unit`)} />
+        <Field
+          label={t('field.unit')}
+          hint={t('field.unitHint')}
+          readOnly={locked}
+          error={errorAt(`${path}.unit`)}
+          {...register(`${path}.unit`)}
+        />
       </div>
       {hasBounds(type) && (
         <div className="grid gap-4 sm:grid-cols-3">
@@ -270,7 +334,7 @@ function AttributeRow({ itemId, form, name, index, readOnly, expanded, onExpande
         rows={2}
       />
       <CheckboxField label={t('field.required')} hint={t('field.requiredHint')} {...register(`${path}.required`)} />
-      {hasOptions(type, itemType) && <OptionsEditor form={form} path={path} readOnly={readOnly} />}
+      {hasOptions(type, itemType) && <OptionsEditor form={form} path={path} readOnly={readOnly || locked} />}
     </RepeaterItem>
   )
 }

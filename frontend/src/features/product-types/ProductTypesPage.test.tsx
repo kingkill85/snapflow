@@ -28,7 +28,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   ...over,
 })
 
-const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb' })
+const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb', defaultBusCurrentMa: 10, reservePercent: 25, busDevicesMax: 64 })
 const beta = productType({
   id: '6f1c2b8e-0000-4000-8000-000000000002',
   key: 'knx',
@@ -141,7 +141,16 @@ describe('ProductTypesPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     // Sent as typed (trimmed): the server normalises it.
-    expect(posted).toEqual({ key: 'knx', name: { en: 'KNX' }, abbreviation: 'knx', color: '#ffcc00', isActive: true })
+    expect(posted).toEqual({
+      key: 'knx',
+      name: { en: 'KNX' },
+      abbreviation: 'knx',
+      color: '#ffcc00',
+      defaultBusCurrentMa: 0,
+      reservePercent: 20,
+      busDevicesMax: 0,
+      isActive: true,
+    })
     await waitFor(() => expect(names()).toEqual(['ZBZigbee', 'KNXKNX']))
     // Products show their type's badge: the add-on picker refetches.
     expect(client.getQueryState(getSearchVariantsQueryKey({ search: 'x' }))?.isInvalidated).toBe(true)
@@ -249,6 +258,9 @@ describe('ProductTypesPage', () => {
     expect(within(dialog).getByLabelText('Abbreviation')).toHaveValue('ZB')
     expect(within(dialog).getByLabelText('Colour')).toHaveValue('#1f6feb')
     expect(within(dialog).getByLabelText('Active')).toBeChecked()
+    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('10')
+    expect(within(dialog).getByLabelText(/^Reserve/)).toHaveValue('25')
+    expect(within(dialog).getByLabelText('Devices per line')).toHaveValue('64')
 
     // Someone else saves meanwhile.
     current = { ...alpha, name: { en: 'Zigbee 3.0' }, updatedAt: '2026-01-02T00:00:00Z' }
@@ -257,7 +269,17 @@ describe('ProductTypesPage', () => {
 
     const alert = await within(dialog).findByRole('alert')
     expect(alert).toHaveTextContent('Someone else changed this product type in the meantime.')
-    expect(puts[0]).toEqual({ key: 'zigbee', name: { en: 'Zigbee', de: 'Zigbee' }, color: '#1f6feb', isActive: true, expectedUpdatedAt: alpha.updatedAt })
+    // The stored system settings are sent along (D294).
+    expect(puts[0]).toEqual({
+      key: 'zigbee',
+      name: { en: 'Zigbee', de: 'Zigbee' },
+      color: '#1f6feb',
+      defaultBusCurrentMa: 10,
+      reservePercent: 25,
+      busDevicesMax: 64,
+      isActive: true,
+      expectedUpdatedAt: alpha.updatedAt,
+    })
 
     // Reload starts over from the current version.
     await u.click(within(alert).getByRole('button', { name: 'Reload' }))

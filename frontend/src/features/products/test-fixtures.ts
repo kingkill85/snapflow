@@ -165,7 +165,25 @@ export const dimmer: Product = {
   categoryId: dimmerCategory.id,
   category: { id: dimmerCategory.id, key: dimmerCategory.key, name: dimmerCategory.name, isActive: true },
   modelNumber: 'M485/DIM.4',
-  capabilities: { mounting: 'floorplan', channels: [] },
+  mounting: 'board',
+  capabilities: {
+    mounting: 'board',
+    channels: [
+      {
+        outputKindId: id(401),
+        outputKindKey: 'dimmer_output',
+        count: 6,
+        limitsW: [
+          { loadTypeId: id(501), loadTypeKey: 'led', maxW: 200 },
+          { loadTypeId: id(502), loadTypeKey: 'halogen', maxW: 220 },
+        ],
+        alternatives: [],
+      },
+    ],
+    moduleTotalA: 6,
+    busCurrentUsedMa: 20,
+    railWidthTe: 6,
+  },
   name: { en: 'Dimmer 4ch', de: 'Dimmer 4-fach' },
   description: { en: 'Four channels' },
   attributes: { series: 'Pro', power: 300, width_te: 4, dali: true, bus_system: 'zigbee', loads: ['led', 'motor'], protocols: ['DALI'], currents: [1.5, 2] },
@@ -201,3 +219,12 @@ export const listItem = (overrides: Partial<ProductListItem> = {}): ProductListI
 })
 
 export const ids = { id }
+
+/** Output kinds and load types the capabilities name. */
+export const outputKinds = [
+  { id: id(401), key: 'dimmer_output', name: { en: 'dimmer output', de: 'Dimmerausgang' }, isActive: true, sortOrder: 1, functionTypeIds: [], createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+]
+export const loadTypes = [
+  { id: id(501), key: 'led', name: { en: 'LED' }, isActive: true, sortOrder: 1, createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+  { id: id(502), key: 'halogen', name: { en: 'halogen' }, isActive: true, sortOrder: 2, createdAt: at, updatedAt: at, can: { update: true, delete: true } },
+]

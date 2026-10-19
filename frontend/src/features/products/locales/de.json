@@ -49,7 +49,9 @@
     "active": "Aktiv",
     "activeHint": "Inaktive Produkte werden im Katalog ausgeblendet; ihre Varianten behalten ihre eigene Einstellung.",
     "name": "Name",
-    "description": "Beschreibung"
+    "description": "Beschreibung",
+    "mounting": "Montage",
+    "mountingHint": "Wo dieses Produkt platziert wird; standardmäßig wie seine Kategorie."
   },
   "categoryChange": "Sie haben die Kategorie geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute der neuen Kategorie geprüft; Werte, die die neue Kategorie nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zur neuen Kategorie passen, werden an den Varianten markiert.",
   "chooseCategoryFirst": "Wählen Sie eine Kategorie, um ihre Attribute auszufüllen.",
@@ -130,5 +132,42 @@
     "shown_one": "{{count}} Variante angezeigt",
     "shown_other": "{{count}} Varianten angezeigt",
     "showMore": "Mehr anzeigen"
+  },
+  "mounting": {
+    "asCategory": "Wie Kategorie",
+    "asCategoryNamed": "Wie Kategorie ({{mounting}})",
+    "floorplan": "Grundriss",
+    "board": "Verteiler",
+    "both": "Grundriss und Verteiler"
+  },
+  "capabilities": {
+    "title": "Was SnapFlow über dieses Produkt weiß",
+    "hint": "Berechnet aus den Attributwerten von Katalogfeldern mit einer Bedeutung. Leere Werte zählen nicht.",
+    "product": "Produkt",
+    "channels": "{{n}} × {{kind}}",
+    "limitW": "{{w}} W {{load}}",
+    "max": "max. {{limits}}",
+    "limitA": "max. {{a}} A je Kanal",
+    "minLoad": "min. {{w}} W je Kanal",
+    "alternative": "oder bis zu {{max}} × {{kind}} (je {{per}})",
+    "moduleTotalA": "Modul max. {{a}} A",
+    "moduleTotalW": "Modul max. {{w}} W",
+    "busUsed": "verbraucht {{ma}} mA Busstrom",
+    "busSupplied": "liefert {{ma}} mA Busstrom",
+    "busDevicesMax_one": "bis zu {{count}} Gerät pro Linie",
+    "busDevicesMax_other": "bis zu {{count}} Geräte pro Linie",
+    "railWidth": "{{te}} TE",
+    "enclosure": "Verteiler {{rows}} Reihen × {{te}} TE",
+    "wirelessSupplied_one": "{{count}} Funkplatz",
+    "wirelessSupplied_other": "{{count}} Funkplätze",
+    "wirelessUsed_one": "belegt {{count}} Funkplatz",
+    "wirelessUsed_other": "belegt {{count}} Funkplätze",
+    "router": "Zigbee-Router",
+    "noRouter": "kein Zigbee-Router",
+    "motor": {
+      "ac": "AC-Motor",
+      "dc": "DC-Motor"
+    },
+    "mounting": "Montage: {{mounting}}"
   }
 }

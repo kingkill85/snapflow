@@ -24,6 +24,8 @@ import {
   ivory,
   knxType,
   legacyType,
+  loadTypes,
+  outputKinds,
   problem,
   types,
   zigbeeType,
@@ -51,6 +53,8 @@ function editHandlers(item: () => Product = () => dimmer, respond?: () => Respon
     http.get('/api/product-types', () => HttpResponse.json({ items: types })),
     http.get('/api/categories', () => HttpResponse.json({ items: categories })),
     http.get('/api/products/:id', () => HttpResponse.json(item())),
+    http.get('/api/output-kinds', () => HttpResponse.json({ items: outputKinds })),
+    http.get('/api/load-types', () => HttpResponse.json({ items: loadTypes })),
     http.put('/api/products/:id', async ({ request }) => {
       puts.push((await request.json()) as ProductUpdate)
       return respond ? respond() : HttpResponse.json(item())
@@ -141,6 +145,7 @@ describe('ProductEditorPage', () => {
         currents: [1.5, 2],
       },
       isActive: true,
+      mounting: '',
     })
   })
 
@@ -189,9 +194,32 @@ describe('ProductEditorPage', () => {
         description: dimmer.description,
         attributes: dimmer.attributes,
         isActive: true,
+        // The stored mounting override is sent back (D294).
+        mounting: 'board',
         expectedUpdatedAt: dimmer.updatedAt,
       },
     ])
+  })
+
+  it('shows what SnapFlow knows about the product and its variants, and edits the mounting override', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+
+    const block = await screen.findByTestId('capabilities')
+    await waitFor(() =>
+      expect(block).toHaveTextContent(
+        '6 × dimmer output, max 200 W LED, 220 W halogen · module max 6 A · uses 20 mA bus current · 6 TE · mounting: Distribution board',
+      ),
+    )
+    // One line per variant.
+    expect(within(block).getByText('Ivory White')).toBeInTheDocument()
+
+    const mounting = within(region('Basics')).getByLabelText('Mounting')
+    expect(mounting).toHaveTextContent('Distribution board')
+    await chooseOption(u, mounting, 'As category (Floorplan)')
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].mounting).toBe('')
   })
 
   it('edits lists and clears values, leaving out what is not set', async () => {

@@ -28,6 +28,7 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  FormSelectField,
   FormTranslatableField,
   LeaveLink,
   Loading,
@@ -237,6 +238,16 @@ function CategoryEditor({ item, notice, onReload, onSaved, onChanged }: Category
               <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
             </div>
             <FormTranslatableField control={form.control} name="description" label={t('field.description')} multiline />
+            <div className="grid items-start gap-4 sm:grid-cols-2">
+              <FormSelectField
+                control={form.control}
+                name="mounting"
+                label={t('field.mounting')}
+                hint={t('field.mountingHint')}
+                options={(['floorplan', 'board', 'both'] as const).map((v) => ({ value: v, label: t(`mounting.${v}`) }))}
+                error={fieldError(errors.mounting?.message)}
+              />
+            </div>
             <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
           </Section>
           <Section title={t('section.attributes')} description={t('section.attributesHint')}>

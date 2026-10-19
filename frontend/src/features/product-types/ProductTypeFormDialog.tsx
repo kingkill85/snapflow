@@ -54,6 +54,13 @@ const normalizedAbbreviation = (s: string) =>
 /** Characters (code points), as the server counts them. */
 const characters = (s: string) => [...s.normalize('NFC').trim()].length
 
+/** An optional whole number in [min, max] as typed; empty for none. */
+const optionalWhole = (min: number, max: number) =>
+  z
+    .string()
+    .trim()
+    .refine((v) => v === '' || (/^\d+$/.test(v) && Number(v) >= min && Number(v) <= max), errorKey('validation.range', { min, max }))
+
 const schema = z.object({
   key: z
     .string()
@@ -68,17 +75,30 @@ const schema = z.object({
     .string()
     .trim()
     .regex(/^(#[0-9a-fA-F]{6})?$/, errorKey('product_type.color_format')),
+  defaultBusCurrentMa: optionalWhole(1, 100000),
+  reservePercent: z
+    .string()
+    .trim()
+    .regex(/^\d+$/, errorKey('validation.range', { min: 0, max: 90 }))
+    .refine((v) => Number(v) <= 90, errorKey('validation.range', { min: 0, max: 90 })),
+  busDevicesMax: optionalWhole(1, 100000),
   isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = { ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'isActive']), ...translatableApiFields('name') }
+const fields = {
+  ...apiFields<FormValues>(['key', 'abbreviation', 'color', 'defaultBusCurrentMa', 'reservePercent', 'busDevicesMax', 'isActive']),
+  ...translatableApiFields('name'),
+}
 
 const toFormValues = (item: ProductType | null): FormValues => ({
   key: item?.key ?? '',
   name: toTranslatable(item?.name),
   abbreviation: item?.abbreviation ?? '',
   color: item?.color ?? '',
+  defaultBusCurrentMa: item?.defaultBusCurrentMa?.toString() ?? '',
+  reservePercent: (item?.reservePercent ?? 20).toString(),
+  busDevicesMax: item?.busDevicesMax?.toString() ?? '',
   isActive: item?.isActive ?? true,
 })
 
@@ -90,6 +110,10 @@ const toInput = (v: FormValues): ProductTypeInput => {
     name: fromTranslatable(v.name),
     ...(abbreviation ? { abbreviation } : {}),
     ...(color ? { color } : {}),
+    // Always sent (D294): 0 clears an optional setting.
+    defaultBusCurrentMa: Number(v.defaultBusCurrentMa.trim() || 0),
+    reservePercent: Number(v.reservePercent.trim()),
+    busDevicesMax: Number(v.busDevicesMax.trim() || 0),
     isActive: v.isActive,
   }
 }
@@ -239,6 +263,35 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
           <TypeBadge color={previewColor} abbreviation={normalizedAbbreviation(abbreviation)}>
             {localized(name).trim() || t('field.previewName')}
           </TypeBadge>
+        </div>
+      </div>
+      <div className="space-y-3">
+        <p className="text-sm font-medium">{t('field.systemSettings')}</p>
+        <div className="grid items-start gap-4 sm:grid-cols-3">
+          <Field
+            label={t('field.defaultBusCurrentMa')}
+            hint={t('field.defaultBusCurrentMaHint')}
+            suffix="mA"
+            inputMode="numeric"
+            error={fieldError(errors.defaultBusCurrentMa?.message)}
+            {...form.register('defaultBusCurrentMa')}
+          />
+          <Field
+            label={t('field.reservePercent')}
+            hint={t('field.reservePercentHint')}
+            suffix="%"
+            inputMode="numeric"
+            required
+            error={fieldError(errors.reservePercent?.message)}
+            {...form.register('reservePercent')}
+          />
+          <Field
+            label={t('field.busDevicesMax')}
+            hint={t('field.busDevicesMaxHint')}
+            inputMode="numeric"
+            error={fieldError(errors.busDevicesMax?.message)}
+            {...form.register('busDevicesMax')}
+          />
         </div>
       </div>
       <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />

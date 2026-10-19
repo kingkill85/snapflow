@@ -21,6 +21,18 @@ const dimmer: FunctionType = {
   updatedAt: '2026-10-18T10:00:00Z',
 }
 
+const led = {
+  id: '6f1c2b8e-0000-4000-8000-0000000000aa',
+  key: 'led',
+  name: { en: 'LED' },
+  isActive: true,
+  sortOrder: 1,
+  can: { update: true, delete: true },
+  createdAt: '2026-10-18T10:00:00Z',
+  updatedAt: '2026-10-18T10:00:00Z',
+}
+const loadTypes = () => http.get('/api/load-types', () => HttpResponse.json({ items: [led] }))
+
 describe('FunctionTypesPage', () => {
   it('lists function types', async () => {
     server.use(http.get('/api/function-types', () => HttpResponse.json({ items: [dimmer] })))
@@ -50,6 +62,7 @@ describe('FunctionTypesPage', () => {
     let items: FunctionType[] = []
     let posted: unknown
     server.use(
+      loadTypes(),
       http.get('/api/function-types', () => HttpResponse.json({ items })),
       http.post('/api/function-types', async ({ request }) => {
         posted = await request.json()
@@ -64,11 +77,39 @@ describe('FunctionTypesPage', () => {
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
     await user.type((await translation(user, dialog, 'Name', 'en')), 'Dimmer')
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'LED' }))
+    await user.click(within(dialog).getByRole('switch', { name: /share one channel/i }))
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' } })
+    expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id] })
     expect(await screen.findByText('dimmer')).toBeInTheDocument()
+  })
+
+  it('sends the stored circuit flag and load types when updating other fields', async () => {
+    const stored = { ...dimmer, allowsCircuit: true, loadTypeIds: [led.id] }
+    let sent: unknown
+    server.use(
+      loadTypes(),
+      http.get('/api/function-types', () => HttpResponse.json({ items: [stored] })),
+      http.put('/api/function-types/:id', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json(stored)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('checkbox', { name: 'LED' })).toBeChecked()
+    expect(within(dialog).getByRole('switch', { name: /share one channel/i })).toBeChecked()
+    const key = within(dialog).getByLabelText('Key')
+    await user.clear(key)
+    await user.type(key, 'dimming')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id] }))
   })
 
   it('validates the key before sending', async () => {

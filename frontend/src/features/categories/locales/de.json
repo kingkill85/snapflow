@@ -36,7 +36,10 @@
     "position": "Position",
     "description": "Beschreibung",
     "label": "Bezeichnung",
-    "descriptionHint": "Wird als Hilfe unter der Eingabe angezeigt."
+    "descriptionHint": "Wird als Hilfe unter der Eingabe angezeigt.",
+    "mounting": "Montage",
+    "mountingHint": "Wo Produkte dieser Kategorie platziert werden. Ein Produkt kann es überschreiben.",
+    "catalogField": "Katalogfeld"
   },
   "schema": {
     "item": "Attribut {{n}}",
@@ -82,5 +85,36 @@
   "notFound": {
     "title": "Kategorie nicht gefunden",
     "message": "Diese Kategorie gibt es nicht (mehr)."
+  },
+  "mounting": {
+    "floorplan": "Grundriss",
+    "board": "Verteiler",
+    "both": "Grundriss und Verteiler"
+  },
+  "link": {
+    "none": "Keine Verknüpfung",
+    "hint": "Die Verknüpfung übernimmt Typ, Einheit und Optionen des Felds sowie seine Bedeutung.",
+    "meaning": "Bedeutung",
+    "information": "Nur Information",
+    "locked": "Vom verknüpften Katalogfeld vorgegeben.",
+    "summary": "Feld {{key}}"
+  },
+  "meaning": {
+    "channels_supplied": "Gelieferte Kanäle (je Ausgangsart)",
+    "channel_limit_w": "Max. Watt je Kanal (je Ausgangsart und Lastart)",
+    "channel_limit_a": "Max. Ampere je Kanal",
+    "channel_min_load_w": "Mindestlast je Kanal (W)",
+    "module_total_a": "Modul gesamt (A)",
+    "module_total_w": "Modul gesamt (W)",
+    "bus_current_used_ma": "Verbrauchter Busstrom (mA)",
+    "bus_current_supplied_ma": "Gelieferter Busstrom (mA)",
+    "bus_devices_max": "Geräte pro Buslinie",
+    "rail_width_te": "Breite auf der Schiene (TE)",
+    "enclosure_rows": "Reihen im Verteiler",
+    "enclosure_te_per_row": "TE je Reihe im Verteiler",
+    "wireless_places_supplied": "Gelieferte Funkplätze",
+    "wireless_place_used": "Belegt einen Funkplatz",
+    "zigbee_router": "Zigbee-Router",
+    "motor_type": "Motorart"
   }
 }

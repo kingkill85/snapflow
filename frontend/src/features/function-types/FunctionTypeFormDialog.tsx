@@ -1,18 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { useLocalized } from '@/i18n/localized'
 import {
   getListFunctionTypesQueryKey,
   useCreateFunctionType,
   useUpdateFunctionType,
 } from '@/api/generated/function-types/function-types'
+import { useListLoadTypes } from '@/api/generated/load-types/load-types'
 import type { FunctionType } from '@/api/generated/model'
 import {
   apiFields,
+  CheckboxGroupField,
   errorKey,
   ErrorMessage,
   Field,
@@ -20,6 +23,7 @@ import {
   FormTranslatableField,
   fromTranslatable,
   setApiFieldErrors,
+  SwitchField,
   toTranslatable,
   translatableApiFields,
   translatableSchema,
@@ -29,10 +33,12 @@ import {
 const schema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]*$/, errorKey('function_type.key_format')).max(64, errorKey('validation.too_long', { max: 64 })),
   name: translatableSchema({ required: errorKey('validation.required') }),
+  allowsCircuit: z.boolean(),
+  loadTypeIds: z.array(z.string()),
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = { ...apiFields<FormValues>(['key']), ...translatableApiFields('name') }
+const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds']), ...translatableApiFields('name') }
 
 type Props = {
   open: boolean
@@ -49,6 +55,10 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
   const create = useCreateFunctionType()
   const update = useUpdateFunctionType()
   const mutation = functionType ? update : create
+  const localized = useLocalized()
+  // Inactive load types stay listed: a function type may still allow one.
+  const loadTypes = useListLoadTypes({ includeInactive: true }, { query: { enabled: open } })
+  const loadTypeOptions = (loadTypes.data?.items ?? []).map((l) => ({ value: l.id, label: localized(l.name) }))
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
   const { errors } = form.formState
@@ -62,13 +72,20 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
     reset({
       key: functionType?.key ?? '',
       name: toTranslatable(functionType?.name),
+      allowsCircuit: functionType?.allowsCircuit ?? false,
+      loadTypeIds: functionType?.loadTypeIds ?? [],
     })
     resetCreate()
     resetUpdate()
   }, [open, functionType, reset, resetCreate, resetUpdate])
 
   const submit = form.handleSubmit(async (values) => {
-    const data = { key: values.key, name: fromTranslatable(values.name) }
+    const data = {
+      key: values.key,
+      name: fromTranslatable(values.name),
+      allowsCircuit: values.allowsCircuit,
+      loadTypeIds: values.loadTypeIds,
+    }
     try {
       if (functionType) await update.mutateAsync({ id: functionType.id, data })
       else await create.mutateAsync({ data })
@@ -92,6 +109,21 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
     >
       <Field label={t('field.key')} hint={t('field.keyHint')} required autoComplete="off" error={fieldError(errors.key?.message)} {...form.register('key')} />
       <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
+      <Controller
+        control={form.control}
+        name="loadTypeIds"
+        render={({ field }) => (
+          <CheckboxGroupField
+            label={t('field.loadTypes')}
+            hint={t('field.loadTypesHint')}
+            options={loadTypeOptions}
+            value={field.value}
+            onChange={field.onChange}
+            error={fieldError(errors.loadTypeIds?.message)}
+          />
+        )}
+      />
+      <SwitchField label={t('field.allowsCircuit')} hint={t('field.allowsCircuitHint')} {...form.register('allowsCircuit')} />
     </FormDialog>
   )
 }

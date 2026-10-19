@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import { getGetCategoryQueryKey } from '@/api/generated/categories/categories'
-import type { Category, CategoryUpdate } from '@/api/generated/model'
+import type { CatalogField, Category, CategoryUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
@@ -26,13 +26,23 @@ const routes = [
 const existing: Category = {
   id: '6f1c2b8e-0000-4000-8000-000000000001',
   key: 'dimmer_actuator',
-  mounting: 'floorplan',
+  mounting: 'board',
   name: { en: 'Dimmer actuator', de: 'Dimmaktor' },
   description: { en: 'DIN rail dimmer' },
   sortOrder: 1,
   isActive: true,
   attributes: [
-    { key: 'width_te', label: { en: 'Width', de: 'Breite' }, type: 'integer', required: true, unit: 'TE', min: 1, max: 12, scope: 'product' },
+    {
+      key: 'width_te',
+      label: { en: 'Width', de: 'Breite' },
+      type: 'integer',
+      required: true,
+      unit: 'TE',
+      min: 1,
+      max: 12,
+      scope: 'product',
+      fieldKey: 'width_te',
+    },
     {
       key: 'colour',
       label: { en: 'Colour' },
@@ -51,6 +61,28 @@ const existing: Category = {
   can: { update: true, delete: true },
 }
 const editRoute = `/catalog/categories/${existing.id}`
+
+const catalogField = (over: Partial<CatalogField>): CatalogField => ({
+  id: '6f1c2b8e-0000-4000-8000-0000000000f1',
+  key: 'width_te',
+  label: { en: 'Width' },
+  type: 'integer',
+  unit: 'TE',
+  meaning: 'rail_width_te',
+  options: [],
+  productTypeIds: [],
+  sortOrder: 1,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  can: { update: true, delete: true },
+  ...over,
+})
+const catalogFields = [
+  catalogField({}),
+  catalogField({ id: '6f1c2b8e-0000-4000-8000-0000000000f2', key: 'bus_current_ma', label: { en: 'Bus current' }, type: 'number', unit: 'mA', meaning: 'bus_current_used_ma' }),
+  catalogField({ id: '6f1c2b8e-0000-4000-8000-0000000000f3', key: 'notes', label: { en: 'Notes' }, type: 'text', unit: undefined, meaning: undefined }),
+]
+const fieldsHandler = () => http.get('/api/catalog-fields', () => HttpResponse.json({ items: catalogFields }))
 
 /** A group by name; an attribute card is named by its position and label, e.g. "Attribute 2: Colour". */
 const group = (name: string, container: HTMLElement = document.body) =>
@@ -75,6 +107,7 @@ function editHandlers(item: () => Category = () => existing, respond?: () => Res
   const puts: CategoryUpdate[] = []
   const gets: number[] = []
   server.use(
+    fieldsHandler(),
     http.get('/api/categories/:id', () => {
       gets.push(Date.now())
       return HttpResponse.json(item())
@@ -99,6 +132,7 @@ describe('CategoryEditorPage', () => {
     let posted: unknown
     const created: Category = { ...existing, id: '6f1c2b8e-0000-4000-8000-000000000099', key: 'gateway', name: { en: 'Gateway', de: 'Gateway' } }
     server.use(
+      fieldsHandler(),
       http.post('/api/categories', async ({ request }) => {
         posted = await request.json()
         return HttpResponse.json(created, { status: 201 })
@@ -148,6 +182,7 @@ describe('CategoryEditorPage', () => {
       key: 'gateway',
       name: { en: 'Gateway', de: 'Gateway' },
       isActive: true,
+      mounting: 'floorplan',
       attributes: [
         {
           key: 'bus_system',
@@ -165,6 +200,38 @@ describe('CategoryEditorPage', () => {
     })
   })
 
+  it('links an attribute to a catalog field: type, unit and options follow it, its meaning is shown', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    expect(within(region('Basics')).getByLabelText('Mounting')).toHaveTextContent('Distribution board')
+    await chooseOption(u, within(region('Basics')).getByLabelText('Mounting'), 'Floorplan and board')
+
+    const attributes = attributesRegion()
+    const adds = within(attributes).getAllByRole('button', { name: 'Add attribute' })
+    await u.click(adds[adds.length - 1])
+    const row = group('Attribute 4', attributes)
+    await u.type(own(row, 'Key'), 'bus_ma')
+    await u.type(await translation(u, row, 'Label', 'en'), 'Bus current')
+    await chooseOption(u, within(row).getByLabelText('Catalog field'), 'Bus current (bus_current_ma)')
+    expect(within(row).getByLabelText('Type')).toHaveTextContent('Number')
+    expect(within(row).getByLabelText('Unit')).toHaveValue('mA')
+    expect(within(row).getByLabelText('Unit')).toHaveAttribute('readonly')
+    expect(within(row).getByTestId('linked-meaning')).toHaveTextContent('Bus current used (mA)')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].mounting).toBe('both')
+    expect(puts[0].attributes[3]).toEqual({
+      key: 'bus_ma',
+      label: { en: 'Bus current' },
+      type: 'number',
+      unit: 'mA',
+      required: false,
+      scope: 'product',
+      fieldKey: 'bus_current_ma',
+    })
+  })
+
   it('loads an existing schema collapsed, and saves it unchanged with the version it was loaded from', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()
@@ -179,7 +246,7 @@ describe('CategoryEditorPage', () => {
     const width = group('Attribute 1', attributes)
     // Titled by the label, with key, type, unit, required and scope beside it (D114).
     expect(screen.getByRole('group', { name: 'Attribute 1: Width' })).toBe(width)
-    expect(width).toHaveTextContent('width_te · Whole number · TE · Required · Product')
+    expect(width).toHaveTextContent('width_te · Whole number · TE · field width_te · Required · Product')
     expect(within(width).queryByLabelText('Key')).not.toBeInTheDocument()
     expect(group('Attribute 2', attributes)).toHaveTextContent('Colourcolour · Choice · Variant')
     expect(group('Attribute 1', instanceRegion())).toHaveTextContent('Bus addressbus_address · Text · Required')
@@ -215,6 +282,8 @@ describe('CategoryEditorPage', () => {
         name: existing.name,
         description: existing.description,
         isActive: true,
+        // The stored mounting and field link are sent back (D294).
+        mounting: 'board',
         attributes: [
           { ...existing.attributes[0] },
           { ...existing.attributes[1], required: false },
@@ -495,6 +564,9 @@ describe('CategoryEditorPage', () => {
     const attributes = attributesRegion()
     await expandAll(u, attributes)
 
+    // A linked attribute's type is locked until the link is removed.
+    expect(within(group('Attribute 1', attributes)).getByLabelText('Type')).toBeDisabled()
+    await chooseOption(u, within(group('Attribute 1', attributes)).getByLabelText('Catalog field'), 'No link')
     // integer with min/max -> boolean; enum with options -> text; list of text -> list of enum.
     await chooseOption(u, within(group('Attribute 1', attributes)).getByLabelText('Type'), 'Yes/no')
     await chooseOption(u, within(group('Attribute 2', attributes)).getByLabelText('Type'), 'Text')
