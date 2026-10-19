@@ -130,6 +130,10 @@ const internalDetail = "internal server error"
 // Internal logs err as a server error (with the request id) and returns a
 // 500 that reveals nothing about it. msg says what failed, for the log.
 func Internal(ctx context.Context, msg string, err error) *Error {
+	if canceled(ctx, []error{err}) {
+		slog.DebugContext(ctx, msg, "request_id", RequestID(ctx), "error", err)
+		return &Error{Status: StatusClientClosedRequest, Code: "request.canceled", Detail: "request canceled"}
+	}
 	slog.ErrorContext(ctx, msg, "request_id", RequestID(ctx), "error", err)
 	return New(http.StatusInternalServerError, "server.error", internalDetail)
 }
@@ -186,6 +190,11 @@ func newError(ctx context.Context, status int, msg string, errs ...error) *Error
 				return ConflictRetry()
 			}
 		}
+		if canceled(ctx, errs) {
+			// The client went away (reload, navigation): not a server error.
+			slog.DebugContext(ctx, "request canceled", "request_id", RequestID(ctx), "error", errors.Join(errs...))
+			return &Error{Status: StatusClientClosedRequest, Code: "request.canceled", Detail: "request canceled"}
+		}
 		slog.ErrorContext(ctx, "server error", "request_id", RequestID(ctx), "status", status,
 			"message", msg, "error", errors.Join(errs...))
 		return &Error{Status: status, Code: codeForStatus(status), Detail: internalDetail}
@@ -206,6 +215,24 @@ func newError(ctx context.Context, status int, msg string, errs ...error) *Error
 		}
 	}
 	return e
+}
+
+// StatusClientClosedRequest is the status of a request the client aborted
+// (nginx's 499); the client never sees it, the access log does.
+const StatusClientClosedRequest = 499
+
+// canceled reports whether errs come from the request's context being
+// canceled (the client closed the connection).
+func canceled(ctx context.Context, errs []error) bool {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return true
+	}
+	for _, err := range errs {
+		if errors.Is(err, context.Canceled) {
+			return true
+		}
+	}
+	return false
 }
 
 func codeForStatus(status int) string {
