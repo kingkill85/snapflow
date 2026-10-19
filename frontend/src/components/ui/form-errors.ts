@@ -70,6 +70,8 @@ export const errorParamNames = {
   'import.undo_conflict': ['count'],
   'board.capacity_invalid': ['max'],
   'board.offset_invalid': ['max'],
+  'address.taken': ['address'],
+  'export.too_many_group_addresses': ['max'],
   'bus_line.in_use': ['count'],
   'bus_line.name_taken': ['name'],
   'bus_line.devices_max_invalid': ['max'],

@@ -6927,11 +6927,8 @@
             "type": "string"
           },
           "loadTypeId": {
-            "description": "null for none",
-            "type": [
-              "string",
-              "null"
-            ]
+            "description": "Absent for none",
+            "type": "string"
           },
           "needId": {
             "type": "string"
@@ -6975,8 +6972,7 @@
           "functionTypeKey",
           "quantity",
           "connectedUnits",
-          "powerW",
-          "loadTypeId"
+          "powerW"
         ],
         "type": "object"
       },

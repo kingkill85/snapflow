@@ -56,7 +56,7 @@ type NeedInfo struct {
 	Quantity        int32      `json:"quantity"`
 	ConnectedUnits  int32      `json:"connectedUnits" doc:"Σ units of its connections (may exceed the quantity: a finding)"`
 	PowerW          *string    `json:"powerW" nullable:"true" doc:"Per unit, decimal string"`
-	LoadTypeID      *uuid.UUID `json:"loadTypeId" nullable:"true" doc:"null for none"`
+	LoadTypeID      *uuid.UUID `json:"loadTypeId,omitempty" doc:"Absent for none"`
 }
 
 // Wiring is the wiring view of a version.

@@ -328,15 +328,16 @@ func (w *writer) table(b *strings.Builder, t document.Table, width int) error {
 	} else {
 		fmt.Fprintf(b, `<w:tblW w:w="%d" w:type="dxa"/>`, width)
 	}
-	if t.CutLines {
+	switch {
+	case t.CutLines:
 		b.WriteString(`<w:tblBorders>`)
 		for _, side := range []string{"top", "left", "bottom", "right", "insideH", "insideV"} {
 			fmt.Fprintf(b, `<w:%s w:val="dashed" w:sz="4" w:space="0" w:color="000000"/>`, side)
 		}
 		b.WriteString(`</w:tblBorders>`)
-	} else if t.Borderless {
+	case t.Borderless:
 		b.WriteString(`<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>`)
-	} else {
+	default:
 		b.WriteString(`<w:tblBorders>` +
 			`<w:top w:val="single" w:sz="4" w:space="0" w:color="A6A6A6"/>` +
 			`<w:left w:val="single" w:sz="4" w:space="0" w:color="A6A6A6"/>` +

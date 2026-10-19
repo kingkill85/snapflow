@@ -11,11 +11,8 @@ export interface NeedInfo {
   functionTypeId: string;
   functionTypeKey: string;
   label: string;
-  /**
-     * null for none
-     * @nullable
-     */
-  loadTypeId: string | null;
+  /** Absent for none */
+  loadTypeId?: string;
   needId: string;
   planId: string;
   planName: string;
