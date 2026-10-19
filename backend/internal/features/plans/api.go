@@ -207,7 +207,7 @@ func Register(api huma.API, svc *Service) {
 		Summary:     "Download a plan's image",
 		Description: "As GET /api/files/{id}, for whoever may read the plan. Use the plan's image.url: only the current " +
 			"image is served (plan.image_not_found otherwise), so the URL changes when the image is replaced.",
-		Tags:        []string{tag},
+		Tags: []string{tag},
 		Responses: map[string]*huma.Response{
 			"200": {Description: "The image", Content: map[string]*huma.MediaType{
 				files.TypeJPEG: {Schema: binary}, files.TypePNG: {Schema: binary}, files.TypeWebP: {Schema: binary},

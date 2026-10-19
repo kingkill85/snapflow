@@ -92,10 +92,12 @@ export function usePlanLock(planId: string, wanted: boolean, { beforeRelease, on
   // Take on open, release on close.
   useEffect(() => {
     if (!wanted) return
-    const opened = generation.current
+    // A counter, not a DOM node: the same object in the cleanup.
+    const gen = generation
+    const opened = gen.current
     // The request answers later; the state changes then.
     void Promise.resolve().then(() => {
-      if (opened === generation.current) void take(false)
+      if (opened === gen.current) void take(false)
     })
     const unload = () => {
       if (!mine.current) return
@@ -105,7 +107,7 @@ export function usePlanLock(planId: string, wanted: boolean, { beforeRelease, on
     }
     window.addEventListener('pagehide', unload)
     return () => {
-      generation.current++
+      gen.current++
       window.removeEventListener('pagehide', unload)
       if (mine.current) {
         mine.current = false
