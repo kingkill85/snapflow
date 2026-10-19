@@ -19,6 +19,7 @@ import {
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
+import { useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 import {
@@ -107,8 +108,8 @@ export function SchemaEditor({ form, name, readOnly, startCollapsed, errorRevisi
   const onDuplicate = (index: number) => add(index + 1, copyAttribute(form.getValues(`${name}.${index}`)))
 
   const listError = errorAt(name)
-  // Inactive fields stay listed: an attribute may still be linked to one.
-  const catalogFields = useListCatalogFields({ includeInactive: true }).data?.items ?? []
+  // Catalog fields have no active flag: every field can be linked.
+  const catalogFields = useListCatalogFields().data?.items ?? []
 
   return (
     <div className="space-y-4">
@@ -182,6 +183,7 @@ type AttributeRowProps = {
 function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expanded, onExpandedChange, controls }: AttributeRowProps) {
   const { t } = useTranslation('categories')
   const localized = useLocalized()
+  const meaningLabel = useMeaningLabel()
   const errorAt = useErrorAt(form)
   const path = `${name}.${index}` as const
   const [key, label, type, itemType, unit, required, scope, fieldKey] = useWatch({
@@ -198,7 +200,10 @@ function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expa
     ],
   })
   const register = form.register
-  // A linked catalog field gives type, unit and options (D294); they are locked here.
+  // A linked catalog field gives type, unit and options (D287, D295): the
+  // server resolves them from the field when the category is read, so they
+  // are locked here and the row shows the field's meaning. "No link" unlocks
+  // the row and keeps the values it had.
   const linked = catalogFields.find((f) => f.key === fieldKey)
   const locked = fieldKey !== ''
   const fieldOptions = [
@@ -268,7 +273,7 @@ function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expa
         {locked && (
           <div className="space-y-1.5 sm:col-span-2" data-testid="linked-meaning">
             <p className="text-sm font-medium">{t('link.meaning')}</p>
-            <p className="text-sm text-muted">{linked?.meaning ? t(`meaning.${linked.meaning}`) : t('link.information')}</p>
+            <p className="text-sm text-muted">{meaningLabel(linked?.meaning)}</p>
           </div>
         )}
       </div>

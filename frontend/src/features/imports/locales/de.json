@@ -219,7 +219,8 @@
     "image": "Bild",
     "addons": "Zubehör",
     "localized": "{{name}} ({{language}})",
-    "mounting": "Montage"
+    "mounting": "Montage",
+    "attributeLink": "Attribut „{{attribute}}“: Katalogfeld"
   },
   "value": {
     "none": "–",
@@ -267,7 +268,8 @@
     "warnings": "Warnungen",
     "rowsSkipped": "Zeilen mit Fehlern",
     "unmapped_one": "{{count}} Spalte wird nicht importiert:",
-    "unmapped_other": "{{count}} Spalten werden nicht importiert:"
+    "unmapped_other": "{{count}} Spalten werden nicht importiert:",
+    "changedCategories": "Kategorien mit Feldverknüpfung"
   },
   "preview": {
     "title": "Vorschau",
@@ -392,7 +394,6 @@
     "optionsHint": "Wert eingeben und Enter drücken.",
     "meaning": "Bedeutung für die Prüfungen",
     "meaningHint": "Was SnapFlow mit dem Wert macht; „Keine Bedeutung“ behält ihn als Information am Produkt.",
-    "noMeaning": "Keine Bedeutung (nur Information)",
     "outputKind": "Ausgangsart",
     "loadType": "Lastart",
     "productTypes": "Nur für diese Produkttypen",
@@ -404,27 +405,22 @@
     "knownField": "Katalogfeld „{{field}}“ · {{meaning}}",
     "status": {
       "information": "Nur Information",
-      "category": "Attribut einer Kategorie (kein Katalogfeld)",
+      "category": "Bekannt, ohne Bedeutung (Attribut einer Kategorie, kein Katalogfeld)",
       "field": "Katalogfeld"
     },
-    "knownFieldKey": "Katalogfeld „{{key}}“"
-  },
-  "meaning": {
-    "channels_supplied": "Kanäle (Anzahl Ausgänge einer Art)",
-    "channel_limit_w": "Max. Watt je Kanal (je Lastart)",
-    "channel_limit_a": "Max. Ampere je Kanal",
-    "channel_min_load_w": "Mindestlast je Kanal (W)",
-    "module_total_a": "Max. Ampere für das ganze Modul",
-    "module_total_w": "Max. Watt für das ganze Modul",
-    "bus_current_used_ma": "Verbrauchter Busstrom (mA)",
-    "bus_current_supplied_ma": "Gelieferter Busstrom (mA)",
-    "bus_devices_max": "Max. Geräte je Buslinie",
-    "rail_width_te": "Breite auf der Hutschiene (TE)",
-    "enclosure_rows": "Reihen eines Verteilers",
-    "enclosure_te_per_row": "TE je Verteilerreihe",
-    "wireless_places_supplied": "Funkplätze (Gateway)",
-    "wireless_place_used": "Belegt einen Funkplatz",
-    "zigbee_router": "Zigbee-Router (ja/nein)",
-    "motor_type": "Motorart (AC/DC)"
+    "knownFieldKey": "Katalogfeld „{{key}}“",
+    "modeExisting": "Ein vorhandenes Katalogfeld",
+    "existingField": "Katalogfeld",
+    "change": "Ändern",
+    "linkField": "Feld verknüpfen",
+    "changeColumn": "Ändern, was Spalte {{column}} bedeutet",
+    "link": {
+      "linked": "verknüpft in {{category}}",
+      "will_link": "wird mit Feld {{field}} verknüpft in {{category}}",
+      "type_mismatch": "bleibt unverknüpft in {{category}}: anderer Werttyp",
+      "other_field": "mit Feld {{field}} verknüpft in {{category}}",
+      "unlinked": "Attribut von {{category}}, kein Feld"
+    },
+    "anyLoadType": "Jede Lastart"
   }
 }

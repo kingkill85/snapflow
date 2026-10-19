@@ -29,6 +29,15 @@
     "reservePercent": "Reserve",
     "reservePercentHint": "Capacity kept free: amber above 100 % − reserve, red when exceeded.",
     "busDevicesMax": "Devices per line",
-    "busDevicesMaxHint": "Default maximum devices on one bus line. Empty = not checked."
+    "busDevicesMaxHint": "Default maximum devices on one bus line. Empty = not checked.",
+    "topology": "Topology",
+    "topologyHint": "How devices of this system connect: a bus (bus current, devices per line), wireless (places at a gateway) or neither.",
+    "defaultWirelessPlacesUsed": "Default wireless places",
+    "defaultWirelessPlacesUsedHint": "Places at the gateway a device uses without its own value (usually 1). Empty = unknown."
+  },
+  "topology": {
+    "none": "None",
+    "bus": "Bus",
+    "wireless": "Wireless"
   }
 }

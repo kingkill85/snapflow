@@ -208,7 +208,7 @@ describe('ProductEditorPage', () => {
     const block = await screen.findByTestId('capabilities')
     await waitFor(() =>
       expect(block).toHaveTextContent(
-        '6 × dimmer output, max 200 W LED, 220 W halogen · module max 6 A · uses 20 mA bus current · 6 TE · mounting: Distribution board',
+        '6 × dimmer output, max 200 W LED, 220 W halogen, max 2.5 A per channel, min 3 W LED per channel · module max 6 A · module max 1200.5 W · uses 20 mA bus current (system default) · 6 TE · mounting: Distribution board',
       ),
     )
     // One line per variant.

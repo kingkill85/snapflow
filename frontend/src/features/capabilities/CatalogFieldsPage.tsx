@@ -15,6 +15,7 @@ import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { useCan } from '@/app/session'
 import { invalidateProductQueries } from '@/catalog/invalidate'
 import { type Column } from '@/components/ui'
+import { useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 import { CatalogFieldFormDialog } from './CatalogFieldFormDialog'
@@ -25,6 +26,7 @@ import { useReorder } from './use-reorder'
 export function CatalogFieldsPage() {
   const { t } = useTranslation('capabilities')
   const localized = useLocalized()
+  const meaningLabel = useMeaningLabel()
   const canWrite = useCan()('catalog.write')
   const queryClient = useQueryClient()
   const list = useListCatalogFields()
@@ -60,8 +62,8 @@ export function CatalogFieldsPage() {
   // "Max W per channel · Dimmer output · LED"
   const meaningText = (f: CatalogField) =>
     f.meaning
-      ? [t(`meaning.${f.meaning}`), kindName(f.outputKindId), loadTypeName(f.loadTypeId)].filter(Boolean).join(' · ')
-      : t('meaning.none')
+      ? [meaningLabel(f.meaning), kindName(f.outputKindId), loadTypeName(f.loadTypeId)].filter(Boolean).join(' · ')
+      : meaningLabel()
 
   const columns: Column<CatalogField>[] = [
     {

@@ -1,6 +1,6 @@
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Pencil } from 'lucide-react'
 import { useRef } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { useListCatalogFieldMeanings, useListCatalogFields } from '@/api/generated/catalog-fields/catalog-fields'
@@ -18,6 +18,7 @@ import {
   Fieldset,
   focusFirstError,
   FormActions,
+  FormComboboxField,
   FormSelectField,
   FormTranslatableField,
   Section,
@@ -29,18 +30,23 @@ import {
   type TranslatableValue,
   useFieldError,
 } from '@/components/ui'
+import { useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 // The mapping's "New columns – what do they mean?" step (D188): every
 // attribute column that matches no catalog field is answered as "just
-// information" or as a new catalog field (with its meaning for the checks);
-// the answered mapping is previewed next.
+// information", as an existing catalog field, or as a new catalog field (with
+// its meaning for the checks); a known column (also one matched
+// automatically) can be answered again with "Change". The answered mapping is
+// previewed next.
 
 const fieldTypes = ['text', 'number', 'integer', 'boolean', 'enum'] as const
 
 type Answer = {
   target: string
-  mode: 'information' | 'field'
+  mode: 'information' | 'field' | 'existing'
+  /** The existing catalog field (mode existing). */
+  fieldKey: string
   key: string
   label: TranslatableValue
   type: CatalogFieldInputType
@@ -65,9 +71,10 @@ const snakeKey = (s: string) =>
     .replace(/^_+|_+$/g, '')
     .replace(/^(\d)/, 'f_$1')
 
-const firstAnswer = (c: ImportColumn): Answer => ({
+const firstAnswer = (c: ImportColumn, mode: Answer['mode'] = 'field'): Answer => ({
   target: c.target,
-  mode: 'field',
+  mode,
+  fieldKey: c.field?.key ?? '',
   key: c.key,
   label: toTranslatable({ en: c.column || c.key }),
   type: 'text',
@@ -87,6 +94,7 @@ function answerFields(count: number): ApiFieldMap {
     const to = `answers.${i}`
     map[at] = `${to}.mode`
     map[`${at}.target`] = `${to}.mode`
+    map[`${at}.fieldKey`] = `${to}.fieldKey`
     map[`${at}.field`] = `${to}.key`
     for (const f of ['key', 'type', 'unit', 'meaning', 'outputKindId', 'loadTypeId', 'productTypeIds', 'options', 'etimFeature']) map[`${at}.field.${f}`] = `${to}.${f === 'etimFeature' ? 'key' : f}`
     map[`${at}.field.label`] = `${to}.label`
@@ -125,20 +133,28 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
   const localized = useLocalized()
   const formRef = useRef<HTMLFormElement>(null)
   const unknown = check.columns.filter((c) => c.status === 'unknown')
-  const known = check.columns.filter((c) => c.status !== 'unknown')
-  const form = useForm<AnswersForm>({ defaultValues: { answers: unknown.map(firstAnswer) } })
+  const form = useForm<AnswersForm>({ defaultValues: { answers: unknown.map((c) => firstAnswer(c)) } })
+  const rows = useFieldArray({ control: form.control, name: 'answers' })
   const answers = useWatch({ control: form.control, name: 'answers' })
+  // Known columns being answered again ("Change") get a row; the others stay listed as known.
+  const answered = new Set(rows.fields.map((r) => r.target))
+  const known = check.columns.filter((c) => !answered.has(c.target))
+  const columnOf = (target: string) => check.columns.find((c) => c.target === target)!
+  const change = (c: ImportColumn) => rows.append(firstAnswer(c, 'existing'))
+  const catalogFields = useListCatalogFields()
+  const existingOptions = (catalogFields.data?.items ?? []).map((f) => ({ value: f.key, label: `${localized(f.label)} (${f.key})` }))
   const meanings = useListCatalogFieldMeanings()
   const outputKinds = useListOutputKinds()
   const loadTypes = useListLoadTypes()
   const productTypes = useListProductTypes()
   const answer = useAnswerImportColumns()
 
-  const meaningLabel = (m: string) => t(`meaning.${m}` as 'meaning.channels_supplied', { defaultValue: m })
-  const meaningOptions = [{ value: '', label: t('columns.noMeaning') }, ...(meanings.data?.items ?? []).map((m) => ({ value: m.meaning, label: meaningLabel(m.meaning) }))]
+  const meaningLabel = useMeaningLabel()
+  const meaningOptions = [{ value: '', label: meaningLabel() }, ...(meanings.data?.items ?? []).map((m) => ({ value: m.meaning, label: meaningLabel(m.meaning) }))]
   const typeOptions = fieldTypes.map((v) => ({ value: v, label: t(`columns.type.${v}`) }))
   const modeOptions = [
     { value: 'field', label: t('columns.modeField') },
+    { value: 'existing', label: t('columns.modeExisting') },
     { value: 'information', label: t('columns.modeInformation') },
   ]
   const outputKindOptions = (outputKinds.data?.items ?? []).map((k) => ({ value: k.id, label: localized(k.name) }))
@@ -151,11 +167,19 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
     if (spec && spec.types.length > 0 && !spec.types.includes(type)) form.setValue(`answers.${i}.type`, spec.types[0] as CatalogFieldInputType)
     if (!spec?.outputKind) form.setValue(`answers.${i}.outputKindId`, '')
     if (!spec?.loadType) form.setValue(`answers.${i}.loadTypeId`, '')
+    // A meaning with fixed choices (motor_type: ac, dc) sets them.
+    if (spec && spec.options.length > 0) form.setValue(`answers.${i}.options`, spec.options)
   }
 
   const submit = async (values: AnswersForm) => {
     form.clearErrors()
-    const body: ImportColumnAnswer[] = values.answers.map((a) => (a.mode === 'information' ? { target: a.target, information: true } : { target: a.target, field: toInput(a) }))
+    const body: ImportColumnAnswer[] = values.answers.map((a) =>
+      a.mode === 'information'
+        ? { target: a.target, information: true }
+        : a.mode === 'existing'
+          ? { target: a.target, fieldKey: a.fieldKey }
+          : { target: a.target, field: toInput(a) },
+    )
     try {
       const result = await answer.mutateAsync({ data: { mapping, answers: body } })
       onAnswered(result.mapping)
@@ -172,7 +196,8 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
       <Fieldset disabled={answer.isPending}>
         <Section title={t('columns.title')} description={t('columns.description', { count: unknown.length })}>
           <ul className="space-y-4">
-            {unknown.map((c, i) => {
+            {rows.fields.map((row, i) => {
+              const c = columnOf(row.target)
               const a = answers[i]
               const errors = form.formState.errors.answers?.[i]
               const spec = meanings.data?.items.find((m) => m.meaning === a?.meaning)
@@ -184,6 +209,18 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
                   <div className="max-w-sm">
                     <FormSelectField control={form.control} name={`answers.${i}.mode`} label={t('columns.mode')} options={modeOptions} />
                   </div>
+                  {a?.mode === 'existing' && (
+                    <div className="max-w-md">
+                      <FormComboboxField
+                        control={form.control}
+                        name={`answers.${i}.fieldKey`}
+                        label={t('columns.existingField')}
+                        required
+                        options={existingOptions}
+                        error={fieldError(errors?.fieldKey?.message)}
+                      />
+                    </div>
+                  )}
                   {a?.mode === 'field' && (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Field label={t('columns.key')} required {...form.register(`answers.${i}.key`)} error={fieldError(errors?.key?.message)} />
@@ -220,7 +257,15 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
                       {spec?.outputKind && (
                         <FormSelectField control={form.control} name={`answers.${i}.outputKindId`} label={t('columns.outputKind')} options={outputKindOptions} required />
                       )}
-                      {spec?.loadType && <FormSelectField control={form.control} name={`answers.${i}.loadTypeId`} label={t('columns.loadType')} options={loadTypeOptions} required />}
+                      {spec?.loadType && (
+                        <FormSelectField
+                          control={form.control}
+                          name={`answers.${i}.loadTypeId`}
+                          label={t('columns.loadType')}
+                          options={spec.loadTypeRequired ? loadTypeOptions : [{ value: '', label: t('columns.anyLoadType') }, ...loadTypeOptions]}
+                          required={spec.loadTypeRequired}
+                        />
+                      )}
                       {a.meaning && (
                         <Controller
                           control={form.control}
@@ -244,7 +289,7 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
             })}
           </ul>
         </Section>
-        {known.length > 0 && <KnownColumns columns={known} />}
+        {known.length > 0 && <KnownColumns columns={known} onChange={change} />}
       </Fieldset>
       <FormActions error={<ErrorMessage error={answer.error} fields={answerFields(answers.length)} />}>
         <Button variant="secondary" onClick={onBack} disabled={answer.isPending}>
@@ -258,25 +303,37 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
   )
 }
 
-/** The attribute columns that are known: linked to a catalog field, defined by a category, or answered as just information. */
-export function KnownColumns({ columns }: { columns: (ImportColumn & { fieldKey?: string })[] }) {
+/** The attribute columns that are known: linked to a catalog field, defined by a category, or answered as just information; per category whether its attribute is (or will be) linked to the field. */
+export function KnownColumns({ columns, onChange }: { columns: (ImportColumn & { fieldKey?: string })[]; onChange?: (c: ImportColumn) => void }) {
   const { t } = useTranslation('imports')
   const localized = useLocalized()
+  const meaningLabel = useMeaningLabel()
+  const status = (c: ImportColumn & { fieldKey?: string }) =>
+    c.status === 'field' && c.field
+      ? t('columns.knownField', { field: localized(c.field.label), meaning: meaningLabel(c.field.meaning) })
+      : c.status === 'field' && c.fieldKey
+        ? t('columns.knownFieldKey', { key: c.fieldKey })
+        : t(`columns.status.${c.status}` as 'columns.status.category')
   return (
     <Section title={t('columns.knownTitle')} description={t('columns.knownDescription')}>
       <ul className="divide-y divide-line text-sm">
         {columns.map((c) => (
-          <li key={c.target} className="flex flex-wrap justify-between gap-2 py-2">
+          <li key={c.target} className="flex flex-wrap items-start justify-between gap-2 py-2" aria-label={c.column || c.columnLetter}>
             <span>{c.column || c.columnLetter}</span>
-            <span className="text-muted">
-              {c.status === 'field' && c.field
-                ? t('columns.knownField', {
-                    field: localized(c.field.label),
-                    meaning: c.field.meaning ? t(`meaning.${c.field.meaning}` as 'meaning.channels_supplied') : t('columns.noMeaning'),
-                  })
-                : c.status === 'field' && c.fieldKey
-                  ? t('columns.knownFieldKey', { key: c.fieldKey })
-                  : t(`columns.status.${c.status}` as 'columns.status.category')}
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-right text-muted">
+                {status(c)}
+                {c.categories.map((cat) => (
+                  <span key={cat.categoryId} className="block">
+                    {t(`columns.link.${cat.status}`, { category: localized(cat.name) || cat.key, field: c.field?.key ?? cat.fieldKey ?? '' })}
+                  </span>
+                ))}
+              </span>
+              {onChange && (
+                <Button variant="secondary" size="sm" aria-label={t('columns.changeColumn', { column: c.column || c.columnLetter })} onClick={() => onChange(c)}>
+                  <Pencil /> {c.status === 'category' ? t('columns.linkField') : t('columns.change')}
+                </Button>
+              )}
             </span>
           </li>
         ))}
@@ -287,11 +344,12 @@ export function KnownColumns({ columns }: { columns: (ImportColumn & { fieldKey?
 
 /** The columns of a previewed mapping linked to catalog fields or answered as just information. */
 export function LinkedColumns({ mapping }: { mapping?: ImportMapping }) {
-  const linked = (mapping?.fields ?? []).filter((f) => f.fieldKey || f.information)
-  const fields = useListCatalogFields(undefined, { query: { enabled: linked.some((f) => f.fieldKey) } })
+  // fieldIndex is the column's index in mapping.fields (as the column check reports it).
+  const linked = (mapping?.fields ?? []).map((f, fieldIndex) => ({ f, fieldIndex })).filter(({ f }) => f.fieldKey || f.information)
+  const fields = useListCatalogFields({ query: { enabled: linked.some(({ f }) => f.fieldKey) } })
   if (linked.length === 0) return null
-  const columns = linked.map((f, i) => ({
-    fieldIndex: i,
+  const columns = linked.map(({ f, fieldIndex }) => ({
+    fieldIndex,
     target: f.target,
     key: f.target.slice('attribute.'.length),
     column: f.column,
@@ -299,6 +357,7 @@ export function LinkedColumns({ mapping }: { mapping?: ImportMapping }) {
     status: f.information ? ('information' as const) : ('field' as const),
     field: fields.data?.items.find((x) => x.key === f.fieldKey),
     fieldKey: f.fieldKey,
+    categories: [],
   }))
   return <KnownColumns columns={columns} />
 }

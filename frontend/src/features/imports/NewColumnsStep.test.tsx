@@ -37,17 +37,21 @@ const widthField: CatalogField = {
   options: [],
   productTypeIds: [],
   sortOrder: 1,
+  inUse: 0,
+  usedBy: [],
   createdAt: at,
   updatedAt: at,
   can: { update: true, delete: true },
 }
 
+const ledField: CatalogField = { ...widthField, id: id(702), key: 'dimmer_led_w', label: { en: 'Max LED per output' }, unit: 'W', meaning: 'channel_limit_w' }
+
 const check = (m: ImportMapping): ImportColumns => ({
   mapping: m,
   unknown: 1,
   columns: [
-    { fieldIndex: 3, target: 'attribute.dimmer_w', key: 'dimmer_w', column: 'Price', columnLetter: 'D', status: 'unknown' },
-    { fieldIndex: 4, target: 'attribute.width_te', key: 'width_te', column: 'Width', columnLetter: 'E', status: 'field', field: widthField },
+    { fieldIndex: 3, target: 'attribute.dimmer_w', key: 'dimmer_w', column: 'Price', columnLetter: 'D', status: 'unknown', categories: [] },
+    { fieldIndex: 4, target: 'attribute.width_te', key: 'width_te', column: 'Width', columnLetter: 'E', status: 'field', field: widthField, categories: [] },
   ],
 })
 
@@ -58,8 +62,8 @@ function columnHandlers(answer: (body: ImportColumnAnswers) => Response) {
     http.get('/api/catalog-field-meanings', () =>
       HttpResponse.json({
         items: [
-          { meaning: 'channels_supplied', outputKind: true, loadType: false, types: ['integer'] },
-          { meaning: 'channel_limit_w', outputKind: true, loadType: true, types: ['number', 'integer'] },
+          { meaning: 'channels_supplied', outputKind: true, loadType: false, loadTypeRequired: false, options: [], types: ['integer'] },
+          { meaning: 'channel_limit_w', outputKind: true, loadType: true, loadTypeRequired: true, options: [], types: ['number', 'integer'] },
         ],
       }),
     ),
@@ -70,6 +74,7 @@ function columnHandlers(answer: (body: ImportColumnAnswers) => Response) {
       HttpResponse.json({ items: [{ id: id(811), key: 'led', name: { en: 'LED' }, isActive: true, sortOrder: 1, createdAt: at, updatedAt: at, can: { update: true, delete: true } }] }),
     ),
     http.get('/api/product-types', () => HttpResponse.json({ items: [zigbee] })),
+    http.get('/api/catalog-fields', () => HttpResponse.json({ items: [widthField, ledField] })),
     http.post('/api/import-columns', async ({ request }) => {
       const body = (await request.json()) as { mapping: ImportMapping }
       return HttpResponse.json(check(body.mapping))
@@ -106,7 +111,7 @@ describe('NewColumnsStep', () => {
     const row = screen.getByRole('listitem', { name: 'Column "Price" (D)' })
     expect(within(row).getByText('attribute dimmer_w')).toBeInTheDocument()
     // The known column, with its field and meaning.
-    expect(screen.getByText('Catalog field "Width" · Width on the DIN rail (TE)')).toBeInTheDocument()
+    expect(screen.getByText('Catalog field "Width" · Width on the rail (TE)')).toBeInTheDocument()
 
     await chooseOption(user, within(row).getByRole('combobox', { name: 'This column is' }), 'Just information')
     expect(within(row).queryByLabelText(/Field key/)).not.toBeInTheDocument()
@@ -144,7 +149,7 @@ describe('NewColumnsStep', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Preview' }))
     const row = await screen.findByRole('listitem', { name: 'Column "Price" (D)' })
-    await chooseOption(user, within(row).getByRole('combobox', { name: 'Meaning for the checks' }), 'Max watts per channel (per load type)')
+    await chooseOption(user, within(row).getByRole('combobox', { name: 'Meaning for the checks' }), 'Max. load per channel (W)')
     // The meaning's type and parameters follow.
     expect(within(row).getByRole('combobox', { name: /Value type/ })).toHaveTextContent('Number')
     await chooseOption(user, within(row).getByRole('combobox', { name: /Output kind/ }), 'Dimmer output')
@@ -196,7 +201,50 @@ describe('NewColumnsStep', () => {
     renderRoutes(routes, { route: runRoute })
 
     const known = await screen.findByRole('region', { name: 'Known columns' })
-    expect(await within(known).findByText('Catalog field "Width" · Width on the DIN rail (TE)')).toBeInTheDocument()
+    expect(await within(known).findByText('Catalog field "Width" · Width on the rail (TE)')).toBeInTheDocument()
     expect(within(known).getByText('Just information')).toBeInTheDocument()
+  })
+
+  it('links a column to an existing field, re-answers a matched column and shows each category link', async () => {
+    lookups([])
+    runHandlers(() => run({ mapping: withAttribute }))
+    const answers = columnHandlers((body) => HttpResponse.json({ ...check(body.mapping), unknown: 0 }))
+    server.use(
+      http.post('/api/import-columns', async ({ request }) => {
+        const body = (await request.json()) as { mapping: ImportMapping }
+        const c = check(body.mapping)
+        c.columns[1].categories = [
+          { categoryId: id(601), key: 'dimmers', name: { en: 'Dimmers' }, attributeType: 'number', status: 'will_link' },
+          { categoryId: id(602), key: 'relays', name: { en: 'Relays' }, attributeType: 'text', status: 'type_mismatch' },
+        ]
+        return HttpResponse.json(c)
+      }),
+    )
+    previewHandler(blockedUntilAnswered)
+    previewLists()
+    const user = userEvent.setup()
+    renderRoutes(routes, { route: runRoute })
+
+    await user.click(await screen.findByRole('button', { name: 'Preview' }))
+    const known = await screen.findByRole('region', { name: 'Known columns' })
+    expect(within(known).getByText('will be linked to field width_te in Dimmers')).toBeInTheDocument()
+    expect(within(known).getByText('stays unlinked in Relays: other value type')).toBeInTheDocument()
+
+    // The unknown column: an existing field.
+    const row = screen.getByRole('listitem', { name: 'Column "Price" (D)' })
+    await chooseOption(user, within(row).getByRole('combobox', { name: 'This column is' }), 'An existing catalog field')
+    await chooseOption(user, within(row).getByRole('combobox', { name: 'Catalog field' }), 'Max LED per output (dimmer_led_w)')
+
+    // The column matched automatically: answered again as just information.
+    await user.click(within(known).getByRole('button', { name: 'Change what column Width means' }))
+    const width = await screen.findByRole('listitem', { name: 'Column "Width" (E)' })
+    await chooseOption(user, within(width).getByRole('combobox', { name: 'This column is' }), 'Just information')
+    await user.click(screen.getByRole('button', { name: 'Save answers and preview' }))
+
+    await waitFor(() => expect(answers).toHaveLength(1))
+    expect(answers[0].answers).toEqual([
+      { target: 'attribute.dimmer_w', fieldKey: 'dimmer_led_w' },
+      { target: 'attribute.width_te', information: true },
+    ])
   })
 })

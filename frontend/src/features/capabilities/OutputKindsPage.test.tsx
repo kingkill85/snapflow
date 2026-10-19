@@ -32,7 +32,7 @@ const blind = outputKind({
   name: { en: 'Blind output' },
   sortOrder: 2,
   functionTypeIds: [blinds.id],
-  alternative: { outputKindId: relay.id, count: 2 },
+  alternatives: [{ outputKindId: relay.id, count: 2 }],
 })
 
 function handlers(all: () => OutputKind[]) {
@@ -77,14 +77,21 @@ describe('OutputKindsPage', () => {
     await u.type(within(dialog).getByLabelText('Key'), 'blind_output')
     await u.type(await translation(u, dialog, 'Name', 'en'), 'Blind output')
     await u.click(await within(dialog).findByRole('checkbox', { name: 'Blind' }))
-    await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Alternative' }), 'Relay output')
+    await u.click(within(dialog).getByRole('button', { name: 'Add alternative' }))
+    await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Kind' }), 'Relay output')
+    // A second row with the same kind is refused before saving, and can be removed.
+    await u.click(within(dialog).getByRole('button', { name: 'Add alternative' }))
+    await chooseOption(u, within(within(dialog).getByRole('group', { name: 'Alternative 2' })).getByRole('combobox', { name: 'Kind' }), 'Relay output')
+    await u.click(within(dialog).getByRole('button', { name: 'Create' }))
+    expect(await within(dialog).findByText('This output kind is listed twice as an alternative.')).toBeInTheDocument()
+    await u.click(within(dialog).getByRole('button', { name: 'Remove Alternative 2' }))
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(posted).toEqual({
       key: 'blind_output',
       name: { en: 'Blind output' },
       functionTypeIds: [blinds.id],
-      alternative: { outputKindId: relay.id, count: 2 },
+      alternatives: [{ outputKindId: relay.id, count: 2 }],
       isActive: true,
     })
   })
@@ -97,7 +104,7 @@ describe('OutputKindsPage', () => {
         sent = (await request.json()) as OutputKindUpdate
         return problem(422, {
           code: 'validation.failed',
-          fields: [{ location: 'body.alternative.outputKindId', code: 'output_kind.alternative_cycle' }],
+          fields: [{ location: 'body.alternatives[0].outputKindId', code: 'output_kind.alternative_cycle' }],
         })
       }),
     )
@@ -108,7 +115,7 @@ describe('OutputKindsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Edit output kind' })
     await u.click(within(dialog).getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(sent?.expectedUpdatedAt).toBe(blind.updatedAt))
-    expect(sent?.alternative).toEqual({ outputKindId: relay.id, count: 2 })
-    expect(await within(dialog).findAllByText('That output kind already uses this one as its alternative.')).not.toHaveLength(0)
+    expect(sent?.alternatives).toEqual([{ outputKindId: relay.id, count: 2 }])
+    expect(await within(dialog).findAllByText('That output kind already has this one as an alternative.')).not.toHaveLength(0)
   })
 })

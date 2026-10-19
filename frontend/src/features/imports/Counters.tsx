@@ -96,6 +96,9 @@ export function Counters({ counts, filterHref, issuesHref, applied, extra }: Cou
           lines={[
             { label: t('counts.rowsRead'), value: counts.rows },
             { label: t('counts.newCategories'), value: counts.categories.new, to: filterHref?.('category', 'new') },
+            ...(counts.categories.changed > 0
+              ? [{ label: t('counts.changedCategories'), value: counts.categories.changed, to: filterHref?.('category', 'changed') }]
+              : []),
             { label: t('counts.errors'), value: counts.errors, tone: 'danger', to: issuesHref?.('error') },
             { label: t('counts.warnings'), value: counts.warnings, tone: 'warning', to: issuesHref?.('warning') },
             { label: t('counts.rowsSkipped'), value: counts.rowsSkipped, tone: 'danger', to: filterHref?.('', 'skipped') },

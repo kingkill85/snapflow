@@ -31,12 +31,14 @@
     "activeHint": "Inaktive Ausgangsarten können für neue Felder nicht gewählt werden.",
     "functionTypes": "Bedient",
     "functionTypesHint": "Die Funktionstypen, die ein Kanal dieser Art ansteuern kann.",
-    "alternative": "Alternative",
-    "alternativeHint": "Kanäle einer anderen Art, die zusammen als einer dieser Art dienen, z. B. 2 Schaltausgänge als 1 Jalousieausgang.",
-    "noAlternative": "Keine",
+    "alternative": "Art",
+    "alternativeHint": "Kanäle einer anderen Art, die zusammen als einer dieser Art dienen können, z. B. 2 Schaltausgänge als 1 Jalousieausgang (feste Paare 1+2, 3+4, …). Ein Produkt nutzt sie nur, wo es das erlaubt (Bedeutung „Darf als andere Ausgangsart dienen“).",
     "alternativeCount": "Benötigte Kanäle",
     "alternativeCountHint": "Wie viele dieser Kanäle einen dieser Art ergeben (1–16).",
-    "alternativeText": "{{count}} × {{kind}}"
+    "alternativeText": "{{count}} × {{kind}}",
+    "alternatives": "Alternativen",
+    "alternativeN": "Alternative {{n}}",
+    "addAlternative": "Alternative hinzufügen"
   },
   "fields": {
     "title": "Felder",
@@ -62,7 +64,13 @@
     "loadType": "Lastart",
     "choose": "Auswählen …",
     "productTypes": "Nur für Produkttypen",
-    "productTypesHint": "Die Bedeutung gilt nur für Produkte dieser Produkttypen; keiner angehakt = alle."
+    "productTypesHint": "Die Bedeutung gilt nur für Produkte dieser Produkttypen; keiner angehakt = alle.",
+    "inUseHint_one": "Von {{count}} Kategorie verknüpft ({{categories}}).",
+    "inUseHint_other": "Von {{count}} Kategorien verknüpft ({{categories}}).",
+    "lockedHint": "Fest, solange Kategorien dieses Feld verknüpfen.",
+    "anyLoadType": "Jede Lastart",
+    "loadTypeOptionalHint": "„Jede Lastart“ für eine Grenze, die für jede Last gilt.",
+    "optionsFixed": "Diese Bedeutung braucht genau diese Auswahlwerte; ihre Beschriftungen sind änderbar."
   },
   "type": {
     "text": "Text",
@@ -88,6 +96,7 @@
     "wireless_places_supplied": "Gelieferte Funkplätze",
     "wireless_place_used": "Belegte Funkplätze",
     "zigbee_router": "Zigbee-Router",
-    "motor_type": "Motortyp (AC/DC)"
+    "motor_type": "Motortyp (AC/DC)",
+    "alternative_allowed": "Darf als andere Ausgangsart dienen"
   }
 }

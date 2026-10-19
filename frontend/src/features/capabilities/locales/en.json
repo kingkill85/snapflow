@@ -31,12 +31,14 @@
     "activeHint": "Inactive output kinds cannot be chosen for new fields.",
     "functionTypes": "Serves",
     "functionTypesHint": "The function types a channel of this kind can drive.",
-    "alternative": "Alternative",
-    "alternativeHint": "Channels of another kind that together act as one of this kind, e.g. 2 relay outputs as 1 blind output.",
-    "noAlternative": "None",
+    "alternative": "Kind",
+    "alternativeHint": "Channels of another kind that together can act as one of this kind, e.g. 2 relay outputs as 1 blind output (fixed pairs 1+2, 3+4, …). A product uses them only where it allows it (meaning \"May act as another output kind\").",
     "alternativeCount": "Channels needed",
     "alternativeCountHint": "How many of those channels make one of this kind (1–16).",
-    "alternativeText": "{{count}} × {{kind}}"
+    "alternativeText": "{{count}} × {{kind}}",
+    "alternatives": "Alternatives",
+    "alternativeN": "Alternative {{n}}",
+    "addAlternative": "Add alternative"
   },
   "fields": {
     "title": "Fields",
@@ -62,7 +64,13 @@
     "loadType": "Load type",
     "choose": "Choose …",
     "productTypes": "Only for product types",
-    "productTypesHint": "The meaning applies only to products of these product types; none ticked = all."
+    "productTypesHint": "The meaning applies only to products of these product types; none ticked = all.",
+    "inUseHint_one": "Linked by {{count}} category ({{categories}}).",
+    "inUseHint_other": "Linked by {{count}} categories ({{categories}}).",
+    "lockedHint": "Fixed while categories link this field.",
+    "anyLoadType": "Any load type",
+    "loadTypeOptionalHint": "Leave at \"Any load type\" for a limit that applies to every load.",
+    "optionsFixed": "This meaning needs exactly these choices; their labels can change."
   },
   "type": {
     "text": "Text",
@@ -88,6 +96,7 @@
     "wireless_places_supplied": "Wireless places supplied",
     "wireless_place_used": "Wireless places used",
     "zigbee_router": "Zigbee router",
-    "motor_type": "Motor type (AC/DC)"
+    "motor_type": "Motor type (AC/DC)",
+    "alternative_allowed": "May act as another output kind"
   }
 }

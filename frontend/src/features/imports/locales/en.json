@@ -219,7 +219,8 @@
     "image": "Image",
     "addons": "Add-ons",
     "localized": "{{name}} ({{language}})",
-    "mounting": "Mounting"
+    "mounting": "Mounting",
+    "attributeLink": "Attribute \"{{attribute}}\": catalog field"
   },
   "value": {
     "none": "–",
@@ -267,7 +268,8 @@
     "warnings": "Warnings",
     "rowsSkipped": "Rows with errors",
     "unmapped_one": "{{count}} column is not imported:",
-    "unmapped_other": "{{count}} columns are not imported:"
+    "unmapped_other": "{{count}} columns are not imported:",
+    "changedCategories": "Categories linked to fields"
   },
   "preview": {
     "title": "Preview",
@@ -392,7 +394,6 @@
     "optionsHint": "Type a choice and press Enter.",
     "meaning": "Meaning for the checks",
     "meaningHint": "What SnapFlow does with the value; \"No meaning\" keeps it as information on the product.",
-    "noMeaning": "No meaning (just information)",
     "outputKind": "Output kind",
     "loadType": "Load type",
     "productTypes": "Only for these product types",
@@ -404,27 +405,22 @@
     "knownField": "Catalog field \"{{field}}\" · {{meaning}}",
     "status": {
       "information": "Just information",
-      "category": "Attribute of a category (no catalog field)",
+      "category": "Known, no meaning (an attribute of a category, no catalog field)",
       "field": "Catalog field"
     },
-    "knownFieldKey": "Catalog field \"{{key}}\""
-  },
-  "meaning": {
-    "channels_supplied": "Channels supplied (number of outputs of a kind)",
-    "channel_limit_w": "Max watts per channel (per load type)",
-    "channel_limit_a": "Max amps per channel",
-    "channel_min_load_w": "Minimum load per channel (W)",
-    "module_total_a": "Max amps for the whole module",
-    "module_total_w": "Max watts for the whole module",
-    "bus_current_used_ma": "Bus current used (mA)",
-    "bus_current_supplied_ma": "Bus current supplied (mA)",
-    "bus_devices_max": "Max devices per bus line",
-    "rail_width_te": "Width on the DIN rail (TE)",
-    "enclosure_rows": "Rows of an enclosure",
-    "enclosure_te_per_row": "TE per enclosure row",
-    "wireless_places_supplied": "Wireless places supplied (gateway)",
-    "wireless_place_used": "Uses a wireless place",
-    "zigbee_router": "Zigbee router (yes/no)",
-    "motor_type": "Motor type (AC/DC)"
+    "knownFieldKey": "Catalog field \"{{key}}\"",
+    "modeExisting": "An existing catalog field",
+    "existingField": "Catalog field",
+    "change": "Change",
+    "linkField": "Link a field",
+    "changeColumn": "Change what column {{column}} means",
+    "link": {
+      "linked": "linked in {{category}}",
+      "will_link": "will be linked to field {{field}} in {{category}}",
+      "type_mismatch": "stays unlinked in {{category}}: other value type",
+      "other_field": "linked to field {{field}} in {{category}}",
+      "unlinked": "attribute of {{category}}, no field"
+    },
+    "anyLoadType": "Any load type"
   }
 }

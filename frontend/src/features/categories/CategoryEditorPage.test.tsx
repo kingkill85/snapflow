@@ -75,6 +75,8 @@ const catalogField = (over: Partial<CatalogField>): CatalogField => ({
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   can: { update: true, delete: true },
+  inUse: 0,
+  usedBy: [],
   ...over,
 })
 const catalogFields = [
@@ -229,6 +231,36 @@ describe('CategoryEditorPage', () => {
       required: false,
       scope: 'product',
       fieldKey: 'bus_current_ma',
+    })
+  })
+
+  it('unlinking a catalog field keeps the values the field gave and unlocks them (D295)', async () => {
+    const u = userEvent.setup()
+    const { puts } = await openEditor()
+    const attributes = attributesRegion()
+    const adds = within(attributes).getAllByRole('button', { name: 'Add attribute' })
+    await u.click(adds[adds.length - 1])
+    const row = group('Attribute 4', attributes)
+    await u.type(own(row, 'Key'), 'bus_ma')
+    await u.type(await translation(u, row, 'Label', 'en'), 'Bus current')
+    await chooseOption(u, within(row).getByLabelText('Catalog field'), 'Bus current (bus_current_ma)')
+    expect(within(row).getByLabelText('Unit')).toHaveAttribute('readonly')
+
+    await chooseOption(u, within(row).getByLabelText('Catalog field'), 'No link')
+    expect(within(row).queryByTestId('linked-meaning')).not.toBeInTheDocument()
+    expect(within(row).getByLabelText('Type')).toHaveTextContent('Number')
+    expect(within(row).getByLabelText('Unit')).toHaveValue('mA')
+    expect(within(row).getByLabelText('Unit')).not.toHaveAttribute('readonly')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes[3]).toEqual({
+      key: 'bus_ma',
+      label: { en: 'Bus current' },
+      type: 'number',
+      unit: 'mA',
+      required: false,
+      scope: 'product',
     })
   })
 

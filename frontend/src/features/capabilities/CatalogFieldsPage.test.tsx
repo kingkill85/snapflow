@@ -97,7 +97,7 @@ describe('CatalogFieldsPage', () => {
       label: { en: 'Motor' },
       type: 'enum',
       unit: undefined,
-      meaning: 'motor_type',
+      meaning: undefined,
       options: [{ key: 'ac', label: { en: 'AC' } }],
     })
     let sent: CatalogFieldUpdate | undefined
@@ -105,7 +105,7 @@ describe('CatalogFieldsPage', () => {
       ...handlers(() => [motor]),
       http.put('/api/catalog-fields/:id', async ({ request }) => {
         sent = (await request.json()) as CatalogFieldUpdate
-        return problem(422, { code: 'validation.failed', fields: [{ location: 'body.meaning', code: 'catalog_field.meaning_type', params: { expected: 'enum' } }] })
+        return problem(422, { code: 'validation.failed', fields: [{ location: 'body.meaning', code: 'catalog_field.meaning_type', params: { expected: 'integer, boolean' } }] })
       }),
     )
     const u = userEvent.setup()
@@ -123,14 +123,13 @@ describe('CatalogFieldsPage', () => {
     expect(sent).toMatchObject({
       key: 'motor',
       type: 'enum',
-      meaning: 'motor_type',
       options: [
         { key: 'ac', label: { en: 'AC' } },
         { key: 'dc', label: { en: 'DC' } },
       ],
       expectedUpdatedAt: motor.updatedAt,
     })
-    expect(within(dialog).getByRole('combobox', { name: 'Meaning' })).toHaveAccessibleDescription('This meaning needs another value type (enum).')
+    expect(within(dialog).getByRole('combobox', { name: 'Meaning' })).toHaveAccessibleDescription('This meaning needs another value type (a whole number or yes or no).')
   })
 
   it('shows why a linked field cannot be deleted', async () => {
@@ -143,6 +142,59 @@ describe('CatalogFieldsPage', () => {
     await u.click(await screen.findByRole('button', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete field' })
     await u.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    expect(await within(dialog).findByText(/Categories link the field "width_te"/)).toBeInTheDocument()
+  })
+
+  it('motor type: the meaning fixes the choices ac and dc', async () => {
+    let posted: CatalogFieldInput | undefined
+    server.use(
+      ...handlers(() => []),
+      http.post('/api/catalog-fields', async ({ request }) => {
+        posted = (await request.json()) as CatalogFieldInput
+        return HttpResponse.json(catalogField({ key: 'motor' }), { status: 201 })
+      }),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<CatalogFieldsPage />, { me: adminMe })
+    await u.click(await screen.findByRole('button', { name: 'New field' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New field' })
+    await u.type(within(dialog).getByLabelText('Key'), 'motor')
+    await u.type(await translation(u, dialog, 'Label', 'en'), 'Motor')
+    await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Meaning' }), 'Motor type (AC/DC)')
+    expect(within(dialog).getByRole('combobox', { name: 'Value type' })).toBeDisabled()
+    expect(await within(dialog).findByText('This meaning needs exactly these choices; their labels can change.')).toBeInTheDocument()
+    const keys = within(within(dialog).getByRole('group', { name: 'Choices' })).getAllByLabelText('Key')
+    expect(keys.map((k) => (k as HTMLInputElement).value)).toEqual(['ac', 'dc'])
+    expect(keys[0]).toHaveAttribute('readonly')
+    expect(within(dialog).queryByRole('button', { name: 'Add choice' })).not.toBeInTheDocument()
+    await u.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(posted).toBeDefined())
+    expect(posted).toMatchObject({
+      type: 'enum',
+      meaning: 'motor_type',
+      options: [
+        { key: 'ac', label: { en: 'AC' } },
+        { key: 'dc', label: { en: 'DC' } },
+      ],
+    })
+  })
+
+  it('locks key and type of a field categories link, and shows the conflict the server reports', async () => {
+    const linked = { ...width, inUse: 2, usedBy: [{ id: 'c1', key: 'dimmers', name: { en: 'Dimmers' } }, { id: 'c2', key: 'relays', name: { en: 'Relays' } }] }
+    server.use(
+      ...handlers(() => [linked]),
+      http.put('/api/catalog-fields/:id', () => problem(409, { code: 'catalog_field.in_use', params: { key: 'width_te', count: 2 } })),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<CatalogFieldsPage />, { me: adminMe })
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit field' })
+    expect(within(dialog).getByTestId('field-in-use')).toHaveTextContent('Linked by 2 categories (Dimmers, Relays).')
+    expect(within(dialog).getByLabelText('Key')).toHaveAttribute('readonly')
+    expect(within(dialog).getByRole('combobox', { name: 'Value type' })).toBeDisabled()
+    await u.clear(await translation(u, dialog, 'Label', 'en'))
+    await u.type(await translation(u, dialog, 'Label', 'en'), 'Rail width')
+    await u.click(within(dialog).getByRole('button', { name: 'Update' }))
     expect(await within(dialog).findByText(/Categories link the field "width_te"/)).toBeInTheDocument()
   })
 })

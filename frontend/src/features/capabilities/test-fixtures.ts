@@ -26,6 +26,7 @@ export const outputKind = (over: Partial<OutputKind>): OutputKind => ({
   sortOrder: 1,
   isActive: true,
   functionTypeIds: [],
+  alternatives: [],
   ...over,
 })
 
@@ -40,13 +41,17 @@ export const catalogField = (over: Partial<CatalogField>): CatalogField => ({
   options: [],
   productTypeIds: [],
   sortOrder: 1,
+  inUse: 0,
+  usedBy: [],
   ...over,
 })
 
 export const meanings: MeaningSpec[] = [
-  { meaning: 'channels_supplied', outputKind: true, loadType: false, types: ['integer'] },
-  { meaning: 'channel_limit_w', outputKind: true, loadType: true, types: ['number', 'integer'] },
-  { meaning: 'rail_width_te', outputKind: false, loadType: false, types: ['number', 'integer'] },
+  { meaning: 'channels_supplied', outputKind: true, loadType: false, loadTypeRequired: false, options: [], types: ['integer'] },
+  { meaning: 'channel_limit_w', outputKind: true, loadType: true, loadTypeRequired: true, options: [], types: ['number', 'integer'] },
+  { meaning: 'channel_limit_a', outputKind: true, loadType: true, loadTypeRequired: false, options: [], types: ['number', 'integer'] },
+  { meaning: 'rail_width_te', outputKind: false, loadType: false, loadTypeRequired: false, options: [], types: ['number', 'integer'] },
+  { meaning: 'motor_type', outputKind: false, loadType: false, loadTypeRequired: false, options: ['ac', 'dc'], types: ['enum'] },
 ]
 
 export { readOnly }

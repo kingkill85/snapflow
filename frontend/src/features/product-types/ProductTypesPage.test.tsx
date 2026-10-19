@@ -8,6 +8,7 @@ import { getSearchVariantsQueryKey } from '@/api/generated/products/products'
 import { adminMe, userMe } from '@/test/fixtures'
 import { translation } from '@/test/translatable'
 import { renderWithProviders } from '@/test/render'
+import { chooseOption } from '@/test/select'
 import { server } from '@/test/server'
 
 import { ProductTypesPage } from './ProductTypesPage'
@@ -21,6 +22,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   name: { en: 'Zigbee', de: 'Zigbee' },
   sortOrder: 1,
   reservePercent: 20,
+  topology: 'none',
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -28,7 +30,7 @@ const productType = (over: Partial<ProductType>): ProductType => ({
   ...over,
 })
 
-const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb', defaultBusCurrentMa: 10, reservePercent: 25, busDevicesMax: 64 })
+const alpha = productType({ abbreviation: 'ZB', color: '#1f6feb', topology: 'bus', defaultBusCurrentMa: 10, reservePercent: 25, busDevicesMax: 64 })
 const beta = productType({
   id: '6f1c2b8e-0000-4000-8000-000000000002',
   key: 'knx',
@@ -133,6 +135,11 @@ describe('ProductTypesPage', () => {
     await u.type((await translation(u, dialog, 'Name', 'en')), 'KNX')
     await u.type(within(dialog).getByLabelText('Abbreviation'), ' knx ')
     await u.type(within(dialog).getByLabelText('Colour'), '#FFCC00')
+    // The defaults shown follow the topology.
+    expect(within(dialog).queryByLabelText('Default bus current')).not.toBeInTheDocument()
+    await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Wireless')
+    expect(within(dialog).queryByLabelText('Devices per line')).not.toBeInTheDocument()
+    await u.type(within(dialog).getByLabelText('Default wireless places'), '1')
     // The preview follows the form; a light colour gets black text.
     expect(preview).toHaveTextContent('KNXKNX')
     expect(within(preview).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#FFCC00', color: '#000000' })
@@ -149,6 +156,8 @@ describe('ProductTypesPage', () => {
       defaultBusCurrentMa: 0,
       reservePercent: 20,
       busDevicesMax: 0,
+      topology: 'wireless',
+      defaultWirelessPlacesUsed: 1,
       isActive: true,
     })
     await waitFor(() => expect(names()).toEqual(['ZBZigbee', 'KNXKNX']))
@@ -277,6 +286,8 @@ describe('ProductTypesPage', () => {
       defaultBusCurrentMa: 10,
       reservePercent: 25,
       busDevicesMax: 64,
+      topology: 'bus',
+      defaultWirelessPlacesUsed: 0,
       isActive: true,
       expectedUpdatedAt: alpha.updatedAt,
     })

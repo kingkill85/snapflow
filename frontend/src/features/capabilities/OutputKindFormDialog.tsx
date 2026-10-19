@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
+import { Plus, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
@@ -16,6 +17,7 @@ import {
 } from '@/api/generated/output-kinds/output-kinds'
 import {
   apiFields,
+  Button,
   CheckboxGroupField,
   errorKey,
   ErrorMessage,
@@ -46,29 +48,35 @@ const schema = z
       required: errorKey('validation.required'),
     }),
     functionTypeIds: z.array(z.string()),
-    alternativeKindId: z.string(),
-    alternativeCount: z.string(),
+    // Alternatives: `count` channels of another kind act as one of this kind.
+    alternatives: z.array(
+      z.object({
+        outputKindId: z.string().min(1, errorKey('validation.required')),
+        count: z.string().refine((c) => /^\d+$/.test(c.trim()) && Number(c) >= 1 && Number(c) <= 16, errorKey('validation.range', { min: 1, max: 16 })),
+      }),
+    ),
     isActive: z.boolean(),
   })
   .superRefine((v, ctx) => {
-    if (!v.alternativeKindId) return
-    const n = Number(v.alternativeCount)
-    if (!Number.isInteger(n) || n < 1 || n > 16) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['alternativeCount'],
-        message: errorKey('validation.range', { min: 1, max: 16 }),
-      })
-    }
+    v.alternatives.forEach((a, i) => {
+      if (a.outputKindId && v.alternatives.findIndex((b) => b.outputKindId === a.outputKindId) < i) {
+        ctx.addIssue({ code: 'custom', path: ['alternatives', i, 'outputKindId'], message: errorKey('output_kind.alternative_duplicate') })
+      }
+    })
   })
 type FormValues = z.infer<typeof schema>
 
+/** Rows of alternatives the API reports errors at (body.alternatives[i].*). */
+const maxAlternatives = 20
+const alternativeFields = Object.fromEntries(
+  Array.from({ length: maxAlternatives }, (_, i) => [
+    [`alternatives[${i}].outputKindId`, `alternatives.${i}.outputKindId`],
+    [`alternatives[${i}].count`, `alternatives.${i}.count`],
+  ]).flat(),
+) as Record<string, never>
+
 const fields = {
-  ...apiFields<FormValues>(['key', 'functionTypeIds', 'isActive'], {
-    alternative: 'alternativeKindId',
-    'alternative.outputKindId': 'alternativeKindId',
-    'alternative.count': 'alternativeCount',
-  }),
+  ...apiFields<FormValues>(['key', 'functionTypeIds', 'isActive'], alternativeFields),
   ...translatableApiFields('name'),
 }
 
@@ -76,8 +84,7 @@ const toFormValues = (item: OutputKind | null): FormValues => ({
   key: item?.key ?? '',
   name: toTranslatable(item?.name),
   functionTypeIds: item?.functionTypeIds ?? [],
-  alternativeKindId: item?.alternative?.outputKindId ?? '',
-  alternativeCount: String(item?.alternative?.count ?? 2),
+  alternatives: (item?.alternatives ?? []).map((a) => ({ outputKindId: a.outputKindId, count: String(a.count) })),
   isActive: item?.isActive ?? true,
 })
 
@@ -85,14 +92,8 @@ const toInput = (v: FormValues): OutputKindInput => ({
   key: v.key,
   name: fromTranslatable(v.name),
   functionTypeIds: v.functionTypeIds,
-  ...(v.alternativeKindId
-    ? {
-        alternative: {
-          outputKindId: v.alternativeKindId,
-          count: Number(v.alternativeCount),
-        },
-      }
-    : {}),
+  // Always sent: left out would clear them (new endpoints, D294 note).
+  alternatives: v.alternatives.map((a) => ({ outputKindId: a.outputKindId, count: Number(a.count) })),
   isActive: v.isActive,
 })
 
@@ -136,10 +137,7 @@ export function OutputKindFormDialog({ open, onOpenChange, item, onSaved }: Prop
     resetUpdate()
   }, [open, item, reset, resetCreate, resetUpdate])
 
-  const alternativeKindId = useWatch({
-    control: form.control,
-    name: 'alternativeKindId',
-  })
+  const alternatives = useFieldArray({ control: form.control, name: 'alternatives' })
 
   const submit = form.handleSubmit(async (values) => {
     const data = toInput(values)
@@ -168,10 +166,7 @@ export function OutputKindFormDialog({ open, onOpenChange, item, onSaved }: Prop
     value: f.id,
     label: localized(f.name),
   }))
-  const kindOptions = [
-    { value: '', label: t('outputKinds.noAlternative') },
-    ...(kinds.data?.items ?? []).filter((k) => k.id !== item?.id).map((k) => ({ value: k.id, label: localized(k.name) })),
-  ]
+  const kindOptions = (kinds.data?.items ?? []).filter((k) => k.id !== item?.id).map((k) => ({ value: k.id, label: localized(k.name) }))
 
   return (
     <FormDialog
@@ -223,26 +218,44 @@ export function OutputKindFormDialog({ open, onOpenChange, item, onSaved }: Prop
           />
         )}
       />
-      <div className="grid items-start gap-4 sm:grid-cols-2">
-        <FormSelectField
-          control={form.control}
-          name="alternativeKindId"
-          label={t('outputKinds.alternative')}
-          hint={t('outputKinds.alternativeHint')}
-          options={kindOptions}
-          error={fieldError(errors.alternativeKindId?.message)}
-        />
-        {alternativeKindId && (
-          <Field
-            label={t('outputKinds.alternativeCount')}
-            hint={t('outputKinds.alternativeCountHint')}
-            type="number"
-            min={1}
-            max={16}
-            required
-            error={fieldError(errors.alternativeCount?.message)}
-            {...form.register('alternativeCount')}
-          />
+      <div className="space-y-3" role="group" aria-label={t('outputKinds.alternatives')}>
+        <div>
+          <p className="text-sm font-medium">{t('outputKinds.alternatives')}</p>
+          <p className="text-sm text-muted">{t('outputKinds.alternativeHint')}</p>
+        </div>
+        {alternatives.fields.map((row, i) => (
+          <div key={row.id} className="grid items-start gap-4 sm:grid-cols-[1fr_10rem_auto]" role="group" aria-label={t('outputKinds.alternativeN', { n: i + 1 })}>
+            <FormSelectField
+              control={form.control}
+              name={`alternatives.${i}.outputKindId`}
+              label={t('outputKinds.alternative')}
+              placeholder={t('fields.choose')}
+              required
+              options={kindOptions}
+              error={fieldError(errors.alternatives?.[i]?.outputKindId?.message)}
+            />
+            <Field
+              label={t('outputKinds.alternativeCount')}
+              hint={t('outputKinds.alternativeCountHint')}
+              inputMode="numeric"
+              required
+              error={fieldError(errors.alternatives?.[i]?.count?.message)}
+              {...form.register(`alternatives.${i}.count`)}
+            />
+            <Button
+              variant="danger-quiet"
+              className="sm:mt-6"
+              aria-label={tCommon('action.removeItem', { item: t('outputKinds.alternativeN', { n: i + 1 }) })}
+              onClick={() => alternatives.remove(i)}
+            >
+              <Trash2 /> {tCommon('action.remove')}
+            </Button>
+          </div>
+        ))}
+        {alternatives.fields.length < maxAlternatives && (
+          <Button variant="secondary" size="sm" onClick={() => alternatives.append({ outputKindId: '', count: '2' })}>
+            <Plus /> {t('outputKinds.addAlternative')}
+          </Button>
         )}
       </div>
       <SwitchField label={t('field.active')} hint={t('outputKinds.activeHint')} {...form.register('isActive')} />

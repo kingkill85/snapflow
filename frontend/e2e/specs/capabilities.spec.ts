@@ -77,17 +77,17 @@ test('an import asks what new capability columns mean; the product then shows it
 
   // Dimmer outputs: channels supplied of the new output kind.
   const dimmers = column(columns.dimmers)
-  await chooseOption(dimmers.getByRole('combobox', { name: 'Meaning for the checks' }), 'Channels supplied (number of outputs of a kind)')
+  await chooseOption(dimmers.getByRole('combobox', { name: 'Meaning for the checks' }), 'Number of channels')
   await chooseOption(dimmers.getByRole('combobox', { name: /Output kind/ }), kindName)
   // LED limit: watts per channel for the output kind and load type.
   const led = column(columns.led)
-  await chooseOption(led.getByRole('combobox', { name: 'Meaning for the checks' }), 'Max watts per channel (per load type)')
+  await chooseOption(led.getByRole('combobox', { name: 'Meaning for the checks' }), 'Max. load per channel (W)')
   await chooseOption(led.getByRole('combobox', { name: /Output kind/ }), kindName)
   await chooseOption(led.getByRole('combobox', { name: /Load type/ }), loadName)
   await led.getByRole('textbox', { name: /Unit/ }).fill('W')
   // Width: rail width in TE.
   const width = column(columns.width)
-  await chooseOption(width.getByRole('combobox', { name: 'Meaning for the checks' }), 'Width on the DIN rail (TE)')
+  await chooseOption(width.getByRole('combobox', { name: 'Meaning for the checks' }), 'Width on the rail (TE)')
   await width.getByRole('textbox', { name: /Unit/ }).fill('TE')
   // Notes: just information.
   await chooseOption(column(columns.notes).getByRole('combobox', { name: 'This column is' }), 'Just information')

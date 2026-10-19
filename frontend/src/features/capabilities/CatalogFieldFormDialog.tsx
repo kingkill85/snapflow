@@ -29,9 +29,11 @@ import {
   RepeaterControls,
   RepeaterItem,
   setApiFieldErrors,
+  toTranslatable,
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
+import { useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 import {
@@ -62,6 +64,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
   const localized = useLocalized()
+  const meaningLabel = useMeaningLabel()
   const queryClient = useQueryClient()
   const create = useCreateCatalogField()
   const update = useUpdateCatalogField()
@@ -91,6 +94,25 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
     name: ['type', 'meaning'],
   })
   const spec = meanings.data?.items.find((m) => m.meaning === meaning)
+  // A meaning with fixed choices (motor_type: ac, dc) sets them when it is chosen.
+  const fixedOptions = spec && spec.options.length > 0 ? spec.options : undefined
+  const fixedKey = fixedOptions?.join(',')
+  const { getValues, setValue } = form
+  useEffect(() => {
+    if (!fixedKey) return
+    const keys = fixedKey.split(',')
+    if (getValues('type') !== 'enum') setValue('type', 'enum', { shouldDirty: true })
+    const current = getValues('options')
+    if (current.map((o) => o.key).join(',') === fixedKey) return
+    setValue(
+      'options',
+      keys.map((key) => current.find((o) => o.key === key) ?? { key, label: toTranslatable({ en: key.toUpperCase() }) }),
+      { shouldDirty: true },
+    )
+  }, [fixedKey, getValues, setValue])
+  // A field categories link keeps its key and type (catalog_field.in_use).
+  const inUse = (item?.inUse ?? 0) > 0
+  const usedByNames = (item?.usedBy ?? []).map((c) => localized(c.name) || c.key).join(', ')
 
   const submit = form.handleSubmit(async (values) => {
     const data = toCatalogFieldInput(values, spec)
@@ -120,10 +142,10 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
     label: t(`type.${v}`),
   }))
   const meaningOptions = [
-    { value: '', label: t('meaning.none') },
+    { value: '', label: meaningLabel() },
     ...Object.values(CatalogFieldInputMeaning).map((m) => ({
       value: m,
-      label: t(`meaning.${m}`),
+      label: meaningLabel(m),
     })),
   ]
   const meaningHint =
@@ -160,10 +182,16 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
         />
       }
     >
+      {inUse && (
+        <p className="text-sm text-muted" data-testid="field-in-use">
+          {t('fields.inUseHint', { count: item?.inUse ?? 0, categories: usedByNames })}
+        </p>
+      )}
       <Field
         label={t('field.key')}
-        hint={t('fields.keyHint')}
+        hint={inUse ? t('fields.lockedHint') : t('fields.keyHint')}
         required
+        readOnly={inUse}
         autoComplete="off"
         error={fieldError(errors.key?.message)}
         {...form.register('key')}
@@ -176,6 +204,8 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
           label={t('fields.type')}
           options={typeOptions}
           required
+          disabled={inUse || !!fixedOptions}
+          hint={inUse ? t('fields.lockedHint') : undefined}
           error={fieldError(errors.type?.message)}
         />
         <Field
@@ -186,7 +216,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
           {...form.register('unit')}
         />
       </div>
-      {type === 'enum' && <OptionsEditor form={form} />}
+      {type === 'enum' && <OptionsEditor form={form} fixed={!!fixedOptions} />}
       <Field
         label={t('fields.etimFeature')}
         hint={t('fields.etimFeatureHint')}
@@ -223,12 +253,16 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
               control={form.control}
               name="loadTypeId"
               label={t('fields.loadType')}
-              required
+              required={spec.loadTypeRequired}
+              hint={spec.loadTypeRequired ? undefined : t('fields.loadTypeOptionalHint')}
               placeholder={t('fields.choose')}
-              options={(loadTypes.data?.items ?? []).map((l) => ({
-                value: l.id,
-                label: localized(l.name),
-              }))}
+              options={[
+                ...(spec.loadTypeRequired ? [] : [{ value: '', label: t('fields.anyLoadType') }]),
+                ...(loadTypes.data?.items ?? []).map((l) => ({
+                  value: l.id,
+                  label: localized(l.name),
+                })),
+              ]}
               error={fieldError(errors.loadTypeId?.message)}
             />
           )}
@@ -260,7 +294,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
 type Form = ReturnType<typeof useForm<CatalogFieldFormValues>>
 
 /** The choices of an enum field. */
-function OptionsEditor({ form }: { form: Form }) {
+function OptionsEditor({ form, fixed }: { form: Form; fixed: boolean }) {
   const { t } = useTranslation('capabilities')
   const fieldError = useFieldError()
   const { fields, append, remove, move } = useFieldArray({
@@ -273,6 +307,7 @@ function OptionsEditor({ form }: { form: Form }) {
   return (
     <div role="group" aria-label={t('fields.options')} className="space-y-2">
       <p className="text-sm font-medium">{t('fields.options')}</p>
+      {fixed && <p className="text-sm text-muted">{t('fields.optionsFixed')}</p>}
       {errors?.root?.message && <p className="text-sm text-danger">{fieldError(errors.root.message)}</p>}
       {fields.map((field, j) => (
         <RepeaterItem
@@ -282,25 +317,28 @@ function OptionsEditor({ form }: { form: Form }) {
           title={t('fields.option', { n: j + 1 })}
           invalid={!!errors?.[j]}
           controls={
-            <RepeaterControls
-              index={j}
-              count={fields.length}
-              name={t('fields.option', { n: j + 1 })}
-              onMove={(from, to, action) => {
-                move(from, to)
-                focus.moved(to, action)
-              }}
-              onRemove={(i) => {
-                remove(i)
-                focus.removed(i)
-              }}
-            />
+            !fixed && (
+              <RepeaterControls
+                index={j}
+                count={fields.length}
+                name={t('fields.option', { n: j + 1 })}
+                onMove={(from, to, action) => {
+                  move(from, to)
+                  focus.moved(to, action)
+                }}
+                onRemove={(i) => {
+                  remove(i)
+                  focus.removed(i)
+                }}
+              />
+            )
           }
         >
           <div className="grid items-start gap-3 sm:grid-cols-3">
             <Field
               label={t('field.key')}
               required
+              readOnly={fixed}
               autoComplete="off"
               error={fieldError(errors?.[j]?.key?.message)}
               {...form.register(`options.${j}.key`)}
@@ -311,17 +349,19 @@ function OptionsEditor({ form }: { form: Form }) {
           </div>
         </RepeaterItem>
       ))}
-      <Button
-        data-repeater-add={focus.listId}
-        variant="secondary"
-        size="sm"
-        onClick={() => {
-          append({ key: '', label: emptyTranslatable() })
-          focus.added(fields.length)
-        }}
-      >
-        <Plus /> {t('fields.addOption')}
-      </Button>
+      {!fixed && (
+        <Button
+          data-repeater-add={focus.listId}
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            append({ key: '', label: emptyTranslatable() })
+            focus.added(fields.length)
+          }}
+        >
+          <Plus /> {t('fields.addOption')}
+        </Button>
+      )}
     </div>
   )
 }

@@ -29,6 +29,15 @@
     "reservePercent": "Reserve",
     "reservePercentHint": "Freizuhaltende Kapazität: gelb über 100 % − Reserve, rot bei Überschreitung.",
     "busDevicesMax": "Geräte pro Linie",
-    "busDevicesMaxHint": "Standard-Höchstzahl von Geräten an einer Buslinie. Leer = nicht geprüft."
+    "busDevicesMaxHint": "Standard-Höchstzahl von Geräten an einer Buslinie. Leer = nicht geprüft.",
+    "topology": "Topologie",
+    "topologyHint": "Wie Geräte dieses Systems angebunden sind: Bus (Busstrom, Geräte pro Linie), Funk (Plätze am Gateway) oder keins von beiden.",
+    "defaultWirelessPlacesUsed": "Standard-Funkplätze",
+    "defaultWirelessPlacesUsedHint": "Plätze am Gateway, die ein Gerät ohne eigenen Wert belegt (meist 1). Leer = unbekannt."
+  },
+  "topology": {
+    "none": "Keine",
+    "bus": "Bus",
+    "wireless": "Funk"
   }
 }

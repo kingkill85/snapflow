@@ -70,14 +70,9 @@ export function OutputKindsPage() {
       cell: (p) => p.functionTypeIds.map(functionTypeName).join(', ') || '–',
     },
     {
-      header: t('outputKinds.alternative'),
+      header: t('outputKinds.alternatives'),
       cell: (p) =>
-        p.alternative
-          ? t('outputKinds.alternativeText', {
-              count: p.alternative.count,
-              kind: kindName(p.alternative.outputKindId),
-            })
-          : '–',
+        p.alternatives.map((a) => t('outputKinds.alternativeText', { count: a.count, kind: kindName(a.outputKindId) })).join(', ') || '–',
     },
     {
       header: t('field.status'),

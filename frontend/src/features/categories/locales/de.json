@@ -95,26 +95,7 @@
     "none": "Keine Verknüpfung",
     "hint": "Die Verknüpfung übernimmt Typ, Einheit und Optionen des Felds sowie seine Bedeutung.",
     "meaning": "Bedeutung",
-    "information": "Nur Information",
     "locked": "Vom verknüpften Katalogfeld vorgegeben.",
     "summary": "Feld {{key}}"
-  },
-  "meaning": {
-    "channels_supplied": "Kanäle (Anzahl Ausgänge einer Art)",
-    "channel_limit_w": "Max. Watt je Kanal (je Lastart)",
-    "channel_limit_a": "Max. Ampere je Kanal",
-    "channel_min_load_w": "Mindestlast je Kanal (W)",
-    "module_total_a": "Max. Ampere für das ganze Modul",
-    "module_total_w": "Max. Watt für das ganze Modul",
-    "bus_current_used_ma": "Verbrauchter Busstrom (mA)",
-    "bus_current_supplied_ma": "Gelieferter Busstrom (mA)",
-    "bus_devices_max": "Max. Geräte je Buslinie",
-    "rail_width_te": "Breite auf der Hutschiene (TE)",
-    "enclosure_rows": "Reihen eines Verteilers",
-    "enclosure_te_per_row": "TE je Verteilerreihe",
-    "wireless_places_supplied": "Funkplätze (Gateway)",
-    "wireless_place_used": "Belegt einen Funkplatz",
-    "zigbee_router": "Zigbee-Router (ja/nein)",
-    "motor_type": "Motorart (AC/DC)"
   }
 }

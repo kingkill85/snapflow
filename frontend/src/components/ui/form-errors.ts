@@ -34,7 +34,9 @@ export const errorParamNames = {
   'attribute.wrong_scope': ['scope'],
   'auth.too_many_attempts': ['seconds'],
   'catalog_field.in_use': ['key'],
+  'catalog_field.key_referenced': ['key'],
   'catalog_field.key_taken': ['key'],
+  'catalog_field.meaning_options': ['expected'],
   'catalog_field.meaning_type': ['expected'],
   'category.key_taken': ['key'],
   'bom.quantity_range': ['min', 'max'],
@@ -47,6 +49,8 @@ export const errorParamNames = {
   'import.addon_ambiguous': ['ref'],
   'import.addon_not_found': ['ref'],
   'import.addon_skipped': ['ref'],
+  'import.answer_field_not_found': ['key'],
+  'import.attribute_not_linked': ['category', 'expected', 'field', 'key', 'type'],
   'import.category_unknown': ['value'],
   'import.column_missing': ['column'],
   'import.columns_unknown': ['count', 'columns'],
@@ -129,15 +133,36 @@ const numberParams = new Set(['min', 'max', 'online'])
 const decimal = /^-?\d+(\.\d+)?$/
 
 /**
+ * Params that list value types ("number, integer"), by error code: each type
+ * is shown by its name ("a number or a whole number").
+ */
+const typeListParams: Readonly<Record<string, readonly string[]>> = {
+  'catalog_field.meaning_type': ['expected'],
+  'import.attribute_not_linked': ['expected', 'type'],
+}
+
+function typeList(value: string, language: string) {
+  const names = value.split(',').map((type) => {
+    const key = `attribute.type_name.${type.trim()}`
+    return i18next.exists(key, { ns: 'errors', lng: language }) ? i18next.t(key as ErrorKey, { ns: 'errors', lng: language }) : type.trim()
+  })
+  return names.join(` ${i18next.t('attribute.type_or', { ns: 'errors', lng: language })} `)
+}
+
+/**
  * Params as localized text: times (RFC 3339) as the time of day for today
  * ("14:32"), else date and time; limits (min, max) and rates (online), numbers or decimal strings
  * as the API sends them (e.g. "9999999999.99"), with the language's digits
  * ("9.999.999.999,99"). Other params stay as they are (a SKU is no number).
  */
-export function formatParams(params: Record<string, unknown> | undefined, language: string, now = new Date()) {
+export function formatParams(params: Record<string, unknown> | undefined, language: string, now = new Date(), code?: string) {
   if (!params) return params
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(params)) {
+    if (code && typeListParams[code]?.includes(key) && typeof value === 'string') {
+      out[key] = typeList(value, language)
+      continue
+    }
     if (numberParams.has(key) && (typeof value === 'number' || (typeof value === 'string' && decimal.test(value)))) {
       out[key] = new Intl.NumberFormat(language, { maximumFractionDigits: 20 }).format(value as number | Intl.StringNumericLiteral)
       continue
@@ -153,7 +178,14 @@ export function formatParams(params: Record<string, unknown> | undefined, langua
   return out
 }
 
-const knownError = (code: string): ErrorKey => (i18next.exists(code, { ns: 'errors' }) ? (code as ErrorKey) : 'validation.invalid')
+/** Whether the errors namespace has a text for code (plural texts need the count). */
+export function errorExists(code: string, params?: Record<string, unknown>) {
+  const count = typeof params?.count === 'number' ? params.count : undefined
+  return i18next.exists(code, { ns: 'errors', ...(count === undefined ? {} : { count }) })
+}
+
+const knownError = (code: string, params?: Record<string, unknown>): ErrorKey =>
+  errorExists(code, params) ? (code as ErrorKey) : 'validation.invalid'
 
 /** Translates a form field's error message (an error key from zod or the API, with its params). */
 export function useFieldError() {
@@ -161,8 +193,8 @@ export function useFieldError() {
   return (message?: string): string | undefined => {
     if (!message) return undefined
     const { key, params } = decodeMessage(message)
-    const known = knownError(key)
-    return String(t(known, (known === key ? formatParams(params, i18n.resolvedLanguage ?? 'en') : undefined) as never))
+    const known = knownError(key, params)
+    return String(t(known, (known === key ? formatParams(params, i18n.resolvedLanguage ?? 'en', undefined, key) : undefined) as never))
   }
 }
 
@@ -204,7 +236,8 @@ export function setApiFieldErrors<T extends FieldValues>(error: unknown, setErro
   if (!(error instanceof ApiError)) return 0
   const shown = error.fields.flatMap((field) => {
     const name = apiFieldFor(field.location, fields)
-    return name ? [{ name, message: encode(knownError(field.code), knownError(field.code) === field.code ? field.params : undefined) }] : []
+    const known = knownError(field.code, field.params)
+    return name ? [{ name, message: encode(known, known === field.code ? field.params : undefined) }] : []
   })
   // Errors of whole lists last: react-hook-form keeps a list's item errors in
   // an array and adds the list's own error to it, not the other way round.

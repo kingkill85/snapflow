@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '@/api/client'
 
-import { type ApiFieldMap, apiFieldFor, type ErrorKey, formatParams } from './form-errors'
+import { type ApiFieldMap, apiFieldFor, type ErrorKey, errorExists, formatParams } from './form-errors'
 
 /**
  * Translates an API error code into the user's language. `fields` are the
@@ -12,7 +12,7 @@ import { type ApiFieldMap, apiFieldFor, type ErrorKey, formatParams } from './fo
 export function useErrorMessage() {
   const { t, i18n } = useTranslation('errors')
   const translate = (code: string, params?: Record<string, unknown>) =>
-    i18n.exists(code, { ns: 'errors' }) ? String(t(code as ErrorKey, formatParams(params, i18n.resolvedLanguage ?? 'en') as never)) : undefined
+    errorExists(code, params) ? String(t(code as ErrorKey, formatParams(params, i18n.resolvedLanguage ?? 'en', undefined, code) as never)) : undefined
 
   return (error: unknown, fields?: ApiFieldMap): string => {
     if (!(error instanceof ApiError)) return t('server.error')
