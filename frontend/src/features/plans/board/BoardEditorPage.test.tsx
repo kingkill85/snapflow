@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import type { BoardContent, Project } from '@/api/generated/model'
+import type { BoardContent, Checks, Project, Wiring } from '@/api/generated/model'
 import { problem, villa } from '@/features/projects/test-fixtures'
 import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
@@ -36,9 +36,23 @@ const content = (over: Partial<BoardContent> = {}): BoardContent => ({
   ...over,
 })
 
-function serve(c = content(), p: Project = project) {
+const emptyWiring: Wiring = { items: [], needs: [], connections: [], can: { update: true } }
+const emptyChecks: Checks = {
+  versionId,
+  counts: { errors: 0, warnings: 0, infos: 0, units: 0, connectedUnits: 0, zonesWithNeeds: 0, zonesCovered: 0 },
+  zones: [],
+  boards: [],
+  busLines: [],
+  gateways: [],
+  findings: [],
+}
+
+function serve(c = content(), p: Project = project, wiring: Wiring = emptyWiring, checks: Checks = emptyChecks) {
   const saved: { modules: { rowId: string; offsetTe: number; variantId: string }[] }[] = []
   server.use(
+    http.get('/api/versions/:v/wiring', () => HttpResponse.json(wiring)),
+    http.get('/api/versions/:v/checks', () => HttpResponse.json(checks)),
+    http.get('/api/function-types', () => HttpResponse.json({ items: [] })),
     http.get('/api/plans/:id', () => HttpResponse.json(board)),
     http.get('/api/plans/:id/board', () => HttpResponse.json(c)),
     http.get('/api/projects/:id', () => HttpResponse.json(p)),
@@ -62,13 +76,13 @@ function serve(c = content(), p: Project = project) {
   return { saved }
 }
 
-const open = () =>
+const open = (query = '') =>
   renderRoutes(
     [
       { path: `/${boardRoute}`, element: <BoardEditorPage /> },
       { path: '/projects/:id/versions/:versionId', element: <h1>Project page</h1> },
     ],
-    { route: boardPath(projectId, versionId, board.id) },
+    { route: boardPath(projectId, versionId, board.id) + query },
   )
 
 describe('BoardEditorPage', () => {
@@ -94,10 +108,10 @@ describe('BoardEditorPage', () => {
     await user.click(screen.getByRole('tab', { name: 'Inspector' }))
     placed.focus()
     await user.keyboard('{ArrowRight}')
-    expect(screen.getByRole('tabpanel', { name: 'Inspector' })).toHaveTextContent('2 TE at 0.5 TE')
+    expect(screen.getByRole('tabpanel', { name: 'Inspector' })).toHaveTextContent('2 TE wide · at 0.5 TE')
     await user.click(document.body)
     await user.keyboard('{Control>}z{/Control}')
-    expect(screen.getByRole('tabpanel', { name: 'Inspector' })).toHaveTextContent('2 TE at 0 TE')
+    expect(screen.getByRole('tabpanel', { name: 'Inspector' })).toHaveTextContent('2 TE wide · at 0 TE')
 
     await waitFor(() => expect(saved.length).toBeGreaterThan(0))
     expect(saved.at(-1)).toMatchObject({ expectedContentUpdatedAt: '2026-10-18T10:00:00Z', modules: [{ rowId: row, offsetTe: 0, variantId: catalog[0].id }] })
@@ -133,5 +147,103 @@ describe('BoardEditorPage', () => {
     screen.getByRole('group', { name: 'Row 1: 0 of 12 TE used' }).focus()
     await user.keyboard('{Enter}')
     expect(await screen.findByText('1 item could not be saved:', {}, { timeout: 3000 })).toBeInTheDocument()
+  })
+
+  it('shows channel use, the board check, and the channels of a module selected by ?select=', async () => {
+    const dimmerKind = pid(60)
+    const blindKind = pid(61)
+    const relayKind = pid(62)
+    const m = pid(70)
+    const floor = pid(80)
+    const need = pid(81)
+    const conn = pid(90)
+    const wiring: Wiring = {
+      items: [
+        {
+          planId: board.id,
+          planName: 'Main board',
+          planKind: 'board',
+          itemId: m,
+          label: 'D1',
+          productName: { en: 'Power supply' },
+          variantName: { en: 'PS' },
+          zoneId: null,
+          channels: [
+            { outputKindId: relayKind, outputKindKey: 'relay', channelNo: 1, alternative: false, baseKindKey: 'relay', baseFrom: 1, baseTo: 1, blocked: false, connectionIds: [conn] },
+            { outputKindId: relayKind, outputKindKey: 'relay', channelNo: 2, alternative: false, baseKindKey: 'relay', baseFrom: 2, baseTo: 2, blocked: true, connectionIds: [] },
+            { outputKindId: blindKind, outputKindKey: 'blind', channelNo: 1, alternative: true, baseKindKey: 'relay', baseFrom: 1, baseTo: 2, blocked: true, connectionIds: [] },
+            { outputKindId: dimmerKind, outputKindKey: 'dimmer', channelNo: 1, alternative: false, baseKindKey: 'dimmer', baseFrom: 1, baseTo: 1, blocked: false, connectionIds: [] },
+          ],
+        },
+      ],
+      needs: [
+        { planId: floor, planName: 'Ground floor', needId: need, zoneId: pid(82), zoneName: 'Kitchen', label: 'Spots', functionTypeId: pid(83), functionTypeKey: 'switched', quantity: 3, connectedUnits: 2, powerW: '10.00' },
+      ],
+      connections: [
+        { id: conn, versionId, needPlanId: floor, needId: need, units: 2, targetPlanId: board.id, targetItemId: m, outputKindId: relayKind, channelNo: 1, pinned: true, batchId: null, createdAt: '2026-10-18T10:00:00Z' },
+      ],
+      can: { update: true },
+    }
+    const checks: Checks = {
+      ...emptyChecks,
+      boards: [
+        {
+          planId: board.id,
+          name: 'Main board',
+          channels: [{ outputKindId: relayKind, outputKindKey: 'relay', alternative: false, total: 2, used: 2, free: 0 }],
+          rows: [],
+          usedTe: 11,
+          capacityTe: 12,
+          status: 'amber',
+        },
+      ],
+    }
+    serve(content({ modules: [{ id: m, rowId: row, offsetTe: 0, variantId: catalog[0].id, label: 'D1', existing: false, addonVariantIds: [], instanceValues: {}, widthTe: 2 }] }), project, wiring, checks)
+    server.use(
+      http.get('/api/output-kinds', () =>
+        HttpResponse.json({
+          items: [
+            { id: relayKind, key: 'relay', name: { en: 'Relay output' }, isActive: true },
+            { id: blindKind, key: 'blind', name: { en: 'Blind output' }, isActive: true },
+            { id: dimmerKind, key: 'dimmer', name: { en: 'Dimmer output' }, isActive: true },
+          ],
+        }),
+      ),
+      http.get('/api/function-types', () => HttpResponse.json({ items: [{ id: pid(83), key: 'switched', name: { en: 'Switched light' }, isActive: true }] })),
+    )
+    const deleted: string[] = []
+    let candidates = 0
+    server.use(
+      http.delete('/api/versions/:v/connections/:id', ({ params }) => {
+        deleted.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('/api/versions/:v/connections/candidates', () => {
+        candidates++
+        return HttpResponse.json({ items: [], reason: 'complete' })
+      }),
+    )
+    const user = userEvent.setup()
+    open(`?select=${m}`)
+
+    // Module badge (used = connected or taken by an alternative) and the header check.
+    expect(await screen.findByRole('button', { name: /D1, 2 TE, 3 of 4 channels used/ })).toBeInTheDocument()
+    expect(await screen.findByTestId('board-check')).toHaveTextContent('Near limit')
+
+    // The inspector shows the module's channels: native first, then alternatives.
+    const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
+    const channels = await within(inspector).findByRole('region', { name: 'Channels' })
+    expect(within(channels).getByText('Relay output: 0 of 2 free')).toBeInTheDocument()
+    expect(within(channels).getByText('from Relay output 1–2')).toBeInTheDocument()
+    expect(within(channels).getByText('Dimmer output: 1 of 1 free')).toBeInTheDocument()
+    expect(within(channels).getByText('3 × Switched light · Spots')).toBeInTheDocument()
+    expect(within(channels).getByText('Ground floor · Kitchen · 2 units · 20 W')).toBeInTheDocument()
+
+    await user.click(within(channels).getByRole('button', { name: 'Disconnect 3 × Switched light · Spots' }))
+    await waitFor(() => expect(deleted).toEqual([conn]))
+
+    await user.click(within(channels).getByRole('button', { name: 'Connect a need to Dimmer output 1' }))
+    expect(await screen.findByRole('dialog', { name: /Connect a need to/ })).toBeInTheDocument()
+    await waitFor(() => expect(candidates).toBe(1))
   })
 })

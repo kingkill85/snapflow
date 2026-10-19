@@ -72,5 +72,12 @@
     "unknown": "Unknown",
     "unassigned": "Without gateway",
     "unassignedNotice": "These devices have no gateway: add a gateway of this system to a plan."
+  },
+  "checks": {
+    "current": "Bus current",
+    "devices": "Devices",
+    "places": "Places",
+    "reserve": "reserve {{reserve}} %",
+    "label": "Checks"
   }
 }

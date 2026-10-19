@@ -6,6 +6,7 @@ import type { BoardWarning, Capabilities, VariantSearchItem } from '@/api/genera
 import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, Field, IconButton, Notice, SelectField, SwitchField } from '@/components/ui'
+import type { WiringModel } from '@/features/checks'
 import { useDescribeCapabilities } from '@/features/products/describe-capabilities'
 import { useLocalized } from '@/i18n/localized'
 
@@ -13,6 +14,7 @@ import type { PaletteProduct } from '../editor/catalog'
 import { Addons, ItemInstanceValues, ProductPicker, Warnings } from '../editor/Inspector'
 import { type BoardDocument, type BoardModuleDoc, enclosureSize, fitToEnclosure, type ModulePatch, newId, rowUsed, slotIn } from './board'
 import type { BoardEditorAction } from './board-state'
+import { ModuleChannels } from './ModuleChannels'
 
 const maxCapacity = 999.9
 
@@ -159,6 +161,10 @@ type InspectorProps = {
   editable: boolean
   dispatch: (action: BoardEditorAction) => void
   onNotice: (text: string) => void
+  versionId: string
+  planId: string
+  /** The version's wiring view (channels and connections); undefined in tests that do not need it. */
+  wiring?: WiringModel
 }
 
 /** The Inspector tab of the board editor: one module (product, variant, row, add-ons, values, capabilities), or a count. */
@@ -180,7 +186,7 @@ export function ModuleInspector(props: InspectorProps) {
   return <OneModule key={modules[0].id} {...props} module={modules[0]} />
 }
 
-function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice }: InspectorProps & { module: BoardModuleDoc }) {
+function OneModule({ doc, module: m, variants, allVariants, products, caps, widthOf, warnings, errors, editable, dispatch, onNotice, versionId, planId, wiring }: InspectorProps & { module: BoardModuleDoc }) {
   const { t } = useTranslation('plans')
   const { t: tc } = useTranslation()
   const localize = useLocalized()
@@ -258,17 +264,15 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
           <h3 className="text-sm font-medium">{t('board.capabilities')}</h3>
           <p className="text-sm text-muted">{describe(capabilities)}</p>
           {capabilities.channels.length > 0 && (
-            <>
-              <ul className="list-inside list-disc text-sm">
-                {capabilities.channels.map((c) => (
-                  <li key={c.outputKindId}>{t('board.channel', { count: c.count, kind: kindName(c.outputKindId, c.outputKindKey) })}</li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted">{t('board.connectionsLater')}</p>
-            </>
+            <ul className="list-inside list-disc text-sm">
+              {capabilities.channels.map((c) => (
+                <li key={c.outputKindId}>{t('board.channel', { count: c.count, kind: kindName(c.outputKindId, c.outputKindKey) })}</li>
+              ))}
+            </ul>
           )}
         </section>
       )}
+      {wiring && <ModuleChannels versionId={versionId} planId={planId} moduleId={m.id} hasChannels={(capabilities?.channels.length ?? 0) > 0} wiring={wiring} />}
       <SwitchField label={t('inspector.existing')} hint={t('inspector.existingHint')} checked={m.existing} disabled={!editable} onChange={(e) => update({ existing: e.target.checked })} />
       <Button variant="danger-quiet" size="sm" disabled={!editable} onClick={() => dispatch({ type: 'change', action: { type: 'remove', ids: [m.id] } })}>
         <Trash2 /> {tc('action.delete')}
