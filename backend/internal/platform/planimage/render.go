@@ -28,6 +28,9 @@ import (
 // Plan is what is drawn; coordinates are pixels of Background.
 type Plan struct {
 	Background image.Image
+	// Size is the pixel size the coordinates refer to when Background was
+	// scaled down already (zero: Background's own size).
+	Size image.Point
 	Zones      []Zone
 	Placements []Placement
 }
@@ -66,6 +69,9 @@ func Render(p Plan) *image.RGBA { return RenderMax(p, 0) }
 func RenderMax(p Plan, maxSide int) *image.RGBA {
 	b := p.Background.Bounds()
 	w, h := float64(b.Dx()), float64(b.Dy())
+	if p.Size.X > 0 && p.Size.Y > 0 {
+		w, h = float64(p.Size.X), float64(p.Size.Y)
+	}
 	s := 1.0
 	if long := math.Max(w, h); maxSide > 0 && long > float64(maxSide) {
 		s = float64(maxSide) / long

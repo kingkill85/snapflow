@@ -438,37 +438,44 @@ func (w *writer) drawing(img document.Image) (string, error) {
 		cx, cy, n, n, n, name, rel, cx, cy), nil
 }
 
+// footerXML is the footer: the text left and the page label right, in a
+// borderless table as wide as the text area (a percentage, so it fits
+// portrait and landscape pages alike; LibreOffice ignores relative tabs).
 func footerXML(f document.Footer) string {
 	var b strings.Builder
-	// A right-aligned tab relative to the margin, so the page label sits at
-	// the right edge of portrait and landscape pages alike.
-	b.WriteString(`<w:p><w:pPr><w:pStyle w:val="Footer"/></w:pPr>`)
-	b.WriteString(runs([]document.Run{{Text: f.Text}}))
-	if f.PageLabel != "" {
-		b.WriteString(`<w:r><w:ptab w:relativeTo="margin" w:alignment="right" w:leader="none"/></w:r>`)
-		rest := f.PageLabel
-		for rest != "" {
-			i := strings.IndexByte(rest, '{')
-			if i < 0 {
-				b.WriteString(runs([]document.Run{{Text: rest}}))
-				break
-			}
-			b.WriteString(runs([]document.Run{{Text: rest[:i]}}))
-			rest = rest[i:]
-			switch {
-			case strings.HasPrefix(rest, "{page}"):
-				b.WriteString(`<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple>`)
-				rest = rest[len("{page}"):]
-			case strings.HasPrefix(rest, "{pages}"):
-				b.WriteString(`<w:fldSimple w:instr=" NUMPAGES "><w:r><w:t>1</w:t></w:r></w:fldSimple>`)
-				rest = rest[len("{pages}"):]
-			default:
-				b.WriteString(runs([]document.Run{{Text: "{"}}))
-				rest = rest[1:]
-			}
+	cell := func(pct int, align, content string) {
+		fmt.Fprintf(&b, `<w:tc><w:tcPr><w:tcW w:w="%d" w:type="pct"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="Footer"/>%s</w:pPr>%s</w:p></w:tc>`, pct, align, content)
+	}
+	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+		`<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>` +
+		`<w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar>` +
+		`<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>`)
+	fmt.Fprintf(&b, `<w:tblGrid><w:gridCol w:w="%d"/><w:gridCol w:w="%d"/></w:tblGrid><w:tr>`, textWidth(document.Portrait)*7/10, textWidth(document.Portrait)*3/10)
+	cell(3500, "", runs([]document.Run{{Text: f.Text}}))
+	var label strings.Builder
+	rest := f.PageLabel
+	for rest != "" {
+		i := strings.IndexByte(rest, '{')
+		if i < 0 {
+			label.WriteString(runs([]document.Run{{Text: rest}}))
+			break
+		}
+		label.WriteString(runs([]document.Run{{Text: rest[:i]}}))
+		rest = rest[i:]
+		switch {
+		case strings.HasPrefix(rest, "{page}"):
+			label.WriteString(`<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple>`)
+			rest = rest[len("{page}"):]
+		case strings.HasPrefix(rest, "{pages}"):
+			label.WriteString(`<w:fldSimple w:instr=" NUMPAGES "><w:r><w:t>1</w:t></w:r></w:fldSimple>`)
+			rest = rest[len("{pages}"):]
+		default:
+			label.WriteString(runs([]document.Run{{Text: "{"}}))
+			rest = rest[1:]
 		}
 	}
-	b.WriteString(`</w:p>`)
+	cell(1500, `<w:jc w:val="right"/>`, label.String())
+	b.WriteString(`</w:tr></w:tbl><w:p><w:pPr><w:pStyle w:val="Footer"/><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>`)
 	return b.String()
 }
 

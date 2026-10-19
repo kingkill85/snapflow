@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	_ "golang.org/x/image/webp" // catalog images may be WebP
+	"golang.org/x/sync/semaphore"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
@@ -45,8 +46,28 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/planimage"
 )
 
-// maxPlanPixels is the long side of a rendered plan image in a document.
+// maxPlanPixels is the long side of a rendered plan image in a document;
+// plan backgrounds are scaled down to it right after decoding.
 const maxPlanPixels = 2400
+
+// maxPlacementPixels is the long side catalog images are scaled down to
+// right after decoding: a device is drawn far smaller on a plan.
+const maxPlacementPixels = 256
+
+// maxLogoPixels is the long side of the letterhead logo (45 mm at 300 dpi
+// is about 530 px).
+const maxLogoPixels = 800
+
+// Generation limits (D268): at most defaultGenerations runs at once (a run
+// holds decoded plans and documents in memory); another waits at most
+// generationWait for a slot, then gets 503 server.busy. A run is cancelled
+// after generationTimeout.
+const (
+	defaultGenerations = 2
+	generationTimeout  = 2 * time.Minute
+)
+
+var generationWait = 5 * time.Second // a variable for tests
 
 // maxImageBytes bounds a catalog image or logo read for a document.
 const maxImageBytes = 32 << 20
@@ -68,12 +89,30 @@ type Service struct {
 	users     *users.Service
 	exporters *document.Registry
 	now       func() time.Time
+	// generating holds a slot per running generation.
+	generating *semaphore.Weighted
 }
 
 func NewService(db DB, projectSvc *projects.Service, bomSvc *bom.Service, planSvc *plans.Service, tenantSvc *tenants.Service,
 	fileSvc *files.Service, userSvc *users.Service, exporters *document.Registry) *Service {
 	return &Service{db: db, q: store.New(db), projects: projectSvc, bom: bomSvc, plans: planSvc, tenants: tenantSvc,
-		files: fileSvc, users: userSvc, exporters: exporters, now: time.Now}
+		files: fileSvc, users: userSvc, exporters: exporters, now: time.Now, generating: semaphore.NewWeighted(defaultGenerations)}
+}
+
+// SetConcurrency sets how many generations run at once (at wiring time).
+func (s *Service) SetConcurrency(n int) { s.generating = semaphore.NewWeighted(int64(max(n, 1))) }
+
+// acquire takes a generation slot, waiting at most generationWait.
+func (s *Service) acquire(ctx context.Context) error {
+	wait, cancel := context.WithTimeout(ctx, generationWait)
+	defer cancel()
+	if err := s.generating.Acquire(wait, 1); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return apperr.New(http.StatusServiceUnavailable, "server.busy", "server busy, try again shortly")
+	}
+	return nil
 }
 
 func (s *Service) inScope(ctx context.Context, actor auth.Actor, opts pgx.TxOptions, fn func(tx pgx.Tx, q *store.Queries) error) error {
@@ -344,6 +383,12 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	if !ok {
 		return nil, apperr.Invalid("body.exporter", "proposal.exporter_unknown", "unknown exporter").With("exporters", strings.Join(s.exporters.Keys(), ", "))
 	}
+	if err := s.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.generating.Release(1)
+	ctx, cancel := context.WithTimeout(ctx, generationTimeout)
+	defer cancel()
 	r, err := s.read(ctx, actor, versionID, in)
 	if err != nil {
 		return nil, err
@@ -387,6 +432,7 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 		if err != nil {
 			return nil, err
 		}
+		delete(pages, typeKey(d.productType)) // the document has its images now
 		f, err := s.files.StoreDocument(ctx, files.TenantScope(r.ref.TenantID), data, exp.ContentType())
 		if err != nil {
 			return nil, err
@@ -456,7 +502,7 @@ func (s *Service) read(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 		return r, err
 	}
 	if id := r.tenant.Letterhead.LogoFileID; id != nil {
-		img, err := s.decodeFile(ctx, *id)
+		img, err := s.files.DecodeReferenced(ctx, *id, maxLogoPixels, maxImageBytes)
 		if err != nil {
 			return r, err
 		}
@@ -469,25 +515,6 @@ func (s *Service) read(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 		}
 	}
 	return r, nil
-}
-
-// decodeFile reads and decodes an image file; nil when it is gone or not
-// an image.
-func (s *Service) decodeFile(ctx context.Context, id uuid.UUID) (image.Image, error) {
-	_, contents, err := s.files.OpenReferenced(ctx, id)
-	var ae *apperr.Error
-	if errors.As(err, &ae) && ae.Status == http.StatusNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = contents.Close() }()
-	img, _, err := image.Decode(io.LimitReader(contents, maxImageBytes))
-	if err != nil {
-		return nil, nil //nolint:nilerr // an undecodable image is drawn as a box
-	}
-	return img, nil
 }
 
 func encodePNG(img image.Image) (pngImage, error) {
@@ -510,7 +537,9 @@ func typeKey(pt *bom.SnapshotProductType) string {
 
 // planPages renders the plan images of every document of a run: the
 // combined one shows every placement, a split one only its type's (zones
-// always). Plans without zones and placements are left out.
+// always). Plans without zones and placements are left out. Every image is
+// decoded once per run within the files' decode budget and scaled down at
+// once; a plan's background is dropped as soon as its pages are drawn.
 func (s *Service) planPages(ctx context.Context, r run) (map[string][]planPage, error) {
 	docPlans, err := s.plans.DocumentPlans(ctx, r.ref.ID)
 	if err != nil {
@@ -530,7 +559,7 @@ func (s *Service) planPages(ctx context.Context, r run) (map[string][]planPage, 
 			if _, done := images[*snap.ImageFileID]; done {
 				continue
 			}
-			img, err := s.decodeFile(ctx, *snap.ImageFileID)
+			img, err := s.files.DecodeReferenced(ctx, *snap.ImageFileID, maxPlacementPixels, maxImageBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -539,17 +568,30 @@ func (s *Service) planPages(ctx context.Context, r run) (map[string][]planPage, 
 	}
 	lang := tr(r.project.Language)
 	out := map[string][]planPage{}
-	for _, d := range r.parts {
-		key := typeKey(d.productType)
-		for _, p := range docPlans {
+	for i := range docPlans {
+		p := &docPlans[i]
+		if len(p.Zones) == 0 && len(p.Placements) == 0 {
+			p.Image = nil
+			continue
+		}
+		bg, err := s.files.DecodeImage(ctx, p.Image, maxPlanPixels)
+		p.Image = nil
+		if err != nil {
+			return nil, err
+		}
+		if bg == nil {
+			continue // a plan whose image cannot be read is left out
+		}
+		for _, d := range r.parts {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
-			page, ok, err := renderPlan(p, snaps, images, d.productType, lang)
+			page, ok, err := renderPlan(*p, bg, snaps, images, d.productType, lang)
 			if err != nil {
 				return nil, err
 			}
 			if ok {
+				key := typeKey(d.productType)
 				out[key] = append(out[key], page)
 			}
 		}
@@ -567,16 +609,14 @@ func placementVariant(p plans.PlanPlacement) uuid.UUID {
 	return uuid.Nil
 }
 
-func renderPlan(p plans.DocumentPlan, snaps map[uuid.UUID]bom.VariantSnapshot, images map[uuid.UUID]image.Image,
+// renderPlan draws a plan for a document; bg is its background, possibly
+// scaled down (coordinates refer to the plan's stored size).
+func renderPlan(p plans.DocumentPlan, bg image.Image, snaps map[uuid.UUID]bom.VariantSnapshot, images map[uuid.UUID]image.Image,
 	only *bom.SnapshotProductType, lang tr) (planPage, bool, error) {
-	if len(p.Zones) == 0 && len(p.Placements) == 0 {
-		return planPage{}, false, nil
-	}
-	bg, _, err := image.Decode(bytes.NewReader(p.Image))
-	if err != nil {
-		return planPage{}, false, nil //nolint:nilerr // a plan whose image cannot be read is left out
-	}
 	in := planimage.Plan{Background: bg}
+	if p.Width > 0 && p.Height > 0 {
+		in.Size = image.Pt(int(p.Width), int(p.Height))
+	}
 	for _, z := range p.Zones {
 		in.Zones = append(in.Zones, planimage.Zone{Name: z.Name, Color: hexColor(z.Color), Opacity: z.Opacity, Points: z.Points})
 	}

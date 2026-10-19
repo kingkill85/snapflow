@@ -33,6 +33,9 @@ type Config struct {
 	// StorageDir holds uploaded files (content-addressed). Keep it outside
 	// the repository and back it up with the database.
 	StorageDir string
+	// ProposalGenerations is how many proposal generations run at once
+	// (default 2); more wait briefly, then get 503 server.busy.
+	ProposalGenerations int
 }
 
 func Load() (Config, error) {
@@ -55,6 +58,11 @@ func Load() (Config, error) {
 		return c, errors.New("DATABASE_MAX_CONNS must be a number of at least 2")
 	}
 	c.DatabaseMaxConns = int32(maxConns)
+	gens, err := strconv.Atoi(getenv("PROPOSAL_GENERATIONS", "2"))
+	if err != nil || gens < 1 {
+		return c, errors.New("PROPOSAL_GENERATIONS must be a number of at least 1")
+	}
+	c.ProposalGenerations = gens
 	if c.TrustedProxies, err = clientip.ParseProxies(os.Getenv("TRUSTED_PROXIES")); err != nil {
 		return c, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}

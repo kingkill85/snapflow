@@ -62,6 +62,9 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
 		document.NewRegistry(docx.Exporter{}))
+	if deps.ProposalGenerations > 0 {
+		proposalSvc.SetConcurrency(deps.ProposalGenerations)
+	}
 	projectSvc.OnDeleteVersions(proposalSvc.DeleteVersionFiles)
 	proposals.Register(api, proposalSvc)
 	// Every feature with a file id column answers the files feature's

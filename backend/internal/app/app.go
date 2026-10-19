@@ -30,6 +30,9 @@ type Deps struct {
 	TrustedProxies []netip.Prefix
 	// Storage keeps uploaded files; nil when only exporting OpenAPI.
 	Storage *files.Storage
+	// ProposalGenerations bounds the proposal generations running at once
+	// (0: the default, 2).
+	ProposalGenerations int
 }
 
 // New returns the router with all API routes and the huma API for tests.

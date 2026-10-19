@@ -122,7 +122,12 @@ func upload(t *testing.T, api *apptest.API, path, cookie string, fields map[stri
 // planWith adds a plan with one zone and the given placements.
 func planWith(t *testing.T, api *apptest.API, cookie string, versionID uuid.UUID, name string, placements []any) {
 	t.Helper()
-	resp := upload(t, api, "/api/versions/"+versionID.String()+"/plans", cookie, map[string]string{"name": name}, pngBytes(t, 400, 300, color.White))
+	planWithImage(t, api, cookie, versionID, name, pngBytes(t, 400, 300, color.White), placements)
+}
+
+func planWithImage(t *testing.T, api *apptest.API, cookie string, versionID uuid.UUID, name string, img []byte, placements []any) {
+	t.Helper()
+	resp := upload(t, api, "/api/versions/"+versionID.String()+"/plans", cookie, map[string]string{"name": name}, img)
 	wantCode(t, resp, http.StatusCreated, "")
 	p := decode[plans.Plan](t, resp)
 	wantCode(t, api.Post("/api/plans/"+p.ID.String()+"/lock", cookie, map[string]any{}), http.StatusOK, "")
