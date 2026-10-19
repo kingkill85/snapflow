@@ -1,5 +1,7 @@
 import authDe from '@/features/auth/locales/de.json'
 import authEn from '@/features/auth/locales/en.json'
+import capabilitiesDe from '@/features/capabilities/locales/de.json'
+import capabilitiesEn from '@/features/capabilities/locales/en.json'
 import functionTypesDe from '@/features/function-types/locales/de.json'
 import functionTypesEn from '@/features/function-types/locales/en.json'
 import rolesDe from '@/features/roles/locales/de.json'
@@ -52,6 +54,7 @@ export const resources = {
     plans: plansEn,
     bom: bomEn,
     proposals: proposalsEn,
+    capabilities: capabilitiesEn,
     // scaffold:i18n-en
   },
   de: {
@@ -71,6 +74,7 @@ export const resources = {
     plans: plansDe,
     bom: bomDe,
     proposals: proposalsDe,
+    capabilities: capabilitiesDe,
     // scaffold:i18n-de
   },
 } as const

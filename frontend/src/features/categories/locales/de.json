@@ -100,21 +100,21 @@
     "summary": "Feld {{key}}"
   },
   "meaning": {
-    "channels_supplied": "Gelieferte Kanäle (je Ausgangsart)",
-    "channel_limit_w": "Max. Watt je Kanal (je Ausgangsart und Lastart)",
+    "channels_supplied": "Kanäle (Anzahl Ausgänge einer Art)",
+    "channel_limit_w": "Max. Watt je Kanal (je Lastart)",
     "channel_limit_a": "Max. Ampere je Kanal",
     "channel_min_load_w": "Mindestlast je Kanal (W)",
-    "module_total_a": "Modul gesamt (A)",
-    "module_total_w": "Modul gesamt (W)",
+    "module_total_a": "Max. Ampere für das ganze Modul",
+    "module_total_w": "Max. Watt für das ganze Modul",
     "bus_current_used_ma": "Verbrauchter Busstrom (mA)",
     "bus_current_supplied_ma": "Gelieferter Busstrom (mA)",
-    "bus_devices_max": "Geräte pro Buslinie",
-    "rail_width_te": "Breite auf der Schiene (TE)",
-    "enclosure_rows": "Reihen im Verteiler",
-    "enclosure_te_per_row": "TE je Reihe im Verteiler",
-    "wireless_places_supplied": "Gelieferte Funkplätze",
+    "bus_devices_max": "Max. Geräte je Buslinie",
+    "rail_width_te": "Breite auf der Hutschiene (TE)",
+    "enclosure_rows": "Reihen eines Verteilers",
+    "enclosure_te_per_row": "TE je Verteilerreihe",
+    "wireless_places_supplied": "Funkplätze (Gateway)",
     "wireless_place_used": "Belegt einen Funkplatz",
-    "zigbee_router": "Zigbee-Router",
-    "motor_type": "Motorart"
+    "zigbee_router": "Zigbee-Router (ja/nein)",
+    "motor_type": "Motorart (AC/DC)"
   }
 }

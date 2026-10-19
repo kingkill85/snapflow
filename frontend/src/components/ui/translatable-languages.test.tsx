@@ -23,6 +23,7 @@ describe('a third language', () => {
 
     let posted: unknown
     server.use(
+      http.get('/api/load-types', () => HttpResponse.json({ items: [] })),
       http.post('/api/function-types', async ({ request }) => {
         posted = await request.json()
         return HttpResponse.json({}, { status: 201 })

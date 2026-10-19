@@ -100,21 +100,21 @@
     "summary": "field {{key}}"
   },
   "meaning": {
-    "channels_supplied": "Channels supplied (per output kind)",
-    "channel_limit_w": "Max watts per channel (per output kind and load type)",
+    "channels_supplied": "Channels supplied (number of outputs of a kind)",
+    "channel_limit_w": "Max watts per channel (per load type)",
     "channel_limit_a": "Max amps per channel",
     "channel_min_load_w": "Minimum load per channel (W)",
-    "module_total_a": "Module total (A)",
-    "module_total_w": "Module total (W)",
+    "module_total_a": "Max amps for the whole module",
+    "module_total_w": "Max watts for the whole module",
     "bus_current_used_ma": "Bus current used (mA)",
     "bus_current_supplied_ma": "Bus current supplied (mA)",
-    "bus_devices_max": "Devices per bus line",
-    "rail_width_te": "Rail width (TE)",
-    "enclosure_rows": "Enclosure rows",
-    "enclosure_te_per_row": "Enclosure TE per row",
-    "wireless_places_supplied": "Wireless places supplied",
+    "bus_devices_max": "Max devices per bus line",
+    "rail_width_te": "Width on the DIN rail (TE)",
+    "enclosure_rows": "Rows of an enclosure",
+    "enclosure_te_per_row": "TE per enclosure row",
+    "wireless_places_supplied": "Wireless places supplied (gateway)",
     "wireless_place_used": "Uses a wireless place",
-    "zigbee_router": "Zigbee router",
-    "motor_type": "Motor type"
+    "zigbee_router": "Zigbee router (yes/no)",
+    "motor_type": "Motor type (AC/DC)"
   }
 }

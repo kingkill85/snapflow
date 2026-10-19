@@ -22,6 +22,7 @@ const product = (overrides: Partial<ProductFormValues> = {}): ProductFormValues 
   name: { en: 'Dimmer', de: '  ' },
   description: { en: ' ', de: '' },
   isActive: true,
+  mounting: '',
   values: {},
   keep: {},
   ...overrides,
@@ -29,7 +30,7 @@ const product = (overrides: Partial<ProductFormValues> = {}): ProductFormValues 
 
 describe('product and variant forms', () => {
   it('leaves out a blank SKU, no image and a blank German name, and sends the price in point form', () => {
-    expect(toVariantInput(variant({ sku: '  ' }), {})).toEqual({ name: { en: 'Standard' }, price: '27.5', attributes: {}, isActive: true })
+    expect(toVariantInput(variant({ sku: '  ' }), {})).toEqual({ name: { en: 'Standard' }, price: '27.5', attributes: {}, isActive: true, mounting: '' })
     expect(toVariantInput(variant({ sku: ' SK-1 ', imageFileId: 'f1', name: { en: 'White', de: 'Weiß' } }), { gloss: true })).toEqual({
       name: { en: 'White', de: 'Weiß' },
       sku: 'SK-1',
@@ -41,7 +42,7 @@ describe('product and variant forms', () => {
   })
 
   it('leaves out a blank description and blank German texts', () => {
-    expect(toProductInput(product(), {})).toEqual({ productTypeId: 'type', categoryId: 'category', modelNumber: 'M1', name: { en: 'Dimmer' }, attributes: {}, isActive: true })
+    expect(toProductInput(product(), {})).toEqual({ productTypeId: 'type', categoryId: 'category', modelNumber: 'M1', name: { en: 'Dimmer' }, attributes: {}, isActive: true, mounting: '' })
     expect(toProductInput(product({ description: { en: 'Four channels', de: ' ' } }), {}).description).toEqual({ en: 'Four channels' })
     expect(toProductInput(product({ description: { en: 'Four', de: 'Vier' } }), {}).description).toEqual({ en: 'Four', de: 'Vier' })
   })
