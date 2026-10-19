@@ -37,6 +37,12 @@ function useDeviceName() {
   return {
     product,
     full: (item: Item) => `${[product(item), item.label].filter(Boolean).join(' · ')}, ${item.planName}`,
+    /** A gateway's name; unlabelled gateways of one product on one plan get their number ("…, Ground floor (2)"). */
+    gateway: (g: Gateway, all: Gateway[]) => {
+      const full = (x: Item) => `${[product(x), x.label].filter(Boolean).join(' · ')}, ${x.planName}`
+      const same = all.filter((x) => full(x) === full(g))
+      return same.length > 1 ? `${full(g)} (${same.indexOf(g) + 1})` : full(g)
+    },
   }
 }
 
@@ -336,13 +342,13 @@ function WirelessSystemSection({ system, actions }: { system: WirelessSystem; ac
         {system.gateways.map((gateway) => (
           <li key={`${gateway.planId}:${gateway.itemId}`} className="space-y-2">
             <div className="space-y-0.5 border-b border-line pb-2">
-              <h3 className="font-medium break-words">{names.full(gateway)}</h3>
+              <h3 className="font-medium break-words">{names.gateway(gateway, system.gateways)}</h3>
               <p className="text-sm text-muted tabular-nums">
                 {t('wireless.places', { used: gateway.wirelessPlacesUsed, supplied: gateway.wirelessPlacesSupplied })}
                 {gateway.unknownPlacesCount > 0 && <> · {t('wireless.unknownPlaces', { count: gateway.unknownPlacesCount })}</>}
               </p>
             </div>
-            <DeviceTable label={names.full(gateway)} devices={gateway.devices} gateways={system.gateways} gateway={gateway} actions={actions} />
+            <DeviceTable label={names.gateway(gateway, system.gateways)} devices={gateway.devices} gateways={system.gateways} gateway={gateway} actions={actions} />
           </li>
         ))}
       </ol>
@@ -374,7 +380,7 @@ function DeviceTable({
 }) {
   const { t } = useTranslation('networks')
   const names = useDeviceName()
-  const options = gateways.map((g) => ({ value: gatewayKey(g), label: names.full(g) }))
+  const options = gateways.map((g) => ({ value: gatewayKey(g), label: names.gateway(g, gateways) }))
   const places = (d: WirelessDevice) => {
     if (d.wirelessPlacesUsed === undefined) return t('wireless.unknown')
     return d.wirelessPlacesUsedDefault ? t('wireless.usedPlacesDefault', { value: d.wirelessPlacesUsed }) : t('wireless.usedPlaces', { value: d.wirelessPlacesUsed })

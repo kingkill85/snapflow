@@ -30,6 +30,7 @@ import {
   boardDocumentOf,
   boardUsed,
   copyModules,
+  enclosureSize,
   enclosureVariants,
   moduleWidth,
   newModule,
@@ -130,7 +131,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
   const caps = useCallback((variantId: string): Capabilities | undefined => variantsById.get(variantId)?.capabilities ?? server.capabilities[variantId], [variantsById, server.capabilities])
   const widthOf = useCallback((m: BoardModuleDoc) => moduleWidth(m.variantId, caps), [caps])
   const products = useMemo(
-    () => paletteProducts(variants.filter((v) => onBoard(v.capabilities)), project.productTypeIds),
+    () => paletteProducts(variants.filter((v) => onBoard(v.capabilities) && !enclosureSize(v.capabilities)), project.productTypeIds),
     [variants, project.productTypeIds],
   )
   const enclosures = useMemo(() => enclosureVariants(variants, project.productTypeIds), [variants, project.productTypeIds])
