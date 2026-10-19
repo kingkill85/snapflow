@@ -166,7 +166,7 @@ test('plans: calibration, layers and PNG export', async ({ page, api }) => {
   await typeSwitch.click()
   await page.mouse.click(p.x, p.y)
   await page.getByRole('tab', { name: 'Inspector' }).click()
-  await expect(page.getByRole('tabpanel', { name: 'Inspector' })).toContainText('Select a product or zone')
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' })).toContainText('Select a product, zone or need symbol')
   await page.getByRole('tab', { name: 'Layers' }).click()
   await typeSwitch.click()
 
