@@ -28,6 +28,8 @@ import type {
   AutoConnectPreview,
   AutoConnectResult,
   AutoConnectScope,
+  Candidates,
+  CandidatesInput,
   Checks,
   ConnectionInput,
   ConnectionResult,
@@ -35,7 +37,8 @@ import type {
   Connections,
   DisconnectInput,
   Error,
-  Removed
+  Removed,
+  Wiring
 } from '../model';
 
 import { apiClient } from '../../client';
@@ -545,6 +548,75 @@ export const useCreateConnection = <TError = ErrorType<Error>,
       return useMutation(getCreateConnectionMutationOptions(options), queryClient);
     }
     /**
+ * Give a need (needPlanId, needId) or a channel (targetPlanId, targetItemId, outputKindId, channelNo). Each candidate has the units it takes or the first rule it breaks. Read-only: allowed on completed projects.
+ * @summary Channels a need can be connected to, or needs a channel can take
+ */
+export const connectionCandidates = (
+    versionId: string,
+    candidatesInput: BodyType<NonReadonly<CandidatesInput>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Candidates>(
+      {url: `/api/versions/${versionId}/connections/candidates`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: candidatesInput, signal
+    },
+      );
+    }
+
+
+
+
+export const getConnectionCandidatesMutationKey = () => ['connectionCandidates'] as const;
+
+export const getConnectionCandidatesMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectionCandidates>>, TError,ConnectionCandidatesMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof connectionCandidates>>, TError,ConnectionCandidatesMutationVariables, TContext> => {
+
+const mutationKey = getConnectionCandidatesMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof connectionCandidates>>, ConnectionCandidatesMutationVariables> = (props) => {
+          const {versionId,data} = props ?? {};
+
+          return  connectionCandidates(versionId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConnectionCandidatesMutationResult = NonNullable<Awaited<ReturnType<typeof connectionCandidates>>>
+    export type ConnectionCandidatesMutationBody = BodyType<NonReadonly<CandidatesInput>>
+    export type ConnectionCandidatesMutationError = ErrorType<Error>
+    export type ConnectionCandidatesMutationVariables = {versionId: string;data: BodyType<NonReadonly<CandidatesInput>>}
+
+    /**
+ * @summary Channels a need can be connected to, or needs a channel can take
+ */
+export const useConnectionCandidates = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectionCandidates>>, TError,ConnectionCandidatesMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof connectionCandidates>>,
+        TError,
+        ConnectionCandidatesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConnectionCandidatesMutationOptions(options), queryClient);
+    }
+    /**
  * @summary Remove every connection of a need or of a channel
  */
 export const disconnect = (
@@ -748,3 +820,96 @@ export const useUpdateConnection = <TError = ErrorType<Error>,
       > => {
       return useMutation(getUpdateConnectionMutationOptions(options), queryClient);
     }
+    /**
+ * The data the editors and the Checks tab show connections with (labels, channel numbering D387).
+ * @summary Channels of every item and needs with their connections
+ */
+export const getWiring = (
+    versionId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Wiring>(
+      {url: `/api/versions/${versionId}/wiring`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetWiringQueryKey = (versionId: string,) => {
+    return [
+    `/api/versions/${versionId}/wiring`
+    ] as const;
+    }
+
+
+export const getGetWiringQueryOptions = <TData = Awaited<ReturnType<typeof getWiring>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWiringQueryKey(versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWiring>>> = ({ signal }) => getWiring(versionId, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetWiringQueryResult = NonNullable<Awaited<ReturnType<typeof getWiring>>>
+export type GetWiringQueryError = ErrorType<Error>
+
+
+export function useGetWiring<TData = Awaited<ReturnType<typeof getWiring>>, TError = ErrorType<Error>>(
+ versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getWiring>>,
+          TError,
+          Awaited<ReturnType<typeof getWiring>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetWiring<TData = Awaited<ReturnType<typeof getWiring>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getWiring>>,
+          TError,
+          Awaited<ReturnType<typeof getWiring>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetWiring<TData = Awaited<ReturnType<typeof getWiring>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Channels of every item and needs with their connections
+ */
+
+export function useGetWiring<TData = Awaited<ReturnType<typeof getWiring>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWiring>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetWiringQueryOptions(versionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

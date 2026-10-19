@@ -1835,6 +1835,146 @@
         ],
         "type": "object"
       },
+      "Candidate": {
+        "additionalProperties": false,
+        "properties": {
+          "channelNo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "free": {
+            "description": "The channel holds nothing and no base channel is used",
+            "type": "boolean"
+          },
+          "inZone": {
+            "description": "A device placed in the need's zone",
+            "type": "boolean"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "problem": {
+            "$ref": "#/components/schemas/CandidateWhy",
+            "description": "Why one unit cannot go there"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "type": "string"
+          },
+          "units": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needPlanId",
+          "needId",
+          "targetPlanId",
+          "targetItemId",
+          "outputKindId",
+          "channelNo",
+          "units",
+          "free",
+          "inZone"
+        ],
+        "type": "object"
+      },
+      "CandidateWhy": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "params"
+        ],
+        "type": "object"
+      },
+      "Candidates": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Candidates.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "description": "Channels serving the need's function type (need mode: in-zone devices first, then boards, then other devices) or needs the channel's kind serves with missing units (channel mode)",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "description": "Why no candidate fits (absent when one does): complete = nothing missing",
+            "enum": [
+              "complete",
+              "no_channel_serves",
+              "no_free_channel",
+              "limits_exceeded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "CandidatesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/CandidatesInput.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "channelNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "needPlanId": {
+            "description": "With needId: every connection of the need",
+            "type": "string"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetPlanId": {
+            "description": "With targetItemId, outputKindId, channelNo: every connection of the channel",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Capabilities": {
         "additionalProperties": false,
         "properties": {
@@ -2831,6 +2971,62 @@
           "limitsA",
           "minLoadsW",
           "alternatives"
+        ],
+        "type": "object"
+      },
+      "ChannelInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "alternative": {
+            "description": "Made of base channels of another kind (D303)",
+            "type": "boolean"
+          },
+          "baseFrom": {
+            "description": "First base channel",
+            "format": "int64",
+            "type": "integer"
+          },
+          "baseKindKey": {
+            "description": "The kind of the base channels",
+            "type": "string"
+          },
+          "baseTo": {
+            "description": "Last base channel",
+            "format": "int64",
+            "type": "integer"
+          },
+          "blocked": {
+            "description": "No connection of its own, but a base channel is used by another channel",
+            "type": "boolean"
+          },
+          "channelNo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "connectionIds": {
+            "description": "Its connections in creation order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "outputKindId": {
+            "type": "string"
+          },
+          "outputKindKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outputKindId",
+          "outputKindKey",
+          "channelNo",
+          "alternative",
+          "baseKindKey",
+          "baseFrom",
+          "baseTo",
+          "blocked",
+          "connectionIds"
         ],
         "type": "object"
       },
@@ -5426,6 +5622,75 @@
         ],
         "type": "object"
       },
+      "ItemInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "description": "Output kind order, native channels first, then alternatives",
+            "items": {
+              "$ref": "#/components/schemas/ChannelInfo"
+            },
+            "type": "array"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planKind": {
+            "enum": [
+              "floorplan",
+              "board"
+            ],
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "null: the variant no longer exists",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "zoneId": {
+            "description": "The zone of a floorplan device",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "planId",
+          "planName",
+          "planKind",
+          "itemId",
+          "label",
+          "productName",
+          "variantName",
+          "zoneId",
+          "channels"
+        ],
+        "type": "object"
+      },
       "ItemSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -6121,6 +6386,69 @@
           "loadTypeRequired",
           "types",
           "options"
+        ],
+        "type": "object"
+      },
+      "NeedInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "description": "Σ units of its connections (may exceed the quantity: a finding)",
+            "format": "int32",
+            "type": "integer"
+          },
+          "functionTypeId": {
+            "type": "string"
+          },
+          "functionTypeKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "needId": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Per unit, decimal string",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "zoneId": {
+            "description": "null: outside every zone",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zoneName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "planName",
+          "needId",
+          "zoneId",
+          "zoneName",
+          "label",
+          "functionTypeId",
+          "functionTypeKey",
+          "quantity",
+          "connectedUnits",
+          "powerW"
         ],
         "type": "object"
       },
@@ -10981,6 +11309,51 @@
           "productType",
           "gateways",
           "unassigned"
+        ],
+        "type": "object"
+      },
+      "Wiring": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Wiring.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ConnectionActions"
+          },
+          "connections": {
+            "description": "In creation order",
+            "items": {
+              "$ref": "#/components/schemas/Connection"
+            },
+            "type": "array"
+          },
+          "items": {
+            "description": "Items with channels in plan order (placements, then modules by row and offset)",
+            "items": {
+              "$ref": "#/components/schemas/ItemInfo"
+            },
+            "type": "array"
+          },
+          "needs": {
+            "description": "In plan, zone and need order",
+            "items": {
+              "$ref": "#/components/schemas/NeedInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "needs",
+          "connections",
+          "can"
         ],
         "type": "object"
       },
@@ -17458,6 +17831,59 @@
         ]
       }
     },
+    "/api/versions/{versionId}/connections/candidates": {
+      "post": {
+        "description": "Give a need (needPlanId, needId) or a channel (targetPlanId, targetItemId, outputKindId, channelNo). Each candidate has the units it takes or the first rule it breaks. Read-only: allowed on completed projects.",
+        "operationId": "connectionCandidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidatesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidates"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Channels a need can be connected to, or needs a channel can take",
+        "tags": [
+          "wiring"
+        ]
+      }
+    },
     "/api/versions/{versionId}/connections/disconnect": {
       "post": {
         "operationId": "disconnect",
@@ -18480,6 +18906,49 @@
         "summary": "Preview the totals of the documents a generation would write",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/wiring": {
+      "get": {
+        "description": "The data the editors and the Checks tab show connections with (labels, channel numbering D387).",
+        "operationId": "getWiring",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wiring"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Channels of every item and needs with their connections",
+        "tags": [
+          "wiring"
         ]
       }
     }

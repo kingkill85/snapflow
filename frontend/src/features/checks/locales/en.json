@@ -1,0 +1,67 @@
+{
+  "finding": {
+    "need_unconnected": "{{need}}: {{missing}} of {{quantity}} not connected",
+    "need_not_found": "A connection on {{channel}} belongs to a need that no longer exists",
+    "target_not_found": "{{need}} is connected to a device that no longer exists",
+    "channel_not_found": "{{need}} is connected to {{channel}}, which the device no longer has",
+    "function_not_served": "{{channel}} cannot serve {{need}}",
+    "motor_mismatch": "{{need}}: {{needMotor}} motor on {{channel}}, which drives {{motor}} motors",
+    "units_exceeded": "{{need}}: {{units}} units connected, only {{quantity}} needed",
+    "channel_conflict": "{{channel}} uses output {{baseChannel}}, which another channel uses too",
+    "circuit_not_allowed": "{{channel}}: {{units}} units on one channel, but they may not share a circuit",
+    "channel_overload_w": "{{channel}}: {{loadW}} W connected, at most {{limitW}} W",
+    "channel_overload_a": "{{channel}}: {{currentA}} A at {{voltage}} V connected, at most {{limitA}} A",
+    "module_overload_w": "{{item}}: {{loadW}} W in total ({{loadType}}), at most {{limitW}} W",
+    "module_overload_a": "{{item}}: {{currentA}} A in total at {{voltage}} V, at most {{limitA}} A",
+    "limit_unknown": "{{channel}}: no limit known for {{loadType}}",
+    "min_load": "{{channel}}: {{loadW}} W is below the minimum load of {{minW}} W",
+    "board_over_capacity": "{{board}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
+    "bus_line_no_power_supply": "{{name}}: no power supply",
+    "bus_line_current_exceeded": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used, more than supplied",
+    "bus_line_current_reserve": "{{name}}: {{usedMa}} of {{suppliedMa}} mA used (reserve {{reservePercent}} %)",
+    "bus_line_devices_exceeded": "{{name}}: {{devices}} devices, at most {{max}}",
+    "bus_line_devices_reserve": "{{name}}: {{devices}} of {{max}} devices (reserve {{reservePercent}} %)",
+    "bus_current_unknown": "{{item}}: bus current unknown",
+    "bus_device_unassigned": "{{item}} is on no bus line",
+    "wireless_no_gateway": "{{item}} has no gateway",
+    "gateway_places_reserve": "{{label}}: {{used}} of {{supplied}} places used (reserve {{reservePercent}} %)",
+    "gateway_places_exceeded": "{{label}}: {{used}} of {{supplied}} places used, more than it has",
+    "gateway_no_router": "{{label}}: {{devices}} devices and no router (advised from {{threshold}} end devices)",
+    "unknown": "Check {{code}}"
+  },
+  "reason": {
+    "no_channel_serves": "No channel serves {{functionType}}",
+    "no_free_channel": "No free channel for {{functionType}}",
+    "limits_exceeded": "The free channels' limits would be exceeded"
+  },
+  "fallback": {
+    "need": "A need",
+    "item": "A device",
+    "channel": "a channel",
+    "board": "A board",
+    "loadType": "this load type",
+    "allLoads": "all loads",
+    "functionType": "this function"
+  },
+  "motor": {
+    "ac": "AC",
+    "dc": "DC"
+  },
+  "status": {
+    "ok": "OK",
+    "amber": "Near limit",
+    "red": "Exceeded",
+    "unknown": "Unknown"
+  },
+  "zoneStatus": {
+    "covered": "Covered",
+    "partial": "{{connected}}/{{units}}",
+    "missing": "Not connected",
+    "none": "No needs"
+  },
+  "severity": {
+    "error": "Errors",
+    "warning": "Warnings",
+    "info": "Notes"
+  }
+}

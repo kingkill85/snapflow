@@ -65,6 +65,7 @@ type applyInput struct {
 // Register adds the connection, checks and auto-connect endpoints. Handlers
 // only translate HTTP to service calls; all rules live in Service.
 func Register(api huma.API, svc *Service) {
+	registerViews(api, svc)
 	huma.Register(api, huma.Operation{
 		OperationID: "listConnections",
 		Method:      http.MethodGet,
@@ -192,5 +193,47 @@ func Register(api huma.API, svc *Service) {
 			return nil, err
 		}
 		return &removedOutput{Body: out}, nil
+	})
+}
+
+type wiringOutput struct{ Body Wiring }
+
+type candidatesInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Body      CandidatesInput
+}
+
+type candidatesOutput struct{ Body Candidates }
+
+// registerViews adds the wiring view and the connect candidates.
+func registerViews(api huma.API, svc *Service) {
+	huma.Register(api, huma.Operation{
+		OperationID: "getWiring",
+		Method:      http.MethodGet,
+		Path:        "/api/versions/{versionId}/wiring",
+		Summary:     "Channels of every item and needs with their connections",
+		Description: "The data the editors and the Checks tab show connections with (labels, channel numbering D387).",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *versionParam) (*wiringOutput, error) {
+		out, err := svc.Wiring(ctx, in.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		return &wiringOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "connectionCandidates",
+		Method:      http.MethodPost,
+		Path:        "/api/versions/{versionId}/connections/candidates",
+		Summary:     "Channels a need can be connected to, or needs a channel can take",
+		Description: "Give a need (needPlanId, needId) or a channel (targetPlanId, targetItemId, outputKindId, channelNo). Each candidate has the units it takes or the first rule it breaks. Read-only: allowed on completed projects.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *candidatesInput) (*candidatesOutput, error) {
+		out, err := svc.Candidates(ctx, in.VersionID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &candidatesOutput{Body: out}, nil
 	})
 }

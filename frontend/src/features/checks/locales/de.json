@@ -1,0 +1,67 @@
+{
+  "finding": {
+    "need_unconnected": "{{need}}: {{missing}} von {{quantity}} nicht angeschlossen",
+    "need_not_found": "Eine Verbindung an {{channel}} gehört zu einem Bedarf, den es nicht mehr gibt",
+    "target_not_found": "{{need}} ist an ein Gerät angeschlossen, das es nicht mehr gibt",
+    "channel_not_found": "{{need}} ist an {{channel}} angeschlossen, den das Gerät nicht mehr hat",
+    "function_not_served": "{{channel}} kann {{need}} nicht bedienen",
+    "motor_mismatch": "{{need}}: {{needMotor}}-Motor an {{channel}}, der {{motor}}-Motoren ansteuert",
+    "units_exceeded": "{{need}}: {{units}} Einheiten angeschlossen, nur {{quantity}} benötigt",
+    "channel_conflict": "{{channel}} nutzt Ausgang {{baseChannel}}, den auch ein anderer Kanal nutzt",
+    "circuit_not_allowed": "{{channel}}: {{units}} Einheiten an einem Kanal, die keinen gemeinsamen Stromkreis haben dürfen",
+    "channel_overload_w": "{{channel}}: {{loadW}} W angeschlossen, höchstens {{limitW}} W",
+    "channel_overload_a": "{{channel}}: {{currentA}} A bei {{voltage}} V angeschlossen, höchstens {{limitA}} A",
+    "module_overload_w": "{{item}}: {{loadW}} W gesamt ({{loadType}}), höchstens {{limitW}} W",
+    "module_overload_a": "{{item}}: {{currentA}} A gesamt bei {{voltage}} V, höchstens {{limitA}} A",
+    "limit_unknown": "{{channel}}: kein Grenzwert für {{loadType}} bekannt",
+    "min_load": "{{channel}}: {{loadW}} W liegen unter der Mindestlast von {{minW}} W",
+    "board_over_capacity": "{{board}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
+    "bus_line_no_power_supply": "{{name}}: keine Spannungsversorgung",
+    "bus_line_current_exceeded": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt, mehr als versorgt",
+    "bus_line_current_reserve": "{{name}}: {{usedMa}} von {{suppliedMa}} mA belegt (Reserve {{reservePercent}} %)",
+    "bus_line_devices_exceeded": "{{name}}: {{devices}} Geräte, höchstens {{max}}",
+    "bus_line_devices_reserve": "{{name}}: {{devices}} von {{max}} Geräten (Reserve {{reservePercent}} %)",
+    "bus_current_unknown": "{{item}}: Busstrom unbekannt",
+    "bus_device_unassigned": "{{item}} ist keiner Buslinie zugeordnet",
+    "wireless_no_gateway": "{{item}} hat kein Gateway",
+    "gateway_places_reserve": "{{label}}: {{used}} von {{supplied}} Plätzen belegt (Reserve {{reservePercent}} %)",
+    "gateway_places_exceeded": "{{label}}: {{used}} von {{supplied}} Plätzen belegt, mehr als vorhanden",
+    "gateway_no_router": "{{label}}: {{devices}} Geräte und kein Router (empfohlen ab {{threshold}} Endgeräten)",
+    "unknown": "Prüfung {{code}}"
+  },
+  "reason": {
+    "no_channel_serves": "Kein Kanal bedient „{{functionType}}“",
+    "no_free_channel": "Kein freier Kanal für „{{functionType}}“",
+    "limits_exceeded": "Die Grenzwerte der freien Kanäle würden überschritten"
+  },
+  "fallback": {
+    "need": "Ein Bedarf",
+    "item": "Ein Gerät",
+    "channel": "ein Kanal",
+    "board": "Ein Verteiler",
+    "loadType": "diese Lastart",
+    "allLoads": "alle Lasten",
+    "functionType": "diese Funktion"
+  },
+  "motor": {
+    "ac": "AC",
+    "dc": "DC"
+  },
+  "status": {
+    "ok": "OK",
+    "amber": "Nahe am Limit",
+    "red": "Überschritten",
+    "unknown": "Unbekannt"
+  },
+  "zoneStatus": {
+    "covered": "Versorgt",
+    "partial": "{{connected}}/{{units}}",
+    "missing": "Nicht angeschlossen",
+    "none": "Kein Bedarf"
+  },
+  "severity": {
+    "error": "Fehler",
+    "warning": "Warnungen",
+    "info": "Hinweise"
+  }
+}
