@@ -149,6 +149,31 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
           type: Text
+      - column: plan_needs.power_w
+        go_type:
+          type: float64
+          pointer: true
+      - column: plan_needs.x
+        go_type:
+          type: float64
+          pointer: true
+      - column: plan_needs.y
+        go_type:
+          type: float64
+          pointer: true
+      - column: room_template_lines.power_w
+        go_type:
+          type: float64
+          pointer: true
+      - column: room_templates.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: room_templates.equipment_level
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+          pointer: true
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -245,4 +270,11 @@ sql:
       go:
         <<: *go
         out: internal/features/capabilities/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/roomtemplates/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/roomtemplates/store
   # scaffold:sqlc

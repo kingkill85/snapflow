@@ -13,18 +13,24 @@ import (
 )
 
 const createFunctionType = `-- name: CreateFunctionType :one
-INSERT INTO function_types (key, name, allows_circuit) VALUES ($1, $2, $3)
-RETURNING id, key, name, created_at, updated_at, allows_circuit
+INSERT INTO function_types (key, name, allows_circuit, is_active) VALUES ($1, $2, $3, $4)
+RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active
 `
 
 type CreateFunctionTypeParams struct {
 	Key           string
 	Name          i18n.Text
 	AllowsCircuit bool
+	IsActive      bool
 }
 
 func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionTypeParams) (FunctionType, error) {
-	row := q.db.QueryRow(ctx, createFunctionType, arg.Key, arg.Name, arg.AllowsCircuit)
+	row := q.db.QueryRow(ctx, createFunctionType,
+		arg.Key,
+		arg.Name,
+		arg.AllowsCircuit,
+		arg.IsActive,
+	)
 	var i FunctionType
 	err := row.Scan(
 		&i.ID,
@@ -33,6 +39,7 @@ func (q *Queries) CreateFunctionType(ctx context.Context, arg CreateFunctionType
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
+		&i.IsActive,
 	)
 	return i, err
 }
@@ -59,7 +66,7 @@ func (q *Queries) DeleteFunctionTypeLoadTypes(ctx context.Context, functionTypeI
 }
 
 const getFunctionType = `-- name: GetFunctionType :one
-SELECT id, key, name, created_at, updated_at, allows_circuit FROM function_types WHERE id = $1
+SELECT id, key, name, created_at, updated_at, allows_circuit, is_active FROM function_types WHERE id = $1
 `
 
 func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionType, error) {
@@ -72,6 +79,7 @@ func (q *Queries) GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionTy
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
+		&i.IsActive,
 	)
 	return i, err
 }
@@ -116,7 +124,7 @@ func (q *Queries) ListFunctionTypeLoadTypes(ctx context.Context) ([]FunctionType
 }
 
 const listFunctionTypes = `-- name: ListFunctionTypes :many
-SELECT id, key, name, created_at, updated_at, allows_circuit FROM function_types ORDER BY key
+SELECT id, key, name, created_at, updated_at, allows_circuit, is_active FROM function_types ORDER BY key
 `
 
 func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error) {
@@ -135,6 +143,7 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AllowsCircuit,
+			&i.IsActive,
 		); err != nil {
 			return nil, err
 		}
@@ -147,9 +156,9 @@ func (q *Queries) ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 }
 
 const updateFunctionType = `-- name: UpdateFunctionType :one
-UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, updated_at = now()
+UPDATE function_types SET key = $2, name = $3, allows_circuit = $4, is_active = $5, updated_at = now()
 WHERE id = $1
-RETURNING id, key, name, created_at, updated_at, allows_circuit
+RETURNING id, key, name, created_at, updated_at, allows_circuit, is_active
 `
 
 type UpdateFunctionTypeParams struct {
@@ -157,6 +166,7 @@ type UpdateFunctionTypeParams struct {
 	Key           string
 	Name          i18n.Text
 	AllowsCircuit bool
+	IsActive      bool
 }
 
 func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionTypeParams) (FunctionType, error) {
@@ -165,6 +175,7 @@ func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionType
 		arg.Key,
 		arg.Name,
 		arg.AllowsCircuit,
+		arg.IsActive,
 	)
 	var i FunctionType
 	err := row.Scan(
@@ -174,6 +185,7 @@ func (q *Queries) UpdateFunctionType(ctx context.Context, arg UpdateFunctionType
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AllowsCircuit,
+		&i.IsActive,
 	)
 	return i, err
 }

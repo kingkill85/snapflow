@@ -6,7 +6,8 @@
 // Plans are tenant-owned like projects: every query runs in
 // database.InScope (row-level security). Versions and their projects are
 // read through projects.Service (ReadVersion, WriteVersion), the catalog
-// through products.Service, images through files.Service and lock holders'
+// through products.Service, function types and load types (needs) through
+// functiontypes.Service and capabilities.Service, images through files.Service and lock holders'
 // names through users.Service; this feature never reads their tables.
 package plans
 
@@ -23,7 +24,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
+	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
@@ -46,14 +49,19 @@ type Service struct {
 	products *products.Service
 	files    *files.Service
 	users    *users.Service
+	// functionTypes and capabilities give the catalog facts of needs.
+	functionTypes *functiontypes.Service
+	capabilities  *capabilities.Service
 	// now is the clock of edit locks.
 	now func() time.Time
 	// contentHooks run when a plan's content is saved (OnContentSave).
 	contentHooks []ContentHook
 }
 
-func NewService(db DB, projectSvc *projects.Service, productSvc *products.Service, fileSvc *files.Service, userSvc *users.Service) *Service {
-	return &Service{db: db, q: store.New(db), projects: projectSvc, products: productSvc, files: fileSvc, users: userSvc, now: time.Now}
+func NewService(db DB, projectSvc *projects.Service, productSvc *products.Service, fileSvc *files.Service, userSvc *users.Service,
+	functionTypeSvc *functiontypes.Service, capabilitySvc *capabilities.Service) *Service {
+	return &Service{db: db, q: store.New(db), projects: projectSvc, products: productSvc, files: fileSvc, users: userSvc,
+		functionTypes: functionTypeSvc, capabilities: capabilitySvc, now: time.Now}
 }
 
 // inScope runs fn in one transaction scoped to actor (row-level security).
@@ -480,7 +488,7 @@ func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.Ver
 		Image: PlanImage{
 			URL: imageURL(r.ID, r.ImageFileID), Width: r.ImageWidth, Height: r.ImageHeight,
 		},
-		Scale: r.Scale, ZoneCount: r.ZoneCount, PlacementCount: r.PlacementCount,
+		Scale: r.Scale, ZoneCount: r.ZoneCount, PlacementCount: r.PlacementCount, NeedCount: r.NeedCount,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, ContentUpdatedAt: r.ContentUpdatedAt,
 		Can: PlanActions{Update: write, BreakLock: write && actor.Can(auth.PermProjectsDelete)},
 	}

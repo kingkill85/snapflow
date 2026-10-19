@@ -16,8 +16,8 @@ import (
 const tag = "plans"
 
 // maxContentBytes bounds a content save (2000 placements with instance
-// values).
-const maxContentBytes = 8 << 20
+// values, 2000 needs with notes).
+const maxContentBytes = 12 << 20
 
 type idParam struct {
 	ID uuid.UUID `path:"id" format:"uuid"`
@@ -30,6 +30,10 @@ type imageParam struct {
 
 type versionParam struct {
 	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+}
+
+type versionNeedsOutput struct {
+	Body VersionNeeds
 }
 
 type planOutput struct {
@@ -226,7 +230,7 @@ func Register(api huma.API, svc *Service) {
 		OperationID: "getPlanContent",
 		Method:      http.MethodGet,
 		Path:        "/api/plans/{id}/content",
-		Summary:     "Get a plan's zones and placements",
+		Summary:     "Get a plan's zones, placements and needs",
 		Tags:        []string{tag},
 	}, func(ctx context.Context, in *idParam) (*contentOutput, error) {
 		c, err := svc.Content(ctx, in.ID)
@@ -237,12 +241,27 @@ func Register(api huma.API, svc *Service) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "getVersionNeeds",
+		Method:      http.MethodGet,
+		Path:        "/api/versions/{versionId}/needs",
+		Summary:     "Get the needs of a version by plan and zone",
+		Description: "Every need of the version's plans, grouped by plan and zone, with totals per function type and load type.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *versionParam) (*versionNeedsOutput, error) {
+		out, err := svc.VersionNeeds(ctx, in.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		return &versionNeedsOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "savePlanContent",
 		Method:      http.MethodPut,
 		Path:        "/api/plans/{id}/content",
-		Summary:     "Replace a plan's zones and placements",
+		Summary:     "Replace a plan's zones, placements and needs",
 		Description: "Saves the whole content in one transaction and returns it with the computed zone of every " +
-			"placement and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content " +
+			"placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content " +
 			"as last read (409 plan.stale).",
 		Tags:         []string{tag},
 		MaxBodyBytes: maxContentBytes,

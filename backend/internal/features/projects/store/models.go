@@ -77,6 +77,7 @@ type FunctionType struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	AllowsCircuit bool
+	IsActive      bool
 }
 
 type FunctionTypeLoadType struct {
@@ -197,6 +198,22 @@ type Plan struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ContentUpdatedAt time.Time
+}
+
+type PlanNeed struct {
+	PlanID         uuid.UUID
+	ID             uuid.UUID
+	TenantID       uuid.UUID
+	FunctionTypeID uuid.UUID
+	Quantity       int32
+	PowerW         *float64
+	LoadTypeID     *uuid.UUID
+	Label          string
+	Note           string
+	X              *float64
+	Y              *float64
+	ZoneID         *uuid.UUID
+	Position       int32
 }
 
 type PlanPlacement struct {
@@ -353,6 +370,27 @@ type ProposalCounter struct {
 	VersionID uuid.UUID
 	TenantID  uuid.UUID
 	LastSeq   int32
+}
+
+type RoomTemplate struct {
+	ID             uuid.UUID
+	Key            string
+	Name           i18n.Text
+	EquipmentLevel *i18n.Text
+	SortOrder      int32
+	IsActive       bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type RoomTemplateLine struct {
+	TemplateID     uuid.UUID
+	Position       int32
+	FunctionTypeID uuid.UUID
+	Quantity       int32
+	PowerW         *float64
+	LoadTypeID     *uuid.UUID
+	Label          string
 }
 
 type Session struct {
