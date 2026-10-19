@@ -149,15 +149,15 @@ export function ConnectDialog({ versionId, wiring, target, onOpenChange, onConne
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted">{t('connect.notPossible', { count: broken.length })}</p>
                 <ul className="space-y-1 text-sm text-muted">
-                  {broken.slice(0, shownProblems).map((c) => (
-                    <li key={`${c.needId}/${c.targetItemId}/${c.outputKindId}/${c.channelNo}`}>
-                      {describe(c)}:{' '}
-                      {findingText(
-                        { code: c.problem!.code, params: c.problem!.params },
-                        { channel: wiring.channelText(c), need: wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId))), item: wiring.itemName(wiring.items.get(`${c.targetPlanId}/${c.targetItemId}`)) },
-                      )}
-                    </li>
-                  ))}
+                  {broken.slice(0, shownProblems).map((c) => {
+                    const words = findingText(
+                      { code: c.problem!.code, params: c.problem!.params },
+                      { channel: wiring.channelText(c), need: wiring.needText(wiring.needs.get(needKey(c.needPlanId, c.needId))), item: wiring.itemName(wiring.items.get(`${c.targetPlanId}/${c.targetItemId}`)) },
+                    )
+                    const name = describe(c)
+                    // The rule's sentence mostly names the candidate already (D417).
+                    return <li key={`${c.needId}/${c.targetItemId}/${c.outputKindId}/${c.channelNo}`}>{words.includes(name) ? words : `${name}: ${words}`}</li>
+                  })}
                   {broken.length > shownProblems && <li>{t('connect.more', { count: broken.length - shownProblems })}</li>}
                 </ul>
               </div>

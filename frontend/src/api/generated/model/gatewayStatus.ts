@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { GatewayStatusProductName } from './gatewayStatusProductName';
 import type { GatewayStatusStatus } from './gatewayStatusStatus';
 
 export interface GatewayStatus {
@@ -13,6 +14,11 @@ export interface GatewayStatus {
   placesSupplied: number;
   placesUsed: number;
   planId: string;
+  /**
+     * null: the variant no longer exists
+     * @nullable
+     */
+  productName: GatewayStatusProductName;
   productTypeId: string;
   reservePercent: number;
   routers: number;

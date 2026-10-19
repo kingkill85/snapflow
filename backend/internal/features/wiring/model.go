@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 // Connection gives units of a need to one channel of a board module or
@@ -167,17 +169,19 @@ type BusLineStatus struct {
 
 // GatewayStatus is a gateway's places.
 type GatewayStatus struct {
-	PlanID         uuid.UUID `json:"planId"`
-	ItemID         uuid.UUID `json:"itemId"`
-	Label          string    `json:"label"`
-	ProductTypeID  uuid.UUID `json:"productTypeId"`
-	ReservePercent int32     `json:"reservePercent"`
-	PlacesUsed     float64   `json:"placesUsed"`
-	PlacesSupplied float64   `json:"placesSupplied"`
-	UnknownCount   int       `json:"unknownCount"`
-	Devices        int       `json:"devices"`
-	Routers        int       `json:"routers"`
-	Status         Status    `json:"status" enum:"ok,amber,red,unknown"`
+	PlanID uuid.UUID `json:"planId"`
+	ItemID uuid.UUID `json:"itemId"`
+	Label  string    `json:"label"`
+	// ProductName names a gateway without label (D417).
+	ProductName    *i18n.Text `json:"productName" nullable:"true" doc:"null: the variant no longer exists"`
+	ProductTypeID  uuid.UUID  `json:"productTypeId"`
+	ReservePercent int32      `json:"reservePercent"`
+	PlacesUsed     float64    `json:"placesUsed"`
+	PlacesSupplied float64    `json:"placesSupplied"`
+	UnknownCount   int        `json:"unknownCount"`
+	Devices        int        `json:"devices"`
+	Routers        int        `json:"routers"`
+	Status         Status     `json:"status" enum:"ok,amber,red,unknown"`
 }
 
 // CheckCounts sum up the checks.

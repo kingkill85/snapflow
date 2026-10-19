@@ -335,3 +335,20 @@ func TestPerformance(t *testing.T) {
 	}
 	t.Logf("needs 2000, units %d, connected %d, unconnectable %d", p.Units, p.ConnectedUnits, len(p.Unconnectable))
 }
+
+// The reason of units left over is what the last unit saw: a need whose
+// first units took the last free channels has no free channel, even though
+// its earlier units saw free ones (D417).
+func TestAutoConnectReasonOfLastUnit(t *testing.T) {
+	f := newFixture()
+	v := newVersion(f)
+	living := v.zone("Living")
+	n := v.need(living, f.blindFn, 3, "", &f.acMotor) // two blind outputs from relay pairs, the third unit has none
+	v.module(f.relayCaps())
+
+	p, _ := plan(v.snapshot(), AutoConnectScope{Scope: "all"})
+	if p.ConnectedUnits != 2 || len(p.Unconnectable) != 1 || p.Unconnectable[0].NeedID != n || p.Unconnectable[0].Units != 1 ||
+		p.Unconnectable[0].Reason != ReasonNoFreeChannel {
+		t.Fatalf("preview %+v", p)
+	}
+}

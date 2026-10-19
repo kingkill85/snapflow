@@ -4100,6 +4100,16 @@
           "planId": {
             "type": "string"
           },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "null: the variant no longer exists",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "productTypeId": {
             "type": "string"
           },
@@ -4129,6 +4139,7 @@
           "planId",
           "itemId",
           "label",
+          "productName",
           "productTypeId",
           "reservePercent",
           "placesUsed",

@@ -156,6 +156,7 @@ export * from './gateway';
 export * from './gatewayPlanKind';
 export * from './gatewayProductName';
 export * from './gatewayStatus';
+export * from './gatewayStatusProductName';
 export * from './gatewayStatusStatus';
 export * from './gatewayVariantName';
 export * from './generateInput';

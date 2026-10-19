@@ -326,7 +326,7 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 			continue
 		}
 		t := sn.facts.types[m.SystemID]
-		g := GatewayStatus{PlanID: m.PlanID, ItemID: m.ItemID, Label: it.Label, ProductTypeID: m.SystemID, ReservePercent: t.ReservePercent}
+		g := GatewayStatus{PlanID: m.PlanID, ItemID: m.ItemID, Label: it.Label, ProductName: it.ProductName, ProductTypeID: m.SystemID, ReservePercent: t.ReservePercent}
 		if it.Caps.WirelessPlacesSupplied != nil {
 			g.PlacesSupplied = *it.Caps.WirelessPlacesSupplied
 		}

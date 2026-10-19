@@ -249,3 +249,15 @@ func TestSlotNumbering(t *testing.T) {
 		t.Fatalf("alternative slot: %+v", sl)
 	}
 }
+
+// Overload params say when the limit is that of a mix of load types (D417).
+func TestUsageParamsMixed(t *testing.T) {
+	one := usage{limited: []uuid.UUID{uuid.New()}, load: 250, single: 200, utilisation: 1.25}
+	if p := one.params("loadW", "limitW"); p["mixedLoads"] != nil || p["limitW"] != 200.0 || p["utilisationPercent"] != 125.0 {
+		t.Fatalf("one type %+v", p)
+	}
+	mix := usage{limited: []uuid.UUID{uuid.New(), uuid.New()}, load: 248, utilisation: 1.11}
+	if p := mix.params("loadW", "limitW"); p["mixedLoads"] != true || p["utilisationPercent"] != 111.0 {
+		t.Fatalf("mix %+v", p)
+	}
+}

@@ -10,12 +10,14 @@
     "channel_conflict": "{{channel}} nutzt Ausgang {{baseChannel}}, den auch ein anderer Kanal nutzt",
     "circuit_not_allowed": "{{channel}}: {{units}} Einheiten an einem Kanal, die keinen gemeinsamen Stromkreis haben dürfen",
     "channel_overload_w": "{{channel}}: {{loadW}} W angeschlossen, höchstens {{limitW}} W ({{utilisationPercent}} % der Grenze)",
+    "channel_overload_w_mixed": "{{channel}}: {{loadW}} W gemischter Lasten, {{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt",
     "channel_overload_a": "{{channel}}: {{currentA}} A bei {{voltage}} V angeschlossen, höchstens {{limitA}} A ({{utilisationPercent}} % der Grenze)",
+    "channel_overload_a_mixed": "{{channel}}: {{currentA}} A gemischter Lasten bei {{voltage}} V, {{utilisationPercent}} % dessen, was der Kanal für diese Mischung verträgt",
     "module_overload_w": "{{item}}: {{loadW}} W gesamt ({{loadType}}), höchstens {{limitW}} W",
     "module_overload_a": "{{item}}: {{currentA}} A gesamt bei {{voltage}} V, höchstens {{limitA}} A",
     "limit_unknown": "{{channel}}: kein Grenzwert für {{loadType}} bekannt",
     "min_load": "{{channel}}: {{loadW}} W liegen unter der Mindestlast von {{minW}} W",
-    "power_unknown": "{{channel}}: Die Leistung von {{need}} ist unbekannt, die Grenzwerte werden nicht geprüft (Mindestlast übersprungen)",
+    "power_unknown": "{{channel}}: Für {{need}} ist keine Leistung eingetragen, die Grenzwerte des Kanals können nicht geprüft werden",
     "board_over_capacity": "{{board}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
     "board_row_over_capacity": "{{board}}, Reihe {{row}}: {{usedTe}} von {{capacityTe}} TE belegt, mehr als hineinpasst",
     "bus_line_no_power_supply": "{{name}}: keine Spannungsversorgung",
@@ -35,7 +37,7 @@
   "reason": {
     "no_channel_serves": "Kein Kanal bedient „{{functionType}}“",
     "no_free_channel": "Kein freier Kanal für „{{functionType}}“",
-    "limits_exceeded": "Die Grenzwerte der freien Kanäle würden überschritten"
+    "limits_exceeded": "Kein freier Kanal passt (Leistung, Strom oder Motortyp)"
   },
   "fallback": {
     "need": "Ein Bedarf",
@@ -135,14 +137,19 @@
     "gateway": "Gateway {{name}}",
     "places": "{{used}} von {{supplied}} Plätzen (Reserve {{reserve}} %)",
     "gatewayDevices_one": "{{count}} Gerät, {{routers}} Router",
-    "gatewayDevices_other": "{{count}} Geräte, {{routers}} Router"
+    "gatewayDevices_other": "{{count}} Geräte, {{routers}} Router",
+    "toFix": "Zu beheben",
+    "toReview": "Zu prüfen",
+    "allClear": "Alles in Ordnung"
   },
   "findings": {
     "title": "Befunde",
     "count": "Fehler: {{errors}} · Warnungen: {{warnings}} · Hinweise: {{infos}}",
     "none": "Nichts zu melden.",
     "open": "Öffnen",
-    "openFor": "Öffnen: {{text}}"
+    "openFor": "Öffnen: {{text}}",
+    "unconnected_one": "{{count}} Bedarf hat nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
+    "unconnected_other": "{{count}} Bedarfe haben nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)"
   },
   "area": {
     "needs": "Bedarfe",

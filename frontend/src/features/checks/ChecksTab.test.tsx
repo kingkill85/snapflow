@@ -47,8 +47,9 @@ describe('ChecksTab', () => {
     expect(within(findings).getByText('Networks')).toBeInTheDocument()
     const links = within(findings).getAllByRole('link')
     expect(links[0]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/boards/${boardId}?select=${dimmer}`)
-    expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${living}`)
-    expect(links[2]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks#line-${lineId}`)
+    // Unconnected needs are one line here; they are listed with Connect… below (D417).
+    expect(within(findings).getByText('1 need has units that are not connected (listed under Unconnected needs)')).toBeInTheDocument()
+    expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks#line-${lineId}`)
     expect(within(findings).getByText('KNX 1: 612 of 640 mA used (reserve 20 %)')).toBeInTheDocument()
   })
 
@@ -88,7 +89,7 @@ describe('ChecksTab', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Connect 1 × Light' })
     expect(await within(dialog).findByText('D1 · Dimmer output 2 (Main board)')).toBeInTheDocument()
-    expect(within(dialog).getByText(/Switch actuator · Relay output 1 \(Main board\): .*uses output 1/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/^Switch actuator · Relay output 1 \(Main board\) uses output 1, which another channel uses too$/)).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Connect to D1 · Dimmer output 2 (Main board)' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(created).toEqual({ needPlanId: floorId, needId: ceiling, units: 1, targetPlanId: boardId, targetItemId: dimmer, outputKindId: dimmerKind, channelNo: 2 })
@@ -130,10 +131,10 @@ describe('ChecksTab', () => {
     const section = await screen.findByRole('region', { name: 'Unconnected needs' })
     await userEvent.click(within(section).getByRole('button', { name: 'Connect 1 × Light…' }))
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText("The free channels' limits would be exceeded")).toBeInTheDocument()
+    expect(await within(dialog).findByText('No free channel fits (power, current or motor type)')).toBeInTheDocument()
     expect(within(dialog).getByText('2 not possible:')).toBeInTheDocument()
     expect(within(dialog).getByText(/D1 · Dimmer output 2 \(Main board\): 250 W connected, at most 200 W \(125 % of the limit\)/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/Switch actuator · Relay output 1 \(Main board\): .*uses output 1/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/^Switch actuator · Relay output 1 \(Main board\) uses output 1, which another channel uses too$/)).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /^Connect to / })).not.toBeInTheDocument()
   })
 

@@ -410,6 +410,8 @@ func plan(sn *snapshot, scope AutoConnectScope) (AutoConnectPreview, []*Conn) {
 		circuit := st.cat.Circuit[n.FunctionTypeID]
 		l := &left{n: n, missing: o.missing}
 		for l.placed < l.missing {
+			// The reason of a unit left over is what its own trial saw (D417).
+			l.sawServing, l.sawFree = false, false
 			ok := false
 			var at ChannelKey
 			if circuit {

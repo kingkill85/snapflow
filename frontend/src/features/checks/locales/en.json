@@ -10,12 +10,14 @@
     "channel_conflict": "{{channel}} uses output {{baseChannel}}, which another channel uses too",
     "circuit_not_allowed": "{{channel}}: {{units}} units on one channel, but they may not share a circuit",
     "channel_overload_w": "{{channel}}: {{loadW}} W connected, at most {{limitW}} W ({{utilisationPercent}} % of the limit)",
+    "channel_overload_w_mixed": "{{channel}}: {{loadW}} W of mixed loads, {{utilisationPercent}} % of what the channel takes for this mix",
     "channel_overload_a": "{{channel}}: {{currentA}} A at {{voltage}} V connected, at most {{limitA}} A ({{utilisationPercent}} % of the limit)",
+    "channel_overload_a_mixed": "{{channel}}: {{currentA}} A of mixed loads at {{voltage}} V, {{utilisationPercent}} % of what the channel takes for this mix",
     "module_overload_w": "{{item}}: {{loadW}} W in total ({{loadType}}), at most {{limitW}} W",
     "module_overload_a": "{{item}}: {{currentA}} A in total at {{voltage}} V, at most {{limitA}} A",
     "limit_unknown": "{{channel}}: no limit known for {{loadType}}",
     "min_load": "{{channel}}: {{loadW}} W is below the minimum load of {{minW}} W",
-    "power_unknown": "{{channel}}: the power of {{need}} is unknown, so its limits are not checked (minimum load skipped)",
+    "power_unknown": "{{channel}}: no power entered for {{need}}, so the channel's limits cannot be checked",
     "board_over_capacity": "{{board}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
     "board_row_over_capacity": "{{board}}, row {{row}}: {{usedTe}} of {{capacityTe}} TE used, more than fits",
     "bus_line_no_power_supply": "{{name}}: no power supply",
@@ -35,7 +37,7 @@
   "reason": {
     "no_channel_serves": "No channel serves {{functionType}}",
     "no_free_channel": "No free channel for {{functionType}}",
-    "limits_exceeded": "The free channels' limits would be exceeded"
+    "limits_exceeded": "No free channel fits (power, current or motor type)"
   },
   "fallback": {
     "need": "A need",
@@ -135,14 +137,19 @@
     "gateway": "Gateway {{name}}",
     "places": "{{used}} of {{supplied}} places (reserve {{reserve}} %)",
     "gatewayDevices_one": "{{count}} device, {{routers}} routers",
-    "gatewayDevices_other": "{{count}} devices, {{routers}} routers"
+    "gatewayDevices_other": "{{count}} devices, {{routers}} routers",
+    "toFix": "To fix",
+    "toReview": "To review",
+    "allClear": "All clear"
   },
   "findings": {
     "title": "Findings",
     "count": "Errors: {{errors}} · Warnings: {{warnings}} · Notes: {{infos}}",
     "none": "Nothing to report.",
     "open": "Open",
-    "openFor": "Open: {{text}}"
+    "openFor": "Open: {{text}}",
+    "unconnected_one": "{{count}} need has units that are not connected (listed under Unconnected needs)",
+    "unconnected_other": "{{count}} needs have units that are not connected (listed under Unconnected needs)"
   },
   "area": {
     "needs": "Needs",

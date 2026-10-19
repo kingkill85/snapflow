@@ -478,7 +478,12 @@ func (u usage) params(loadKey, limitKey string) map[string]any {
 	if len(u.limited) > 1 && u.utilisation > 0 {
 		limit = round2(u.load / u.utilisation)
 	}
-	return map[string]any{loadKey: round2(u.load), limitKey: limit, "utilisationPercent": math.Round(u.utilisation*1000) / 10}
+	out := map[string]any{loadKey: round2(u.load), limitKey: limit, "utilisationPercent": math.Round(u.utilisation*1000) / 10}
+	if len(u.limited) > 1 {
+		// Several load types: the limit is that of the mix (D417).
+		out["mixedLoads"] = true
+	}
+	return out
 }
 
 // loadSum is the load of connections that are valid on their own.

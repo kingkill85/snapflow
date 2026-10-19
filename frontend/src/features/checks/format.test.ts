@@ -35,6 +35,10 @@ describe('checks texts', () => {
     expect(result.current({ code: 'channel_overload_w', params: { loadW: 450, limitW: 400, utilisationPercent: 112.5 } })).toBe(
       'a channel: 450 W connected, at most 400 W (112.5 % of the limit)',
     )
+    // Several load types: the share of the mix's limit (D417).
+    expect(result.current({ code: 'channel_overload_w', params: { loadW: 248, limitW: 223.51, utilisationPercent: 111, mixedLoads: true } })).toBe(
+      'a channel: 248 W of mixed loads, 111 % of what the channel takes for this mix',
+    )
     // A device without channels is not in the wiring view: its label, else its product name from params.
     expect(result.current({ code: 'board_row_over_capacity', params: { name: 'Sub board', row: 1, usedTe: 13, capacityTe: 12 } })).toBe(
       'Sub board, row 1: 13 of 12 TE used, more than fits',

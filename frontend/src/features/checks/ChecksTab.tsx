@@ -8,6 +8,7 @@ import { useGetChecks, useUndoAutoConnect } from '@/api/generated/wiring/wiring'
 import { Badge, Button, EmptyState, ErrorMessage, Loading, Notice, Section, TextLink } from '@/components/ui'
 import { boardPath, editorPath } from '@/features/plans/paths'
 import { versionPath } from '@/features/projects/paths'
+import { useLocalized } from '@/i18n/localized'
 
 import { AutoConnectDialog } from './AutoConnectDialog'
 import { ConnectDialog, type ConnectTarget } from './ConnectDialog'
@@ -123,6 +124,7 @@ function Card({ title, value, status, children }: { title: string; value?: React
 
 function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string) => string }) {
   const { t } = useTranslation('checks')
+  const localize = useLocalized()
   const c = checks.counts
   const zonesStatus = c.zonesWithNeeds === 0 ? 'unknown' : c.zonesCovered === c.zonesWithNeeds ? 'ok' : 'red'
   const open = c.units - c.connectedUnits
@@ -141,10 +143,10 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
       <Card
         title={t('overview.findings')}
         value={t('overview.findingsValue', { errors: c.errors, warnings: c.warnings })}
-        status={<Badge variant={c.errors > 0 ? 'danger' : c.warnings > 0 ? 'warning' : 'success'}>{t(c.errors > 0 ? 'status.red' : c.warnings > 0 ? 'status.amber' : 'status.ok')}</Badge>}
+        status={<Badge variant={c.errors > 0 ? 'danger' : c.warnings > 0 ? 'warning' : 'success'}>{t(c.errors > 0 ? 'overview.toFix' : c.warnings > 0 ? 'overview.toReview' : 'overview.allClear')}</Badge>}
       />
       {checks.boards.map((b) => (
-        <Card key={b.planId} title={t('overview.board', { name: b.name })} status={<StatusChip status={b.status} />}>
+        <Card key={b.planId} title={t('overview.board', { name: b.name })} status={<StatusChip status={b.rows.reduce((s, r) => worst(s, r.status), b.status as string)} />}>
           <p className="text-sm">{t('overview.te', { used: b.usedTe, capacity: b.capacityTe })}</p>
           {b.rows.map((r, i) =>
             r.status === 'red' || r.status === 'amber' ? (
@@ -177,7 +179,7 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
         </Card>
       ))}
       {checks.gateways.map((g) => (
-        <Card key={`${g.planId}/${g.itemId}`} title={t('overview.gateway', { name: g.label })} status={<StatusChip status={g.status} />}>
+        <Card key={`${g.planId}/${g.itemId}`} title={t('overview.gateway', { name: [g.label, g.productName && localize(g.productName)].filter(Boolean).join(' · ') })} status={<StatusChip status={g.status} />}>
           <p className="text-sm">{t('overview.places', { used: g.placesUsed, supplied: g.placesSupplied, reserve: g.reservePercent })}</p>
           <p className="text-sm text-muted">{t('overview.gatewayDevices', { count: g.devices, routers: g.routers })}</p>
         </Card>
@@ -231,12 +233,16 @@ function Findings({
               {t(`severity.${sev}`)}
             </h3>
             {areas.map((area) => {
-              const inArea = list.filter((f) => areaOf(f.code) === area)
-              if (inArea.length === 0) return null
+              const all = list.filter((f) => areaOf(f.code) === area)
+              if (all.length === 0) return null
+              // Unconnected needs are listed with Connect… in their own section below: one line here (D417).
+              const unconnected = all.filter((f) => f.code === 'need_unconnected').length
+              const inArea = all.filter((f) => f.code !== 'need_unconnected')
               return (
                 <div key={area} className="space-y-1 pl-2">
                   <h4 className="text-xs font-medium text-muted">{t(`area.${area}`)}</h4>
                   <ul className="space-y-1 text-sm">
+                    {unconnected > 0 && <li>{t('findings.unconnected', { count: unconnected })}</li>}
                     {inArea.map((f, i) => {
                       const link = linkOf(f)
                       const words = text(f, wiring.findingNames(f))

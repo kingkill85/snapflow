@@ -118,6 +118,9 @@ export function useFindingText() {
       needMotor: motor(finding.params?.needMotorType),
       code: finding.code,
     }
+    // Several load types on a channel: the share of the mix's limit, not an effective limit in W or A (D417).
+    if (finding.params?.mixedLoads === true && finding.code === 'channel_overload_w') return t('finding.channel_overload_w_mixed', all)
+    if (finding.params?.mixedLoads === true && finding.code === 'channel_overload_a') return t('finding.channel_overload_a_mixed', all)
     return isCode(finding.code) ? t(`finding.${finding.code}`, all) : t('finding.unknown', all)
   }
 }
