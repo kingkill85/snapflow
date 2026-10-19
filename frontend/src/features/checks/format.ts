@@ -87,6 +87,10 @@ export const findingCodes = [
   'gateway_places_exceeded',
   'gateway_no_router',
   'network_assignment_dangling',
+  'address_duplicate',
+  'address_outside_line',
+  'address_missing',
+  'bus_line_address_invalid',
 ] as const
 export type FindingCode = (typeof findingCodes)[number]
 

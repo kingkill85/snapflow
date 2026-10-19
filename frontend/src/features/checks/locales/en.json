@@ -32,6 +32,10 @@
     "gateway_places_exceeded": "{{label}}: {{used}} of {{supplied}} places used, more than it has",
     "gateway_no_router": "{{label}}: {{devices}} devices and no router (advised from {{threshold}} end devices)",
     "network_assignment_dangling": "{{item}} is assigned to {{target}}",
+    "address_duplicate": "{{item}}: address {{address}} is used by {{count}} devices",
+    "address_outside_line": "{{item}}: address {{address}} is outside its line {{line}} ({{prefix}})",
+    "address_missing": "{{name}}: {{count}} devices without address",
+    "bus_line_address_invalid": "{{name}}: the line address \"{{address}}\" cannot be read",
     "unknown": "Check {{code}}"
   },
   "candidate": {

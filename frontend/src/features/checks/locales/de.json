@@ -32,6 +32,10 @@
     "gateway_places_exceeded": "{{label}}: {{used}} von {{supplied}} Plätzen belegt, mehr als vorhanden",
     "gateway_no_router": "{{label}}: {{devices}} Geräte und kein Router (empfohlen ab {{threshold}} Endgeräten)",
     "network_assignment_dangling": "{{item}} ist {{target}} zugeordnet",
+    "address_duplicate": "{{item}}: Adresse {{address}} wird von {{count}} Geräten verwendet",
+    "address_outside_line": "{{item}}: Adresse {{address}} liegt außerhalb ihrer Linie {{line}} ({{prefix}})",
+    "address_missing": "{{name}}: {{count}} Geräte ohne Adresse",
+    "bus_line_address_invalid": "{{name}}: Die Linienadresse „{{address}}“ ist nicht lesbar",
     "unknown": "Prüfung {{code}}"
   },
   "candidate": {
