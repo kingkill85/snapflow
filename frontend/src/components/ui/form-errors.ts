@@ -77,6 +77,7 @@ export const errorParamNames = {
   'pricing.amount_range': ['max'],
   'pricing.percent_range': ['max'],
   'proposal.exporter_unknown': ['exporters'],
+  'room_template.key_taken': ['key'],
   'proposal.rate_missing': ['currency'],
   'plan.zone_points': ['min', 'max'],
   'product.model_number_taken': ['modelNumber'],
