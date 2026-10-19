@@ -190,21 +190,21 @@ func TestValidation(t *testing.T) {
 		status         int
 		code, location string
 	}{
-		"blank name":     {map[string]any{"name": "  "}, 422, "validation.required", "body.name"},
-		"long name":      {map[string]any{"name": strings.Repeat("x", 201)}, 422, "validation.too_long", "body.name"},
-		"control chars":  {map[string]any{"name": "a\tb"}, 422, "validation.control_chars", "body.name"},
-		"email":          {map[string]any{"name": "x", "customer": map[string]any{"email": "nope"}}, 422, "validation.email", "body.customer.email"},
-		"phone too long": {map[string]any{"name": "x", "customer": map[string]any{"phone": strings.Repeat("1", 51)}}, 422, "validation.too_long", "body.customer.phone"},
-		"currency":       {map[string]any{"name": "x", "currency": "eur"}, 422, "project.currency_format", "body.currency"},
-		"rate zero":      {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "0"}, 422, "project.exchange_rate", "body.exchangeRate"},
-		"rate format":    {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "1e3"}, 422, "project.exchange_rate", "body.exchangeRate"},
-		"usd rate":       {map[string]any{"name": "x", "exchangeRate": "2"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"blank name":       {map[string]any{"name": "  "}, 422, "validation.required", "body.name"},
+		"long name":        {map[string]any{"name": strings.Repeat("x", 201)}, 422, "validation.too_long", "body.name"},
+		"control chars":    {map[string]any{"name": "a\tb"}, 422, "validation.control_chars", "body.name"},
+		"email":            {map[string]any{"name": "x", "customer": map[string]any{"email": "nope"}}, 422, "validation.email", "body.customer.email"},
+		"phone too long":   {map[string]any{"name": "x", "customer": map[string]any{"phone": strings.Repeat("1", 51)}}, 422, "validation.too_long", "body.customer.phone"},
+		"currency":         {map[string]any{"name": "x", "currency": "eur"}, 422, "project.currency_format", "body.currency"},
+		"rate zero":        {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "0"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"rate format":      {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "1e3"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"usd rate":         {map[string]any{"name": "x", "exchangeRate": "2"}, 422, "project.exchange_rate", "body.exchangeRate"},
 		"unknown currency": {map[string]any{"name": "x", "currency": "XYZ"}, 422, "project.currency_unknown", "body.currency"},
-		"language":       {map[string]any{"name": "x", "language": "fr"}, 422, "validation.locale", "body.language"},
-		"no types":       {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{}}, 422, "project.product_types_required", "body.productTypeIds"},
-		"unknown type":   {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{active, uuid.New()}}, 422, "project.product_type_not_found", "body.productTypeIds[1]"},
-		"inactive type":  {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{inactive}}, 422, "project.product_type_inactive", "body.productTypeIds[0]"},
-		"unknown tenant": {map[string]any{"name": "x", "tenantId": uuid.New()}, 422, "project.tenant_not_found", "body.tenantId"},
+		"language":         {map[string]any{"name": "x", "language": "fr"}, 422, "validation.locale", "body.language"},
+		"no types":         {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{}}, 422, "project.product_types_required", "body.productTypeIds"},
+		"unknown type":     {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{active, uuid.New()}}, 422, "project.product_type_not_found", "body.productTypeIds[1]"},
+		"inactive type":    {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{inactive}}, 422, "project.product_type_inactive", "body.productTypeIds[0]"},
+		"unknown tenant":   {map[string]any{"name": "x", "tenantId": uuid.New()}, 422, "project.tenant_not_found", "body.tenantId"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

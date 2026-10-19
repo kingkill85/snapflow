@@ -166,7 +166,7 @@ func (h *HTTP) Fetch(ctx context.Context) (Rates, error) {
 	if err != nil {
 		return Rates{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return Rates{}, fmt.Errorf("exchange rates: %s", resp.Status)
 	}
