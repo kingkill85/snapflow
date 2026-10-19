@@ -165,23 +165,6 @@ func (s *Service) BOMPlacements(ctx context.Context, tx pgx.Tx, versionID uuid.U
 			})
 		}
 	}
-	// Board modules count like placements without a zone; the enclosure is
-	// one more item of its board, with the board's id (step 3c).
-	for _, e := range enclosures {
-		if i, ok := index[e.PlanID]; ok {
-			out[i].Placements = append(out[i].Placements, BOMPlacement{
-				ID: e.PlanID, VariantID: e.EnclosureCatalogVariantID, VariantDeleted: e.VariantDeleted, AddonVariantIDs: []uuid.UUID{},
-			})
-		}
-	}
-	for _, m := range modules {
-		if i, ok := index[m.PlanID]; ok {
-			out[i].Placements = append(out[i].Placements, BOMPlacement{
-				ID: m.ID, VariantID: m.CatalogVariantID, VariantDeleted: m.VariantDeleted, Existing: m.Existing,
-				AddonVariantIDs: m.AddonVariantIds,
-			})
-		}
-	}
 	return out, nil
 }
 
