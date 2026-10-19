@@ -413,7 +413,18 @@ func (s *state) channelProblems(ch ChannelKey) []Problem {
 	if units > 1 && !circuit {
 		p(SeverityError, CodeCircuitNotAllowed, map[string]any{"units": units})
 	}
-	totalW, allKnown, present, _ := s.load(conns)
+	// Loads count the connections that are valid on their own (a need
+	// that is gone or not served is reported per connection).
+	var loads []*Conn
+	for _, c := range conns {
+		if n := s.needs[c.Need]; n != nil && s.cat.Served[ch.Kind][n.FunctionTypeID] {
+			loads = append(loads, c)
+		}
+	}
+	if len(loads) == 0 {
+		return out
+	}
+	totalW, allKnown, present, _ := s.load(loads)
 	if lim, ok, unknown := limitFor(sl.cap.LimitsW, present, true); ok || len(unknown) > 0 {
 		for _, lt := range unknown {
 			params := map[string]any{}

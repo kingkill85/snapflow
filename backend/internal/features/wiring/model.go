@@ -30,7 +30,7 @@ type ConnectionActions struct {
 
 // Connections are the connections of a version.
 type Connections struct {
-	Items []Connection    `json:"items" doc:"In creation order"`
+	Items []Connection      `json:"items" doc:"In creation order"`
 	Can   ConnectionActions `json:"can"`
 }
 
@@ -79,15 +79,15 @@ type Removed struct {
 
 // Refs say what a finding is about; absent = not applicable.
 type Refs struct {
-	PlanID        *uuid.UUID `json:"planId,omitempty" doc:"The floorplan of the zone or need"`
-	ZoneID        *uuid.UUID `json:"zoneId,omitempty"`
-	NeedID        *uuid.UUID `json:"needId,omitempty"`
+	PlanID        *uuid.UUID  `json:"planId,omitempty" doc:"The floorplan of the zone or need"`
+	ZoneID        *uuid.UUID  `json:"zoneId,omitempty"`
+	NeedID        *uuid.UUID  `json:"needId,omitempty"`
 	ConnectionIDs []uuid.UUID `json:"connectionIds,omitempty"`
-	TargetPlanID  *uuid.UUID `json:"targetPlanId,omitempty" doc:"The board or floorplan of the item (module, device, gateway)"`
-	ItemID        *uuid.UUID `json:"itemId,omitempty"`
-	OutputKindID  *uuid.UUID `json:"outputKindId,omitempty"`
-	ChannelNo     *int       `json:"channelNo,omitempty"`
-	BusLineID     *uuid.UUID `json:"busLineId,omitempty"`
+	TargetPlanID  *uuid.UUID  `json:"targetPlanId,omitempty" doc:"The board or floorplan of the item (module, device, gateway)"`
+	ItemID        *uuid.UUID  `json:"itemId,omitempty"`
+	OutputKindID  *uuid.UUID  `json:"outputKindId,omitempty"`
+	ChannelNo     *int        `json:"channelNo,omitempty"`
+	BusLineID     *uuid.UUID  `json:"busLineId,omitempty"`
 }
 
 // Finding is one result of the checks.
@@ -150,18 +150,18 @@ type BoardStatus struct {
 
 // BusLineStatus is a bus line's current and devices.
 type BusLineStatus struct {
-	BusLineID            uuid.UUID `json:"busLineId"`
-	Name                 string    `json:"name"`
-	ProductTypeID        uuid.UUID `json:"productTypeId"`
-	ReservePercent       int32     `json:"reservePercent"`
-	CurrentUsedMa        float64   `json:"currentUsedMa" doc:"Known currents, defaults included"`
-	CurrentDefaultMa     float64   `json:"currentDefaultMa" doc:"Part of currentUsedMa from the system's default"`
-	CurrentSuppliedMa    float64   `json:"currentSuppliedMa"`
-	UnknownCurrentCount  int       `json:"unknownCurrentCount"`
-	CurrentStatus        Status    `json:"currentStatus" enum:"ok,amber,red,unknown" doc:"unknown: no power supply"`
-	Devices              int       `json:"devices" doc:"Members (power supplies included)"`
-	DevicesMax           *int32    `json:"devicesMax,omitempty" doc:"The line's devicesMax, else the system's busDevicesMax; absent = not checked"`
-	DevicesStatus        Status    `json:"devicesStatus" enum:"ok,amber,red,unknown" doc:"unknown: no limit"`
+	BusLineID           uuid.UUID `json:"busLineId"`
+	Name                string    `json:"name"`
+	ProductTypeID       uuid.UUID `json:"productTypeId"`
+	ReservePercent      int32     `json:"reservePercent"`
+	CurrentUsedMa       float64   `json:"currentUsedMa" doc:"Known currents, defaults included"`
+	CurrentDefaultMa    float64   `json:"currentDefaultMa" doc:"Part of currentUsedMa from the system's default"`
+	CurrentSuppliedMa   float64   `json:"currentSuppliedMa"`
+	UnknownCurrentCount int       `json:"unknownCurrentCount"`
+	CurrentStatus       Status    `json:"currentStatus" enum:"ok,amber,red,unknown" doc:"unknown: no power supply"`
+	Devices             int       `json:"devices" doc:"Members (power supplies included)"`
+	DevicesMax          *int32    `json:"devicesMax,omitempty" doc:"The line's devicesMax, else the system's busDevicesMax; absent = not checked"`
+	DevicesStatus       Status    `json:"devicesStatus" enum:"ok,amber,red,unknown" doc:"unknown: no limit"`
 }
 
 // GatewayStatus is a gateway's places.

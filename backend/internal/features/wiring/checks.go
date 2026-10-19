@@ -15,20 +15,20 @@ import (
 
 // Codes of the checks besides the validity codes.
 const (
-	CodeNeedUnconnected       = "need_unconnected"
-	CodeBusLineNoPowerSupply  = "bus_line_no_power_supply"
-	CodeBusLineCurrentHigh    = "bus_line_current_reserve"
-	CodeBusLineCurrentOver    = "bus_line_current_exceeded"
-	CodeBusLineDevicesHigh    = "bus_line_devices_reserve"
-	CodeBusLineDevicesOver    = "bus_line_devices_exceeded"
-	CodeBusCurrentUnknown     = "bus_current_unknown"
-	CodeBusDeviceUnassigned   = "bus_device_unassigned"
-	CodeWirelessNoGateway     = "wireless_no_gateway"
-	CodeGatewayPlacesHigh     = "gateway_places_reserve"
-	CodeGatewayPlacesOver     = "gateway_places_exceeded"
-	CodeGatewayNoRouter       = "gateway_no_router"
-	CodeBoardOverCapacity     = "board_over_capacity"
-	RouterThreshold           = 20
+	CodeNeedUnconnected        = "need_unconnected"
+	CodeBusLineNoPowerSupply   = "bus_line_no_power_supply"
+	CodeBusLineCurrentHigh     = "bus_line_current_reserve"
+	CodeBusLineCurrentOver     = "bus_line_current_exceeded"
+	CodeBusLineDevicesHigh     = "bus_line_devices_reserve"
+	CodeBusLineDevicesOver     = "bus_line_devices_exceeded"
+	CodeBusCurrentUnknown      = "bus_current_unknown"
+	CodeBusDeviceUnassigned    = "bus_device_unassigned"
+	CodeWirelessNoGateway      = "wireless_no_gateway"
+	CodeGatewayPlacesHigh      = "gateway_places_reserve"
+	CodeGatewayPlacesOver      = "gateway_places_exceeded"
+	CodeGatewayNoRouter        = "gateway_no_router"
+	CodeBoardOverCapacity      = "board_over_capacity"
+	RouterThreshold            = 20
 	defaultBoardReservePercent = 20
 )
 
@@ -202,7 +202,7 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 			for _, c := range it.Caps.Channels {
 				u := native[c.OutputKindID]
 				if u == nil {
-					u = &ChannelUse{OutputKindID: c.OutputKindID, OutputKindKey: c.OutputKindKey}
+					u = &ChannelUse{OutputKindID: c.OutputKindID, OutputKindKey: st.cat.KindKey[c.OutputKindID]}
 					native[c.OutputKindID] = u
 				}
 				u.Total += c.Count
@@ -218,7 +218,7 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 				for _, a := range c.Alternatives {
 					u := alt[a.OutputKindID]
 					if u == nil {
-						u = &ChannelUse{OutputKindID: a.OutputKindID, OutputKindKey: a.OutputKindKey, Alternative: true}
+						u = &ChannelUse{OutputKindID: a.OutputKindID, OutputKindKey: st.cat.KindKey[a.OutputKindID], Alternative: true}
 						alt[a.OutputKindID] = u
 					}
 					u.Total += a.Max
