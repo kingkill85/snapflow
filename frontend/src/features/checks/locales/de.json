@@ -116,7 +116,7 @@
     "unconnected": "Nicht verbundene Einheiten",
     "unitsOf": "{{connected}} von {{total}} verbunden",
     "findings": "Befunde",
-    "findingsValue": "{{errors}} Fehler · {{warnings}} Warnungen",
+    "findingsValue": "Fehler: {{errors}} · Warnungen: {{warnings}}",
     "board": "Verteiler {{name}}",
     "te": "{{used}} von {{capacity}} TE belegt",
     "channels": "{{kind}}: {{free}} von {{total}} frei",
@@ -135,7 +135,7 @@
   },
   "findings": {
     "title": "Befunde",
-    "count": "{{errors}} Fehler, {{warnings}} Warnungen, {{infos}} Hinweise",
+    "count": "Fehler: {{errors}} · Warnungen: {{warnings}} · Hinweise: {{infos}}",
     "none": "Nichts zu melden.",
     "open": "Öffnen",
     "openFor": "Öffnen: {{text}}"

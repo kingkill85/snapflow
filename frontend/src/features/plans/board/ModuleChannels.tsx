@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { ChannelInfo } from '@/api/generated/model'
 import { useDeleteConnection } from '@/api/generated/wiring/wiring'
-import { Badge, Button, ErrorMessage, RowAction } from '@/components/ui'
+import { Badge, Button, ErrorMessage, IconButton } from '@/components/ui'
 import { ConnectDialog, type ConnectTarget, itemKey, needKey, useRefreshWiring, type WiringModel } from '@/features/checks'
 import { useFormatWatts } from '@/features/needs/format'
 
@@ -98,8 +98,7 @@ export function ModuleChannels({ versionId, planId, moduleId, hasChannels, wirin
                                 </p>
                               </div>
                               {wiring.canUpdate && (
-                                <RowAction
-                                  compact
+                                <IconButton
                                   variant="danger-quiet"
                                   icon={<Unplug />}
                                   label={tChecks('connection.disconnectFrom', { name: text })}

@@ -116,7 +116,7 @@
     "unconnected": "Unconnected units",
     "unitsOf": "{{connected}} of {{total}} connected",
     "findings": "Findings",
-    "findingsValue": "{{errors}} errors · {{warnings}} warnings",
+    "findingsValue": "Errors: {{errors}} · Warnings: {{warnings}}",
     "board": "Board {{name}}",
     "te": "{{used}} of {{capacity}} TE used",
     "channels": "{{kind}}: {{free}} of {{total}} free",
@@ -135,7 +135,7 @@
   },
   "findings": {
     "title": "Findings",
-    "count": "{{errors}} errors, {{warnings}} warnings, {{infos}} notes",
+    "count": "Errors: {{errors}} · Warnings: {{warnings}} · Notes: {{infos}}",
     "none": "Nothing to report.",
     "open": "Open",
     "openFor": "Open: {{text}}"

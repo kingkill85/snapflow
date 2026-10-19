@@ -304,7 +304,8 @@
     "channelUse": "{{used}}/{{total}} ch",
     "channelUseLabel": "{{used}} of {{total}} channels used",
     "channelTotals": "Channels free: {{list}}",
-    "connPower": "{{power}} W"
+    "connPower": "{{power}} W",
+    "channelAlternative": "from other channels"
   },
   "connections": {
     "unsaved": "Connections after the next save",

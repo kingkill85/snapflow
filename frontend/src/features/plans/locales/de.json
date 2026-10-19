@@ -304,7 +304,8 @@
     "channelUse": "{{used}}/{{total}} K.",
     "channelUseLabel": "{{used}} von {{total}} Kanälen belegt",
     "channelTotals": "Freie Kanäle: {{list}}",
-    "connPower": "{{power}} W"
+    "connPower": "{{power}} W",
+    "channelAlternative": "aus anderen Kanälen"
   },
   "connections": {
     "unsaved": "Verbindungen nach dem nächsten Speichern",

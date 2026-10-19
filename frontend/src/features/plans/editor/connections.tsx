@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { ZoneStatus } from '@/api/generated/model'
 import { useDeleteConnection, useGetChecks } from '@/api/generated/wiring/wiring'
-import { Badge, Button, ErrorMessage, Notice, RowAction } from '@/components/ui'
+import { Badge, Button, ErrorMessage, IconButton, Notice } from '@/components/ui'
 import { ConnectDialog, type ConnectTarget, statusTone, useFindingText, useRefreshWiring, useWiringModel } from '@/features/checks'
 
 import { PlanWiringContext as Context, type PlanWiring, usePlanWiring } from './plan-wiring'
@@ -106,8 +106,7 @@ export function NeedConnections({ needId, name }: { needId: string; name: string
               <li key={c.id} className="flex items-center justify-between gap-2 text-xs">
                 <span className="min-w-0 break-words">{line}</span>
                 {wiring.canUpdate && (
-                  <RowAction
-                    compact
+                  <IconButton
                     variant="danger-quiet"
                     icon={<Unplug />}
                     label={tc('connection.disconnectFrom', { name: line })}

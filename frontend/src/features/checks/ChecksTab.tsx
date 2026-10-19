@@ -90,7 +90,7 @@ export function ChecksTab({ projectId, versionId }: { projectId: string; version
         <Findings checks={data} projectId={projectId} versionId={versionId} wiring={wiring} planKind={planKind} />
       </Section>
 
-      <Section title={t('unconnected.title')} description={t('unconnected.description', { count: unconnected.length })}>
+      <Section title={t('unconnected.title')} description={unconnected.length > 0 ? t('unconnected.description', { count: unconnected.length }) : undefined}>
         <Unconnected needs={unconnected} wiring={wiring} projectId={projectId} versionId={versionId} onConnect={(n) => setConnect({ kind: 'need', needPlanId: n.planId, needId: n.needId })} />
       </Section>
 
