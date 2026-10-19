@@ -229,4 +229,41 @@ describe('TenantsPage', () => {
     await waitFor(() => expect(screen.queryByText('Archived')).not.toBeInTheDocument())
     expect(requests).toContain('?includeArchived=true')
   })
+
+  it('edits the letterhead of a tenant in the dialog (admin)', async () => {
+    let put: unknown
+    let tenantPut: unknown
+    server.use(
+      http.get('/api/tenants', () => HttpResponse.json({ items: [tenant({})] })),
+      http.get('/api/tenants/:id/letterhead', () => HttpResponse.json({ ...emptyLetterhead, companyName: 'Acme Ltd', address: 'Road 1' })),
+      http.put('/api/tenants/:id', async ({ request }) => {
+        tenantPut = await request.json()
+        return HttpResponse.json(tenant({}))
+      }),
+      http.put('/api/tenants/:id/letterhead', async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json({ ...emptyLetterhead, ...(put as object) })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    const dialog = await screen.findByRole('dialog')
+    const company = await within(dialog).findByRole('textbox', { name: 'Company name' })
+    expect(company).toHaveValue('Acme Ltd')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Phone' }), '+49 2')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(tenantPut).toEqual({ name: 'Acme', isActive: true })
+    expect(put).toEqual({ companyName: 'Acme Ltd', address: 'Road 1', phone: '+49 2', email: '', website: '', logoFileId: null })
+  })
+
+  it('has no letterhead when creating a tenant', async () => {
+    server.use(http.get('/api/tenants', () => HttpResponse.json({ items: [] })))
+    const user = userEvent.setup()
+    renderWithProviders(<TenantsPage />)
+    await user.click(await screen.findByRole('button', { name: /new tenant/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('textbox', { name: 'Company name' })).not.toBeInTheDocument()
+  })
 })
