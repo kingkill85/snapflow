@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom/store"
+	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
@@ -40,11 +42,11 @@ func manualLineOf(m store.VersionManualLine, items map[uuid.UUID]store.VersionIt
 		l.Kind = KindCatalog
 		if it, ok := items[*m.VariantID]; ok {
 			snap := snapshotOf(it)
-			l.Snapshot = &snap
-			l.UnitPrice = money.USD(price(it.UnitPrice))
+			l.Snapshot = &NullableItemSnapshot{ItemSnapshot: snap}
+			l.UnitPrice = money.USD(money.MustParse(it.UnitPrice))
 		}
 	} else {
-		l.UnitPrice = money.USD(price(deref(m.UnitPrice)))
+		l.UnitPrice = money.USD(money.MustParse(deref(m.UnitPrice)))
 	}
 	return l
 }
@@ -97,24 +99,59 @@ func validManual(in ManualLineInput) (manualValues, error) {
 	return v, nil
 }
 
+// lineFacts are the catalog facts of a catalog line's variant, read before
+// the transaction (D243).
+type lineFacts struct {
+	// live is the variant as the catalog has it now (nil when deleted).
+	live *products.BOMVariant
+	// snapshots are the snapshots to take (the variant and its required
+	// add-ons, those the version has none of).
+	snapshots map[uuid.UUID]products.BOMVariant
+}
+
+func (s *Service) prepareLine(ctx context.Context, versionID uuid.UUID, v manualValues) (lineFacts, error) {
+	var out lineFacts
+	if v.variantID == nil {
+		return out, nil
+	}
+	live, err := s.products.BOMVariants(ctx, []uuid.UUID{*v.variantID})
+	if err != nil {
+		return out, err
+	}
+	if f, ok := live[*v.variantID]; ok {
+		out.live = &f
+	}
+	out.snapshots, err = s.snapshotFacts(ctx, versionID, []uuid.UUID{*v.variantID})
+	return out, err
+}
+
 // catalogLine makes sure a catalog line's variant has a snapshot (taken now
 // at its first appearance); bom.variant_not_found when the variant neither
-// exists nor has a snapshot.
-func (s *Service) catalogLine(ctx context.Context, q *store.Queries, ref projects.VersionRef, v manualValues) error {
+// exists nor has a snapshot. A variant newly put on a line (check) must be
+// available (bom.variant_unavailable) and of a product type of the project
+// (bom.product_type_not_in_project); lines that keep their variant stay as
+// they are.
+func (s *Service) catalogLine(ctx context.Context, q *store.Queries, ref projects.VersionRef, v manualValues, facts lineFacts, check bool) error {
 	if v.variantID == nil {
 		return nil
 	}
-	if err := s.ensureSnapshots(ctx, q, ref, []uuid.UUID{*v.variantID}); err != nil {
+	if check && facts.live != nil {
+		if !facts.live.Available {
+			return apperr.Invalid("body.variantId", "bom.variant_unavailable", "the variant is not available")
+		}
+		if !slices.Contains(ref.ProductTypeIDs, facts.live.ProductType.ID) {
+			return apperr.Invalid("body.variantId", "bom.product_type_not_in_project", "the variant's product type is not part of the project")
+		}
+	}
+	if err := insertSnapshots(ctx, q, ref, facts.snapshots); err != nil {
 		return err
 	}
 	ids, err := q.ItemVariantIDs(ctx, ref.ID)
 	if err != nil {
 		return err
 	}
-	for _, id := range ids {
-		if id == *v.variantID {
-			return nil
-		}
+	if slices.Contains(ids, *v.variantID) && (!check || facts.live != nil) {
+		return nil
 	}
 	return apperr.Invalid("body.variantId", "bom.variant_not_found", "no such variant")
 }
@@ -126,6 +163,10 @@ func (s *Service) CreateManualLine(ctx context.Context, versionID uuid.UUID, in 
 		return ManualLine{}, err
 	}
 	v, err := validManual(in)
+	if err != nil {
+		return ManualLine{}, err
+	}
+	facts, err := s.prepareLine(ctx, versionID, v)
 	if err != nil {
 		return ManualLine{}, err
 	}
@@ -142,7 +183,7 @@ func (s *Service) CreateManualLine(ctx context.Context, versionID uuid.UUID, in 
 		if len(lines) >= MaxManualLines {
 			return apperr.Conflict("bom.too_many_lines", "too many manual lines").With("max", MaxManualLines)
 		}
-		if err := s.catalogLine(ctx, q, ref, v); err != nil {
+		if err := s.catalogLine(ctx, q, ref, v, facts, true); err != nil {
 			return err
 		}
 		row, err := q.InsertManualLine(ctx, store.InsertManualLineParams{
@@ -196,6 +237,10 @@ func (s *Service) UpdateManualLine(ctx context.Context, versionID, id uuid.UUID,
 	if err != nil {
 		return ManualLine{}, err
 	}
+	facts, err := s.prepareLine(ctx, versionID, v)
+	if err != nil {
+		return ManualLine{}, err
+	}
 	var out ManualLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, row, err := s.lockLine(ctx, tx, q, versionID, id)
@@ -205,7 +250,7 @@ func (s *Service) UpdateManualLine(ctx context.Context, versionID, id uuid.UUID,
 		if !row.UpdatedAt.Equal(in.ExpectedUpdatedAt) {
 			return apperr.Conflict("bom.line_stale", "the line was changed by someone else")
 		}
-		if err := s.catalogLine(ctx, q, ref, v); err != nil {
+		if err := s.catalogLine(ctx, q, ref, v, facts, !sameID(row.VariantID, v.variantID)); err != nil {
 			return err
 		}
 		row, err = q.UpdateManualLine(ctx, store.UpdateManualLineParams{

@@ -12,6 +12,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 )
 
@@ -23,7 +24,8 @@ func (st *state) used() []uuid.UUID {
 	for id := range accs {
 		out = append(out, id)
 	}
-	slices.SortFunc(out, func(a, b uuid.UUID) int { return itemLess(st.items[a], st.items[b]) })
+	ord := st.order()
+	slices.SortFunc(out, func(a, b uuid.UUID) int { return ord.less(st.items[a], st.items[b]) })
 	return out
 }
 
@@ -40,7 +42,7 @@ func resnapshot(it store.VersionItem, f products.BOMVariant) store.VersionItem {
 
 func (st *state) values(it store.VersionItem) ChangeValues {
 	v := ChangeValues{
-		UnitPrice: money.USD(price(it.UnitPrice)), ProductName: it.ProductName, VariantName: it.VariantName,
+		UnitPrice: money.USD(money.MustParse(it.UnitPrice)), ProductName: it.ProductName, VariantName: it.VariantName,
 		ModelNumber: it.ModelNumber, SKU: deref(it.Sku), ImageURL: imageURL(it.ImageFileID), RequiredAddons: []RequiredAddon{},
 	}
 	for _, id := range it.RequiredAddonIds {
@@ -107,7 +109,7 @@ func (s *Service) CatalogChanges(ctx context.Context, versionID uuid.UUID) (Cata
 		c.Available, c.CanApply = f.Available, true
 		next := resnapshot(it, f)
 		v := st.values(next)
-		c.After = &v
+		c.After = &NullableChangeValues{ChangeValues: v}
 		one := st.clone()
 		one.apply(id, next)
 		c.Effect = money.USD(one.grandTotal().Sub(now))
@@ -154,6 +156,32 @@ func (s *Service) ApplyCatalogChanges(ctx context.Context, versionID uuid.UUID, 
 	if !in.All && len(in.VariantIDs) == 0 {
 		return ApplyResult{}, apperr.Invalid("body.variantIds", "bom.nothing_selected", "select variants or all")
 	}
+	// The catalog facts are read before the transaction (D243): the
+	// selected variants (every snapshot of the version with all) and the
+	// required add-ons they bring that have no snapshot yet.
+	ids := in.VariantIDs
+	if in.All {
+		err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(_ pgx.Tx, q *store.Queries) error {
+			ids, err = q.ItemVariantIDs(ctx, versionID)
+			return err
+		})
+		if err != nil {
+			return ApplyResult{}, err
+		}
+	}
+	facts, err := s.products.BOMVariants(ctx, ids)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	var required []uuid.UUID
+	for _, f := range facts {
+		required = append(required, f.RequiredAddonIDs...)
+	}
+	newAddons, err := s.snapshotFacts(ctx, versionID, required)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+
 	out := ApplyResult{Updated: []uuid.UUID{}, Skipped: []uuid.UUID{}}
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		out = ApplyResult{Updated: []uuid.UUID{}, Skipped: []uuid.UUID{}}
@@ -170,11 +198,7 @@ func (s *Service) ApplyCatalogChanges(ctx context.Context, versionID uuid.UUID, 
 		if in.All {
 			selected = used
 		}
-		facts, err := s.products.BOMVariants(ctx, selected)
-		if err != nil {
-			return err
-		}
-		var addons []uuid.UUID
+		take := map[uuid.UUID]products.BOMVariant{}
 		for _, id := range selected {
 			f, ok := facts[id]
 			it, has := st.items[id]
@@ -187,10 +211,14 @@ func (s *Service) ApplyCatalogChanges(ctx context.Context, versionID uuid.UUID, 
 				return err
 			}
 			out.Updated = append(out.Updated, id)
-			addons = append(addons, f.RequiredAddonIDs...)
+			for _, a := range f.RequiredAddonIDs {
+				if af, ok := newAddons[a]; ok {
+					take[a] = af
+				}
+			}
 		}
 		// New required add-ons get their first snapshot.
-		return s.ensureSnapshots(ctx, q, ref, addons)
+		return insertSnapshots(ctx, q, ref, take)
 	})
 	return out, err
 }

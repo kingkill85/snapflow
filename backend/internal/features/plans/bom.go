@@ -17,18 +17,26 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
 
-// ContentHook runs in the transaction that saves a plan's content (scoped
-// to the caller), after the content is written, with the catalog variants
+// ContentHook runs when a plan's content is saved, with the catalog variants
 // the content uses (placement variants and chosen add-ons, sorted, without
-// duplicates). A failure fails the save.
-type ContentHook func(ctx context.Context, tx pgx.Tx, version projects.VersionRef, variantIDs []uuid.UUID) error
+// duplicates). Prepare runs before the save's transaction (no connection or
+// row lock held, so it may read through other services and the pool);
+// Apply runs in the transaction that saves the content (scoped to the
+// caller), after the content is written, with what Prepare returned, and
+// must only use tx: a second pooled connection taken while the transaction
+// holds one can starve the pool (D243). A failure of either fails the save.
+type ContentHook struct {
+	Prepare func(ctx context.Context, versionID uuid.UUID, variantIDs []uuid.UUID) (any, error)
+	Apply   func(ctx context.Context, tx pgx.Tx, version projects.VersionRef, prepared any) error
+}
 
 // OnContentSave registers a hook; call it while wiring the features.
 func (s *Service) OnContentSave(h ContentHook) { s.contentHooks = append(s.contentHooks, h) }
 
-func (s *Service) runContentHooks(ctx context.Context, tx pgx.Tx, ref projects.VersionRef, placements []PlanPlacement) error {
+// prepareContentHooks runs the hooks' Prepare outside any transaction.
+func (s *Service) prepareContentHooks(ctx context.Context, versionID uuid.UUID, placements []PlanPlacement) ([]any, error) {
 	if len(s.contentHooks) == 0 {
-		return nil
+		return nil, nil
 	}
 	var ids []uuid.UUID
 	for _, p := range placements {
@@ -39,8 +47,20 @@ func (s *Service) runContentHooks(ctx context.Context, tx pgx.Tx, ref projects.V
 	}
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	ids = slices.Compact(ids)
-	for _, h := range s.contentHooks {
-		if err := h(ctx, tx, ref, ids); err != nil {
+	out := make([]any, len(s.contentHooks))
+	for i, h := range s.contentHooks {
+		v, err := h.Prepare(ctx, versionID, ids)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+func (s *Service) runContentHooks(ctx context.Context, tx pgx.Tx, ref projects.VersionRef, prepared []any) error {
+	for i, h := range s.contentHooks {
+		if err := h.Apply(ctx, tx, ref, prepared[i]); err != nil {
 			return err
 		}
 	}

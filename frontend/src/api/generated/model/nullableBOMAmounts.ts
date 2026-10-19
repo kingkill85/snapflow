@@ -5,9 +5,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface BOMAmounts {
+/**
+ * @nullable
+ */
+export type NullableBOMAmounts = {
   discount: string;
   grandTotal: string;
   services: string;
   subtotal: string;
-}
+} | null;

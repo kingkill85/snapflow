@@ -127,6 +127,10 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 		return PlanContent{}, err
 	}
 	assignZones(zones, placements)
+	prepared, err := s.prepareContentHooks(ctx, st.plan.VersionID, placements)
+	if err != nil {
+		return PlanContent{}, err
+	}
 
 	var row store.GetPlanRow
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
@@ -147,7 +151,7 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 		if err := writeContent(ctx, q, locked.TenantID, id, zones, placements); err != nil {
 			return err
 		}
-		if err := s.runContentHooks(ctx, tx, ref, placements); err != nil {
+		if err := s.runContentHooks(ctx, tx, ref, prepared); err != nil {
 			return err
 		}
 		if _, err := q.TouchContent(ctx, store.TouchContentParams{ID: id, Scale: in.Scale}); err != nil {

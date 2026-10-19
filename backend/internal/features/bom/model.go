@@ -72,15 +72,15 @@ type BOMLine struct {
 	VariantID *uuid.UUID `json:"variantId" nullable:"true"`
 	ProductID *uuid.UUID `json:"productId" nullable:"true"`
 	// Snapshot is null for free-text lines.
-	Snapshot   *ItemSnapshot  `json:"snapshot"`
-	Name       string         `json:"name" doc:"Free-text lines: the line's name; empty otherwise"`
-	UnitPrice  string         `json:"unitPrice" doc:"USD, decimal string"`
-	Quantity   int64          `json:"quantity"`
-	Quantities LineQuantities `json:"quantities"`
-	Total      string         `json:"total" doc:"USD: unit price × quantity rounded half up to cents"`
-	Converted  *ConvertedLine `json:"converted" doc:"In the project currency; null for USD projects"`
-	Status     *LineStatus    `json:"status" doc:"Null for free-text lines"`
-	AddOnOf    []uuid.UUID    `json:"addOnOf" doc:"The variants this line is an add-on of"`
+	Snapshot   *NullableItemSnapshot  `json:"snapshot" doc:"Null for free-text lines"`
+	Name       string                 `json:"name" doc:"Free-text lines: the line's name; empty otherwise"`
+	UnitPrice  string                 `json:"unitPrice" doc:"USD, decimal string"`
+	Quantity   int64                  `json:"quantity"`
+	Quantities LineQuantities         `json:"quantities"`
+	Total      string                 `json:"total" doc:"USD: unit price × quantity rounded half up to cents"`
+	Converted  *NullableConvertedLine `json:"converted" doc:"In the project currency; null for USD projects"`
+	Status     *NullableLineStatus    `json:"status" doc:"Null for free-text lines"`
+	AddOnOf    []uuid.UUID            `json:"addOnOf" doc:"The variants this line is an add-on of"`
 }
 
 // Amounts are totals in one currency.
@@ -96,9 +96,9 @@ type BOMAmounts struct {
 // converted grand total may differ from the sum of converted parts).
 type BOMTotals struct {
 	BOMAmounts
-	Currency  string      `json:"currency"`
-	Rate      string      `json:"rate"`
-	Converted *BOMAmounts `json:"converted"`
+	Currency  string              `json:"currency"`
+	Rate      string              `json:"rate"`
+	Converted *NullableBOMAmounts `json:"converted" doc:"Null for USD projects"`
 }
 
 // CategoryGroup is the lines of one category within a product type.
@@ -111,12 +111,12 @@ type BOMCategoryGroup struct {
 
 // Group is the lines of one product type (or the free-text lines).
 type BOMGroup struct {
-	Kind        string               `json:"kind" enum:"productType,freeText"`
-	ProductType *SnapshotProductType `json:"productType"`
-	Subtotal    string               `json:"subtotal"`
-	Converted   *string              `json:"converted" nullable:"true"`
-	Categories  []BOMCategoryGroup   `json:"categories" doc:"Empty for free text"`
-	Lines       []string             `json:"lines" doc:"Free text: the line keys; empty otherwise"`
+	Kind        string                       `json:"kind" enum:"productType,freeText"`
+	ProductType *NullableSnapshotProductType `json:"productType" doc:"Null for the free-text group"`
+	Subtotal    string                       `json:"subtotal"`
+	Converted   *string                      `json:"converted" nullable:"true"`
+	Categories  []BOMCategoryGroup           `json:"categories" doc:"Empty for free text"`
+	Lines       []string                     `json:"lines" doc:"Free text: the line keys; empty otherwise"`
 }
 
 // Warning is a placement the BOM cannot count.
@@ -182,12 +182,12 @@ type ManualLine struct {
 	Kind      LineKind   `json:"kind" enum:"catalog,freeText"`
 	VariantID *uuid.UUID `json:"variantId" nullable:"true"`
 	// Snapshot of a catalog line (null for free text).
-	Snapshot  *ItemSnapshot `json:"snapshot"`
-	Name      string        `json:"name" doc:"Free text only"`
-	UnitPrice string        `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
-	Quantity  int32         `json:"quantity"`
-	Note      string        `json:"note"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	Snapshot  *NullableItemSnapshot `json:"snapshot" doc:"Null for free text"`
+	Name      string                `json:"name" doc:"Free text only"`
+	UnitPrice string                `json:"unitPrice" doc:"USD; a catalog line's comes from its snapshot"`
+	Quantity  int32                 `json:"quantity"`
+	Note      string                `json:"note"`
+	UpdatedAt time.Time             `json:"updatedAt"`
 }
 
 // ManualLineInput creates or changes a manual line: either variantId (a
@@ -230,13 +230,13 @@ type CatalogChange struct {
 	ProductID uuid.UUID    `json:"productId"`
 	Snapshot  ItemSnapshot `json:"snapshot"`
 	// Fields lists what changed.
-	Fields    []string      `json:"fields" doc:"unitPrice, productName, variantName, modelNumber, sku, image, requiredAddons"`
-	Before    ChangeValues  `json:"before"`
-	After     *ChangeValues `json:"after" doc:"Null when the variant was deleted"`
-	Deleted   bool          `json:"deleted"`
-	Available bool          `json:"available"`
-	CanApply  bool          `json:"canApply" doc:"False for deleted variants: their snapshot stays frozen"`
-	Effect    string        `json:"effect" doc:"Change of the USD grand total when only this item is updated"`
+	Fields    []string              `json:"fields" doc:"unitPrice, productName, variantName, modelNumber, sku, image, requiredAddons"`
+	Before    ChangeValues          `json:"before"`
+	After     *NullableChangeValues `json:"after" doc:"Null when the variant was deleted"`
+	Deleted   bool                  `json:"deleted"`
+	Available bool                  `json:"available"`
+	CanApply  bool                  `json:"canApply" doc:"False for deleted variants: their snapshot stays frozen"`
+	Effect    string                `json:"effect" doc:"Change of the USD grand total when only this item is updated"`
 }
 
 // CatalogChanges is the preview of "Update from catalog".
@@ -257,4 +257,44 @@ type ApplyInput struct {
 type ApplyResult struct {
 	Updated []uuid.UUID `json:"updated"`
 	Skipped []uuid.UUID `json:"skipped" doc:"Deleted variants or unused/unchanged snapshots, left as they are"`
+}
+
+// Nullable wrappers: huma marks a schema nullable through a blank field with
+// nullable:"true" (D243); the base types stay non-null where they are used
+// as required objects.
+
+// NullableItemSnapshot is an ItemSnapshot that may be null.
+type NullableItemSnapshot struct {
+	_ struct{} `nullable:"true"`
+	ItemSnapshot
+}
+
+// NullableConvertedLine is a ConvertedLine that may be null.
+type NullableConvertedLine struct {
+	_ struct{} `nullable:"true"`
+	ConvertedLine
+}
+
+// NullableLineStatus is a LineStatus that may be null.
+type NullableLineStatus struct {
+	_ struct{} `nullable:"true"`
+	LineStatus
+}
+
+// NullableBOMAmounts are BOMAmounts that may be null.
+type NullableBOMAmounts struct {
+	_ struct{} `nullable:"true"`
+	BOMAmounts
+}
+
+// NullableSnapshotProductType is a SnapshotProductType that may be null.
+type NullableSnapshotProductType struct {
+	_ struct{} `nullable:"true"`
+	SnapshotProductType
+}
+
+// NullableChangeValues are ChangeValues that may be null.
+type NullableChangeValues struct {
+	_ struct{} `nullable:"true"`
+	ChangeValues
 }

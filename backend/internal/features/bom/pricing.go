@@ -37,8 +37,8 @@ func (st *state) pricingOut() Pricing {
 	}
 	at := p.UpdatedAt
 	return Pricing{
-		DiscountKind: p.DiscountKind, DiscountValue: money.USD(price(p.DiscountValue)),
-		ServicesKind: p.ServicesKind, ServicesValue: money.USD(price(p.ServicesValue)),
+		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
+		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)),
 		ServicesLabel: label, UpdatedAt: &at,
 	}
 }
@@ -96,8 +96,8 @@ func pricingOf(p store.UpsertPricingParams) Pricing {
 		label = *p.ServicesLabel
 	}
 	return Pricing{
-		DiscountKind: p.DiscountKind, DiscountValue: money.USD(price(p.DiscountValue)),
-		ServicesKind: p.ServicesKind, ServicesValue: money.USD(price(p.ServicesValue)), ServicesLabel: label,
+		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
+		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)), ServicesLabel: label,
 	}
 }
 
@@ -161,7 +161,7 @@ func (s *Service) PreviewPricing(ctx context.Context, versionID uuid.UUID, in Pr
 		return BOMTotals{}, err
 	}
 	b := st.bom()
-	return st.totals(price(b.Totals.Subtotal), pricingOf(params)), nil
+	return st.totals(money.MustParse(b.Totals.Subtotal), pricingOf(params)), nil
 }
 
 func errPricingStale() *apperr.Error {

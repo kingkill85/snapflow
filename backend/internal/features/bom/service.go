@@ -25,7 +25,6 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
-	"github.com/kingkill85/snapflow/backend/internal/platform/money"
 )
 
 // DB is the database the service runs on; *pgxpool.Pool implements it.
@@ -47,7 +46,7 @@ type Service struct {
 func NewService(db DB, projectSvc *projects.Service, planSvc *plans.Service, productSvc *products.Service) *Service {
 	s := &Service{db: db, q: store.New(db), projects: projectSvc, plans: planSvc, products: productSvc}
 	projectSvc.OnCopyVersion(s.CopyVersion)
-	planSvc.OnContentSave(s.snapshotHook)
+	planSvc.OnContentSave(s.snapshotHook())
 	return s
 }
 
@@ -58,57 +57,83 @@ func (s *Service) inScope(ctx context.Context, actor auth.Actor, opts pgx.TxOpti
 // ---------------------------------------------------------------- snapshots
 
 // snapshotHook takes the snapshots of variants a saved plan content uses for
-// the first time (plans.Service.OnContentSave).
-func (s *Service) snapshotHook(ctx context.Context, tx pgx.Tx, ref projects.VersionRef, ids []uuid.UUID) error {
-	return s.ensureSnapshots(ctx, s.q.WithTx(tx), ref, ids)
+// the first time (plans.Service.OnContentSave): the catalog facts are read
+// before the save's transaction, the inserts run in it.
+func (s *Service) snapshotHook() plans.ContentHook {
+	return plans.ContentHook{
+		Prepare: func(ctx context.Context, versionID uuid.UUID, ids []uuid.UUID) (any, error) {
+			return s.snapshotFacts(ctx, versionID, ids)
+		},
+		Apply: func(ctx context.Context, tx pgx.Tx, ref projects.VersionRef, prepared any) error {
+			facts, _ := prepared.(map[uuid.UUID]products.BOMVariant)
+			return insertSnapshots(ctx, s.q.WithTx(tx), ref, facts)
+		},
+	}
 }
 
-// ensureSnapshots takes a snapshot of every variant of ids (and of its
-// required add-ons) that the version has none of. Existing snapshots are
-// never changed; a concurrent first appearance keeps the first one
-// (ON CONFLICT DO NOTHING). Variants missing from the catalog are skipped.
-func (s *Service) ensureSnapshots(ctx context.Context, q *store.Queries, ref projects.VersionRef, ids []uuid.UUID) error {
+// snapshotFacts reads, outside any transaction, the catalog facts of the
+// variants of ids that the version has no snapshot of yet, and of their
+// available required add-ons (D54) that have none either. Variants missing
+// from the catalog are left out. The facts are taken as they are now; a
+// catalog change before they are inserted is a later state, which "Update
+// from catalog" shows (snapshots are point-in-time, D243).
+func (s *Service) snapshotFacts(ctx context.Context, versionID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]products.BOMVariant, error) {
+	facts := map[uuid.UUID]products.BOMVariant{}
 	if len(ids) == 0 {
-		return nil
+		return facts, nil
 	}
-	existing, err := q.ItemVariantIDs(ctx, ref.ID)
+	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
+		return nil, err
+	}
+	var existing []uuid.UUID
+	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(_ pgx.Tx, q *store.Queries) error {
+		existing, err = q.ItemVariantIDs(ctx, versionID)
 		return err
+	})
+	if err != nil {
+		return nil, err
 	}
 	have := make(map[uuid.UUID]bool, len(existing))
 	for _, id := range existing {
 		have[id] = true
 	}
-	missing := func(ids []uuid.UUID, also map[uuid.UUID]products.BOMVariant) []uuid.UUID {
+	missing := func(ids []uuid.UUID) []uuid.UUID {
 		var out []uuid.UUID
 		for _, id := range ids {
-			if _, ok := also[id]; !have[id] && !ok && !slices.Contains(out, id) {
+			if _, ok := facts[id]; !have[id] && !ok && !slices.Contains(out, id) {
 				out = append(out, id)
 			}
 		}
 		return out
 	}
-	want := missing(ids, nil)
+	want := missing(ids)
 	if len(want) == 0 {
-		return nil
+		return facts, nil
 	}
-	facts, err := s.products.BOMVariants(ctx, want)
-	if err != nil {
-		return err
+	if facts, err = s.products.BOMVariants(ctx, want); err != nil {
+		return nil, err
 	}
 	var addons []uuid.UUID
 	for _, f := range facts {
 		addons = append(addons, f.RequiredAddonIDs...)
 	}
-	if more := missing(addons, facts); len(more) > 0 {
+	if more := missing(addons); len(more) > 0 {
 		extra, err := s.products.BOMVariants(ctx, more)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for id, f := range extra {
 			facts[id] = f
 		}
 	}
+	return facts, nil
+}
+
+// insertSnapshots takes a snapshot of every variant of facts, in tx (only
+// q). Existing snapshots are never changed; a concurrent first appearance
+// keeps the first one (ON CONFLICT DO NOTHING).
+func insertSnapshots(ctx context.Context, q *store.Queries, ref projects.VersionRef, facts map[uuid.UUID]products.BOMVariant) error {
 	keys := make([]uuid.UUID, 0, len(facts))
 	for id := range facts {
 		keys = append(keys, id)
@@ -255,14 +280,6 @@ func snapshotOf(it store.VersionItem) ItemSnapshot {
 		Category: SnapshotCategory{ID: it.CategoryID, Name: it.CategoryName},
 		ImageURL: imageURL(it.ImageFileID),
 	}
-}
-
-func price(s string) money.Amount {
-	d, err := money.Parse(s)
-	if err != nil {
-		return money.Zero
-	}
-	return d
 }
 
 func sameText(a, b i18n.Text) bool {

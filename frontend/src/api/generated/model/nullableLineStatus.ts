@@ -5,7 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LineStatus {
+/**
+ * @nullable
+ */
+export type NullableLineStatus = {
   /** The variant can be offered (variant, product, product type and category active) */
   available: boolean;
   /** The variant was deleted from the catalog; the snapshot stays frozen */
@@ -14,4 +17,4 @@ export interface LineStatus {
   inactive: boolean;
   /** The snapshot differs from the catalog (price, names, model number, SKU, image, required add-ons) */
   outdated: boolean;
-}
+} | null;

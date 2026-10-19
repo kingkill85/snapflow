@@ -467,7 +467,7 @@ func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.Ver
 		if err != nil {
 			return Plan{}, err
 		}
-		p.Lock = &PlanLock{UserID: *r.LockUserID, Name: name, ExpiresAt: *r.LockExpiresAt, Mine: *r.LockUserID == actor.UserID}
+		p.Lock = &NullablePlanLock{PlanLock: PlanLock{UserID: *r.LockUserID, Name: name, ExpiresAt: *r.LockExpiresAt, Mine: *r.LockUserID == actor.UserID}}
 	}
 	return p, nil
 }

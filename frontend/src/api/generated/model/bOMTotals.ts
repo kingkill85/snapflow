@@ -4,12 +4,13 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { BOMAmounts } from './bOMAmounts';
+import type { NullableBOMAmounts } from './nullableBOMAmounts';
 
 export interface BOMTotals {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  converted: BOMAmounts;
+  /** Null for USD projects */
+  converted: NullableBOMAmounts | null;
   currency: string;
   discount: string;
   grandTotal: string;

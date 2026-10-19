@@ -14,6 +14,8 @@ import (
 type Config struct {
 	Port        string
 	DatabaseURL string
+	// DatabaseMaxConns is the size of the connection pool (default 20).
+	DatabaseMaxConns int32
 	// StaticDir holds the built frontend. Empty means the API is served alone.
 	StaticDir string
 	// CookieSecure marks the session cookie Secure. Turn it off only for
@@ -48,6 +50,11 @@ func Load() (Config, error) {
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
 		StorageDir:      getenv("STORAGE_DIR", "./data/files"),
 	}
+	maxConns, err := strconv.ParseInt(getenv("DATABASE_MAX_CONNS", "20"), 10, 32)
+	if err != nil || maxConns < 2 {
+		return c, errors.New("DATABASE_MAX_CONNS must be a number of at least 2")
+	}
+	c.DatabaseMaxConns = int32(maxConns)
 	if c.TrustedProxies, err = clientip.ParseProxies(os.Getenv("TRUSTED_PROXIES")); err != nil {
 		return c, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}

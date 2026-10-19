@@ -127,7 +127,7 @@ func (st *state) status(it store.VersionItem) LineStatus {
 // changedFields lists what differs between a snapshot and the catalog.
 func changedFields(it store.VersionItem, f products.BOMVariant) []string {
 	var out []string
-	if !price(it.UnitPrice).Equal(price(f.Price)) {
+	if !money.MustParse(it.UnitPrice).Equal(money.MustParse(f.Price)) {
 		out = append(out, "unitPrice")
 	}
 	if !sameText(it.ProductName, f.ProductName) {
@@ -165,13 +165,51 @@ func sameID(a, b *uuid.UUID) bool {
 	return *a == *b
 }
 
-// itemLess is the BOM order (D82): product type catalog order, category
-// catalog order, model number, variant name (snapshot values).
-func itemLess(a, b store.VersionItem) int {
+// order settles one position (and one shown snapshot) per product type and
+// per category, so a catalog reorder between two snapshots never splits a
+// group: the live catalog position when a used variant of it still exists,
+// else the newest snapshot's (D244).
+type order struct {
+	types, cats map[uuid.UUID]int32
+	// typeItem and catItem are the newest snapshot of each, whose names and
+	// colour the group headers show.
+	typeItem, catItem map[uuid.UUID]store.VersionItem
+}
+
+func (st *state) order() order {
+	o := order{types: map[uuid.UUID]int32{}, cats: map[uuid.UUID]int32{}, typeItem: map[uuid.UUID]store.VersionItem{}, catItem: map[uuid.UUID]store.VersionItem{}}
+	newer := func(a, b store.VersionItem) bool {
+		return a.UpdatedAt.After(b.UpdatedAt) || (a.UpdatedAt.Equal(b.UpdatedAt) && a.VariantID.String() > b.VariantID.String())
+	}
+	for _, it := range st.items {
+		if prev, ok := o.typeItem[it.ProductTypeID]; !ok || newer(it, prev) {
+			o.typeItem[it.ProductTypeID] = it
+			o.types[it.ProductTypeID] = it.ProductTypePosition
+		}
+		if prev, ok := o.catItem[it.CategoryID]; !ok || newer(it, prev) {
+			o.catItem[it.CategoryID] = it
+			o.cats[it.CategoryID] = it.CategoryPosition
+		}
+	}
+	for _, f := range st.catalog {
+		if _, ok := o.types[f.ProductType.ID]; ok {
+			o.types[f.ProductType.ID] = f.ProductType.SortOrder
+		}
+		if _, ok := o.cats[f.Category.ID]; ok {
+			o.cats[f.Category.ID] = f.Category.SortOrder
+		}
+	}
+	return o
+}
+
+// less is the BOM order (D82): product type catalog order, category
+// catalog order (settled per id), model number, variant name (snapshot
+// values).
+func (o order) less(a, b store.VersionItem) int {
 	return cmp.Or(
-		cmp.Compare(a.ProductTypePosition, b.ProductTypePosition),
+		cmp.Compare(o.types[a.ProductTypeID], o.types[b.ProductTypeID]),
 		strings.Compare(a.ProductTypeID.String(), b.ProductTypeID.String()),
-		cmp.Compare(a.CategoryPosition, b.CategoryPosition),
+		cmp.Compare(o.cats[a.CategoryID], o.cats[b.CategoryID]),
 		strings.Compare(a.CategoryID.String(), b.CategoryID.String()),
 		strings.Compare(strings.ToLower(a.ModelNumber), strings.ToLower(b.ModelNumber)),
 		strings.Compare(strings.ToLower(a.VariantName["en"]), strings.ToLower(b.VariantName["en"])),
@@ -189,7 +227,7 @@ func (st *state) currency() *currency {
 	if st.ref.Currency == "" || st.ref.Currency == "USD" {
 		return nil
 	}
-	return &currency{code: st.ref.Currency, rate: price(st.ref.ExchangeRate)}
+	return &currency{code: st.ref.Currency, rate: money.MustParse(st.ref.ExchangeRate)}
 }
 
 func (c *currency) convert(usd money.Amount) *string {
@@ -208,7 +246,8 @@ func (st *state) bom() BOM {
 	for _, a := range accs {
 		ordered = append(ordered, a)
 	}
-	slices.SortFunc(ordered, func(a, b *acc) int { return itemLess(a.item, b.item) })
+	ord := st.order()
+	slices.SortFunc(ordered, func(a, b *acc) int { return ord.less(a.item, b.item) })
 
 	out := BOM{Lines: []BOMLine{}, Groups: []BOMGroup{}, Warnings: warnings, Plans: []BOMPlanRef{}, ManualLines: st.manualLines()}
 	for _, p := range st.plans {
@@ -236,7 +275,7 @@ func (st *state) bom() BOM {
 	}
 	for _, a := range ordered {
 		it := a.item
-		unit := price(it.UnitPrice)
+		unit := money.MustParse(it.UnitPrice)
 		total := money.LineTotal(unit, a.total)
 		subtotal = subtotal.Add(total)
 		kind := KindCatalog
@@ -247,24 +286,24 @@ func (st *state) bom() BOM {
 		snap := snapshotOf(it)
 		status := st.status(it)
 		line := BOMLine{
-			Key: it.VariantID.String(), Kind: kind, VariantID: &variantID, ProductID: &productID, Snapshot: &snap,
+			Key: it.VariantID.String(), Kind: kind, VariantID: &variantID, ProductID: &productID, Snapshot: &NullableItemSnapshot{ItemSnapshot: snap},
 			UnitPrice: money.USD(unit), Quantity: a.total, Quantities: a.qty, Total: money.USD(total),
-			Status: &status, AddOnOf: a.addOnOf,
+			Status: &NullableLineStatus{LineStatus: status}, AddOnOf: a.addOnOf,
 		}
 		if cur != nil {
-			line.Converted = &ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
+			line.Converted = &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}}
 		}
 		out.Lines = append(out.Lines, line)
 
 		if group == nil || group.ProductType.ID != it.ProductTypeID {
 			closeGroup()
-			pt := snap.ProductType
-			group = &BOMGroup{Kind: "productType", ProductType: &pt, Categories: []BOMCategoryGroup{}, Lines: []string{}}
+			pt := snapshotOf(ord.typeItem[it.ProductTypeID]).ProductType
+			group = &BOMGroup{Kind: "productType", ProductType: &NullableSnapshotProductType{SnapshotProductType: pt}, Categories: []BOMCategoryGroup{}, Lines: []string{}}
 			groupSum = money.Zero
 		}
 		if n := len(group.Categories); n == 0 || group.Categories[n-1].Category.ID != it.CategoryID {
 			closeCat()
-			group.Categories = append(group.Categories, BOMCategoryGroup{Category: snap.Category, Lines: []string{}})
+			group.Categories = append(group.Categories, BOMCategoryGroup{Category: snapshotOf(ord.catItem[it.CategoryID]).Category, Lines: []string{}})
 			catSum = money.Zero
 		}
 		c := &group.Categories[len(group.Categories)-1]
@@ -280,7 +319,7 @@ func (st *state) bom() BOM {
 		if m.VariantID != nil {
 			continue
 		}
-		unit := price(deref(m.UnitPrice))
+		unit := money.MustParse(deref(m.UnitPrice))
 		total := money.LineTotal(unit, int64(m.Quantity))
 		subtotal = subtotal.Add(total)
 		freeSum = freeSum.Add(total)
@@ -290,7 +329,7 @@ func (st *state) bom() BOM {
 			Quantities: LineQuantities{Plans: map[string]int64{}, Zones: map[string]int64{}, Unzoned: map[string]int64{}, Manual: int64(m.Quantity)},
 		}
 		if cur != nil {
-			line.Converted = &ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}
+			line.Converted = &NullableConvertedLine{ConvertedLine: ConvertedLine{UnitPrice: *cur.convert(unit), Total: *cur.convert(total)}}
 		}
 		out.Lines = append(out.Lines, line)
 		if free == nil {
@@ -313,11 +352,11 @@ func (st *state) grandTotal() money.Amount {
 	accs, _ := st.counts()
 	subtotal := money.Zero
 	for _, a := range accs {
-		subtotal = subtotal.Add(money.LineTotal(price(a.item.UnitPrice), a.total))
+		subtotal = subtotal.Add(money.LineTotal(money.MustParse(a.item.UnitPrice), a.total))
 	}
 	for _, m := range st.manual {
 		if m.VariantID == nil {
-			subtotal = subtotal.Add(money.LineTotal(price(deref(m.UnitPrice)), int64(m.Quantity)))
+			subtotal = subtotal.Add(money.LineTotal(money.MustParse(deref(m.UnitPrice)), int64(m.Quantity)))
 		}
 	}
 	p := st.pricingOut()
@@ -326,8 +365,8 @@ func (st *state) grandTotal() money.Amount {
 
 func computeTotals(subtotal money.Amount, p Pricing) money.Totals {
 	return money.Compute(subtotal,
-		money.Adjustment{Kind: money.Kind(p.DiscountKind), Value: price(p.DiscountValue)},
-		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: price(p.ServicesValue)})
+		money.Adjustment{Kind: money.Kind(p.DiscountKind), Value: money.MustParse(p.DiscountValue)},
+		money.Adjustment{Kind: money.Kind(p.ServicesKind), Value: money.MustParse(p.ServicesValue)})
 }
 
 func (st *state) totals(subtotal money.Amount, p Pricing) BOMTotals {
@@ -340,13 +379,13 @@ func (st *state) totals(subtotal money.Amount, p Pricing) BOMTotals {
 		Currency: "USD", Rate: "1",
 	}
 	if st.ref.Currency != "" {
-		out.Currency, out.Rate = st.ref.Currency, price(st.ref.ExchangeRate).String()
+		out.Currency, out.Rate = st.ref.Currency, money.MustParse(st.ref.ExchangeRate).String()
 	}
 	if cur := st.currency(); cur != nil {
-		out.Converted = &BOMAmounts{
+		out.Converted = &NullableBOMAmounts{BOMAmounts: BOMAmounts{
 			Subtotal: *cur.convert(t.Subtotal), Discount: *cur.convert(t.Discount),
 			Services: *cur.convert(t.Services), GrandTotal: *cur.convert(t.GrandTotal),
-		}
+		}}
 	}
 	return out
 }

@@ -6,7 +6,7 @@
  */
 import type { BOMCategoryGroup } from './bOMCategoryGroup';
 import type { BOMGroupKind } from './bOMGroupKind';
-import type { SnapshotProductType } from './snapshotProductType';
+import type { NullableSnapshotProductType } from './nullableSnapshotProductType';
 
 export interface BOMGroup {
   /** Empty for free text */
@@ -16,6 +16,7 @@ export interface BOMGroup {
   kind: BOMGroupKind;
   /** Free text: the line keys; empty otherwise */
   lines: string[];
-  productType: SnapshotProductType;
+  /** Null for the free-text group */
+  productType: NullableSnapshotProductType | null;
   subtotal: string;
 }

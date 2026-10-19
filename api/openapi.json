@@ -351,30 +351,6 @@
         ],
         "type": "object"
       },
-      "BOMAmounts": {
-        "additionalProperties": false,
-        "properties": {
-          "discount": {
-            "type": "string"
-          },
-          "grandTotal": {
-            "type": "string"
-          },
-          "services": {
-            "type": "string"
-          },
-          "subtotal": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "subtotal",
-          "discount",
-          "services",
-          "grandTotal"
-        ],
-        "type": "object"
-      },
       "BOMCategoryGroup": {
         "additionalProperties": false,
         "properties": {
@@ -437,7 +413,8 @@
             "type": "array"
           },
           "productType": {
-            "$ref": "#/components/schemas/SnapshotProductType"
+            "$ref": "#/components/schemas/NullableSnapshotProductType",
+            "description": "Null for the free-text group"
           },
           "subtotal": {
             "type": "string"
@@ -464,7 +441,7 @@
             "type": "array"
           },
           "converted": {
-            "$ref": "#/components/schemas/ConvertedLine",
+            "$ref": "#/components/schemas/NullableConvertedLine",
             "description": "In the project currency; null for USD projects"
           },
           "key": {
@@ -497,10 +474,11 @@
             "type": "integer"
           },
           "snapshot": {
-            "$ref": "#/components/schemas/ItemSnapshot"
+            "$ref": "#/components/schemas/NullableItemSnapshot",
+            "description": "Null for free-text lines"
           },
           "status": {
-            "$ref": "#/components/schemas/LineStatus",
+            "$ref": "#/components/schemas/NullableLineStatus",
             "description": "Null for free-text lines"
           },
           "total": {
@@ -571,7 +549,8 @@
             "type": "string"
           },
           "converted": {
-            "$ref": "#/components/schemas/BOMAmounts"
+            "$ref": "#/components/schemas/NullableBOMAmounts",
+            "description": "Null for USD projects"
           },
           "currency": {
             "type": "string"
@@ -646,7 +625,7 @@
         "additionalProperties": false,
         "properties": {
           "after": {
-            "$ref": "#/components/schemas/ChangeValues",
+            "$ref": "#/components/schemas/NullableChangeValues",
             "description": "Null when the variant was deleted"
           },
           "available": {
@@ -1070,22 +1049,6 @@
           "sku",
           "imageUrl",
           "requiredAddons"
-        ],
-        "type": "object"
-      },
-      "ConvertedLine": {
-        "additionalProperties": false,
-        "properties": {
-          "total": {
-            "type": "string"
-          },
-          "unitPrice": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "unitPrice",
-          "total"
         ],
         "type": "object"
       },
@@ -2645,34 +2608,6 @@
         ],
         "type": "object"
       },
-      "LineStatus": {
-        "additionalProperties": false,
-        "properties": {
-          "available": {
-            "description": "The variant can be offered (variant, product, product type and category active)",
-            "type": "boolean"
-          },
-          "deleted": {
-            "description": "The variant was deleted from the catalog; the snapshot stays frozen",
-            "type": "boolean"
-          },
-          "inactive": {
-            "description": "The variant exists but is not available",
-            "type": "boolean"
-          },
-          "outdated": {
-            "description": "The snapshot differs from the catalog (price, names, model number, SKU, image, required add-ons)",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "available",
-          "deleted",
-          "inactive",
-          "outdated"
-        ],
-        "type": "object"
-      },
       "LoginInput": {
         "additionalProperties": false,
         "properties": {
@@ -2734,7 +2669,8 @@
             "type": "integer"
           },
           "snapshot": {
-            "$ref": "#/components/schemas/ItemSnapshot"
+            "$ref": "#/components/schemas/NullableItemSnapshot",
+            "description": "Null for free text"
           },
           "unitPrice": {
             "description": "USD; a catalog line's comes from its snapshot",
@@ -2910,6 +2846,248 @@
         ],
         "type": "object"
       },
+      "NullableBOMAmounts": {
+        "additionalProperties": false,
+        "properties": {
+          "discount": {
+            "type": "string"
+          },
+          "grandTotal": {
+            "type": "string"
+          },
+          "services": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subtotal",
+          "discount",
+          "services",
+          "grandTotal"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableChangeValues": {
+        "additionalProperties": false,
+        "properties": {
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "requiredAddons": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredAddon"
+            },
+            "type": "array"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "unitPrice",
+          "productName",
+          "variantName",
+          "modelNumber",
+          "sku",
+          "imageUrl",
+          "requiredAddons"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableConvertedLine": {
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "unitPrice",
+          "total"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableItemSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SnapshotCategory"
+          },
+          "imageUrl": {
+            "description": "Image download path; null for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelNumber": {
+            "type": "string"
+          },
+          "productName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/SnapshotProductType"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "variantName": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "productName",
+          "variantName",
+          "modelNumber",
+          "sku",
+          "productType",
+          "category",
+          "imageUrl"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableLineStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "description": "The variant can be offered (variant, product, product type and category active)",
+            "type": "boolean"
+          },
+          "deleted": {
+            "description": "The variant was deleted from the catalog; the snapshot stays frozen",
+            "type": "boolean"
+          },
+          "inactive": {
+            "description": "The variant exists but is not available",
+            "type": "boolean"
+          },
+          "outdated": {
+            "description": "The snapshot differs from the catalog (price, names, model number, SKU, image, required add-ons)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available",
+          "deleted",
+          "inactive",
+          "outdated"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullablePlanLock": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "description": "Without a renewal the lock ends then",
+            "format": "date-time",
+            "type": "string"
+          },
+          "mine": {
+            "description": "The caller holds the lock",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The holder's full name, or their email if they have none",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "expiresAt",
+          "mine"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NullableSnapshotProductType": {
+        "additionalProperties": false,
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "abbreviation",
+          "color"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "OrderInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3013,7 +3191,7 @@
             "type": "string"
           },
           "lock": {
-            "$ref": "#/components/schemas/PlanLock",
+            "$ref": "#/components/schemas/NullablePlanLock",
             "description": "The live edit lock, null when nobody holds it"
           },
           "name": {

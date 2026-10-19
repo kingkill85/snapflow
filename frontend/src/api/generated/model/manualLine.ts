@@ -4,8 +4,8 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { ItemSnapshot } from './itemSnapshot';
 import type { ManualLineKind } from './manualLineKind';
+import type { NullableItemSnapshot } from './nullableItemSnapshot';
 
 export interface ManualLine {
   /** A URL to the JSON Schema for this object. */
@@ -16,7 +16,8 @@ export interface ManualLine {
   name: string;
   note: string;
   quantity: number;
-  snapshot: ItemSnapshot;
+  /** Null for free text */
+  snapshot: NullableItemSnapshot | null;
   /** USD; a catalog line's comes from its snapshot */
   unitPrice: string;
   updatedAt: string;

@@ -39,6 +39,12 @@ type PlanLock struct {
 	Mine      bool      `json:"mine" doc:"The caller holds the lock"`
 }
 
+// NullablePlanLock is a PlanLock that may be null (D243).
+type NullablePlanLock struct {
+	_ struct{} `nullable:"true"`
+	PlanLock
+}
+
 // PlanImage is a plan's background image.
 type PlanImage struct {
 	URL    string `json:"url" doc:"Download path of the current image (changes when the image is replaced, so it may be cached forever; works also after the project moved to another tenant)" example:"/api/plans/3f2c…/images/9a1b…"`
@@ -48,21 +54,21 @@ type PlanImage struct {
 
 // Plan is a plan of a project version, without its content.
 type Plan struct {
-	ID               uuid.UUID   `json:"id"`
-	VersionID        uuid.UUID   `json:"versionId"`
-	ProjectID        uuid.UUID   `json:"projectId"`
-	Kind             string      `json:"kind" enum:"floorplan"`
-	Name             string      `json:"name"`
-	Position         int32       `json:"position" doc:"Order within the version, 1 first"`
-	Image            PlanImage   `json:"image"`
-	Scale            *float64    `json:"scale,omitempty" doc:"Metres per image pixel (calibration); absent when not calibrated"`
-	ZoneCount        int64       `json:"zoneCount"`
-	PlacementCount   int64       `json:"placementCount"`
-	CreatedAt        time.Time   `json:"createdAt"`
-	UpdatedAt        time.Time   `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when renaming or replacing the image"`
-	ContentUpdatedAt time.Time   `json:"contentUpdatedAt" doc:"The version of the content"`
-	Lock             *PlanLock   `json:"lock" doc:"The live edit lock, null when nobody holds it"`
-	Can              PlanActions `json:"can"`
+	ID               uuid.UUID         `json:"id"`
+	VersionID        uuid.UUID         `json:"versionId"`
+	ProjectID        uuid.UUID         `json:"projectId"`
+	Kind             string            `json:"kind" enum:"floorplan"`
+	Name             string            `json:"name"`
+	Position         int32             `json:"position" doc:"Order within the version, 1 first"`
+	Image            PlanImage         `json:"image"`
+	Scale            *float64          `json:"scale,omitempty" doc:"Metres per image pixel (calibration); absent when not calibrated"`
+	ZoneCount        int64             `json:"zoneCount"`
+	PlacementCount   int64             `json:"placementCount"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	UpdatedAt        time.Time         `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when renaming or replacing the image"`
+	ContentUpdatedAt time.Time         `json:"contentUpdatedAt" doc:"The version of the content"`
+	Lock             *NullablePlanLock `json:"lock" doc:"The live edit lock, null when nobody holds it"`
+	Can              PlanActions       `json:"can"`
 }
 
 // PlanZone is a zone (room, area) of a plan: a polygon in image pixels.

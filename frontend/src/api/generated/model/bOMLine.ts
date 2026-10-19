@@ -5,16 +5,16 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BOMLineKind } from './bOMLineKind';
-import type { ConvertedLine } from './convertedLine';
-import type { ItemSnapshot } from './itemSnapshot';
 import type { LineQuantities } from './lineQuantities';
-import type { LineStatus } from './lineStatus';
+import type { NullableConvertedLine } from './nullableConvertedLine';
+import type { NullableItemSnapshot } from './nullableItemSnapshot';
+import type { NullableLineStatus } from './nullableLineStatus';
 
 export interface BOMLine {
   /** The variants this line is an add-on of */
   addOnOf: string[];
   /** In the project currency; null for USD projects */
-  converted: ConvertedLine;
+  converted: NullableConvertedLine | null;
   /** Stable key: the variant id, or the manual line id of a free-text line */
   key: string;
   kind: BOMLineKind;
@@ -24,9 +24,10 @@ export interface BOMLine {
   productId: string | null;
   quantities: LineQuantities;
   quantity: number;
-  snapshot: ItemSnapshot;
   /** Null for free-text lines */
-  status: LineStatus;
+  snapshot: NullableItemSnapshot | null;
+  /** Null for free-text lines */
+  status: NullableLineStatus | null;
   /** USD: unit price × quantity rounded half up to cents */
   total: string;
   /** USD, decimal string */

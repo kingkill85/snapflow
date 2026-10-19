@@ -6,10 +6,11 @@
  */
 import type { ChangeValues } from './changeValues';
 import type { ItemSnapshot } from './itemSnapshot';
+import type { NullableChangeValues } from './nullableChangeValues';
 
 export interface CatalogChange {
   /** Null when the variant was deleted */
-  after: ChangeValues;
+  after: NullableChangeValues | null;
   available: boolean;
   before: ChangeValues;
   /** False for deleted variants: their snapshot stays frozen */

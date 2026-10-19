@@ -5,7 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ConvertedLine {
-  total: string;
-  unitPrice: string;
-}
+export type NullableSnapshotProductTypeName = {[key: string]: string};
