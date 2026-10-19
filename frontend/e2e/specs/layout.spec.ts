@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { type Page, type TestInfo } from '@playwright/test'
 
 import { expect, test, unique, uniqueKey } from '../fixtures'
+import { wiringSeed } from '../wiring-seed'
 
 // Key pages at phone, tablet and desktop width, in light and dark mode: nothing
 // may overflow the viewport horizontally (tables scroll inside their own box).
@@ -406,6 +407,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
             await expectNoHorizontalOverflow(page)
             await screenshot(page, testInfo, `${tab}-${viewport.name}-${colorScheme}-${lang}`, true)
           }
+        }
+        await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
+      })
+
+      test('the documents tab and the networks addresses fit the screen', async ({ page, api }, testInfo) => {
+        // Step 3e (D425–D427): addresses assigned, one by hand, a manual and labels generated.
+        const s = await wiringSeed(api)
+        const assign = await api.ctx.post(`/api/versions/${s.versionId}/addresses/assign`, { data: {} })
+        expect(assign.ok(), await assign.text()).toBe(true)
+        for (const kind of ['installation_manual', 'channel_labels']) {
+          const res = await api.ctx.post(`/api/versions/${s.versionId}/documents`, { data: { kind } })
+          expect(res.ok(), await res.text()).toBe(true)
+        }
+        for (const lang of ['en', 'de'] as const) {
+          await page.goto('/profile')
+          await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
+          await page.goto(`/projects/${s.project.id}/versions/${s.versionId}?tab=networks`)
+          await expect(page.getByRole('row').filter({ hasText: s.dimmer.name })).toContainText('1.1.1')
+          await expectNoHorizontalOverflow(page)
+          await screenshot(page, testInfo, `networks-addresses-${viewport.name}-${colorScheme}-${lang}`, true)
+          await page.goto(`/projects/${s.project.id}/versions/${s.versionId}?tab=documents`)
+          await expect(page.getByRole('table', { name: lang === 'en' ? 'Installation documents' : 'Installationsunterlagen' }).getByRole('row')).toHaveCount(3)
+          await expect(page.getByText(lang === 'en' ? 'Loading…' : 'Wird geladen…')).toHaveCount(0)
+          await expectNoHorizontalOverflow(page)
+          await screenshot(page, testInfo, `documents-${viewport.name}-${colorScheme}-${lang}`, true)
         }
         await page.evaluate(() => window.localStorage.setItem('i18nextLng', 'en'))
       })

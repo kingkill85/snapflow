@@ -116,7 +116,7 @@ test('installation: assign addresses, generate manual and labels, download the e
   await expect(table.getByRole('row')).toHaveCount(2)
 })
 
-test('installation: an HDL line with a hand-set address and the HDL commissioning list', async ({ page, api }) => {
+test('installation: HDL addresses and the HDL commissioning list', async ({ page, api }) => {
   // HDL: the scheme comes from the product type key (hdl…, D419).
   const s = await wiringSeed(api, { systemKey: 'hdl' })
   await page.setViewportSize({ width: 1400, height: 900 })
