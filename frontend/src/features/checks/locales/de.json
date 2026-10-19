@@ -63,5 +63,44 @@
     "error": "Fehler",
     "warning": "Warnungen",
     "info": "Hinweise"
+  },
+  "channel": {
+    "text": "{{item}} · {{kind}} {{no}} ({{plan}})",
+    "short": "{{kind}} {{no}}",
+    "alternative": "aus {{baseKind}} {{from}}–{{to}}",
+    "blocked": "Von einem anderen Kanal belegt"
+  },
+  "need": {
+    "text_one": "{{count}} × {{name}}",
+    "text_other": "{{count}} × {{name}}",
+    "noZone": "Außerhalb aller Zonen"
+  },
+  "connection": {
+    "line": "{{units}} × → {{channel}}",
+    "disconnect": "Trennen",
+    "disconnectFrom": "{{name}} trennen",
+    "connect": "Verbinden…",
+    "connectNeed": "{{name}} verbinden…",
+    "none": "Nicht verbunden",
+    "warnings": "Mit Warnung verbunden: {{text}}"
+  },
+  "connect": {
+    "titleNeed": "{{need}} verbinden",
+    "titleChannel": "Bedarf mit {{channel}} verbinden",
+    "descriptionNeed": "Kanäle, die diesen Bedarf aufnehmen können, Geräte in seiner Zone zuerst.",
+    "descriptionChannel": "Bedarfe mit offenen Einheiten, die dieser Kanal aufnehmen kann.",
+    "fitting": "Mögliche Verbindungen",
+    "units_one": "{{count}} Einheit",
+    "units_other": "{{count}} Einheiten",
+    "inZone": "In dieser Zone",
+    "circuit": "Teil eines Stromkreises",
+    "connect": "Verbinden",
+    "connectTo": "Mit {{name}} verbinden",
+    "notPossible_one": "{{count}} nicht möglich:",
+    "notPossible_other": "{{count}} nicht möglich:",
+    "more_one": "und {{count}} weitere",
+    "more_other": "und {{count}} weitere",
+    "complete": "Alle Einheiten dieses Bedarfs sind verbunden.",
+    "noNeeds": "Kein offener Bedarf kann diesen Kanal nutzen."
   }
 }

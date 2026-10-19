@@ -63,5 +63,44 @@
     "error": "Errors",
     "warning": "Warnings",
     "info": "Notes"
+  },
+  "channel": {
+    "text": "{{item}} · {{kind}} {{no}} ({{plan}})",
+    "short": "{{kind}} {{no}}",
+    "alternative": "from {{baseKind}} {{from}}–{{to}}",
+    "blocked": "Taken by another channel"
+  },
+  "need": {
+    "text_one": "{{count}} × {{name}}",
+    "text_other": "{{count}} × {{name}}",
+    "noZone": "Outside every zone"
+  },
+  "connection": {
+    "line": "{{units}} × → {{channel}}",
+    "disconnect": "Disconnect",
+    "disconnectFrom": "Disconnect {{name}}",
+    "connect": "Connect…",
+    "connectNeed": "Connect {{name}}…",
+    "none": "Not connected",
+    "warnings": "Connected with a warning: {{text}}"
+  },
+  "connect": {
+    "titleNeed": "Connect {{need}}",
+    "titleChannel": "Connect a need to {{channel}}",
+    "descriptionNeed": "Channels that can take this need, devices in its zone first.",
+    "descriptionChannel": "Needs with unconnected units this channel can take.",
+    "fitting": "Possible connections",
+    "units_one": "{{count}} unit",
+    "units_other": "{{count}} units",
+    "inZone": "In this zone",
+    "circuit": "Joins a circuit",
+    "connect": "Connect",
+    "connectTo": "Connect to {{name}}",
+    "notPossible_one": "{{count}} not possible:",
+    "notPossible_other": "{{count}} not possible:",
+    "more_one": "and {{count}} more",
+    "more_other": "and {{count}} more",
+    "complete": "All units of this need are connected.",
+    "noNeeds": "No unconnected need can use this channel."
   }
 }
