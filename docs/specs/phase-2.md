@@ -204,6 +204,22 @@ A proposal is a document generated from one version: what the customer receives.
 - Frontend: Vitest for the proposals tab and dialog, tenant letterhead fields.
 - E2E: generate a combined and a split proposal, download, check the file is a DOCX (zip with word/document.xml) containing the project number and totals; click-through converts one with LibreOffice to PDF and looks at it.
 
+## Exchange rates online (follow-up to 2a/2c/2d, user request 2026-10-19)
+
+User: SnapFlow 1 fetched the rate from an online service; in countries with high inflation the rate of a project must be easy to update.
+
+- Backend `platform/exchangerate` (or `features/currency`): provider interface; default provider open.er-api.com (`https://open.er-api.com/v6/latest/USD`, as SnapFlow 1, no API key), configurable URL/provider via config; fetch with timeout, cache all rates in memory for 1 h; on provider failure use the last cached rates if not older than 24 h, else error `exchange_rate.unavailable` (503). `GET /api/exchange-rates/{currency}` → `{currency, rate, date (provider's update time), source}` (any logged-in user with projects.read).
+- Project: store `exchange_rate_date` and `exchange_rate_source` (`online` with provider name | `manual`) next to the rate (migration). Setting the rate manually marks it manual; fetching marks it online with the provider's date. USD projects: rate 1, no date.
+- `POST /api/projects/{id}/exchange-rate/refresh` (projects.write; read-only projects refused): fetches and saves the current rate (one action, project `updatedAt` moves; stale check not needed but use the project lock as D169/D171 do).
+- Project dialog: when a non-USD currency is chosen, fetch and prefill the rate (with source/date hint); "Fetch current rate" button; editing the number switches the hint to "entered manually".
+- BOM and Pricing tabs (and project page header area for non-USD projects): show "1 USD = 0,9237 EUR · rate from 19.10.2026 (online)" with an "Update rate" button (write permission); if older than N days (config `EXCHANGE_RATE_MAX_AGE_DAYS`, default 7) show it as a warning "Rate is 12 days old". After updating, BOM/totals refresh.
+- Proposals: already store their totals; additionally store the rate, its date and source used; the document footnote states "converted from USD at 0,9237 (rate from 19.10.2026)".
+- Document nits from the 2d click-through: non-breaking hyphens in model numbers / SKUs in the DOCX writer (U+2011 or `w:noBreakHyphen`), and print notes of manual lines in the proposal.
+- Tests: provider via httptest server (success, failure with cache fallback, stale cache), refresh endpoint permissions/read-only, frontend dialog prefill + update button + age warning (MSW), e2e with a stubbed provider URL (config) for the refresh flow.
+- Manual rates stay first-class (user, 2026-10-19): a rate typed in by the user is never replaced automatically (no auto-fetch on save or on opening; the dialog only prefills when the currency is changed and the rate field was not edited by hand). Manual rates show "entered manually on <date>" and no age warning (an agreed rate is deliberate); "Update rate" stays available to switch back to the online rate. Manual entry is possible in the project dialog and directly next to the rate on the BOM/Pricing tabs ("Set rate").
+- No rate handling when starting a project (user, 2026-10-19): the create dialog does not fetch or ask for a rate. Choosing a non-USD currency on create stores the currency without a rate ("no rate yet"); the rate is set later (fetched or typed) on the BOM/Pricing tabs or in the edit dialog. Until a rate is set, converted amounts are not shown (USD only) and the BOM/Pricing tabs show "No exchange rate yet – fetch or set one"; generating a proposal for a non-USD project without a rate is refused (`proposal.rate_missing`) with a link to set it. The edit dialog keeps the rate field (manual) and the fetch button.
+- Currency as a dropdown (user, 2026-10-19): the project dialog's currency field becomes a searchable select (design-system `SelectField`/combobox) of the ISO 4217 currencies the backend supports (the money package's minor-unit table, exposed via `GET /api/currencies` → code, minor units, whether the online provider has a rate), labelled in the UI language with `Intl.DisplayNames` ("EUR – Euro", "PKR – Pakistanische Rupie"), USD and the tenant's recently used currencies first. The backend validates against the same list (`project.currency_unknown`).
+
 ---
 
 ## Outlook: phase 3 concept agreed with the user (2026-10-18/19)
