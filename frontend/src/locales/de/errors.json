@@ -56,13 +56,15 @@
   "bom": {
     "line_kind": "Wählen Sie entweder ein Katalogprodukt oder einen Namen und einen Stückpreis.",
     "line_not_found": "Diese Position existiert nicht mehr.",
-    "line_stale": "Jemand anderes hat diese Position inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "line_stale": "Jemand anderes hat diese Position inzwischen geändert. Der aktuelle Stand ist jetzt geladen; erneutes Speichern überschreibt ihn.",
     "nothing_selected": "Wählen Sie mindestens einen Eintrag zum Aktualisieren aus.",
-    "order_mismatch": "Die Positionen wurden inzwischen geändert. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    "order_mismatch": "Die Positionen wurden inzwischen geändert. Die aktuelle Reihenfolge ist jetzt geladen; versuchen Sie es erneut.",
+    "product_type_not_in_project": "Der Produkttyp dieses Produkts gehört nicht zum Projekt.",
     "quantity_range": "Geben Sie eine ganze Zahl von {{min}} bis {{max}} ein.",
     "too_many_lines": "Eine Version kann höchstens {{max}} manuelle Positionen haben.",
     "unit_price_invalid": "Geben Sie einen Betrag ab 0 mit höchstens 2 Nachkommastellen ein.",
-    "variant_not_found": "Diese Produktvariante existiert nicht mehr."
+    "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
+    "variant_unavailable": "Dieses Produkt ist nicht verfügbar (inaktiv) und kann nicht hinzugefügt werden."
   },
   "category": {
     "in_use": "Diese Kategorie wird noch von Produkten verwendet. Deaktivieren Sie sie stattdessen.",
@@ -154,7 +156,7 @@
   "pricing": {
     "amount_range": "Dieser Betrag ist zu groß (höchstens {{max}}).",
     "percent_range": "Geben Sie einen Prozentsatz von 0 bis {{max}} ein.",
-    "stale": "Jemand anderes hat die Preisgestaltung inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "stale": "Jemand anderes hat die Preisgestaltung inzwischen geändert. Der aktuelle Stand ist jetzt geladen; erneutes Speichern überschreibt ihn.",
     "value_invalid": "Geben Sie eine Zahl ab 0 mit höchstens 2 Nachkommastellen ein."
   },
   "product": {

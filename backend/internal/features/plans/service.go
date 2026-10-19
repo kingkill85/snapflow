@@ -57,8 +57,12 @@ func NewService(db DB, projectSvc *projects.Service, productSvc *products.Servic
 }
 
 // inScope runs fn in one transaction scoped to actor (row-level security).
+// inScope runs fn in a transaction scoped to actor. A plan.locked refusal
+// gets the holder's name after the transaction ended (D243: no second
+// pooled connection while one is held).
 func (s *Service) inScope(ctx context.Context, actor auth.Actor, opts pgx.TxOptions, fn func(tx pgx.Tx, q *store.Queries) error) error {
-	return database.InScope(ctx, s.db, actor, opts, func(tx pgx.Tx) error { return fn(tx, s.q.WithTx(tx)) })
+	err := database.InScope(ctx, s.db, actor, opts, func(tx pgx.Tx) error { return fn(tx, s.q.WithTx(tx)) })
+	return s.namedLock(ctx, err)
 }
 
 // ---------------------------------------------------------------- plans
@@ -211,7 +215,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in PlanUpdate) (Plan
 	var file *files.File
 	if in.Image != nil {
 		if err := s.checkLock(ctx, actor, current.LockUserID, current.LockExpiresAt); err != nil {
-			return Plan{}, err
+			return Plan{}, s.namedLock(ctx, err)
 		}
 		f, err := s.files.UploadImage(ctx, files.TenantScope(current.TenantID), in.Image, files.FloorplanImage)
 		if err != nil {
@@ -406,17 +410,35 @@ func (s *Service) Unlock(ctx context.Context, id uuid.UUID) error {
 	})
 }
 
-// checkLock refuses a change while another user holds a live lock.
-func (s *Service) checkLock(ctx context.Context, actor auth.Actor, userID *uuid.UUID, expires *time.Time) error {
+// checkLock refuses a change while another user holds a live lock, with a
+// *lockedError that namedLock turns into plan.locked (inScope does so).
+func (s *Service) checkLock(_ context.Context, actor auth.Actor, userID *uuid.UUID, expires *time.Time) error {
 	if !s.live(userID, expires) || *userID == actor.UserID {
 		return nil
 	}
-	name, err := s.users.DisplayName(ctx, *userID)
-	if err != nil {
+	return &lockedError{userID: *userID, expires: *expires}
+}
+
+// lockedError is a plan.locked refusal before the holder's name is read.
+type lockedError struct {
+	userID  uuid.UUID
+	expires time.Time
+}
+
+func (e *lockedError) Error() string { return "plan.locked" }
+
+// namedLock turns a *lockedError into plan.locked with the holder's name.
+func (s *Service) namedLock(ctx context.Context, err error) error {
+	var le *lockedError
+	if !errors.As(err, &le) {
 		return err
 	}
+	name, nerr := s.users.DisplayName(ctx, le.userID)
+	if nerr != nil {
+		return nerr
+	}
 	return apperr.Conflict("plan.locked", "another user is editing the plan").
-		With("name", name).With("expiresAt", expires.UTC().Format(time.RFC3339))
+		With("name", name).With("expiresAt", le.expires.UTC().Format(time.RFC3339))
 }
 
 // requireLock refuses a content save without the caller's live lock.

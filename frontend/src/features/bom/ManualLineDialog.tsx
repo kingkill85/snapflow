@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import { ApiError } from '@/api/client'
 import { useCreateManualLine, useUpdateManualLine } from '@/api/generated/bom/bom'
+import type { ManualLine } from '@/api/generated/model'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { pricePattern } from '@/catalog/money'
 import {
@@ -26,7 +27,7 @@ import { groupPalette, paletteProducts, useCatalogVariants } from '@/features/pl
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
-import { type BomManualLine, useFormatMoney, useLineName, useRefreshBom } from './format'
+import { useFormatMoney, useLineName, useRefreshBom } from './format'
 
 export type ManualLineKindChoice = 'catalog' | 'freeText'
 
@@ -59,7 +60,7 @@ type Props = {
   onOpenChange: (open: boolean) => void
   versionId: string
   /** null = a new line of `kind`. */
-  item: BomManualLine | null
+  item: ManualLine | null
   kind: ManualLineKindChoice
   productTypeIds: string[]
 }
@@ -222,13 +223,19 @@ function ProductPicker({ productTypeIds, value, onChange, control, error }: Pick
           ))
         )}
       </div>
-      {error && !chosen && <p className="text-xs text-danger">{error}</p>}
+      {/* Required (client), or the API's verdict on the chosen variant (e.g. inactive): at the variant select when there is one. */}
+      {error && !(chosen && chosen.variants.length > 1) && (
+        <p className="text-xs text-danger" data-field-error tabIndex={-1}>
+          {error}
+        </p>
+      )}
       {!chosen && !error && <p className="text-xs text-muted">{t('manual.chooseProduct')}</p>}
       {chosen && chosen.variants.length > 1 && (
         <FormSelectField
           control={control}
           name="variantId"
           label={t('manual.variant')}
+          error={error}
           options={chosen.variants.map((v) => ({ value: v.id, label: `${localize(v.name)} (${money(v.price)})` }))}
         />
       )}

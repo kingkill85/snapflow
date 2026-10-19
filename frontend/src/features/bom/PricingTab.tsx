@@ -8,6 +8,8 @@ import { z } from 'zod'
 import { ApiError } from '@/api/client'
 import { getGetBomQueryKey, previewPricing, useGetPricing, useUpdatePricing } from '@/api/generated/bom/bom'
 import type { Pricing, PricingInput } from '@/api/generated/model'
+import { contentLocales } from '@/i18n/content-locales'
+import type { LocalizedText } from '@/i18n/localized'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import {
   apiFields,
@@ -29,7 +31,7 @@ import {
   useFieldError,
 } from '@/components/ui'
 
-import { type BomTotals, fresh } from './format'
+import { fresh } from './format'
 import { TotalsBlock } from './TotalsBlock'
 
 const kinds = ['none', 'percent', 'amount'] as const
@@ -62,18 +64,26 @@ type FormValues = z.infer<typeof schema>
 const fields = apiFields<FormValues>(['discountKind', 'discountValue', 'servicesKind', 'servicesValue', 'servicesLabel'])
 const allFields = { ...fields, ...translatableApiFields('servicesLabel') }
 
-/** The API body of the form values; undefined while a value cannot be sent. */
-function toInput(v: FormValues): PricingInput | undefined {
+/** Whether two texts are the same in every content language. */
+const sameText = (a: LocalizedText, b: LocalizedText) => contentLocales.every((l) => (a[l] ?? '').trim() === (b[l] ?? '').trim())
+
+/**
+ * The API body of the form values; undefined while a value cannot be sent.
+ * A services label equal to the API's default is sent as {} (= no label of
+ * its own), so the version keeps following the default.
+ */
+function toInput(v: FormValues, defaultLabel: LocalizedText | undefined): PricingInput | undefined {
   const parse = (kind: Kind, text: string) => (kind === 'none' ? '0' : parseDecimal(text))
   const discountValue = parse(v.discountKind, v.discountValue)
   const servicesValue = parse(v.servicesKind, v.servicesValue)
   if (discountValue === undefined || servicesValue === undefined) return undefined
+  const label = optionalTranslatable(v.servicesLabel)
   return {
     discountKind: v.discountKind,
     discountValue,
     servicesKind: v.servicesKind,
     servicesValue,
-    servicesLabel: optionalTranslatable(v.servicesLabel) ?? {},
+    servicesLabel: label && !(defaultLabel && sameText(label, defaultLabel)) ? label : {},
   }
 }
 
@@ -104,6 +114,10 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
   // The pricing the next save expects: the loaded one, or the one a stale error made us reload.
   const base = useRef(pricing)
   base.current = pricing
+  // The API's default services label: what it returns while the version has no pricing saved
+  // (updatedAt null). The API does not say whether a saved version's label is the default.
+  const defaultLabel = useRef<LocalizedText | undefined>(undefined)
+  if (pricing.updatedAt === null) defaultLabel.current = pricing.servicesLabel
 
   const toForm = (p: Pricing): FormValues => ({
     discountKind: p.discountKind,
@@ -117,7 +131,7 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
   const values = useWatch({ control: form.control }) as FormValues
 
   // Debounced preview of the totals for the values as typed.
-  const input = toInput(values)
+  const input = toInput(values, defaultLabel.current)
   const [debounced, setDebounced] = useState(input)
   const inputKey = JSON.stringify(input)
   useEffect(() => {
@@ -135,7 +149,7 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
 
   const submit = form.handleSubmit(async (v) => {
     setSaved(false)
-    const body = toInput(v)!
+    const body = toInput(v, defaultLabel.current)!
     try {
       const bom = await save.mutateAsync({ versionId, data: { ...body, expectedUpdatedAt: base.current.updatedAt } })
       queryClient.setQueryData(getGetBomQueryKey(versionId), bom)
@@ -166,7 +180,7 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
       />
     )
   }
-  const previewTotals = preview.data as BomTotals | undefined
+  const previewTotals = preview.data
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start">

@@ -5,8 +5,8 @@ import { ApiError } from '@/api/client'
 import errorsDe from '@/locales/de/errors.json'
 import errorsEn from '@/locales/en/errors.json'
 
-import { apiFieldFor, apiFields, decodeMessage, errorKey, errorParamNames, setApiFieldErrors, useFieldError } from './form-errors'
-import { formatTimeParams, useErrorMessage } from './use-error-message'
+import { apiFieldFor, apiFields, decodeMessage, errorKey, errorParamNames, formatParams, setApiFieldErrors, useFieldError } from './form-errors'
+import { useErrorMessage } from './use-error-message'
 
 type FieldErrorBody = { location: string; code: string; params?: Record<string, unknown> }
 const invalid = (...fields: FieldErrorBody[]) => new ApiError({ status: 422, code: 'validation.failed', fields })
@@ -110,9 +110,18 @@ describe('API field errors', () => {
     expect(message).not.toContain(expiresAt)
     expect(message).not.toMatch(/\d{4}-\d{2}-\d{2}T/)
     const now = new Date('2026-10-19T10:00:00')
-    const today = formatTimeParams({ at: new Date('2026-10-19T14:32:00').toISOString(), n: 3, s: 'x' }, 'de', now)
+    const today = formatParams({ at: new Date('2026-10-19T14:32:00').toISOString(), n: 3, s: 'x' }, 'de', now)
     expect(today).toEqual({ at: '14:32', n: 3, s: 'x' })
-    expect(String(formatTimeParams({ at: new Date('2026-10-20T14:32:00').toISOString() }, 'en', now)?.at)).toMatch(/Oct 20, 2026/)
+    expect(String(formatParams({ at: new Date('2026-10-20T14:32:00').toISOString() }, 'en', now)?.at)).toMatch(/Oct 20, 2026/)
+  })
+
+  it('shows limits in params as localized numbers, exactly', () => {
+    expect(formatParams({ max: '9999999999.99', min: 100000 }, 'de')).toEqual({ max: '9.999.999.999,99', min: '100.000' })
+    expect(formatParams({ max: '9999999999.99' }, 'en')).toEqual({ max: '9,999,999,999.99' })
+    // Only limits: a SKU stays as it is.
+    expect(formatParams({ sku: '12345' }, 'en')).toEqual({ sku: '12345' })
+    const { result } = renderHook(() => useErrorMessage())
+    expect(result.current(new ApiError({ status: 422, code: 'pricing.amount_range', params: { max: '9999999999.99' } }))).toBe('This amount is too large (at most 9,999,999,999.99).')
   })
 
   it('only says "check the highlighted fields" when every error is at a field', () => {

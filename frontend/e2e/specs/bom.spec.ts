@@ -102,7 +102,7 @@ test('bom: quantities per plan and zone, manual lines, pricing, update from cata
   await page.reload()
   await expect(sensorRow.getByText('Outdated')).toBeVisible()
   await expect(sensorRow).toContainText('$10.00')
-  await sensorRow.getByRole('button', { name: /Update from catalog/ }).click()
+  await sensorRow.getByRole('button', { name: /update from catalog/i }).click()
   const changes = page.getByRole('dialog', { name: 'Update from catalog' })
   await expect(changes.getByRole('checkbox', { name: new RegExp(sensorName) })).toBeChecked()
   await expect(changes).toContainText('$15.00')

@@ -27,12 +27,11 @@
     "freeText": "Other items",
     "subtotal": "Subtotal {{amount}}",
     "status": {
-      "unavailable": "Unavailable",
       "deleted": "Deleted",
       "inactive": "Inactive",
       "outdated": "Outdated"
     },
-    "statusAction": "Update from catalog: {{name}}",
+    "statusAction": "{{statuses}} – update from catalog: {{name}}",
     "updateFromCatalog": "Update from catalog",
     "warning": "A placement on “{{plan}}” has no price snapshot and is not counted.",
     "openPlan": "Open plan",

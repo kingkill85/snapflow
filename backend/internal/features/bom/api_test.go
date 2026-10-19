@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -467,5 +468,206 @@ func TestConcurrentSnapshots(t *testing.T) {
 	}
 	if got := getBOM(t, api, admin, v); line(t, got, c.Req).Quantity < 1 {
 		t.Errorf("required add-on missing: %+v", got.Lines)
+	}
+}
+
+// A pool of two connections serves concurrent content saves, manual lines
+// and catalog applies: no request holds a transaction while it waits for a
+// second pooled connection (D243).
+func TestSmallPool(t *testing.T) {
+	api := apptest.NewWithPool(t, testdb.SmallPool(t, 2))
+	admin := api.Admin.Cookie
+	c := newCatalog(t, api, "pool")
+	v := newProject(t, api, admin, map[string]any{"name": "House", "productTypeIds": []string{c.TypeID}}).Versions[0].ID
+	vs := v.String()
+	var ps []plans.Plan
+	for i := range 4 {
+		ps = append(ps, createPlan(t, api, admin, v, "Plan "+string(rune('A'+i))))
+	}
+	if _, err := api.DB.Exec(t.Context(), `UPDATE product_variants SET price = 21 WHERE id = $1`, c.Other); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	codes := make([]int, 0, 12)
+	var mu sync.Mutex
+	record := func(code int) {
+		mu.Lock()
+		codes = append(codes, code)
+		mu.Unlock()
+	}
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		for i, p := range ps {
+			wg.Go(func() {
+				pl := placement(c.Main, 50, 50, false, c.Opt)
+				if i%2 == 1 {
+					pl = placement(c.Other, 50, 50, false)
+				}
+				record(saveContent(t, api, admin, p.ID, nil, []any{pl}).Code)
+			})
+			wg.Go(func() {
+				record(api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": c.Other, "quantity": 1}).Code)
+			})
+			wg.Go(func() {
+				record(api.Post("/api/versions/"+vs+"/catalog-changes/apply", admin, map[string]any{"all": true}).Code)
+			})
+		}
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(60 * time.Second):
+		t.Fatal("requests did not finish: the pool starved")
+	}
+	for i, code := range codes {
+		if code != http.StatusOK && code != http.StatusCreated && code != http.StatusConflict {
+			t.Errorf("request %d: %d", i, code)
+		}
+	}
+	if got := getBOM(t, api, admin, v); line(t, got, c.Req).Quantity < 1 || line(t, got, c.Other).Quantity < 4 {
+		t.Errorf("lines: %+v", got.Lines)
+	}
+}
+
+// A catalog reorder between two snapshots of one product type never splits
+// its group: the position is settled per product type (D244).
+func TestGroupsAfterReorder(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	a, b := newCatalog(t, api, "first"), newCatalog(t, api, "second")
+	v := newProject(t, api, admin, map[string]any{"name": "House", "productTypeIds": []string{a.TypeID, b.TypeID}}).Versions[0].ID
+	vs := v.String()
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": a.Main, "quantity": 1}), http.StatusCreated, "")
+	wantCode(t, api.Put("/api/product-types/order", admin, map[string]any{"ids": []string{b.TypeID, a.TypeID}}), http.StatusOK, "")
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": a.Other, "quantity": 1}), http.StatusCreated, "")
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": b.Other, "quantity": 1}), http.StatusCreated, "")
+
+	check := func(when string) {
+		t.Helper()
+		got := getBOM(t, api, admin, v)
+		var types []string
+		for _, g := range got.Groups {
+			if g.Kind == "productType" {
+				types = append(types, g.ProductType.ID.String())
+				if len(g.Categories) != 1 {
+					t.Errorf("%s: categories of %s: %+v", when, g.ProductType.Key, g.Categories)
+				}
+			}
+		}
+		if len(types) != 2 || types[0] != b.TypeID || types[1] != a.TypeID {
+			t.Errorf("%s: groups %v, want [%s %s]", when, types, b.TypeID, a.TypeID)
+		}
+	}
+	check("live order")
+	// With the type's variants deleted, the newest snapshot's position
+	// counts for all of them.
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM product_variants WHERE product_id = $1`, a.ProductID); err != nil {
+		t.Fatal(err)
+	}
+	check("snapshot order")
+}
+
+// Catalog-change effects without a discount cap: each item's effect is the
+// difference applying only it makes, the preview's grand total after is the
+// grand total after applying all; a new required add-on gets its snapshot
+// and is counted.
+func TestCatalogChangeEffects(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	c := newCatalog(t, api, "fx")
+	v := newProject(t, api, admin, map[string]any{"name": "House", "productTypeIds": []string{c.TypeID}}).Versions[0].ID
+	vs := v.String()
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 2}), http.StatusCreated, "")
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": c.Other, "quantity": 3}), http.StatusCreated, "")
+	wantCode(t, api.Put("/api/versions/"+vs+"/pricing", admin, map[string]any{"discountKind": "percent", "discountValue": "10", "servicesKind": "amount", "servicesValue": "50", "expectedUpdatedAt": nil}), http.StatusOK, "")
+	// Main 2 × (20 + required 5) + other 3 × 7 = 71; −7.10 + 50 = 113.90.
+	if got := getBOM(t, api, admin, v); got.Totals.GrandTotal != "113.90" {
+		t.Fatalf("grand total: %+v", got.Totals)
+	}
+
+	// Main costs 30 and gets a second required add-on (4.00); other costs 8.
+	resp := api.Post("/api/products/"+c.ProductID+"/variants", admin, map[string]any{"name": text("Required 2"), "price": "4.00", "isActive": true})
+	wantCode(t, resp, http.StatusCreated, "")
+	req2 := decode[struct{ ID string }](t, resp).ID
+	wantCode(t, api.Put("/api/products/"+c.ProductID+"/variants/"+c.Main+"/addons", admin, map[string]any{"addons": []any{
+		map[string]any{"addonVariantId": c.Opt, "required": false},
+		map[string]any{"addonVariantId": c.Req, "required": true},
+		map[string]any{"addonVariantId": req2, "required": true},
+	}}), http.StatusOK, "")
+	if _, err := api.DB.Exec(t.Context(), `UPDATE product_variants SET price = CASE id WHEN $1::uuid THEN 30 ELSE 8 END WHERE id IN ($1, $2)`, c.Main, c.Other); err != nil {
+		t.Fatal(err)
+	}
+
+	resp = api.Get("/api/versions/"+vs+"/catalog-changes", admin)
+	wantCode(t, resp, http.StatusOK, "")
+	changes := decode[bom.CatalogChanges](t, resp)
+	effects := map[string]string{}
+	for _, ch := range changes.Items {
+		effects[ch.VariantID.String()] = ch.Effect
+	}
+	// Main: 2 × (10 + 4) = 28 → × 0.9 = 25.20; other: 3 × 1 = 3 → 2.70.
+	if effects[c.Main] != "25.20" || effects[c.Other] != "2.70" || changes.GrandTotal != "113.90" ||
+		changes.GrandTotalAfter != "141.80" || changes.Effect != "27.90" {
+		t.Fatalf("preview: %+v", changes)
+	}
+
+	resp = api.Post("/api/versions/"+vs+"/catalog-changes/apply", admin, map[string]any{"variantIds": []string{c.Main}})
+	wantCode(t, resp, http.StatusOK, "")
+	got := getBOM(t, api, admin, v)
+	if got.Totals.GrandTotal != "139.10" {
+		t.Errorf("after applying main (113.90 + 25.20): %+v", got.Totals)
+	}
+	if l := line(t, got, req2); l.Quantity != 2 || l.Kind != bom.KindAddOn || l.UnitPrice != "4.00" {
+		t.Errorf("new required add-on: %+v", l)
+	}
+	wantCode(t, api.Post("/api/versions/"+vs+"/catalog-changes/apply", admin, map[string]any{"variantIds": []string{c.Other}}), http.StatusOK, "")
+	if got := getBOM(t, api, admin, v); got.Totals.GrandTotal != changes.GrandTotalAfter {
+		t.Errorf("after applying all: %s, preview said %s", got.Totals.GrandTotal, changes.GrandTotalAfter)
+	}
+}
+
+// Conversion to currencies with 0 and 3 decimals, per line and in totals.
+func TestCurrencyDecimals(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	c := newCatalog(t, api, "cur")
+	for _, tc := range []struct{ currency, rate, unit, total, grand string }{
+		// Main 20 × 3 = 60 (required add-on 5 × 3 = 15): subtotal 75.
+		{"JPY", "150.5", "3010", "9030", "11288"},
+		{"KWD", "0.3075", "6.150", "18.450", "23.063"},
+	} {
+		v := newProject(t, api, admin, map[string]any{"name": "House " + tc.currency, "productTypeIds": []string{c.TypeID}, "currency": tc.currency, "exchangeRate": tc.rate}).Versions[0].ID
+		wantCode(t, api.Post("/api/versions/"+v.String()+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 3}), http.StatusCreated, "")
+		got := getBOM(t, api, admin, v)
+		m := line(t, got, c.Main)
+		if m.Converted == nil || m.Converted.UnitPrice != tc.unit || m.Converted.Total != tc.total {
+			t.Errorf("%s line: %+v", tc.currency, m.Converted)
+		}
+		if got.Totals.Converted == nil || got.Totals.Converted.GrandTotal != tc.grand || got.Totals.Currency != tc.currency {
+			t.Errorf("%s totals: %+v %+v", tc.currency, got.Totals, got.Totals.Converted)
+		}
+	}
+}
+
+// A new manual catalog line needs an available variant of a product type of
+// the project; existing lines keep their variant when it is deactivated.
+func TestManualLineAvailability(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	c, foreign := newCatalog(t, api, "avail"), newCatalog(t, api, "foreign")
+	v := newProject(t, api, admin, map[string]any{"name": "House", "productTypeIds": []string{c.TypeID}}).Versions[0].ID
+	vs := v.String()
+	resp := api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 1})
+	wantCode(t, resp, http.StatusCreated, "")
+	existing := decode[bom.ManualLine](t, resp)
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": foreign.Main, "quantity": 1}), http.StatusUnprocessableEntity, "bom.product_type_not_in_project")
+	if _, err := api.DB.Exec(t.Context(), `UPDATE product_variants SET is_active = false WHERE id = $1`, c.Main); err != nil {
+		t.Fatal(err)
+	}
+	wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": c.Main, "quantity": 1}), http.StatusUnprocessableEntity, "bom.variant_unavailable")
+	wantCode(t, api.Put("/api/versions/"+vs+"/manual-lines/"+existing.ID.String(), admin, map[string]any{"variantId": c.Main, "quantity": 4, "expectedUpdatedAt": existing.UpdatedAt}), http.StatusOK, "")
+	if l := line(t, getBOM(t, api, admin, v), c.Main); l.Quantity != 4 || !l.Status.Inactive {
+		t.Errorf("existing line: %+v %+v", l, l.Status)
 	}
 }

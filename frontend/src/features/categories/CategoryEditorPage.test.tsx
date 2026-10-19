@@ -401,7 +401,7 @@ describe('CategoryEditorPage', () => {
     expect(within(width).getByLabelText('Maximum')).toHaveAccessibleDescription('This limit must be a whole number.')
     expect(within(protocols).getByLabelText('Minimum items')).toHaveAccessibleDescription('Lengths and item counts cannot be negative.')
     expect(within(protocols).getByLabelText('Maximum items')).toHaveAccessibleDescription(
-      'This limit must be between 0 and 9007199254740991.',
+      'This limit must be between 0 and 9,007,199,254,740,991.',
     )
     expect(puts).toHaveLength(0)
   })

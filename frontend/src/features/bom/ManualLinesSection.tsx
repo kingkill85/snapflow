@@ -3,14 +3,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useDeleteManualLine, useReorderManualLines } from '@/api/generated/bom/bom'
+import type { ManualLine } from '@/api/generated/model'
 import { Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, IconButton, RowAction, Section } from '@/components/ui'
 
-import { type BomManualLine, useFormatMoney, useLineName, useRefreshBom } from './format'
+import { useFormatMoney, useLineName, useRefreshBom } from './format'
 import { ManualLineDialog, type ManualLineKindChoice } from './ManualLineDialog'
 
 type Props = {
   versionId: string
-  lines: BomManualLine[]
+  lines: ManualLine[]
   canWrite: boolean
   productTypeIds: string[]
 }
@@ -27,7 +28,7 @@ export function ManualLinesSection({ versionId, lines, canWrite, productTypeIds 
   // undefined: closed; null: a new line of `newKind`; an id: edit that line (read from the current lines, so a refetch brings its newer updatedAt).
   const [editing, setEditing] = useState<string | null | undefined>(undefined)
   const [newKind, setNewKind] = useState<ManualLineKindChoice>('catalog')
-  const [deleting, setDeleting] = useState<BomManualLine | null>(null)
+  const [deleting, setDeleting] = useState<ManualLine | null>(null)
   const editItem = typeof editing === 'string' ? (lines.find((l) => l.id === editing) ?? null) : null
 
   const add = (kind: ManualLineKindChoice) => {

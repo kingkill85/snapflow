@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next'
 
-import type { PricingServicesLabel } from '@/api/generated/model'
+import type { BOMTotals, PricingServicesLabel } from '@/api/generated/model'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
-import { type BomTotals, usd, useFormatMoney, useFormatRate } from './format'
+import { usd, useFormatMoney, useFormatRate } from './format'
 
 type Props = {
-  totals: BomTotals
+  totals: BOMTotals
   servicesLabel: PricingServicesLabel
   /** Heading of the block; default "Totals". */
   title?: string

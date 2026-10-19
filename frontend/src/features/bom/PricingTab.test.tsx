@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
+import type { Pricing } from '@/api/generated/model'
 import { problem } from '@/features/projects/test-fixtures'
 import { chooseOption } from '@/test/select'
 import { renderWithProviders } from '@/test/render'
@@ -11,10 +12,10 @@ import { server } from '@/test/server'
 import { PricingTab } from './PricingTab'
 import { bom, versionId } from './test-fixtures'
 
-function serve() {
+function serve(pricing: Pricing = bom.pricing) {
   const previews: unknown[] = []
   server.use(
-    http.get('/api/versions/:versionId/pricing', () => HttpResponse.json(bom.pricing)),
+    http.get('/api/versions/:versionId/pricing', () => HttpResponse.json(pricing)),
     http.post('/api/versions/:versionId/pricing/preview', async ({ request }) => {
       const body = (await request.json()) as { discountValue: string }
       previews.push(body)
@@ -69,6 +70,35 @@ describe('PricingTab', () => {
       servicesLabel: { en: 'Programming', de: 'Programmierung' },
       expectedUpdatedAt: bom.pricing.updatedAt,
     })
+  })
+
+  it('keeps the default services label the default', async () => {
+    // Never saved: the API returns its default label.
+    const defaults: Pricing = { ...bom.pricing, servicesLabel: { en: 'System design', de: 'Systemplanung' }, updatedAt: null }
+    serve(defaults)
+    const saved: unknown[] = []
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved.push(await request.json())
+        return HttpResponse.json({ ...bom, pricing: { ...defaults, updatedAt: '2026-10-19T11:00:00Z' } })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ servicesLabel: {}, expectedUpdatedAt: null })
+
+    // After that save the default is still known; a label of its own is sent as typed.
+    expect(await screen.findByText('Pricing saved.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(2))
+    expect(saved[1]).toMatchObject({ servicesLabel: {} })
+    const label = screen.getByRole('textbox', { name: /^Services label/ })
+    await user.type(label, ' and more')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(3))
+    expect(saved[2]).toMatchObject({ servicesLabel: { en: 'System design and more', de: 'Systemplanung' } })
   })
 
   it('shows API errors at their fields and a stale save', async () => {

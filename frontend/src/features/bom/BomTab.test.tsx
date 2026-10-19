@@ -3,16 +3,16 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
+import type { Bom } from '@/api/generated/model'
 import { problem } from '@/features/projects/test-fixtures'
 import { chooseOption } from '@/test/select'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { BomTab } from './BomTab'
-import type { BomData } from './format'
-import { bom, bomEur, changes, manualBattery, manualCabling, projectId, versionId } from './test-fixtures'
+import { bom, bomEur, changes, dimmer, manualBattery, manualCabling, motion, projectId, versionId } from './test-fixtures'
 
-function serve(data: BomData = bom) {
+function serve(data: Bom = bom) {
   let gets = 0
   server.use(
     http.get('/api/versions/:versionId/bom', () => {
@@ -108,7 +108,7 @@ describe('BomTab', () => {
     expect(within(row('Motion sensor')).getByText('Outdated')).toBeInTheDocument()
     expect(within(row('Battery')).getByText('Deleted')).toBeInTheDocument()
 
-    await user.click(within(row('Motion sensor')).getByRole('button', { name: 'Update from catalog: Motion sensor' }))
+    await user.click(within(row('Motion sensor')).getByRole('button', { name: 'Outdated – update from catalog: Motion sensor' }))
     const dialog = await screen.findByRole('dialog', { name: 'Update from catalog' })
     expect(await within(dialog).findByText('Grand total $279.50 → $297.50 if everything is updated')).toBeInTheDocument()
     const motion = within(dialog).getByRole('checkbox', { name: 'Motion sensor' })
@@ -122,8 +122,71 @@ describe('BomTab', () => {
     const before = gets()
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(applied).toEqual({ all: true })
+    expect(applied).toEqual({ variantIds: [changes.items[0].variantId] })
     expect(gets()).toBeGreaterThan(before)
+  })
+
+  it('names the statuses in the update button and offers it only for outdated lines', async () => {
+    serve({
+      ...bom,
+      lines: bom.lines.map((l) =>
+        l.key === motion.key
+          ? { ...l, status: { available: false, deleted: false, inactive: true, outdated: true } }
+          : l.key === dimmer.key
+            ? { ...l, status: { available: false, deleted: false, inactive: true, outdated: false } }
+            : l,
+      ),
+    })
+    render()
+    await screen.findByRole('table', { name: 'Bill of materials' })
+    expect(within(row('Motion sensor')).getByRole('button', { name: 'Inactive, Outdated – update from catalog: Motion sensor' })).toBeInTheDocument()
+    // Inactive only, or deleted: nothing to take over, plain badges.
+    expect(within(row('Dimmer')).getByText('Inactive')).toBeInTheDocument()
+    expect(within(row('Dimmer')).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(row('Battery')).getByText('Deleted')).toBeInTheDocument()
+    expect(within(row('Battery')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('applies only the selected changes, by id', async () => {
+    const dimmerChange = { ...changes.items[0], variantId: dimmer.key, productId: dimmer.productId!, snapshot: dimmer.snapshot }
+    serve()
+    server.use(http.get('/api/versions/:versionId/catalog-changes', () => HttpResponse.json({ ...changes, items: [changes.items[0], dimmerChange, changes.items[1]] })))
+    let applied: unknown
+    server.use(
+      http.post('/api/versions/:versionId/catalog-changes/apply', async ({ request }) => {
+        applied = await request.json()
+        return HttpResponse.json({ updated: [dimmer.key], skipped: [] })
+      }),
+    )
+    const user = userEvent.setup()
+    render()
+    await user.click(await screen.findByRole('button', { name: 'Update from catalog' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Update from catalog' })
+    const all = await within(dialog).findByRole('checkbox', { name: 'Select all' })
+    expect(all).toBeChecked()
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Motion sensor' }))
+    expect(all).not.toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'Dimmer' })).toBeChecked()
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(applied).toEqual({ variantIds: [dimmer.key] }))
+
+    // Everything selected is still sent as ids, never as "all".
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Update from catalog' }))
+    const again = await screen.findByRole('dialog', { name: 'Update from catalog' })
+    await within(again).findByRole('checkbox', { name: 'Select all' })
+    await user.click(within(again).getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(applied).toEqual({ variantIds: [motion.key, dimmer.key] }))
+  })
+
+  it('hides a zero discount and zero services in the totals', async () => {
+    serve({ ...bom, totals: { ...bom.totals, discount: '0.00', services: '0.00', grandTotal: '255.00' } })
+    render()
+    const totals = await screen.findByRole('region', { name: 'Totals' })
+    expect(within(totals).getByTestId('total-subtotal')).toHaveTextContent('$255.00')
+    expect(within(totals).queryByTestId('total-discount')).not.toBeInTheDocument()
+    expect(within(totals).queryByTestId('total-services')).not.toBeInTheDocument()
+    expect(within(totals).getByTestId('total-grandTotal')).toHaveTextContent('$255.00')
   })
 
   it('links a placement without snapshot to its plan', async () => {
@@ -180,7 +243,7 @@ describe('Manual lines', () => {
     await user.clear(within(dialog).getByLabelText(/^Quantity/))
     await user.type(within(dialog).getByLabelText(/^Quantity/), '0')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    expect(await within(dialog).findByText(/1 to 100000|1 and 100000|1–100000|1 bis 100000/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/1 to 100,000/)).toBeInTheDocument()
   })
 
   it('edits a line with its updatedAt and shows a stale error', async () => {
@@ -273,5 +336,41 @@ describe('Manual catalog line', () => {
     await chooseOption(user, within(dialog).getByRole('combobox', { name: 'Variant' }), /Black/)
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(posted).toEqual({ variantId: 'v2', quantity: 1, note: '' }))
+  })
+  it('shows the API verdict on the chosen product at the picker', async () => {
+    serve()
+    const type = { id: 'pt1', key: 'zigbee', name: { en: 'Zigbee' }, abbreviation: 'ZB', color: '#1f6feb' }
+    server.use(
+      http.get('/api/variants', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 'v3',
+              available: true,
+              category: { id: 'c1', name: { en: 'Sensors' } },
+              categoryId: 'c1',
+              modelNumber: 'M-Door',
+              name: { en: 'Std' },
+              price: '10.00',
+              productId: 'p-door',
+              productName: { en: 'Door' },
+              productType: type,
+              productTypeId: 'pt1',
+            },
+          ],
+          total: 1,
+        }),
+      ),
+      http.post('/api/versions/:versionId/manual-lines', () =>
+        problem(422, { code: 'validation.failed', fields: [{ location: 'body.variantId', code: 'bom.variant_unavailable' }] }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<BomTab projectId={projectId} versionId={versionId} canWrite productTypeIds={['pt1']} />)
+    await user.click(await screen.findByRole('button', { name: 'Add product' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add product' })
+    await user.click(await within(dialog).findByRole('button', { name: /Door/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+    expect(await within(dialog).findByText('This product is not available (inactive) and cannot be added.')).toBeInTheDocument()
   })
 })

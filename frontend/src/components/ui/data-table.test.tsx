@@ -32,4 +32,20 @@ describe('DataTable', () => {
     expect(screen.getAllByRole('rowgroup')[0]).toHaveClass('sr-only')
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
   })
+
+  it('marks group headers as row headers spanning the row', () => {
+    render(
+      <DataTable
+        rows={rows}
+        rowKey={(r) => r.id}
+        columns={[{ header: 'Name', cell: (r) => r.name }, { header: 'Id', cell: (r) => r.id }]}
+        groups={[{ key: 'g', header: 'Group A', rows }]}
+        empty={null}
+      />,
+    )
+    const header = screen.getByRole('rowheader', { name: 'Group A' })
+    expect(header.tagName).toBe('TH')
+    expect(header).toHaveAttribute('colspan', '2')
+    expect(screen.getAllByRole('cell')).toHaveLength(4)
+  })
 })

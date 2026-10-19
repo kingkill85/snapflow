@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApplyCatalogChanges, useGetCatalogChanges } from '@/api/generated/bom/bom'
-import type { ChangeValues } from '@/api/generated/model'
+import type { CatalogChange, ChangeValues } from '@/api/generated/model'
 import { Badge, Button, CheckboxField, DataTable, Dialog, ErrorMessage, Loading, Thumbnail } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
-import { type Change, fresh, useFormatMoney, useLineName, useRefreshBom } from './format'
+import { fresh, useFormatMoney, useLineName, useRefreshBom } from './format'
 
 type Props = {
   open: boolean
@@ -35,7 +35,7 @@ export function CatalogChangesDialog({ open, onOpenChange, versionId }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const { reset } = apply
 
-  const items = (query.data?.items ?? []) as Change[]
+  const items = query.data?.items ?? []
   const applicable = items.filter((i) => i.canApply)
   // Every applicable item is selected when the list arrives.
   const dataKey = query.dataUpdatedAt
@@ -57,7 +57,7 @@ export function CatalogChangesDialog({ open, onOpenChange, versionId }: Props) {
 
   const submit = async () => {
     try {
-      await apply.mutateAsync({ versionId, data: allSelected ? { all: true } : { variantIds: [...selected] } })
+      await apply.mutateAsync({ versionId, data: { variantIds: [...selected] } })
     } catch {
       return // shown by ErrorMessage via apply.error
     }
@@ -130,7 +130,7 @@ export function CatalogChangesDialog({ open, onOpenChange, versionId }: Props) {
 }
 
 /** The changed fields of one item: before and after. */
-function FieldDiff({ item, after }: { item: Change; after: ChangeValues }) {
+function FieldDiff({ item, after }: { item: CatalogChange; after: ChangeValues }) {
   const { t } = useTranslation('bom')
   const localize = useLocalized()
   const money = useFormatMoney()

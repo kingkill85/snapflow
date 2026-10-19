@@ -95,13 +95,14 @@ export function DataTable<T>({ rows, columns, rowKey, actions, empty, label, fla
             {(groups ?? [{ key: '', header: null, rows }]).map((group) => [
               group.header != null && (
                 <tr key={`group-${group.key}`} role="row" className={cn('border-b border-line max-md:block max-md:border-0', group.level === 2 ? 'bg-canvas/50' : 'bg-canvas')}>
-                  <td
-                    role="cell"
+                  <th
+                    role="rowheader"
+                    scope="row"
                     colSpan={columns.length + (actions ? 1 : 0)}
-                    className={cn('px-3 py-2 first:pl-4 last:pr-4 max-md:block max-md:px-0', group.level === 2 ? 'text-sm' : 'font-semibold')}
+                    className={cn('px-3 py-2 text-left first:pl-4 last:pr-4 max-md:block max-md:px-0', group.level === 2 ? 'text-sm font-normal' : 'font-semibold')}
                   >
                     {group.header}
-                  </td>
+                  </th>
                 </tr>
               ),
               ...group.rows.map((row) => {

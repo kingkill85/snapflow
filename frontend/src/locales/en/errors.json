@@ -56,13 +56,15 @@
   "bom": {
     "line_kind": "Choose either a catalog product or a name and unit price.",
     "line_not_found": "This line no longer exists.",
-    "line_stale": "Someone else has changed this line in the meantime. Reload it and make your changes again.",
+    "line_stale": "Someone else has changed this line in the meantime. Their version is loaded now; saving again overwrites it.",
     "nothing_selected": "Select at least one item to update.",
-    "order_mismatch": "The lines have changed in the meantime. Reload the page and try again.",
+    "order_mismatch": "The lines have changed in the meantime. The current order is loaded now; try again.",
+    "product_type_not_in_project": "This product's product type is not part of the project.",
     "quantity_range": "Enter a whole number from {{min}} to {{max}}.",
     "too_many_lines": "A version can have at most {{max}} manual lines.",
     "unit_price_invalid": "Enter an amount of 0 or more with at most 2 decimals.",
-    "variant_not_found": "This product variant no longer exists."
+    "variant_not_found": "This product variant no longer exists.",
+    "variant_unavailable": "This product is not available (inactive) and cannot be added."
   },
   "category": {
     "in_use": "This category is still used by products. Deactivate it instead.",
@@ -154,7 +156,7 @@
   "pricing": {
     "amount_range": "This amount is too large (at most {{max}}).",
     "percent_range": "Enter a percentage from 0 to {{max}}.",
-    "stale": "Someone else has changed the pricing in the meantime. Reload it and make your changes again.",
+    "stale": "Someone else has changed the pricing in the meantime. Their version is loaded now; saving again overwrites it.",
     "value_invalid": "Enter a number of 0 or more with at most 2 decimals."
   },
   "product": {

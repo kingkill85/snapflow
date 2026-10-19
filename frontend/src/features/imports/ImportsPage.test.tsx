@@ -176,6 +176,6 @@ describe('NewImportPage', () => {
     renderRoutes(routes, { route: '/catalog/imports/new' })
     await user.upload(await screen.findByLabelText('File to import'), xlsx())
     await user.click(screen.getByRole('button', { name: 'Upload and map columns' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('The sheet has too many rows (at most 20000).')
+    expect(await screen.findByRole('alert')).toHaveTextContent('The sheet has too many rows (at most 20,000).')
   })
 })

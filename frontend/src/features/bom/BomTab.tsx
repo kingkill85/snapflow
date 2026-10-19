@@ -3,12 +3,13 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useGetBom } from '@/api/generated/bom/bom'
+import type { Bom, BOMLine } from '@/api/generated/model'
 import { Badge, Button, type Column, DataTable, EmptyState, ErrorMessage, Loading, Notice, SelectField, type TableGroup, TextLink, Thumbnail, TypeBadge } from '@/components/ui'
 import { editorPath } from '@/features/plans/paths'
 import { useLocalized } from '@/i18n/localized'
 
 import { CatalogChangesDialog } from './CatalogChangesDialog'
-import { type BomData, type BomLine, fresh, useFormatMoney, useLineName } from './format'
+import { fresh, useFormatMoney, useLineName } from './format'
 import { ManualLinesSection } from './ManualLinesSection'
 import { TotalsBlock } from './TotalsBlock'
 
@@ -39,10 +40,10 @@ export function BomTab({ projectId, versionId, canWrite, productTypeIds }: Props
 
   if (query.isPending) return <Loading />
   if (query.isError) return <ErrorMessage error={query.error} />
-  const bom = query.data as BomData
+  const bom = query.data
   const planRef = bom.plans.find((p) => p.id === plan)
   const filter: Filter | undefined = planRef ? { planId: planRef.id, zone: zone === all ? undefined : zone } : undefined
-  const needsUpdate = bom.lines.some((l) => l.status && (l.status.outdated || l.status.deleted || !l.status.available))
+  const needsUpdate = bom.lines.some((l) => l.status?.outdated)
 
   return (
     <div className="space-y-6">
@@ -102,20 +103,20 @@ export function BomTab({ projectId, versionId, canWrite, productTypeIds }: Props
 type Filter = { planId: string; zone?: string }
 
 /** The quantity a filter shows: the API's number for that plan, zone or the plan's unzoned placements (no client maths). */
-function filteredQuantity(line: BomLine, filter: Filter) {
+function filteredQuantity(line: BOMLine, filter: Filter) {
   if (filter.zone === undefined) return line.quantities.plans[filter.planId] ?? 0
   if (filter.zone === noZone) return line.quantities.unzoned[filter.planId] ?? 0
   return line.quantities.zones[filter.zone] ?? 0
 }
 
-function BomTable({ bom, filter, onUpdate }: { bom: BomData; filter?: Filter; onUpdate?: () => void }) {
+function BomTable({ bom, filter, onUpdate }: { bom: Bom; filter?: Filter; onUpdate?: () => void }) {
   const { t } = useTranslation('bom')
   const localize = useLocalized()
   const money = useFormatMoney()
   const lineName = useLineName()
   const currency = bom.totals.currency
   const byKey = new Map(bom.lines.map((l) => [l.key, l]))
-  const visible = (l: BomLine) => !filter || filteredQuantity(l, filter) > 0
+  const visible = (l: BOMLine) => !filter || filteredQuantity(l, filter) > 0
 
   const amount = (usdValue: string, converted: string | null | undefined) => (
     <span className="block text-right whitespace-nowrap tabular-nums max-md:text-left">
@@ -137,34 +138,36 @@ function BomTable({ bom, filter, onUpdate }: { bom: BomData; filter?: Filter; on
     </div>
   )
 
-  const groups: TableGroup<BomLine>[] = []
+  const groups: TableGroup<BOMLine>[] = []
   for (const g of bom.groups) {
     if (g.kind === 'freeText') {
-      const rows = g.lines.map((k) => byKey.get(k)).filter((l): l is BomLine => !!l && visible(l))
+      const rows = g.lines.map((k) => byKey.get(k)).filter((l): l is BOMLine => !!l && visible(l))
       if (rows.length) groups.push({ key: 'free-text', header: header(t('bom.freeText'), subtotal(g.subtotal, g.converted)), rows })
       continue
     }
+    const type = g.productType
+    if (!type) continue
     const categories = g.categories
-      .map((c) => ({ c, rows: c.lines.map((k) => byKey.get(k)).filter((l): l is BomLine => !!l && visible(l)) }))
+      .map((c) => ({ c, rows: c.lines.map((k) => byKey.get(k)).filter((l): l is BOMLine => !!l && visible(l)) }))
       .filter((c) => c.rows.length > 0)
     if (!categories.length) continue
     groups.push({
-      key: g.productType.id,
+      key: type.id,
       header: header(
-        <TypeBadge color={g.productType.color} abbreviation={g.productType.abbreviation}>
-          {localize(g.productType.name)}
+        <TypeBadge color={type.color} abbreviation={type.abbreviation}>
+          {localize(type.name)}
         </TypeBadge>,
         subtotal(g.subtotal, g.converted),
       ),
       rows: [],
     })
     for (const { c, rows } of categories) {
-      groups.push({ key: `${g.productType.id}-${c.category.id}`, level: 2, header: header(<span>{localize(c.category.name)}</span>, subtotal(c.subtotal, c.converted)), rows })
+      groups.push({ key: `${type.id}-${c.category.id}`, level: 2, header: header(<span>{localize(c.category.name)}</span>, subtotal(c.subtotal, c.converted)), rows })
     }
   }
   const rows = groups.flatMap((g) => g.rows)
 
-  const columns: Column<BomLine>[] = [
+  const columns: Column<BOMLine>[] = [
     { header: t('bom.columns.image'), mobile: 'media', className: 'w-12', cell: (l) => (l.snapshot ? <Thumbnail src={l.snapshot.imageUrl ?? undefined} /> : null) },
     {
       header: t('bom.columns.product'),
@@ -215,21 +218,36 @@ function BomTable({ bom, filter, onUpdate }: { bom: BomData; filter?: Filter; on
   )
 }
 
-/** Unavailable / deleted / inactive / outdated; a button to "Update from catalog" when the user may change the version. */
-function StatusBadges({ line, name, onUpdate }: { line: BomLine; name: string; onUpdate?: () => void }) {
+/**
+ * Deleted / inactive / outdated. An outdated line (there are changes to take
+ * over) is a button to "Update from catalog" when the user may change the
+ * version; a deleted or inactive line has nothing to take over (D234).
+ */
+function StatusBadges({ line, name, onUpdate }: { line: BOMLine; name: string; onUpdate?: () => void }) {
   const { t } = useTranslation('bom')
   const s = line.status
   if (!s) return null
-  const badges = [
-    s.deleted && <Badge key="deleted" variant="danger">{t('bom.status.deleted')}</Badge>,
-    s.inactive && <Badge key="inactive" variant="warning">{t('bom.status.inactive')}</Badge>,
-    !s.available && !s.deleted && !s.inactive && <Badge key="unavailable" variant="warning">{t('bom.status.unavailable')}</Badge>,
-    s.outdated && <Badge key="outdated" variant="primary">{t('bom.status.outdated')}</Badge>,
-  ].filter(Boolean)
-  if (!badges.length) return null
-  if (!onUpdate) return <div className="flex flex-wrap gap-1">{badges}</div>
+  const statuses = [
+    s.deleted && { key: 'deleted', variant: 'danger' as const, label: t('bom.status.deleted') },
+    s.inactive && { key: 'inactive', variant: 'warning' as const, label: t('bom.status.inactive') },
+    s.outdated && { key: 'outdated', variant: 'primary' as const, label: t('bom.status.outdated') },
+  ].filter((b) => !!b)
+  if (!statuses.length) return null
+  const badges = statuses.map((b) => (
+    <Badge key={b.key} variant={b.variant}>
+      {b.label}
+    </Badge>
+  ))
+  if (!onUpdate || !s.outdated) return <div className="flex flex-wrap gap-1">{badges}</div>
   return (
-    <Button variant="ghost" size="sm" className="h-auto gap-1 px-0 py-0.5 hover:bg-transparent" aria-label={t('bom.statusAction', { name })} title={t('bom.updateFromCatalog')} onClick={onUpdate}>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-auto gap-1 px-0 py-0.5 hover:bg-transparent"
+      aria-label={t('bom.statusAction', { statuses: statuses.map((b) => b.label).join(', '), name })}
+      title={t('bom.updateFromCatalog')}
+      onClick={onUpdate}
+    >
       {badges}
     </Button>
   )

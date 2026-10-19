@@ -272,7 +272,7 @@ describe('ProductEditorPage', () => {
     expect(shownTranslation(basics, 'Name').input).toHaveAccessibleDescription(/control characters/i)
     expect(shownTranslation(basics, 'Name').input).toHaveFocus()
     expect(shownTranslation(basics, 'Description').language).toBe('German')
-    expect(shownTranslation(basics, 'Description').input).toHaveAccessibleDescription('This value is too long (at most 5000 characters).')
+    expect(shownTranslation(basics, 'Description').input).toHaveAccessibleDescription('This value is too long (at most 5,000 characters).')
     expect(within(basics).getAllByRole('tab', { name: 'English' })[0]).toHaveAccessibleDescription('Filled in')
   })
 

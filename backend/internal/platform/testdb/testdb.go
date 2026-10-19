@@ -221,6 +221,21 @@ END $$;`)
 	return pool
 }
 
+// SmallPool returns a pool of at most maxConns connections to the package's
+// database (tables emptied as by Pool), closed when the test ends: tests
+// that prove no code path holds a transaction while it waits for a second
+// connection (D243).
+func SmallPool(t *testing.T, maxConns int32) *pgxpool.Pool {
+	t.Helper()
+	Pool(t)
+	p, err := database.OpenWith(context.Background(), serverURL, maxConns)
+	if err != nil {
+		t.Fatalf("testdb: small pool: %v", err)
+	}
+	t.Cleanup(p.Close)
+	return p
+}
+
 var dbSeq atomic.Int64
 
 // NewDatabase creates an empty database (no migrations applied) on the test

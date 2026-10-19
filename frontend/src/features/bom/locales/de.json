@@ -27,12 +27,11 @@
     "freeText": "Sonstige Positionen",
     "subtotal": "Zwischensumme {{amount}}",
     "status": {
-      "unavailable": "Nicht verfügbar",
       "deleted": "Gelöscht",
       "inactive": "Inaktiv",
       "outdated": "Veraltet"
     },
-    "statusAction": "Aus dem Katalog aktualisieren: {{name}}",
+    "statusAction": "{{statuses}} – aus dem Katalog aktualisieren: {{name}}",
     "updateFromCatalog": "Aus dem Katalog aktualisieren",
     "warning": "Eine Platzierung auf „{{plan}}“ hat keinen Preisstand und wird nicht gezählt.",
     "openPlan": "Plan öffnen",

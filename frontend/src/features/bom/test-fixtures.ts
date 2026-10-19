@@ -1,4 +1,4 @@
-import type { BomData, BomLine, BomManualLine, Change } from './format'
+import type { Bom, BOMLine, CatalogChanges, ManualLine } from '@/api/generated/model'
 
 // Test data of the BOM tests (not shipped: only tests import it).
 
@@ -23,7 +23,7 @@ const snapshot = (product: string, model: string, category: { id: string; name: 
 })
 const ok = { available: true, deleted: false, inactive: false, outdated: false }
 
-export const motion: BomLine = {
+export const motion: BOMLine = {
   key: id(701),
   kind: 'catalog',
   variantId: id(701),
@@ -38,7 +38,7 @@ export const motion: BomLine = {
   status: { ...ok, outdated: true },
   addOnOf: [],
 }
-export const battery: BomLine = {
+export const battery: BOMLine = {
   ...motion,
   key: id(702),
   kind: 'addOn',
@@ -52,7 +52,7 @@ export const battery: BomLine = {
   status: { ...ok, deleted: true, available: false },
   addOnOf: [id(701)],
 }
-export const dimmer: BomLine = {
+export const dimmer: BOMLine = {
   ...motion,
   key: id(703),
   variantId: id(703),
@@ -64,7 +64,7 @@ export const dimmer: BomLine = {
   total: '40.00',
   status: ok,
 }
-export const cabling: BomLine = {
+export const cabling: BOMLine = {
   key: id(901),
   kind: 'freeText',
   variantId: null,
@@ -80,7 +80,7 @@ export const cabling: BomLine = {
   addOnOf: [],
 }
 
-export const manualCabling: BomManualLine = {
+export const manualCabling: ManualLine = {
   id: id(901),
   kind: 'freeText',
   variantId: null,
@@ -91,7 +91,7 @@ export const manualCabling: BomManualLine = {
   note: 'Cat 7',
   updatedAt: '2026-10-19T10:00:00Z',
 }
-export const manualBattery: BomManualLine = {
+export const manualBattery: ManualLine = {
   id: id(902),
   kind: 'catalog',
   variantId: id(702),
@@ -112,7 +112,7 @@ const pricing = {
   updatedAt: '2026-10-19T09:00:00Z',
 }
 
-export const bom: BomData = {
+export const bom: Bom = {
   plans: [ground, upper],
   lines: [motion, battery, dimmer, cabling],
   groups: [
@@ -127,7 +127,7 @@ export const bom: BomData = {
       ],
       lines: [],
     },
-    { kind: 'freeText', productType: zigbee, subtotal: '100.00', converted: null, categories: [], lines: [cabling.key] },
+    { kind: 'freeText', productType: null, subtotal: '100.00', converted: null, categories: [], lines: [cabling.key] },
   ],
   totals: { subtotal: '255.00', discount: '25.50', services: '50.00', grandTotal: '279.50', currency: 'USD', rate: '1', converted: null },
   pricing,
@@ -136,7 +136,7 @@ export const bom: BomData = {
 }
 
 /** The same BOM for a project in EUR at 0.9. */
-export const bomEur: BomData = {
+export const bomEur: Bom = {
   ...bom,
   lines: bom.lines.map((l) => (l.key === motion.key ? { ...l, converted: { unitPrice: '22.50', total: '90.00' } } : l)),
   totals: { ...bom.totals, currency: 'EUR', rate: '0.9', converted: { subtotal: '229.50', discount: '22.95', services: '45.00', grandTotal: '251.55' } },
@@ -151,7 +151,7 @@ const values = (price: string) => ({
   imageUrl: null,
   requiredAddons: [],
 })
-export const changes: { items: Change[]; grandTotal: string; grandTotalAfter: string; effect: string } = {
+export const changes: CatalogChanges = {
   items: [
     {
       variantId: motion.key,
