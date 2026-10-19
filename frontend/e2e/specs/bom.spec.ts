@@ -131,22 +131,24 @@ test('bom: a project in another currency shows converted amounts', async ({ page
   }
   await page.setViewportSize({ width: 1400, height: 900 })
 
-  // EUR: every amount converted on its own from its USD value (D228).
+  // EUR: converted unit price × quantity, sums of converted line totals,
+  // percent on the converted subtotal, USD amounts converted once (D267).
   await page.goto(`/projects/${projects.EUR.id}?tab=bom`)
   await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '', '3', '$10.00€9.20', '$30.00€27.60'])
   await expect(bomRow(page, 'Cabling')).toContainText('$12.34€11.35')
   const totals = page.getByRole('region', { name: 'Totals', exact: true })
-  // Subtotal 42.34, discount 4.23, services 100, grand total 138.11.
+  // USD subtotal 42.34, discount 4.23, services 100, grand total 138.11;
+  // EUR 27.60 + 11.35 = 38.95, 10 % = 3.90, services 92.00, grand total 127.05.
   await expect(totals.getByTestId('total-subtotal')).toHaveText(/\$42\.34\s*€38\.95/)
-  await expect(totals.getByTestId('total-discount')).toHaveText(/\u2212\$4\.23\s*\u2212€3\.89/)
-  await expect(grandTotal(page)).toHaveText(/\$138\.11\s*€127\.06/)
+  await expect(totals.getByTestId('total-discount')).toHaveText(/\u2212\$4\.23\s*\u2212€3\.90/)
+  await expect(grandTotal(page)).toHaveText(/\$138\.11\s*€127\.05/)
   await expect(totals).toContainText('1 USD = 0.92 EUR')
   // Manual lines carry the API's converted amounts too.
   const manual = page.getByRole('table', { name: 'Manual lines' }).getByRole('row').filter({ hasText: 'Cabling' })
   await expect(manual).toContainText('$12.34€11.35')
 
-  // JPY has no minor unit.
+  // JPY has no minor unit: 1,514 × 3 = 4,542; 4,542 + 1,868 = 6,410 − 641 + 15,137.
   await page.goto(`/projects/${projects.JPY.id}?tab=bom`)
-  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '', '3', '$10.00¥1,514', '$30.00¥4,541'])
+  await expect(bomRow(page, name).getByRole('cell')).toHaveText(['', new RegExp(name), '3', '', '3', '$10.00¥1,514', '$30.00¥4,542'])
   await expect(grandTotal(page)).toHaveText(/\$138\.11\s*¥20,906/)
 })
