@@ -102,5 +102,82 @@
     "more_other": "und {{count}} weitere",
     "complete": "Alle Einheiten dieses Bedarfs sind verbunden.",
     "noNeeds": "Kein offener Bedarf kann diesen Kanal nutzen."
+  },
+  "tab": {
+    "title": "Prüfungen",
+    "description": "Ob jeder Bedarf verbunden ist und jeder Verteiler, jede Buslinie und jedes Gateway innerhalb der Grenzen bleibt."
+  },
+  "overview": {
+    "zones": "Abgedeckte Zonen",
+    "zonesValue": "{{covered}} / {{total}}",
+    "allCovered": "Alle abgedeckt",
+    "notAllCovered": "Nicht alle abgedeckt",
+    "noNeeds": "Keine Bedarfe",
+    "unconnected": "Nicht verbundene Einheiten",
+    "unitsOf": "{{connected}} von {{total}} verbunden",
+    "findings": "Befunde",
+    "findingsValue": "{{errors}} Fehler · {{warnings}} Warnungen",
+    "board": "Verteiler {{name}}",
+    "te": "{{used}} von {{capacity}} TE belegt",
+    "channels": "{{kind}}: {{free}} von {{total}} frei",
+    "channelsAlternative": "{{kind}} (aus anderen Kanälen): {{free}} von {{total}} frei",
+    "busLine": "Buslinie {{name}}",
+    "current": "{{used}} von {{supplied}} mA (Reserve {{reserve}} %)",
+    "devicesOf": "{{devices}} von {{max}} Geräten",
+    "devices_one": "{{count}} Gerät",
+    "devices_other": "{{count}} Geräte",
+    "unknownCurrent_one": "{{count}} Gerät mit unbekanntem Busstrom",
+    "unknownCurrent_other": "{{count}} Geräte mit unbekanntem Busstrom",
+    "gateway": "Gateway {{name}}",
+    "places": "{{used}} von {{supplied}} Plätzen (Reserve {{reserve}} %)",
+    "gatewayDevices_one": "{{count}} Gerät, {{routers}} Router",
+    "gatewayDevices_other": "{{count}} Geräte, {{routers}} Router"
+  },
+  "findings": {
+    "title": "Befunde",
+    "count": "{{errors}} Fehler, {{warnings}} Warnungen, {{infos}} Hinweise",
+    "none": "Nichts zu melden.",
+    "open": "Öffnen",
+    "openFor": "Öffnen: {{text}}"
+  },
+  "area": {
+    "needs": "Bedarfe",
+    "connections": "Verbindungen",
+    "boards": "Verteiler",
+    "networks": "Netzwerke"
+  },
+  "unconnected": {
+    "title": "Nicht verbundene Bedarfe",
+    "description_one": "{{count}} Bedarf mit noch nicht verbundenen Einheiten.",
+    "description_other": "{{count}} Bedarfe mit noch nicht verbundenen Einheiten.",
+    "none": "Jeder Bedarf ist verbunden.",
+    "openPlan": "Grundriss öffnen",
+    "connected": "{{connected}} von {{quantity}} verbunden"
+  },
+  "auto": {
+    "open": "Automatisch verbinden…",
+    "title": "Automatisch verbinden",
+    "description": "Verbindet offene Einheiten mit freien Kanälen: zuerst Geräte im Raum, dann die Verteiler der Reihe nach. Bestehende Verbindungen bleiben unverändert.",
+    "scope": "Bedarfe",
+    "scopeAll": "Alle offenen Bedarfe",
+    "scopeZones": "Bedarfe ausgewählter Zonen",
+    "zones": "Zonen",
+    "preview": "Vorschau",
+    "apply": "Übernehmen",
+    "back": "Auswahl ändern",
+    "nothing": "Nichts zu verbinden.",
+    "failures": "Bedarfe, die nicht verbunden werden können",
+    "unitsLeft_one": "{{count}} Einheit",
+    "unitsLeft_other": "{{count}} Einheiten",
+    "changed": "Die Version wurde seit der Vorschau geändert. Dies ist die neue Vorschau.",
+    "applied_one": "Automatisch {{count}} Verbindung angelegt.",
+    "applied_other": "Automatisch {{count}} Verbindungen angelegt.",
+    "undo": "Automatisches Verbinden rückgängig",
+    "undone_one": "Rückgängig gemacht: {{count}} Verbindung entfernt.",
+    "undone_other": "Rückgängig gemacht: {{count}} Verbindungen entfernt.",
+    "summary_one": "{{count}} Einheit wird verbunden.",
+    "summary_other": "{{count}} Einheiten werden verbunden.",
+    "summaryWithFailures_one": "{{count}} Einheit wird verbunden, {{failed}} nicht:",
+    "summaryWithFailures_other": "{{count}} Einheiten werden verbunden, {{failed}} nicht:"
   }
 }

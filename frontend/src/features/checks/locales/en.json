@@ -102,5 +102,82 @@
     "more_other": "and {{count}} more",
     "complete": "All units of this need are connected.",
     "noNeeds": "No unconnected need can use this channel."
+  },
+  "tab": {
+    "title": "Checks",
+    "description": "Whether every need is connected and every board, bus line and gateway stays within its limits."
+  },
+  "overview": {
+    "zones": "Zones covered",
+    "zonesValue": "{{covered}} / {{total}}",
+    "allCovered": "All covered",
+    "notAllCovered": "Not all covered",
+    "noNeeds": "No needs",
+    "unconnected": "Unconnected units",
+    "unitsOf": "{{connected}} of {{total}} connected",
+    "findings": "Findings",
+    "findingsValue": "{{errors}} errors · {{warnings}} warnings",
+    "board": "Board {{name}}",
+    "te": "{{used}} of {{capacity}} TE used",
+    "channels": "{{kind}}: {{free}} of {{total}} free",
+    "channelsAlternative": "{{kind}} (from other channels): {{free}} of {{total}} free",
+    "busLine": "Bus line {{name}}",
+    "current": "{{used}} of {{supplied}} mA (reserve {{reserve}} %)",
+    "devicesOf": "{{devices}} of {{max}} devices",
+    "devices_one": "{{count}} device",
+    "devices_other": "{{count}} devices",
+    "unknownCurrent_one": "{{count}} device with unknown bus current",
+    "unknownCurrent_other": "{{count}} devices with unknown bus current",
+    "gateway": "Gateway {{name}}",
+    "places": "{{used}} of {{supplied}} places (reserve {{reserve}} %)",
+    "gatewayDevices_one": "{{count}} device, {{routers}} routers",
+    "gatewayDevices_other": "{{count}} devices, {{routers}} routers"
+  },
+  "findings": {
+    "title": "Findings",
+    "count": "{{errors}} errors, {{warnings}} warnings, {{infos}} notes",
+    "none": "Nothing to report.",
+    "open": "Open",
+    "openFor": "Open: {{text}}"
+  },
+  "area": {
+    "needs": "Needs",
+    "connections": "Connections",
+    "boards": "Boards",
+    "networks": "Networks"
+  },
+  "unconnected": {
+    "title": "Unconnected needs",
+    "description_one": "{{count}} need with units that are not connected yet.",
+    "description_other": "{{count}} needs with units that are not connected yet.",
+    "none": "Every need is connected.",
+    "openPlan": "Open floorplan",
+    "connected": "{{connected}} of {{quantity}} connected"
+  },
+  "auto": {
+    "open": "Auto-connect…",
+    "title": "Auto-connect",
+    "description": "Connects unconnected units to free channels: devices in the room first, then the boards in order. Existing connections stay as they are.",
+    "scope": "Needs",
+    "scopeAll": "All unconnected needs",
+    "scopeZones": "Needs of selected zones",
+    "zones": "Zones",
+    "preview": "Preview",
+    "apply": "Apply",
+    "back": "Change scope",
+    "nothing": "Nothing to connect.",
+    "failures": "Needs that cannot be connected",
+    "unitsLeft_one": "{{count}} unit",
+    "unitsLeft_other": "{{count}} units",
+    "changed": "The version changed since the preview. This is the new preview.",
+    "applied_one": "Auto-connect made {{count}} connection.",
+    "applied_other": "Auto-connect made {{count}} connections.",
+    "undo": "Undo auto-connect",
+    "undone_one": "Auto-connect undone: {{count}} connection removed.",
+    "undone_other": "Auto-connect undone: {{count}} connections removed.",
+    "summary_one": "{{count}} unit will be connected.",
+    "summary_other": "{{count}} units will be connected.",
+    "summaryWithFailures_one": "{{count}} unit will be connected, {{failed}} cannot:",
+    "summaryWithFailures_other": "{{count}} units will be connected, {{failed}} cannot:"
   }
 }

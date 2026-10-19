@@ -69,6 +69,10 @@ export function useWiringModel(versionId: string, enabled = true) {
       const item = items.get(itemKey(ref.targetPlanId, ref.targetItemId))
       return t('channel.text', { item: itemName(item), kind: kindName(ref.outputKindId), no: ref.channelNo, plan: item?.planName ?? '' })
     }
+    const kindNameByKey = (key: string) => {
+      const k = kindByKey.get(key)
+      return k ? localize(k.name) : key
+    }
     const functionTypeName = (id: string) => {
       const f = ftById.get(id)
       return f ? localize(f.name) : ''
@@ -110,6 +114,7 @@ export function useWiringModel(versionId: string, enabled = true) {
       kindByKey,
       itemName,
       kindName,
+      kindNameByKey,
       channelText,
       needText,
       needPlace,

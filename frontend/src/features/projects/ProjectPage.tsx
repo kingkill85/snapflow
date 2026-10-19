@@ -14,6 +14,7 @@ import {
 } from '@/api/generated/projects/projects'
 import { BomTab, PricingTab } from '@/features/bom'
 import { NeedsTab } from '@/features/needs'
+import { ChecksTab } from '@/features/checks'
 import { NetworksTab } from '@/features/networks'
 import { PlansSection } from '@/features/plans'
 import { ProposalsTab } from '@/features/proposals'
@@ -208,10 +209,10 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
   )
 }
 
-const versionTabs = ['plans', 'needs', 'networks', 'bom', 'pricing', 'proposals'] as const
+const versionTabs = ['plans', 'needs', 'networks', 'checks', 'bom', 'pricing', 'proposals'] as const
 type VersionTab = (typeof versionTabs)[number]
 
-/** Plans / Needs / Networks / Bill of materials / Pricing / Proposals of a version; the tab is in the URL (?tab=bom, D236). */
+/** Plans / Needs / Networks / Checks / Bill of materials / Pricing / Proposals of a version; the tab is in the URL (?tab=bom, D236). */
 function VersionTabs({ project, version, canWrite }: { project: Project; version: ProjectVersion; canWrite: boolean }) {
   const { t } = useTranslation('bom')
   const [params, setParams] = useSearchParams()
@@ -237,6 +238,7 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
         { key: 'plans', label: t('tabs.plans'), content: <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} /> },
         { key: 'needs', label: t('tabs.needs'), content: <NeedsTab key={version.id} versionId={version.id} /> },
         { key: 'networks', label: t('tabs.networks'), content: <NetworksTab key={version.id} versionId={version.id} /> },
+        { key: 'checks', label: t('tabs.checks'), content: <ChecksTab key={version.id} projectId={project.id} versionId={version.id} /> },
         {
           key: 'bom',
           label: t('tabs.bom'),

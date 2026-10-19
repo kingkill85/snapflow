@@ -126,3 +126,15 @@ export function useReasonText() {
       ? t(`reason.${reason as UnconnectableReason}`, { functionType: functionType ?? t('fallback.functionType') })
       : reason
 }
+
+export const areas = ['needs', 'connections', 'boards', 'networks'] as const
+type Area = (typeof areas)[number]
+
+/** The area a finding belongs to (only for grouping the list). */
+export function areaOf(code: string): Area {
+  if (code === 'need_unconnected' || code === 'units_exceeded') return 'needs'
+  if (code === 'board_over_capacity') return 'boards'
+  if (code.startsWith('bus_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
+  return 'connections'
+}
+
