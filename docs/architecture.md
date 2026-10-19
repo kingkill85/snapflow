@@ -71,7 +71,7 @@ The catalog has two independent axes (D99, replacing D14): the **product type** 
 
 ## Catalog: capabilities
 
-Step 3a (D284–D293). What a product can do on a distribution board comes from its attribute values, never from code (D187).
+Step 3a (D284–D302). What a product can do on a distribution board comes from its attribute values, never from code (D187).
 
 - **Load types** and **output kinds** are catalog configuration (`features/capabilities`, `catalog.write`, own order, optimistic updates). An output kind serves function types and may have an alternative: `count` channels of another kind act as one of it (blind output ← 2 relay outputs, per pair, Q8). Function types gain `allowsCircuit` and their allowed load types.
 - **Catalog fields** (`/api/catalog-fields`) are the catalog-wide registry of known columns: key, label, type, unit, options, ETIM code and an optional **meaning** with parameters (`channels_supplied` and `channel_limit_a` / `channel_min_load_w` per output kind, `channel_limit_w` per output kind and load type, `module_total_a`/`_w`, `bus_current_used_ma`/`_supplied_ma`, `bus_devices_max`, `rail_width_te`, `enclosure_rows`, `enclosure_te_per_row`, `wireless_places_supplied`, `wireless_place_used`, `zigbee_router`, `motor_type`), optionally limited to product types. `GET /api/catalog-field-meanings` lists the meanings with their parameters and accepted types.
@@ -79,6 +79,8 @@ Step 3a (D284–D293). What a product can do on a distribution board comes from 
 - **Product types** carry the system settings `defaultBusCurrentMa`, `reservePercent` (20) and `busDevicesMax`.
 - **Computation**: `capabilities.Compute(Registry, Input)` (pure) turns a product's or variant's values into a `Capabilities` block: channels by output kind with count, A limit, minimum load, W limits per load type and alternatives (`per`, `max`); module totals; bus current used/supplied; bus devices; rail width; enclosure rows and TE; wireless places supplied/used; Zigbee router; motor type; the effective mounting. Empty values count as unknown, never 0. Products and variants return it as `capabilities`; later steps call `products.Service.Capabilities(ctx, variantIDs)`.
 - **Import** (D188, D290): attribute columns are matched with the fields (link, key, header text); unknown ones block the preview (`import.columns_unknown`) until answered through `POST /api/import-columns/answers` (new field or just information); the mapping keeps `fieldKey`/`information`, created categories link their attributes to the fields, and `product.mounting` is a target.
+- **Updates** keep omitted capability settings (D294): a client that does not send `mounting`, the product type settings, `allowsCircuit`/`loadTypeIds` or a product's `mounting` leaves them as stored.
+- **Frontend** (D295–D302): `features/capabilities` holds the Fields, Output kinds and Load types pages (one list shell, one reorder helper); the function type, product type, category (mounting, per-attribute "Catalog field" link that locks type/unit/options) and product (mounting override) editors edit the new values; the product page words the `capabilities` block ("What SnapFlow knows about this product"); the import mapping page asks for unknown columns in a "New columns" step after the preview reports them.
 
 ## Catalog import
 

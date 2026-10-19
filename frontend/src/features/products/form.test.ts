@@ -30,7 +30,7 @@ const product = (overrides: Partial<ProductFormValues> = {}): ProductFormValues 
 
 describe('product and variant forms', () => {
   it('leaves out a blank SKU, no image and a blank German name, and sends the price in point form', () => {
-    expect(toVariantInput(variant({ sku: '  ' }), {})).toEqual({ name: { en: 'Standard' }, price: '27.5', attributes: {}, isActive: true, mounting: '' })
+    expect(toVariantInput(variant({ sku: '  ' }), {})).toEqual({ name: { en: 'Standard' }, price: '27.5', attributes: {}, isActive: true })
     expect(toVariantInput(variant({ sku: ' SK-1 ', imageFileId: 'f1', name: { en: 'White', de: 'Weiß' } }), { gloss: true })).toEqual({
       name: { en: 'White', de: 'Weiß' },
       sku: 'SK-1',

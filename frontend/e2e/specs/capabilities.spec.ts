@@ -43,6 +43,8 @@ test('an import asks what new capability columns mean; the product then shows it
       `${model};Dimmer 6ch;${category};Standard;99.00;6;200;6;made in EU\n`,
   )
   const profileName = unique('Capabilities')
+  // Listing first creates the starter profile while there is none (D121), as the imports spec running alongside expects.
+  expect((await api.ctx.get('/api/import-profiles')).ok()).toBe(true)
   const attr = (column: string, key: string) => ({ target: `attribute.${key}`, column })
   const profile = await api.ctx.post('/api/import-profiles', {
     data: {

@@ -120,6 +120,22 @@ for (const width of [1280, 1440, 1920]) {
           tenantId: (await api.createTenant(unique('Elektrotechnik Mustermann-Schmidt GmbH & Co. KG'))).id,
           customer: { name: 'Maximilian Alexander Mustermann-Schmidt', company: 'Mustermann-Schmidt Immobilienverwaltung GmbH' },
         })
+        // A catalog field with a meaning and both parameters: the widest Fields row (output kinds and load types are seeded).
+        const [kinds, loads] = await Promise.all(
+          ['/api/output-kinds', '/api/load-types'].map(async (path) => ((await (await api.ctx.get(path)).json()) as { items: { id: string }[] }).items),
+        )
+        const field = await api.ctx.post('/api/catalog-fields', {
+          data: {
+            key: uniqueKey('dimmer_led_w'),
+            label: { en: unique('Max. LED load per dimmer channel'), de: unique('Max. LED-Last je Dimmkanal') },
+            type: 'number',
+            unit: 'W',
+            meaning: 'channel_limit_w',
+            outputKindId: kinds[0].id,
+            loadTypeId: loads[0].id,
+          },
+        })
+        expect(field.status()).toBe(201)
         // Required afterwards: the product misses the value, a problem badge in the status cell.
         await api.updateCategory(category.id, { attributes: [{ ...attribute, required: true }] })
         await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
