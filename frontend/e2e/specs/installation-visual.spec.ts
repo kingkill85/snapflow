@@ -84,13 +84,13 @@ for (const lang of ['en', 'de'] as const) {
     const [, knxType, zigbeeType] = await Promise.all(cat.types.map((id) => api.productType(id)))
 
     // Zone short name for the labels (D433).
-    const zones = ground.content.zones as { id: string; name: string }[]
+    const zones = ground.content.zones ?? []
     // A door sensor on the ground floor, which has no Zigbee gateway: a device without gateway.
     const lone = { id: crypto.randomUUID(), variantId: cat.products.sensor.variantId, x: 300, y: 600, label: 'S1' }
     await api.savePlanContent(ground.id, {
       ...ground.content,
       placements: [...groundDevices, lone],
-      zones: zones.map((z, i) => (i === 0 ? { ...z, shortName: lang === 'en' ? 'Drawing' : 'Salon' } : z)),
+      zones: zones.map((z, i) => (i === 0 ? { ...z, shortName: lang === 'en' ? 'Drawing' : 'Salon' } : z)) as typeof zones,
     })
 
     // The first floor's second gateway goes away while the door sensor is pinned to it: the sensor is without gateway.
