@@ -298,7 +298,7 @@ func TestFieldValidation(t *testing.T) {
 	assertError(t, api.Delete("/api/output-kinds/"+relay.ID.String(), api.Admin.Cookie), http.StatusConflict, "output_kind.in_use")
 	assertError(t, api.Delete("/api/load-types/"+led.ID.String(), api.Admin.Cookie), http.StatusConflict, "load_type.in_use")
 	meanings := decode[capabilities.MeaningList](t, api.Get("/api/catalog-field-meanings", api.Admin.Cookie))
-	if len(meanings.Items) != 17 || meanings.Items[1].Meaning != capabilities.MeaningChannelLimitW || !meanings.Items[1].LoadTypeRequired ||
+	if len(meanings.Items) != 18 || meanings.Items[1].Meaning != capabilities.MeaningChannelLimitW || !meanings.Items[1].LoadTypeRequired ||
 		!meanings.Items[2].LoadType || meanings.Items[2].LoadTypeRequired {
 		t.Errorf("meanings %+v", meanings.Items)
 	}
@@ -730,4 +730,28 @@ func TestCompute(t *testing.T) {
 
 func categoriesAttr(key, fieldKey string) attrschema.AttributeDefinition {
 	return attrschema.AttributeDefinition{Definition: attrschema.Definition{Key: key, Type: attrschema.TypeNumber, FieldKey: fieldKey}}
+}
+
+// The power factor of a load type (D407): default 1, kept when left out on
+// update, rounded to 2 decimals, 0.10-1.00.
+func TestLoadTypePowerFactor(t *testing.T) {
+	api := apptest.New(t)
+	lt := create[capabilities.LoadType](t, api, "/api/load-types", map[string]any{"key": "motor", "name": name("Motor"), "isActive": true})
+	if lt.PowerFactor != 1 {
+		t.Fatalf("default %v", lt.PowerFactor)
+	}
+	put := func(body map[string]any) *httptest.ResponseRecorder {
+		return api.Put("/api/load-types/"+lt.ID.String(), api.Admin.Cookie, body)
+	}
+	resp := put(map[string]any{"key": "motor", "name": name("Motor"), "isActive": true, "powerFactor": 0.704, "expectedUpdatedAt": lt.UpdatedAt})
+	lt2 := decode[capabilities.LoadType](t, resp)
+	if lt2.PowerFactor != 0.7 {
+		t.Fatalf("set %v", lt2.PowerFactor)
+	}
+	lt3 := decode[capabilities.LoadType](t, put(map[string]any{"key": "motor", "name": name("Motor"), "isActive": true, "expectedUpdatedAt": lt2.UpdatedAt}))
+	if lt3.PowerFactor != 0.7 {
+		t.Fatalf("kept %v", lt3.PowerFactor)
+	}
+	assertError(t, put(map[string]any{"key": "motor", "name": name("Motor"), "isActive": true, "powerFactor": 1.2, "expectedUpdatedAt": lt3.UpdatedAt}),
+		http.StatusUnprocessableEntity, "validation.failed")
 }

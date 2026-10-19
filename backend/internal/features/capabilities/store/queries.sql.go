@@ -812,9 +812,9 @@ func (q *Queries) UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) 
 
 const updateOutputKind = `-- name: UpdateOutputKind :one
 UPDATE output_kinds
-SET key = $2, name = $3, is_active = $4, power_factor = coalesce($5::numeric, power_factor),
+SET key = $2, name = $3, is_active = $4,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $6
+WHERE id = $1 AND updated_at = $5
 RETURNING id, key, name, sort_order, is_active, created_at, updated_at
 `
 
@@ -823,7 +823,6 @@ type UpdateOutputKindParams struct {
 	Key               string
 	Name              i18n.Text
 	IsActive          bool
-	PowerFactor       *string
 	ExpectedUpdatedAt time.Time
 }
 
@@ -833,7 +832,6 @@ func (q *Queries) UpdateOutputKind(ctx context.Context, arg UpdateOutputKindPara
 		arg.Key,
 		arg.Name,
 		arg.IsActive,
-		arg.PowerFactor,
 		arg.ExpectedUpdatedAt,
 	)
 	var i OutputKind

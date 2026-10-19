@@ -421,6 +421,7 @@ export * from './roomTemplateUpdate';
 export * from './roomTemplateUpdateEquipmentLevel';
 export * from './roomTemplateUpdateName';
 export * from './rowUse';
+export * from './rowUseStatus';
 export * from './searchVariantsParams';
 export * from './snapshotCategory';
 export * from './snapshotCategoryName';

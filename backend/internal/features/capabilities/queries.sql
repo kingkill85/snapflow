@@ -56,7 +56,7 @@ RETURNING *;
 
 -- name: UpdateOutputKind :one
 UPDATE output_kinds
-SET key = $2, name = $3, is_active = $4, power_factor = coalesce(sqlc.narg(power_factor)::numeric, power_factor),
+SET key = $2, name = $3, is_active = $4,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;

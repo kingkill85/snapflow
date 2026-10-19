@@ -68,6 +68,7 @@ type world struct {
 	floor, board  uuid.UUID
 	zone, need    uuid.UUID
 	module        uuid.UUID
+	pairKind      uuid.UUID
 }
 
 func text(en string) map[string]string { return map[string]string{"en": en} }
@@ -76,8 +77,12 @@ func text(en string) map[string]string { return map[string]string{"en": en} }
 // product type KNX, a board product with 2 dimmer channels of 100 W LED, a
 // project with a floorplan (zone with a need of 3 × 40 W LED) and a board
 // with one dimmer.
-func setup(t *testing.T) world {
+//
+// With pair, a kind "pair_output" serving light is made of 2 dimmer
+// channels (the dimmer product opts in): channel pair 1 = dimmers 1+2.
+func setup(t *testing.T, pair ...bool) world {
 	t.Helper()
+	withPair := len(pair) > 0 && pair[0]
 	api := apptest.New(t)
 	w := world{api: api}
 	admin := api.Admin.Cookie
@@ -98,18 +103,31 @@ func setup(t *testing.T) world {
 	post("/api/catalog-fields", map[string]any{"key": "dim_led_w", "label": text("LED W"), "type": "number", "meaning": "channel_limit_w",
 		"outputKindId": w.dimmerKind, "loadTypeId": w.led})
 	post("/api/catalog-fields", map[string]any{"key": "width_te", "label": text("Width"), "type": "number", "meaning": "rail_width_te"})
+	keys := []string{"dim_ch", "dim_led_w", "width_te"}
+	values := map[string]any{"dim_ch": 2, "dim_led_w": 100, "width_te": 4}
+	if withPair {
+		w.pairKind = post("/api/output-kinds", map[string]any{"key": "pair_output", "name": text("Pair output"), "isActive": true,
+			"functionTypeIds": []any{w.light}, "alternatives": []any{map[string]any{"outputKindId": w.dimmerKind, "count": 2}}})
+		post("/api/catalog-fields", map[string]any{"key": "pair_ok", "label": text("Pairs"), "type": "boolean", "meaning": "alternative_allowed",
+			"outputKindId": w.pairKind})
+		keys = append(keys, "pair_ok")
+		values["pair_ok"] = true
+	}
 	attrs := []any{}
-	for _, k := range []string{"dim_ch", "dim_led_w", "width_te"} {
+	for _, k := range keys {
 		typ := "number"
-		if k == "dim_ch" {
+		switch k {
+		case "dim_ch":
 			typ = "integer"
+		case "pair_ok":
+			typ = "boolean"
 		}
 		attrs = append(attrs, map[string]any{"key": k, "label": text(k), "type": typ, "fieldKey": k})
 	}
 	cat := post("/api/categories", map[string]any{"key": "actuators", "name": text("Actuators"), "isActive": true, "mounting": "board",
 		"attributes": attrs, "instanceAttributes": []any{}})
 	p := post("/api/products", map[string]any{"productTypeId": knx, "categoryId": cat, "modelNumber": "DIM", "name": text("Dimmer"), "isActive": true,
-		"attributes": map[string]any{"dim_ch": 2, "dim_led_w": 100, "width_te": 4}})
+		"attributes": values})
 	w.dimmerVariant = post("/api/products/"+p.String()+"/variants", map[string]any{"name": text("DIM"), "price": "10.00", "isActive": true})
 
 	w.user = api.NewUser(api.NewTenant("Acme"), auth.RoleUser)

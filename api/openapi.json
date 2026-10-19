@@ -10360,6 +10360,16 @@
           "rowId": {
             "type": "string"
           },
+          "status": {
+            "description": "TE of the row: red over capacity (board_row_over_capacity), amber above 100 − 20 %",
+            "enum": [
+              "ok",
+              "amber",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
           "usedTe": {
             "description": "Modules' widths (unknown width = 1 TE)",
             "format": "double",
@@ -10370,7 +10380,8 @@
           "rowId",
           "position",
           "usedTe",
-          "capacityTe"
+          "capacityTe",
+          "status"
         ],
         "type": "object"
       },
