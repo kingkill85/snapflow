@@ -5,7 +5,7 @@ test('a demoted tenant admin loses user management on their next action', async 
   const tenantAdmin = await api.createUser({ role: 'tenant_admin' })
   const theirPage = await sessionFor(tenantAdmin)
   await theirPage.goto('/admin/users')
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles', 'Company profile'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types'], Administration: ['Users', 'Roles', 'Company profile'] })
   // They start creating a user...
   await theirPage.getByRole('button', { name: 'New user' }).click()
   const theirDialog = theirPage.getByRole('dialog', { name: 'New user' })
@@ -24,14 +24,14 @@ test('a demoted tenant admin loses user management on their next action', async 
   // Their next action is refused; the app reloads their permissions.
   await theirDialog.getByRole('button', { name: 'Create' }).click()
   await expect(theirPage.getByRole('heading', { name: 'No access' })).toBeVisible()
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Roles: ['Roles'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types'], Roles: ['Roles'] })
 })
 
 test('a promoted user gets user management after a reload', async ({ page, api, sessionFor }) => {
   const user = await api.createUser({ role: 'user' })
   const theirPage = await sessionFor(user)
   await theirPage.goto('/admin/roles')
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Roles: ['Roles'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types'], Roles: ['Roles'] })
 
   await page.goto('/admin/users')
   await row(page, user.email).getByRole('button', { name: 'Edit' }).click()
@@ -41,5 +41,5 @@ test('a promoted user gets user management after a reload', async ({ page, api, 
   await expect(dialog).toBeHidden()
 
   await theirPage.reload()
-  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types'], Administration: ['Users', 'Roles', 'Company profile'] })
+  expect(await navEntries(theirPage)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types'], Administration: ['Users', 'Roles', 'Company profile'] })
 })
