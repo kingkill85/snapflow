@@ -63,7 +63,6 @@
     "renameVersion": "Rename",
     "deleteVersion": "Delete version",
     "lastVersionHint": "The last version cannot be deleted. Delete the project instead.",
-    "noPlans": "No plans yet.",
     "readOnly": {
       "completed": "This project is completed. Reopen it to change it.",
       "cancelled": "This project is cancelled. Reopen it to change it."

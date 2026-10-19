@@ -1,0 +1,109 @@
+{
+  "title": "Pläne",
+  "add": "Plan hinzufügen",
+  "empty": "Noch keine Pläne.",
+  "counts": "Produkte: {{products}} · Zonen: {{zones}}",
+  "lockedBy": "Wird von {{name}} bearbeitet",
+  "moveLeft": "{{name}} nach links verschieben",
+  "moveRight": "{{name}} nach rechts verschieben",
+  "editItem": "{{name}} bearbeiten",
+  "deleteItem": "{{name}} löschen",
+  "deleteTitle": "Plan löschen",
+  "deleteMessage": "Plan {{name}} mit seinen Zonen und Produkten löschen? Das kann nicht rückgängig gemacht werden.",
+  "dialog": {
+    "addTitle": "Plan hinzufügen",
+    "editTitle": "Plan bearbeiten",
+    "name": "Name",
+    "nameHint": "z. B. „Erdgeschoss“",
+    "image": "Grundrissbild",
+    "imageHint": "JPEG, PNG oder WebP bis 20 MB. Hierher ziehen, Datei wählen oder einfügen.",
+    "replaceImage": "Bild ersetzen",
+    "replaceHint": "Optional. Produkte und Zonen behalten ihren Platz auf dem neuen Bild."
+  },
+  "editor": {
+    "title": "Plan",
+    "notFound": "Diesen Plan gibt es nicht (mehr).",
+    "back": "Zurück zum Projekt",
+    "canvas": "Grundriss",
+    "readOnlyProject": "Dieses Projekt ist abgeschlossen oder storniert: Der Plan kann nur angesehen werden.",
+    "viewOnly": "Nur ansehen",
+    "phoneHint": "Pläne werden auf größeren Bildschirmen bearbeitet. Hier können Sie den Plan und seine Produkte ansehen.",
+    "noProducts": "Noch keine Produkte platziert."
+  },
+  "existing": {
+    "badge": "Bestand"
+  },
+  "toolbar": {
+    "label": "Planwerkzeuge",
+    "select": "Auswählen",
+    "pan": "Verschieben",
+    "zoomOut": "Verkleinern",
+    "zoomIn": "Vergrößern",
+    "zoomLevel": "Zoomstufe",
+    "fit": "An Bildschirm anpassen",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen"
+  },
+  "panel": {
+    "label": "Planbereich",
+    "products": "Produkte",
+    "zones": "Zonen",
+    "inspector": "Eigenschaften"
+  },
+  "zones": {
+    "empty": "Noch keine Zonen."
+  },
+  "palette": {
+    "search": "Produkte suchen",
+    "searchHint": "Name, Modellnummer oder SKU",
+    "hint": "Ziehen Sie ein Produkt auf den Plan, oder klicken Sie es und dann die Stelle an.",
+    "armedHint": "Klicken Sie auf den Plan, um das Produkt zu platzieren. Esc bricht ab.",
+    "empty": "Die Produkttypen des Projekts haben keine verfügbaren Produkte.",
+    "noMatch": "Keine Produkte passen zur Suche."
+  },
+  "inspector": {
+    "none": "Wählen Sie ein Produkt auf dem Plan aus, um seine Details zu sehen.",
+    "many_one": "{{count}} Element ausgewählt.",
+    "many_other": "{{count}} Elemente ausgewählt.",
+    "product": "Produkt",
+    "deleted": "Gelöschtes Produkt",
+    "variant": "Variante",
+    "label": "Beschriftung",
+    "x": "X",
+    "y": "Y",
+    "width": "Breite",
+    "height": "Höhe",
+    "rotation": "Drehung",
+    "existing": "Bestand",
+    "existingHint": "Der Kunde hat es bereits: zählt technisch, wird nie berechnet"
+  },
+  "warning": {
+    "variant_deleted": "Dieses Produkt wurde aus dem Katalog gelöscht.",
+    "variant_inactive": "Diese Variante ist im Katalog inaktiv.",
+    "product_inactive": "Dieses Produkt ist im Katalog inaktiv.",
+    "category_inactive": "Die Kategorie des Produkts ist inaktiv.",
+    "product_type_inactive": "Der Produkttyp ist inaktiv.",
+    "product_type_not_in_project": "Der Produkttyp ist für dieses Projekt nicht gewählt.",
+    "required_addon_unavailable": "Ein erforderliches Zubehör ist nicht verfügbar.",
+    "addon_unavailable": "Ein gewähltes Zubehör ist nicht verfügbar.",
+    "addon_not_linked": "Ein gewähltes Zubehör gehört nicht mehr zu dieser Variante."
+  },
+  "save": {
+    "saved": "Gespeichert",
+    "saving": "Speichert…",
+    "unsaved": "Ungespeicherte Änderungen",
+    "failed": "Speichern fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "stale": "Anderswo geändert",
+    "reload": "Plan neu laden",
+    "itemErrors_one": "{{count}} Element konnte nicht gespeichert werden:",
+    "itemErrors_other": "{{count}} Elemente konnten nicht gespeichert werden:",
+    "item": "Element {{n}}"
+  },
+  "lock": {
+    "heldBy": "{{name}} bearbeitet diesen Plan (bis {{time}}). Sie können ihn ansehen.",
+    "takenOver": "{{name}} hat diesen Plan übernommen. Noch nicht gespeicherte Änderungen sind verloren; Sie können ihn ansehen.",
+    "takeOver": "Übernehmen",
+    "retry": "Erneut versuchen"
+  }
+}

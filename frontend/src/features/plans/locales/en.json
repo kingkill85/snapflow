@@ -1,0 +1,109 @@
+{
+  "title": "Plans",
+  "add": "Add plan",
+  "empty": "No plans yet.",
+  "counts": "Products: {{products}} · Zones: {{zones}}",
+  "lockedBy": "Being edited by {{name}}",
+  "moveLeft": "Move {{name}} left",
+  "moveRight": "Move {{name}} right",
+  "editItem": "Edit {{name}}",
+  "deleteItem": "Delete {{name}}",
+  "deleteTitle": "Delete plan",
+  "deleteMessage": "Delete plan {{name}} with its zones and products? This cannot be undone.",
+  "dialog": {
+    "addTitle": "Add plan",
+    "editTitle": "Edit plan",
+    "name": "Name",
+    "nameHint": "e.g. \"Ground floor\"",
+    "image": "Floorplan image",
+    "imageHint": "JPEG, PNG or WebP up to 20 MB. Drop it here, choose a file or paste it.",
+    "replaceImage": "Replace image",
+    "replaceHint": "Optional. Products and zones keep their place on the new image."
+  },
+  "editor": {
+    "title": "Plan",
+    "notFound": "This plan does not exist (anymore).",
+    "back": "Back to the project",
+    "canvas": "Floorplan",
+    "readOnlyProject": "This project is completed or cancelled: the plan can only be viewed.",
+    "viewOnly": "View only",
+    "phoneHint": "Plans are edited on larger screens. Here you can view the plan and its products.",
+    "noProducts": "No products placed yet."
+  },
+  "existing": {
+    "badge": "Existing"
+  },
+  "toolbar": {
+    "label": "Plan tools",
+    "select": "Select",
+    "pan": "Pan",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "zoomLevel": "Zoom level",
+    "fit": "Fit to screen",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "panel": {
+    "label": "Plan panel",
+    "products": "Products",
+    "zones": "Zones",
+    "inspector": "Inspector"
+  },
+  "zones": {
+    "empty": "No zones yet."
+  },
+  "palette": {
+    "search": "Search products",
+    "searchHint": "Name, model number or SKU",
+    "hint": "Drag a product onto the plan, or click it and then the spot.",
+    "armedHint": "Click on the plan to place the product. Esc cancels.",
+    "empty": "The project's product types have no available products.",
+    "noMatch": "No products match the search."
+  },
+  "inspector": {
+    "none": "Select a product on the plan to see its details.",
+    "many_one": "{{count}} item selected.",
+    "many_other": "{{count}} items selected.",
+    "product": "Product",
+    "deleted": "Deleted product",
+    "variant": "Variant",
+    "label": "Label",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "height": "Height",
+    "rotation": "Rotation",
+    "existing": "Existing",
+    "existingHint": "The customer already has it: counted technically, never invoiced"
+  },
+  "warning": {
+    "variant_deleted": "This product was deleted from the catalog.",
+    "variant_inactive": "This variant is inactive in the catalog.",
+    "product_inactive": "This product is inactive in the catalog.",
+    "category_inactive": "The product's category is inactive.",
+    "product_type_inactive": "The product type is inactive.",
+    "product_type_not_in_project": "The product type is not chosen for this project.",
+    "required_addon_unavailable": "A required add-on is not available.",
+    "addon_unavailable": "A chosen add-on is not available.",
+    "addon_not_linked": "A chosen add-on no longer belongs to this variant."
+  },
+  "save": {
+    "saved": "Saved",
+    "saving": "Saving…",
+    "unsaved": "Unsaved changes",
+    "failed": "Save failed",
+    "retry": "Retry",
+    "stale": "Changed elsewhere",
+    "reload": "Reload plan",
+    "itemErrors_one": "{{count}} item could not be saved:",
+    "itemErrors_other": "{{count}} items could not be saved:",
+    "item": "Item {{n}}"
+  },
+  "lock": {
+    "heldBy": "{{name}} is editing this plan (until {{time}}). You can view it.",
+    "takenOver": "{{name}} has taken over this plan. Changes not saved yet are lost; you can view it.",
+    "takeOver": "Take over",
+    "retry": "Try again"
+  }
+}

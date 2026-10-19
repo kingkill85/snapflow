@@ -12,6 +12,7 @@ import {
   useGetProject,
   useUpdateProject,
 } from '@/api/generated/projects/projects'
+import { PlansSection } from '@/features/plans'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, TextLink } from '@/components/ui'
 
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
@@ -175,8 +176,7 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
       )}
       {version?.notes && <Notes label={t('page.versionNotes')} text={version.notes} />}
 
-      {/* Plans arrive in 2b (the floorplan editor), which adds the action here. */}
-      <EmptyState title={t('page.noPlans')} />
+      {version && <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} />}
 
       <ProjectFormDialog open={editOpen} onOpenChange={setEditOpen} item={project} />
       {version && (

@@ -7,8 +7,9 @@ import { describe, expect, it } from 'vitest'
 // interactive elements, so the same thing always looks the same.
 const FORBIDDEN = ['button', 'input', 'select', 'textarea', 'table', 'dialog']
 const src = join(import.meta.dirname, '..')
-// Features and the shared catalog module (src/catalog) alike.
-const roots = [join(src, 'features'), join(src, 'catalog')]
+// Features and the shared modules (src/catalog, src/canvas) alike. Konva
+// elements (<Stage>, <Rect>, ...) are capitalised and not affected (D198).
+const roots = [join(src, 'features'), join(src, 'catalog'), join(src, 'canvas')]
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

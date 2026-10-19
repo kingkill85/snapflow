@@ -30,6 +30,7 @@ function serveProject(initial: Project = villa) {
     http.get('/api/projects', () => HttpResponse.json({ items: [], total: 0 })),
     http.get('/api/tenants', () => HttpResponse.json({ items: tenants })),
     http.get('/api/product-types', () => HttpResponse.json({ items: productTypes })),
+    http.get('/api/versions/:versionId/plans', () => HttpResponse.json([])),
   )
   return (next: Project) => {
     project = next
@@ -45,7 +46,7 @@ describe('ProjectPage', () => {
     expect(screen.getByText('Max Müller, Müller GmbH')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
     expect(screen.getByLabelText('Version')).toHaveTextContent('V1')
-    expect(screen.getByText('No plans yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No plans yet.')).toBeInTheDocument()
     expect(screen.queryByRole('status', { name: /completed/ })).not.toBeInTheDocument()
     expect(screen.getByText('Project notes')).toBeInTheDocument()
     expect(screen.getByText('Gate code 1234')).toBeInTheDocument()
