@@ -1,4 +1,6 @@
-import type { CategoryRef, PlanPlacement, PlanZone, ProductTypeRef, VariantSearchItem } from '@/api/generated/model'
+import type { CategoryRef, PlanNeed, PlanPlacement, PlanZone, ProductTypeRef, VariantSearchItem } from '@/api/generated/model'
+
+import { isSymbol } from './document'
 
 import type { PaletteProduct } from './catalog'
 
@@ -13,9 +15,14 @@ export type Layers = {
   hiddenCategories: Set<string>
   zonesHidden: boolean
   hiddenZones: Set<string>
+  /** Load symbols (needs with a position). */
+  needsHidden: boolean
 }
 
-export const allVisible = (): Layers => ({ hiddenProductTypes: new Set(), hiddenCategories: new Set(), zonesHidden: false, hiddenZones: new Set() })
+export const allVisible = (): Layers => ({ hiddenProductTypes: new Set(), hiddenCategories: new Set(), zonesHidden: false, hiddenZones: new Set(), needsHidden: false })
+
+/** The load symbols the canvas shows. */
+export const visibleSymbols = (needs: PlanNeed[], layers: Layers) => (layers.needsHidden ? [] : needs.filter(isSymbol))
 
 /** Placements of deleted variants have neither type nor category: always shown (they need attention). */
 export function placementVisible(p: PlanPlacement, layers: Layers, variants: Map<string, VariantSearchItem>): boolean {
@@ -34,10 +41,11 @@ export function toggled(set: Set<string>, id: string, on: boolean): Set<string> 
   return next
 }
 
-/** The ids of every visible item: placements and zones (select-all). */
-export const visibleIds = (doc: { placements: PlanPlacement[]; zones: PlanZone[] }, layers: Layers, variants: Map<string, VariantSearchItem>) => [
+/** The ids of every visible item: placements, zones and load symbols (select-all). */
+export const visibleIds = (doc: { placements: PlanPlacement[]; zones: PlanZone[]; needs: PlanNeed[] }, layers: Layers, variants: Map<string, VariantSearchItem>) => [
   ...doc.zones.filter((z) => zoneVisible(z, layers)).map((z) => z.id),
   ...doc.placements.filter((p) => placementVisible(p, layers, variants)).map((p) => p.id),
+  ...visibleSymbols(doc.needs, layers).map((n) => n.id),
 ]
 
 /** The product types and categories on the plan or in the palette, in first-seen order. */

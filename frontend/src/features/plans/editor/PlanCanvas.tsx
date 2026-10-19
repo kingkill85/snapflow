@@ -1,9 +1,9 @@
 import type Konva from 'konva'
 import { type DragEvent, type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text } from 'react-konva'
+import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text, Wedge } from 'react-konva'
 
-import type { Plan, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { Plan, PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import {
   angleTo,
   boundsOf,
@@ -28,10 +28,11 @@ import {
 } from '@/canvas'
 import { fileUrl } from '@/catalog/files'
 
-import type { PlanDocument } from './document'
+import { isSymbol, type PlanDocument } from './document'
 import type { EditorAction } from './editor-state'
 import { chromeName } from './export'
-import { type Layers, placementVisible, zoneVisible } from './layers'
+import { type Layers, placementVisible, visibleSymbols, zoneVisible } from './layers'
+import { duplicateSymbols, type SymbolIcon } from './needs'
 import { clampMove, duplicatePlacements, resizeChanges } from './placements'
 import {
   canClose,
@@ -54,7 +55,10 @@ import {
 /** The data type of a palette product dragged onto the canvas. */
 export const productDragType = 'application/x-snapflow-product'
 
-export type Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate'
+export type Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate' | 'placeNeed'
+
+/** How a load symbol is drawn: a pictogram or a letter, and the text below it. */
+export type SymbolLook = { icon?: SymbolIcon; letter: string }
 
 /** A corner of a zone picked on the canvas (the inspector can remove it). */
 export type ActiveVertex = { zoneId: string; index: number }
@@ -94,6 +98,12 @@ type Props = {
   onPlace: (point: Point, productId?: string) => void
   /** What is hidden (view state). */
   layers: Layers
+  /** The look of a load symbol per function type id. */
+  symbolLooks: Map<string, SymbolLook>
+  /** Load symbols with a warning (drawn with a marker). */
+  needWarningIds: Set<string>
+  /** The "Place need" tool: a click puts a symbol here. */
+  onPlaceNeed: (point: Point) => void
   /** Resizing a placement resizes every placement of its product. */
   resizeAll: boolean
   activeVertex: ActiveVertex | null
@@ -137,6 +147,9 @@ export function PlanCanvas({
   placing,
   onPlace,
   layers,
+  symbolLooks,
+  needWarningIds,
+  onPlaceNeed,
   resizeAll,
   activeVertex,
   onActiveVertex,
@@ -160,6 +173,7 @@ export function PlanCanvas({
 
   const placements = useMemo(() => document.placements.filter((p) => placementVisible(p, layers, variants)), [document.placements, layers, variants])
   const zones = useMemo(() => document.zones.filter((z) => zoneVisible(z, layers)), [document.zones, layers])
+  const symbols = useMemo(() => visibleSymbols(document.needs, layers), [document.needs, layers])
 
   const imageUrls = useMemo(
     () => placements.flatMap((p) => (p.variantId ? [fileUrl(variants.get(p.variantId)?.imageFileId)] : [])).filter((u): u is string => !!u),
@@ -181,6 +195,10 @@ export function PlanCanvas({
     if (interaction.kind === 'resize' && interaction.id === p.id) return interaction.preview
     if (interaction.kind === 'rotate' && interaction.id === p.id) return { ...p, rotation: interaction.rotation }
     return p
+  }
+  const shownNeed = <T extends PlanNeed>(n: T): T => {
+    if (interaction?.kind === 'move' && !interaction.copy && interaction.ids.includes(n.id) && n.x !== null && n.y !== null) return { ...n, x: n.x + interaction.dx, y: n.y + interaction.dy }
+    return n
   }
   const shownZone = (z: PlanZone): PlanZone => {
     if (interaction?.kind === 'move' && !interaction.copy && interaction.ids.includes(z.id))
@@ -260,6 +278,10 @@ export function PlanCanvas({
       clickDraft(point, evt.timeStamp)
       return
     }
+    if (tool === 'placeNeed') {
+      if (editable) onPlaceNeed(clampPoint(point))
+      return
+    }
     if (tool !== 'select') return
     const name = target.name()
     if (editable && single && name.startsWith('handle-')) {
@@ -291,7 +313,7 @@ export function PlanCanvas({
       setInteraction({ kind: 'vertex', id: singleZone.id, index: index + 1, points: insertVertex(singleZone.points, index, at), point: at, inserted: true })
       return
     }
-    const placementId = target.findAncestor('.placement', true)?.id()
+    const placementId = target.findAncestor('.placement', true)?.id() ?? target.findAncestor('.need', true)?.id()
     // An armed palette product is placed on empty canvas and on zones.
     if (placing && editable && !placementId) {
       onPlace(point)
@@ -370,7 +392,13 @@ export function PlanCanvas({
         const { dx, dy } = clampMove(document, done.ids, Math.round(done.dx), Math.round(done.dy), plan.image)
         if (done.copy) {
           const copies = duplicatePlacements(document.placements.filter((p) => done.ids.includes(p.id)), dx, dy, plan.image)
-          if (copies.length > 0) dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select: copies.map((c) => c.id) })
+          const needCopies = duplicateSymbols(document.needs.filter((n) => done.ids.includes(n.id)), dx, dy, plan.image)
+          if (copies.length + needCopies.length > 0)
+            dispatch({
+              type: 'change',
+              action: { type: 'batch', actions: [{ type: 'addPlacements', placements: copies }, { type: 'addNeeds', needs: needCopies }] },
+              select: [...copies.map((c) => c.id), ...needCopies.map((c) => c.id)],
+            })
         } else {
           dispatch({ type: 'change', action: { type: 'moveBy', ids: done.ids, dx, dy } })
         }
@@ -392,6 +420,7 @@ export function PlanCanvas({
         const hits = [
           ...zones.filter((z) => rectsIntersect(band, zoneBounds(z))).map((z) => z.id),
           ...placements.filter((p) => rectsIntersect(band, boundsOf(boxCorners(p)))).map((p) => p.id),
+          ...symbols.filter((n) => rectsIntersect(band, { x: n.x, y: n.y, width: 0, height: 0 })).map((n) => n.id),
         ]
         dispatch(done.add ? { type: 'select', ids: [...new Set([...selection, ...hits])] } : { type: 'select', ids: hits })
         return
@@ -439,7 +468,8 @@ export function PlanCanvas({
   const drawnRect = interaction?.kind === 'drawRect' ? rectFromPoints(interaction.start, interaction.end) : undefined
   const singleShown = single && shown(single)
   const singleZoneShown = singleZone && shownZone(singleZone)
-  const drawing = tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate'
+  const drawing = tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate' || tool === 'placeNeed'
+  const symbolCopies = interaction?.kind === 'move' && interaction.copy ? document.needs.filter((n) => isSymbol(n) && interaction.ids.includes(n.id)) : []
   const draftLine = draft ? [...draft.points, ...(draft.cursor ? [draft.cursor] : [])].flatMap((p) => [p.x, p.y]) : []
 
   return (
@@ -497,6 +527,30 @@ export function PlanCanvas({
               k={k}
               theme={theme}
               existingLabel=""
+            />
+          ))}
+          {symbols.map((n) => (
+            <NeedNode
+              key={n.id}
+              need={shownNeed(n)}
+              look={symbolLooks.get(n.functionTypeId)}
+              selected={selected.has(n.id)}
+              warning={needWarningIds.has(n.id)}
+              error={errorIds.has(n.id)}
+              k={k}
+              theme={theme}
+            />
+          ))}
+          {symbolCopies.map((n) => (
+            <NeedNode
+              key={`copy-${n.id}`}
+              need={{ ...n, x: (n.x ?? 0) + (interaction?.kind === 'move' ? interaction.dx : 0), y: (n.y ?? 0) + (interaction?.kind === 'move' ? interaction.dy : 0) }}
+              look={symbolLooks.get(n.functionTypeId)}
+              selected
+              warning={false}
+              error={false}
+              k={k}
+              theme={theme}
             />
           ))}
           {editable && singleShown && interaction?.kind !== 'move' && <Handles placement={singleShown} k={k} color={theme.primary} surface={theme.surface} />}
@@ -739,6 +793,72 @@ function Handles({ placement: p, k, color, surface }: { placement: PlanPlacement
       {corners.map(([corner, x, y]) => (
         <Rect key={corner} name={`handle-${corner}`} x={x - s / 2} y={y - s / 2} width={s} height={s} fill={surface} stroke={color} strokeWidth={1.5 * k} />
       ))}
+    </Group>
+  )
+}
+
+/** Radius of a load symbol in screen px. */
+const symbolRadius = 11
+
+/**
+ * A load symbol (3b): a small round icon with a pictogram for common
+ * function types (lamp, dimmer, blind, socket, pushbutton) or the function's
+ * first letter, the quantity and label below. Screen-sized like labels.
+ */
+function NeedNode({ need: n, look, selected, warning, error, k, theme }: { need: PlanNeed; look: SymbolLook | undefined; selected: boolean; warning: boolean; error: boolean; k: number; theme: PlanColors }) {
+  const r = symbolRadius * k
+  const ink = error ? theme.danger : theme.ink
+  const d = r * 0.5
+  const caption = [n.quantity > 1 ? `${n.quantity} ×` : '', n.label].filter(Boolean).join(' ')
+  return (
+    <Group name="need" id={n.id} x={n.x ?? 0} y={n.y ?? 0}>
+      <Circle radius={r} fill={theme.surface} stroke={ink} strokeWidth={(selected || error ? 2.5 : 1.5) * k} />
+      {look?.icon === 'dimmer' && <Wedge radius={r - 1.5 * k} angle={180} fill={theme.muted} opacity={0.35} listening={false} />}
+      {(look?.icon === 'lamp' || look?.icon === 'dimmer') && (
+        <>
+          <Line points={[-d, -d, d, d]} stroke={ink} strokeWidth={1.5 * k} listening={false} />
+          <Line points={[-d, d, d, -d]} stroke={ink} strokeWidth={1.5 * k} listening={false} />
+        </>
+      )}
+      {look?.icon === 'blind' && (
+        <>
+          <Line points={[-d, -1.5 * k, 0, -d - 1.5 * k, d, -1.5 * k]} closed fill={ink} listening={false} />
+          <Line points={[-d, 1.5 * k, 0, d + 1.5 * k, d, 1.5 * k]} closed fill={ink} listening={false} />
+        </>
+      )}
+      {look?.icon === 'socket' && (
+        <>
+          <Circle x={-d * 0.7} radius={1.8 * k} fill={ink} listening={false} />
+          <Circle x={d * 0.7} radius={1.8 * k} fill={ink} listening={false} />
+        </>
+      )}
+      {look?.icon === 'pushbutton' && <Circle radius={r * 0.4} fill={ink} listening={false} />}
+      {!look?.icon && (
+        <Text text={look?.letter ?? '?'} x={-r} y={-6.5 * k} width={2 * r} align="center" fontSize={13 * k} fontStyle="bold" fill={ink} listening={false} />
+      )}
+      {selected && <Circle name={chromeName} radius={r + 3 * k} stroke={theme.primary} strokeWidth={k} dash={[4 * k, 3 * k]} listening={false} />}
+      {warning && (
+        <Group x={r * 0.8} y={-r * 0.8} listening={false}>
+          <Circle radius={5.5 * k} fill={theme.warning} />
+          <Text text="!" x={-1.5 * k} y={-4.5 * k} fontSize={9 * k} fontStyle="bold" fill={theme.surface} />
+        </Group>
+      )}
+      {caption && (
+        <Text
+          text={caption}
+          x={-60 * k}
+          y={r + 3 * k}
+          width={120 * k}
+          align="center"
+          fontSize={11 * k}
+          fill={theme.ink}
+          stroke={theme.surface}
+          strokeWidth={3 * k}
+          lineJoin="round"
+          fillAfterStrokeEnabled
+          listening={false}
+        />
+      )}
     </Group>
   )
 }

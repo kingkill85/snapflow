@@ -35,10 +35,11 @@ const schema = z.object({
   name: translatableSchema({ required: errorKey('validation.required') }),
   allowsCircuit: z.boolean(),
   loadTypeIds: z.array(z.string()),
+  isActive: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds']), ...translatableApiFields('name') }
+const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds', 'isActive']), ...translatableApiFields('name') }
 
 type Props = {
   open: boolean
@@ -74,6 +75,7 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       name: toTranslatable(functionType?.name),
       allowsCircuit: functionType?.allowsCircuit ?? false,
       loadTypeIds: functionType?.loadTypeIds ?? [],
+      isActive: functionType?.isActive ?? true,
     })
     resetCreate()
     resetUpdate()
@@ -85,6 +87,7 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       name: fromTranslatable(values.name),
       allowsCircuit: values.allowsCircuit,
       loadTypeIds: values.loadTypeIds,
+      isActive: values.isActive,
     }
     try {
       if (functionType) await update.mutateAsync({ id: functionType.id, data })
@@ -124,6 +127,7 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
         )}
       />
       <SwitchField label={t('field.allowsCircuit')} hint={t('field.allowsCircuitHint')} {...form.register('allowsCircuit')} />
+      <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
     </FormDialog>
   )
 }

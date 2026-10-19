@@ -9,7 +9,7 @@ const image = { width: 1000, height: 800 }
 
 function setup() {
   const p = placement(1, { x: 995, y: 100 })
-  const state = { ...initEditor({ scale: null, zones: [], placements: [p] }), selection: [p.id] }
+  const state = { ...initEditor({ scale: null, zones: [], placements: [p], needs: [] }), selection: [p.id] }
   const dispatch = vi.fn()
   renderHook(() => useShortcuts({ state, dispatch, editable: true, image, onEscape: () => undefined }))
   return { dispatch, p }

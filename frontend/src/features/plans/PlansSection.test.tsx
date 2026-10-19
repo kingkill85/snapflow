@@ -23,14 +23,14 @@ const png = () => new File([new Uint8Array([137, 80, 78, 71])], 'floor.png', { t
 
 describe('PlansSection', () => {
   it('lists the plans with thumbnail, counts and a link to the editor', async () => {
-    servePlans([plan(1, { placementCount: 12, zoneCount: 3 }), plan(2, { lock: { userId: 'u', name: 'Bea', expiresAt: '2026-10-18T10:02:00Z', mine: false } })])
+    servePlans([plan(1, { placementCount: 12, zoneCount: 3, needCount: 7 }), plan(2, { lock: { userId: 'u', name: 'Bea', expiresAt: '2026-10-18T10:02:00Z', mine: false } })])
     renderWithProviders(<PlansSection projectId={projectId} versionId={versionId} canWrite />)
 
     const list = await screen.findByRole('list', { name: 'Plans' })
     const cards = within(list).getAllByRole('listitem')
     expect(cards).toHaveLength(2)
     expect(within(cards[0]).getByRole('link', { name: 'Ground floor' })).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${plan(1).id}`)
-    expect(within(cards[0]).getByText('Products: 12 · Zones: 3')).toBeInTheDocument()
+    expect(within(cards[0]).getByText('Products: 12 · Zones: 3 · Needs: 7')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Being edited by Bea')).toBeInTheDocument()
     expect(within(cards[0]).getByRole('button', { name: 'Move Ground floor left' })).toBeDisabled()
     expect(within(cards[1]).getByRole('button', { name: 'Move Floor 2 right' })).toBeDisabled()

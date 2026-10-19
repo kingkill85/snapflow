@@ -13,6 +13,9 @@
     "loadTypes": "Allowed load types",
     "loadTypesHint": "The load types a need of this function may have. None ticked = any.",
     "allowsCircuit": "Several needs may share one channel",
-    "allowsCircuitHint": "A circuit: e.g. lights and sockets yes, blinds and inputs no."
+    "allowsCircuitHint": "A circuit: e.g. lights and sockets yes, blinds and inputs no.",
+    "status": "Status",
+    "active": "Active",
+    "activeHint": "Inactive function types stay on existing needs but cannot be chosen for new needs or room templates."
   }
 }

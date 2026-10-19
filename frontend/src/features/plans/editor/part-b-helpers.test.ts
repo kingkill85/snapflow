@@ -66,7 +66,7 @@ describe('layers', () => {
   })
 
   it('lists the visible ids for select-all', () => {
-    const doc = { placements: [switchPlacement, sensorPlacement], zones: [zone('a'), zone('b')] }
+    const doc = { placements: [switchPlacement, sensorPlacement], zones: [zone('a'), zone('b')], needs: [] }
     const layers = { ...allVisible(), hiddenCategories: new Set([catalog[2].categoryId]), hiddenZones: new Set(['b']) }
     expect(visibleIds(doc, layers, variants)).toEqual(['a', switchPlacement.id])
   })

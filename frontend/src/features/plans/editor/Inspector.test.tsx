@@ -4,11 +4,11 @@ import { http, HttpResponse } from 'msw'
 import { useReducer, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { PlanPlacement, PlanZone } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement, PlanZone } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
-import { catalog, pid, placement, zigbeeId } from '../test-fixtures'
+import { catalog, needCatalog, pid, placement, zigbeeId } from '../test-fixtures'
 import { paletteProducts } from './catalog'
 import { type PlanDocument } from './document'
 import { type EditorAction, editorReducer, initEditor } from './editor-state'
@@ -67,6 +67,11 @@ function Harness({ doc, selection, spy, initialVertex = null, resizeAll: initial
     <Inspector
       placements={present.placements.filter((p) => selection.includes(p.id))}
       zones={present.zones.filter((z) => selection.includes(z.id))}
+      needs={present.needs.filter((n) => selection.includes(n.id))}
+      allNeeds={present.needs}
+      allZones={present.zones}
+      needCatalog={needCatalog}
+      needWarnings={new Map()}
       allPlacements={present.placements}
       variants={variants}
       allVariants={catalog}
@@ -87,14 +92,14 @@ function Harness({ doc, selection, spy, initialVertex = null, resizeAll: initial
   )
 }
 
-const docOf = (placements: PlanPlacement[], zones: PlanZone[] = []): PlanDocument => ({ scale: null, placements, zones })
+const docOf = (placements: PlanPlacement[], zones: PlanZone[] = [], needs: PlanNeed[] = []): PlanDocument => ({ scale: null, placements, zones, needs })
 const lastChange = (spy: ReturnType<typeof vi.fn>) => spy.mock.calls.at(-1)?.[0] as Extract<EditorAction, { type: 'change' }>
 
 describe('Inspector', () => {
   it('says what to do with nothing selected', () => {
     const spy = vi.fn()
     renderWithProviders(<Harness doc={docOf([])} selection={[]} spy={spy} />)
-    expect(screen.getByText(/Select a product or zone/)).toBeInTheDocument()
+    expect(screen.getByText(/Select a product, zone or need symbol/)).toBeInTheDocument()
   })
 
   describe('zone', () => {
@@ -142,7 +147,7 @@ describe('Inspector', () => {
       renderWithProviders(<Harness doc={docOf([], [z])} selection={[z.id]} spy={spy} />)
       await user.click(screen.getByRole('button', { name: 'Delete' }))
       expect(lastChange(spy).action).toEqual({ type: 'remove', ids: [z.id] })
-      expect(screen.getByText(/Select a product or zone/)).toBeInTheDocument()
+      expect(screen.getByText(/Select a product, zone or need symbol/)).toBeInTheDocument()
     })
 
     it('cannot remove a corner without an active one', () => {
@@ -302,7 +307,7 @@ describe('Inspector', () => {
 
       await user.click(screen.getByRole('button', { name: 'Delete 3 items' }))
       expect(lastChange(spy).action).toEqual({ type: 'remove', ids: [a.id, b.id, z.id] })
-      expect(within(document.body).getByText(/Select a product or zone/)).toBeInTheDocument()
+      expect(within(document.body).getByText(/Select a product, zone or need symbol/)).toBeInTheDocument()
     })
   })
 })

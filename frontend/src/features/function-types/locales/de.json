@@ -13,6 +13,9 @@
     "loadTypes": "Erlaubte Lastarten",
     "loadTypesHint": "Die Lastarten, die ein Bedarf dieser Funktion haben darf. Keine angehakt = alle.",
     "allowsCircuit": "Mehrere Bedarfe dürfen sich einen Kanal teilen",
-    "allowsCircuitHint": "Ein Stromkreis: z. B. Licht und Steckdosen ja, Jalousien und Eingänge nein."
+    "allowsCircuitHint": "Ein Stromkreis: z. B. Licht und Steckdosen ja, Jalousien und Eingänge nein.",
+    "status": "Status",
+    "active": "Aktiv",
+    "activeHint": "Inaktive Funktionstypen bleiben an bestehenden Bedarfen, können aber für neue Bedarfe und Raumvorlagen nicht gewählt werden."
   }
 }

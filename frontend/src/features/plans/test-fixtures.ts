@@ -1,4 +1,4 @@
-import type { Plan, PlanContent, PlanPlacement, VariantSearchItem } from '@/api/generated/model'
+import type { FunctionType, LoadType, Plan, PlanContent, PlanPlacement, RoomTemplate, VariantSearchItem } from '@/api/generated/model'
 
 // Test data of the plans tests (not shipped: only tests import it).
 
@@ -83,3 +83,62 @@ export const catalog: VariantSearchItem[] = [
   variant(4, { productName: { en: 'KNX switch' }, productType: knxRef, productTypeId: knxRef.id }),
 ]
 export const zigbeeId = zigbeeRef.id
+
+// Needs (3b): function types, load types, a room template.
+export const loadType = (n: number, over: Partial<LoadType> = {}): LoadType => ({
+  id: pid(1100 + n),
+  key: `load_${n}`,
+  name: { en: n === 1 ? 'LED' : `Load ${n}` },
+  isActive: true,
+  sortOrder: n,
+  can: { update: true, delete: true },
+  createdAt: at,
+  updatedAt: at,
+  ...over,
+})
+
+export const functionType = (n: number, over: Partial<FunctionType> = {}): FunctionType => ({
+  id: pid(1000 + n),
+  key: n === 1 ? 'dimmable_light' : `function_${n}`,
+  name: { en: n === 1 ? 'Dimmable light' : `Function ${n}` },
+  allowsCircuit: false,
+  isActive: true,
+  loadTypeIds: [],
+  createdAt: at,
+  updatedAt: at,
+  ...over,
+})
+
+export const functionTypes = [
+  functionType(1, { loadTypeIds: [pid(1101)] }),
+  functionType(2, { key: 'blind', name: { en: 'Blind' } }),
+  functionType(3, { key: 'old', name: { en: 'Old function' }, isActive: false }),
+]
+export const loadTypes = [loadType(1), loadType(2)]
+
+export const roomTemplate = (n: number, over: Partial<RoomTemplate> = {}): RoomTemplate => ({
+  id: pid(1200 + n),
+  key: `room_${n}`,
+  name: { en: n === 1 ? 'Living room' : `Room ${n}` },
+  equipmentLevel: { en: 'Comfort' },
+  sortOrder: n,
+  isActive: true,
+  lines: [
+    { functionTypeId: functionTypes[0].id, quantity: 3, powerW: 7.5, loadTypeId: loadTypes[0].id, label: 'Ceiling' },
+    { functionTypeId: functionTypes[1].id, quantity: 2, powerW: null, loadTypeId: null, label: '' },
+    { functionTypeId: functionTypes[2].id, quantity: 1, powerW: null, loadTypeId: null, label: '' },
+  ],
+  can: { update: true, delete: true },
+  createdAt: at,
+  updatedAt: at,
+  ...over,
+})
+
+/** The editor's need catalog as `useNeedCatalog` returns it. */
+export const needCatalog = {
+  functionTypes,
+  functionTypeById: new Map(functionTypes.map((f) => [f.id, f])),
+  loadTypes,
+  loadTypeById: new Map(loadTypes.map((l) => [l.id, l])),
+  templates: [roomTemplate(1)],
+}

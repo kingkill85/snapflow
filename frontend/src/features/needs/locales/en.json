@@ -1,0 +1,28 @@
+{
+  "overview": {
+    "title": "Needs by room",
+    "description": "What each room needs, as planned in the floorplans. Needs are not products and never appear in the bill of materials.",
+    "empty": "No needs planned yet: open a plan and add needs to its zones.",
+    "noZone": "No zone",
+    "symbol": "Symbol on plan",
+    "symbolHint": "Drawn as a load symbol on the plan",
+    "byFunctionType": "Totals by function type",
+    "byLoadType": "Totals by load type",
+    "noLoadType": "No load type",
+    "total": "All plans",
+    "columns": {
+      "functionType": "Function type",
+      "loadType": "Load type",
+      "quantity": "Units",
+      "power": "Power"
+    }
+  },
+  "line": {
+    "quantity": "{{count}} ×",
+    "power": "{{power}} W"
+  },
+  "totals_one": "{{count}} unit",
+  "totals_other": "{{count}} units",
+  "totalsPower_one": "{{count}} unit · {{power}} W",
+  "totalsPower_other": "{{count}} units · {{power}} W"
+}

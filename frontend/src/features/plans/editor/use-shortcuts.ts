@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 
-import type { PlanPlacement } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement } from '@/api/generated/model'
 import { isCanvasKeyTarget, isModKey, isTypingTarget, type Size } from '@/canvas'
 
 import type { EditorAction, EditorState } from './editor-state'
+import { duplicateSymbols } from './needs'
 import { clampMove, duplicateOffset, duplicatePlacements } from './placements'
 
 type Options = {
@@ -40,7 +41,7 @@ export function shortcutOf(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' 
  * select all, Esc. Never while typing in a field or with a dialog open.
  */
 export function useShortcuts({ state, dispatch, editable, image, onEscape, selectable }: Options) {
-  const clipboard = useRef<PlanPlacement[]>([])
+  const clipboard = useRef<{ placements: PlanPlacement[]; needs: PlanNeed[] }>({ placements: [], needs: [] })
   const latest = useRef({ state, editable, image, onEscape, selectable })
   useEffect(() => {
     latest.current = { state, editable, image, onEscape, selectable }
@@ -56,6 +57,7 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
       const { state, editable, image, onEscape, selectable } = latest.current
       const doc = state.history.present
       const selected = doc.placements.filter((p) => state.selection.includes(p.id))
+      const selectedNeeds = doc.needs.filter((n) => state.selection.includes(n.id))
       const ids = state.selection
       switch (command) {
         case 'escape':
@@ -67,7 +69,7 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
           dispatch({ type: 'select', ids: selectable ? selectable() : doc.placements.map((p) => p.id) })
           return
         case 'copy':
-          if (selected.length > 0) clipboard.current = selected
+          if (selected.length + selectedNeeds.length > 0) clipboard.current = { placements: selected, needs: selectedNeeds }
           return
       }
       if (!editable) return
@@ -97,12 +99,20 @@ export function useShortcuts({ state, dispatch, editable, image, onEscape, selec
         }
         case 'duplicate':
         case 'paste': {
-          const source = command === 'duplicate' ? selected : clipboard.current
-          if (source.length === 0) return
-          const copies = duplicatePlacements(source, duplicateOffset, duplicateOffset, image)
+          const source = command === 'duplicate' ? { placements: selected, needs: selectedNeeds } : clipboard.current
+          if (source.placements.length + source.needs.length === 0) return
+          const copies = duplicatePlacements(source.placements, duplicateOffset, duplicateOffset, image)
+          const needCopies = duplicateSymbols(source.needs, duplicateOffset, duplicateOffset, image)
           // Pasting again goes further down-right.
-          if (command === 'paste') clipboard.current = copies
-          dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select: copies.map((c) => c.id) })
+          if (command === 'paste') clipboard.current = { placements: copies, needs: needCopies }
+          const select = [...copies.map((c) => c.id), ...needCopies.map((c) => c.id)]
+          if (needCopies.length === 0) {
+            dispatch({ type: 'change', action: { type: 'addPlacements', placements: copies }, select })
+          } else if (copies.length === 0) {
+            dispatch({ type: 'change', action: { type: 'addNeeds', needs: needCopies }, select })
+          } else {
+            dispatch({ type: 'change', action: { type: 'batch', actions: [{ type: 'addPlacements', placements: copies }, { type: 'addNeeds', needs: needCopies }] }, select })
+          }
           return
         }
       }

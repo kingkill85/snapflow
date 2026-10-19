@@ -1,23 +1,23 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type Konva from 'konva'
-import { ArrowLeft, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, CircleDot, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useBlocker, useParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
+import type { NeedWarning, Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
 import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { type Point, useViewport, type Viewport } from '@/canvas'
-import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
+import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, SelectField, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
 import { defaultPlacementSize, imageAspect, paletteProducts, useCatalogVariants } from './catalog'
-import { documentOf, type PlanDocument, toContentInput } from './document'
+import { documentOf, isSymbol, type PlanDocument, toContentInput } from './document'
 import { editorReducer, initEditor } from './editor-state'
 import { canRedo, canUndo } from './history'
 import { CalibrateDialog } from './CalibrateDialog'
@@ -27,11 +27,13 @@ import { Inspector } from './Inspector'
 import { allVisible, type Layers, visibleIds } from './layers'
 import { LayersPanel } from './LayersPanel'
 import { LockBanner } from './LockBanner'
+import { needText, newNeed, symbolIcon, symbolLetter } from './needs'
+import { useNeedCatalog } from './need-catalog'
 import { Palette } from './Palette'
-import { type ActiveVertex, PlanCanvas, type Tool } from './PlanCanvas'
+import { type ActiveVertex, PlanCanvas, type SymbolLook, type Tool } from './PlanCanvas'
 import { newPlacement } from './placements'
 import { SaveIndicator } from './SaveIndicator'
-import { saveErrorsByItem } from './save-errors'
+import { saveErrorsByItem, selectionFor } from './save-errors'
 import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { useShortcuts } from './use-shortcuts'
@@ -138,6 +140,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const [saveErrors, setSaveErrors] = useState<Map<string, string[]>>(new Map())
 
   const variantsById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants])
+  const needCatalog = useNeedCatalog()
+  // The function type of the next load symbol ("Place need" tool).
+  const [needFunction, setNeedFunction] = useState<string>('')
+  const symbolLooks = useMemo(
+    () => new Map<string, SymbolLook>(needCatalog.functionTypes.map((f) => [f.id, { icon: symbolIcon(f.key), letter: symbolLetter(localize(f.name)) }])),
+    [needCatalog.functionTypes, localize],
+  )
   const products = useMemo(() => paletteProducts(variants, project.productTypeIds), [variants, project.productTypeIds])
   /** Hiding a layer also drops its items from the selection (hidden items cannot be handled). */
   const changeLayers = (next: Layers) => {
@@ -151,6 +160,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     for (const w of server.warnings) map.set(w.placementId, [...(map.get(w.placementId) ?? []), w])
     return map
   }, [server.warnings])
+
+  const needWarnings = useMemo(() => {
+    const map = new Map<string, NeedWarning[]>()
+    for (const w of server.needWarnings ?? []) map.set(w.needId, [...(map.get(w.needId) ?? []), w])
+    return map
+  }, [server.needWarnings])
+  const needWarningIds = useMemo(() => new Set(needWarnings.keys()), [needWarnings])
 
   const save = useCallback(
     async (snapshot: PlanDocument) => {
@@ -166,7 +182,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         setSaveErrors(byItem)
         const first = byItem.keys().next().value
         if (first) {
-          dispatch({ type: 'select', ids: [first] })
+          dispatch({ type: 'select', ids: [selectionFor(first, snapshot)] })
           setTab('inspector')
         }
         throw e
@@ -240,7 +256,10 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     dispatch,
     editable,
     image: plan.image,
-    onEscape: () => setArmed(null),
+    onEscape: () => {
+      setArmed(null)
+      if (tool === 'placeNeed') setTool('select')
+    },
     selectable: () => visibleIds(state.history.present, layers, variantsById),
   })
 
@@ -259,6 +278,16 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   const selectedPlacements = doc.placements.filter((p) => state.selection.includes(p.id))
   const selectedZones = doc.zones.filter((z) => state.selection.includes(z.id))
+  const selectedNeeds = doc.needs.filter((n) => isSymbol(n) && state.selection.includes(n.id))
+
+  /** "Place need": a load symbol of the chosen function type where the plan was clicked; back to Select. */
+  const placeNeed = (point: Point) => {
+    if (!needFunction) return
+    const need = newNeed(needFunction, null, point, plan.image)
+    dispatch({ type: 'change', action: { type: 'addNeeds', needs: [need] }, select: [need.id] })
+    setTool('select')
+    setTab('inspector')
+  }
 
   const [exporting, setExporting] = useState(false)
   const exportPng = () => {
@@ -295,6 +324,9 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       placing={armed !== null}
       onPlace={(point, productId) => void place(point, productId)}
       layers={layers}
+      symbolLooks={symbolLooks}
+      needWarningIds={needWarningIds}
+      onPlaceNeed={placeNeed}
       resizeAll={resizeAll}
       activeVertex={activeVertex}
       onActiveVertex={setActiveVertex}
@@ -312,6 +344,22 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <p aria-live="polite" className="pointer-events-none absolute top-2 left-1/2 max-w-[90%] -translate-x-1/2 rounded-control border border-line bg-surface/90 px-2 py-1 text-xs">
           {toolHint(tool, t)}
         </p>
+      )}
+      {wide && tool === 'placeNeed' && (
+        // The function type is chosen first, then the spot.
+        <div className="absolute top-12 left-1/2 w-72 max-w-[90%] -translate-x-1/2 rounded-control border border-line bg-surface p-2 shadow-sm">
+          {needCatalog.functionTypes.some((f) => f.isActive) ? (
+            <SelectField
+              label={t('needs.placeFunction')}
+              value={needFunction}
+              placeholder={t('needs.functionType')}
+              options={needCatalog.functionTypes.filter((f) => f.isActive).map((f) => ({ value: f.id, label: localize(f.name) }))}
+              onValueChange={setNeedFunction}
+            />
+          ) : (
+            <p className="text-sm text-muted">{t('needs.noFunctionTypes')}</p>
+          )}
+        </div>
       )}
     </div>
   )
@@ -376,11 +424,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
                   size="sm"
                   variant="secondary"
                   onClick={() => {
-                    dispatch({ type: 'select', ids: [id] })
+                    dispatch({ type: 'select', ids: [selectionFor(id, doc)] })
                     setTab('inspector')
                   }}
                 >
-                  {itemName(id, doc, variantsById, localize) ?? t('save.item', { n: i + 1 })}
+                  {itemName(id, doc, variantsById, localize, needCatalog.functionTypeById) ?? t('save.item', { n: i + 1 })}
                 </Button>
               </li>
             ))}
@@ -410,6 +458,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
               zones={doc.zones}
               saved={server.placements}
               placements={doc.placements}
+              needs={doc.needs}
               selection={state.selection}
               layers={layers}
               onLayers={changeLayers}
@@ -431,6 +480,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           zones={doc.zones}
           saved={server.placements}
           placements={doc.placements}
+          needs={doc.needs}
           selection={state.selection}
           layers={layers}
           onLayers={changeLayers}
@@ -453,6 +503,11 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <Inspector
           placements={selectedPlacements}
           zones={selectedZones}
+          needs={selectedNeeds}
+          allNeeds={doc.needs}
+          allZones={doc.zones}
+          needCatalog={needCatalog}
+          needWarnings={needWarnings}
           allPlacements={doc.placements}
           image={plan.image}
           resizeAll={resizeAll}
@@ -481,6 +536,17 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <IconButton label={t('toolbar.pan')} icon={<Hand />} aria-pressed={tool === 'pan'} className={cn(tool === 'pan' && 'bg-canvas text-primary')} onClick={() => setTool('pan')} />
         <IconButton label={t('toolbar.zoneRect')} icon={<Square />} aria-pressed={tool === 'zoneRect'} disabled={!editable} className={cn(tool === 'zoneRect' && 'bg-canvas text-primary')} onClick={() => setTool('zoneRect')} />
         <IconButton label={t('toolbar.zonePolygon')} icon={<Hexagon />} aria-pressed={tool === 'zonePolygon'} disabled={!editable} className={cn(tool === 'zonePolygon' && 'bg-canvas text-primary')} onClick={() => setTool('zonePolygon')} />
+        <IconButton
+          label={t('toolbar.placeNeed')}
+          icon={<CircleDot />}
+          aria-pressed={tool === 'placeNeed'}
+          disabled={!editable}
+          className={cn(tool === 'placeNeed' && 'bg-canvas text-primary')}
+          onClick={() => {
+            setTool('placeNeed')
+            setArmed(null)
+          }}
+        />
         <IconButton label={t('toolbar.calibrate')} icon={<Ruler />} aria-pressed={tool === 'calibrate'} disabled={!editable} className={cn(tool === 'calibrate' && 'bg-canvas text-primary')} onClick={() => setTool('calibrate')} />
         <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
         {zoomControls}
@@ -510,8 +576,8 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 }
 
 /** What the active drawing tool expects (announced, and shown over the canvas). */
-function toolHint(tool: Tool, t: (key: 'tools.zoneRect' | 'tools.zonePolygon' | 'tools.calibrate') => string) {
-  return tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate' ? t(`tools.${tool}`) : undefined
+function toolHint(tool: Tool, t: (key: 'tools.zoneRect' | 'tools.zonePolygon' | 'tools.calibrate' | 'tools.placeNeed') => string) {
+  return tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate' || tool === 'placeNeed' ? t(`tools.${tool}`) : undefined
 }
 
 /** A scale bar over the canvas when the plan is calibrated (not part of the export). */
@@ -536,7 +602,15 @@ function knownPlacements(queryClient: ReturnType<typeof useQueryClient>, plan: P
   return [...others, ...doc.placements]
 }
 
-function itemName(id: string, doc: PlanDocument, variants: Map<string, VariantSearchItem>, localize: ReturnType<typeof useLocalized>) {
+function itemName(
+  id: string,
+  doc: PlanDocument,
+  variants: Map<string, VariantSearchItem>,
+  localize: ReturnType<typeof useLocalized>,
+  functionTypes: ReturnType<typeof useNeedCatalog>['functionTypeById'],
+) {
+  const n = doc.needs.find((x) => x.id === id)
+  if (n) return needText(n, functionTypes, new Map(), localize, String, '') || undefined
   const p = doc.placements.find((x) => x.id === id)
   if (p) {
     const v = p.variantId ? variants.get(p.variantId) : undefined

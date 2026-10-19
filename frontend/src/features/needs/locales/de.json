@@ -1,0 +1,28 @@
+{
+  "overview": {
+    "title": "Bedarf nach Raum",
+    "description": "Was jeder Raum braucht, wie in den Grundrissen geplant. Bedarf ist kein Produkt und erscheint nie in der Stückliste.",
+    "empty": "Noch kein Bedarf geplant: Öffnen Sie einen Plan und erfassen Sie den Bedarf seiner Zonen.",
+    "noZone": "Keine Zone",
+    "symbol": "Symbol im Plan",
+    "symbolHint": "Als Lastsymbol im Plan eingezeichnet",
+    "byFunctionType": "Summen nach Funktionstyp",
+    "byLoadType": "Summen nach Lastart",
+    "noLoadType": "Keine Lastart",
+    "total": "Alle Pläne",
+    "columns": {
+      "functionType": "Funktionstyp",
+      "loadType": "Lastart",
+      "quantity": "Stück",
+      "power": "Leistung"
+    }
+  },
+  "line": {
+    "quantity": "{{count}} ×",
+    "power": "{{power}} W"
+  },
+  "totals_one": "{{count}} Stück",
+  "totals_other": "{{count}} Stück",
+  "totalsPower_one": "{{count}} Stück · {{power}} W",
+  "totalsPower_other": "{{count}} Stück · {{power}} W"
+}

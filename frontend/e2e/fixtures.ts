@@ -87,6 +87,18 @@ export type PlanContent = {
   scale: number | null
   zones: { id: string; name: string; color: string; opacity: number; points: number[][] }[]
   placements: { id: string; x: number; y: number; width: number; height: number; rotation: number; zoneId: string | null }[]
+  needs: {
+    id: string
+    zoneId: string | null
+    functionTypeId: string
+    quantity: number
+    powerW: number | null
+    loadTypeId: string | null
+    label: string
+    note: string
+    x: number | null
+    y: number | null
+  }[]
 }
 
 let counter = 0
@@ -337,7 +349,12 @@ export class Api {
   /** Saves a plan's content as the editor does: take the lock, save against the current content, release the lock. */
   async savePlanContent(
     planId: string,
-    content: { zones?: PlanContent['zones']; placements: { variantId: string; x: number; y: number; existing?: boolean }[] },
+    content: {
+      zones?: PlanContent['zones']
+      placements: { variantId: string; x: number; y: number; existing?: boolean }[]
+      /** Needs as `PlanContent['needs']` without ids and defaults: `{ functionTypeId, quantity, zoneId | x/y, ... }`. */
+      needs?: (Partial<PlanContent['needs'][number]> & { functionTypeId: string })[]
+    },
   ): Promise<void> {
     await this.json(await this.ctx.post(`/api/plans/${planId}/lock`))
     const current = await this.json<{ contentUpdatedAt: string }>(await this.ctx.get(`/api/plans/${planId}/content`))
@@ -354,7 +371,24 @@ export class Api {
     }))
     await this.json(
       await this.ctx.put(`/api/plans/${planId}/content`, {
-        data: { expectedContentUpdatedAt: current.contentUpdatedAt, scale: null, zones: content.zones ?? [], placements },
+        data: {
+          expectedContentUpdatedAt: current.contentUpdatedAt,
+          scale: null,
+          zones: content.zones ?? [],
+          placements,
+          needs: (content.needs ?? []).map((n) => ({
+            id: crypto.randomUUID(),
+            zoneId: null,
+            quantity: 1,
+            powerW: null,
+            loadTypeId: null,
+            label: '',
+            note: '',
+            x: null,
+            y: null,
+            ...n,
+          })),
+        },
       }),
     )
     await this.ctx.delete(`/api/plans/${planId}/lock`)

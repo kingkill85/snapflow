@@ -2,7 +2,7 @@
   "title": "Pläne",
   "add": "Plan hinzufügen",
   "empty": "Noch keine Pläne.",
-  "counts": "Produkte: {{products}} · Zonen: {{zones}}",
+  "counts": "Produkte: {{products}} · Zonen: {{zones}} · Bedarf: {{needs}}",
   "lockedBy": "Wird von {{name}} bearbeitet",
   "moveLeft": "{{name}} nach links verschieben",
   "moveRight": "{{name}} nach rechts verschieben",
@@ -46,7 +46,8 @@
     "zoneRect": "Rechteckige Zone zeichnen",
     "zonePolygon": "Polygon-Zone zeichnen",
     "calibrate": "Maßstab kalibrieren",
-    "export": "Als PNG exportieren"
+    "export": "Als PNG exportieren",
+    "placeNeed": "Bedarf platzieren"
   },
   "panel": {
     "label": "Planbereich",
@@ -88,7 +89,7 @@
     "noMatch": "Keine Produkte passen zur Suche."
   },
   "inspector": {
-    "none": "Wählen Sie ein Produkt oder eine Zone auf dem Plan, um Details zu sehen.",
+    "none": "Wählen Sie ein Produkt, eine Zone oder ein Bedarfssymbol auf dem Plan, um Details zu sehen.",
     "many_one": "{{count}} Element ausgewählt.",
     "many_other": "{{count}} Elemente ausgewählt.",
     "product": "Produkt",
@@ -113,7 +114,8 @@
     "instanceValues": "Werte dieses Geräts",
     "resizeAll": "Alle dieses Produkts anpassen",
     "resizeAllHint_one": "Größenänderungen gelten für die {{count}} Platzierung dieses Produkts auf dem Plan",
-    "resizeAllHint_other": "Größenänderungen gelten für alle {{count}} Platzierungen dieses Produkts auf dem Plan"
+    "resizeAllHint_other": "Größenänderungen gelten für alle {{count}} Platzierungen dieses Produkts auf dem Plan",
+    "manyDetailNeeds": "Produkte: {{products}} · Zonen: {{zones}} · Bedarfssymbole: {{needs}}"
   },
   "warning": {
     "variant_deleted": "Dieses Produkt wurde aus dem Katalog gelöscht.",
@@ -148,13 +150,16 @@
   "tools": {
     "zoneRect": "Ziehen Sie ein Rechteck auf dem Plan auf.",
     "zonePolygon": "Klicken Sie die Ecken an. Doppelklick, Enter oder ein Klick auf die erste Ecke schließt die Zone; Esc bricht ab.",
-    "calibrate": "Klicken Sie zwei Punkte an, deren echten Abstand Sie kennen; Esc bricht ab."
+    "calibrate": "Klicken Sie zwei Punkte an, deren echten Abstand Sie kennen; Esc bricht ab.",
+    "placeNeed": "Klicken Sie auf den Plan, um das Bedarfssymbol zu setzen; Esc bricht ab."
   },
   "layers": {
     "hint": "Ausgeblendetes wird nicht angezeigt, ist nicht auswählbar und wird nicht exportiert. Diese Ansicht wird nicht gespeichert.",
     "zones": "Zonen",
     "productTypes": "Produkttypen",
-    "categories": "Kategorien"
+    "categories": "Kategorien",
+    "needs": "Bedarfssymbole",
+    "needsHint": "Als Symbol auf dem Plan platzierte Bedarfe"
   },
   "calibrate": {
     "title": "Maßstab kalibrieren",
@@ -166,5 +171,49 @@
   },
   "scale": {
     "bar": "Maßstab: der Balken entspricht {{label}}"
+  },
+  "needs": {
+    "title": "Bedarfe",
+    "empty": "Noch keine Bedarfe.",
+    "add": "Bedarf hinzufügen",
+    "addHint": "Wählen Sie eine Funktion, um dieser Zone einen Bedarf hinzuzufügen.",
+    "functionType": "Funktion",
+    "quantity": "Anzahl",
+    "power": "Leistung je Stück",
+    "powerHint": "In W, z. B. 7,5; leer, wenn unbekannt",
+    "loadType": "Lastart",
+    "noLoadType": "Keine",
+    "label": "Bezeichnung",
+    "note": "Notiz",
+    "edit": "{{name}} bearbeiten",
+    "delete": "{{name}} löschen",
+    "moveUp": "{{name}} nach oben",
+    "moveDown": "{{name}} nach unten",
+    "done": "Fertig",
+    "applyTemplate": "Vorlage anwenden",
+    "applyTemplateHint": "Fügt die Zeilen der Vorlage als Bedarfe dieser Zone hinzu.",
+    "noTemplates": "Keine aktiven Raumvorlagen.",
+    "applied_one": "{{count}} Bedarf aus „{{name}}“ hinzugefügt.",
+    "applied_other": "{{count}} Bedarfe aus „{{name}}“ hinzugefügt.",
+    "skipped_one": "{{count}} Zeile wurde übersprungen: Funktion oder Lastart ist inaktiv.",
+    "skipped_other": "{{count}} Zeilen wurden übersprungen: Funktion oder Lastart ist inaktiv.",
+    "symbol": "Bedarfssymbol",
+    "symbolBadge": "Symbol",
+    "symbolsHint_one": "Dazu {{count}} Bedarfssymbol in dieser Zone (auf dem Plan bearbeiten).",
+    "symbolsHint_other": "Dazu {{count}} Bedarfssymbole in dieser Zone (auf dem Plan bearbeiten).",
+    "count_one": "{{count}} Bedarf",
+    "count_other": "{{count}} Bedarfe",
+    "inactive": "{{name}} (inaktiv)",
+    "unknown": "Unbekannte Funktion",
+    "invalidPower": "Geben Sie eine Leistung von 0 bis 100000 W ein.",
+    "placeFunction": "Funktion des nächsten Symbols",
+    "noFunctionTypes": "Im Katalog gibt es keine aktiven Funktionen.",
+    "zoneOfSymbol": "Zone",
+    "noZone": "Außerhalb aller Zonen"
+  },
+  "needWarning": {
+    "need_function_type_inactive": "Die Funktion ist im Katalog inaktiv.",
+    "need_outside_zones": "Das Symbol liegt außerhalb aller Zonen.",
+    "need_load_type_not_allowed": "Die Funktion erlaubt diese Lastart nicht mehr."
   }
 }

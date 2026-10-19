@@ -2,7 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { InstanceAttributeDefinition, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { InstanceAttributeDefinition, NeedWarning, PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import { useGetCategory } from '@/api/generated/categories/categories'
 import { useGetProduct } from '@/api/generated/products/products'
 import { AttributeValuesEditor } from '@/catalog/AttributeValuesEditor'
@@ -16,6 +16,9 @@ import { cn } from '@/lib/cn'
 import { groupPalette, type PaletteProduct } from './catalog'
 import type { PlacementPatch, ZonePatch } from './document'
 import type { EditorAction } from './editor-state'
+import { needZoneId } from './needs'
+import type { NeedCatalog } from './need-catalog'
+import { NeedInspector, ZoneNeeds } from './NeedsSection'
 import type { ActiveVertex } from './PlanCanvas'
 import { changeProduct, clampGeometry, resizeChanges } from './placements'
 import { minZonePoints, removeVertex, zoneColors } from './zones'
@@ -23,6 +26,13 @@ import { minZonePoints, removeVertex, zoneColors } from './zones'
 type Props = {
   placements: PlanPlacement[]
   zones: PlanZone[]
+  /** Selected load symbols. */
+  needs: PlanNeed[]
+  /** Every need of the plan (a zone's Needs section) and every zone (a symbol's zone name). */
+  allNeeds: PlanNeed[]
+  allZones: PlanZone[]
+  needCatalog: NeedCatalog
+  needWarnings: Map<string, NeedWarning[]>
   /** Every placement of the plan ("resize all of this product"). */
   allPlacements: PlanPlacement[]
   variants: Map<string, VariantSearchItem>
@@ -79,11 +89,25 @@ function ErrorList({ messages }: { messages: string[] }) {
 /** The Inspector tab: one placement, one zone, or what can be done with a multi-selection. */
 export function Inspector(props: Props) {
   const { t } = useTranslation('plans')
-  const { placements, zones } = props
-  const count = placements.length + zones.length
+  const { placements, zones, needs } = props
+  const count = placements.length + zones.length + needs.length
   if (count === 0) return <p className="text-sm text-muted">{t('inspector.none')}</p>
   if (count > 1) return <MultiInspector {...props} />
   if (zones.length === 1) return <ZoneInspector {...props} zone={zones[0]} />
+  if (needs.length === 1) {
+    const need = needs[0]
+    return (
+      <NeedInspector
+        need={need}
+        zoneName={props.allZones.find((z) => z.id === needZoneId(need, props.allZones))?.name}
+        catalog={props.needCatalog}
+        warnings={props.needWarnings.get(need.id) ?? []}
+        errors={props.errors.get(need.id) ?? []}
+        editable={props.editable}
+        dispatch={props.dispatch}
+      />
+    )
+  }
   return <PlacementInspector {...props} placement={placements[0]} />
 }
 
@@ -98,14 +122,16 @@ function DeleteItem({ id, editable, dispatch }: { id: string; editable: boolean;
 }
 
 /** Several items: their count, delete, and the existing switch for the placements among them. */
-function MultiInspector({ placements, zones, editable, dispatch }: Props) {
+function MultiInspector({ placements, zones, needs, editable, dispatch }: Props) {
   const { t } = useTranslation('plans')
-  const ids = [...placements.map((p) => p.id), ...zones.map((z) => z.id)]
+  const ids = [...placements.map((p) => p.id), ...zones.map((z) => z.id), ...needs.map((n) => n.id)]
   const allExisting = placements.length > 0 && placements.every((p) => p.existing)
   return (
     <div className="space-y-4">
       <p className="text-sm">{t('inspector.many', { count: ids.length })}</p>
-      <p className="text-sm text-muted">{t('inspector.manyDetail', { products: placements.length, zones: zones.length })}</p>
+      <p className="text-sm text-muted">{needs.length > 0
+          ? t('inspector.manyDetailNeeds', { products: placements.length, zones: zones.length, needs: needs.length })
+          : t('inspector.manyDetail', { products: placements.length, zones: zones.length })}</p>
       {placements.length > 0 && (
         <SwitchField
           label={t('inspector.existing')}
@@ -125,7 +151,7 @@ function MultiInspector({ placements, zones, editable, dispatch }: Props) {
 }
 
 /** One zone: name, colour (palette or any), opacity, corners. */
-function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onActiveVertex }: Props & { zone: PlanZone }) {
+function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onActiveVertex, allNeeds, allZones, needCatalog, needWarnings }: Props & { zone: PlanZone }) {
   const { t } = useTranslation('plans')
   const update = (patch: ZonePatch, field?: string) => dispatch({ type: 'change', action: { type: 'updateZones', changes: [{ id: z.id, patch }] }, key: field && `${z.id}:${field}` })
   const vertex = activeVertex?.zoneId === z.id && activeVertex.index < z.points.length ? activeVertex.index : undefined
@@ -177,6 +203,7 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
           <Trash2 /> {t('zones.removeCorner')}
         </Button>
       </div>
+      <ZoneNeeds zoneId={z.id} needs={allNeeds} zones={allZones} catalog={needCatalog} warnings={needWarnings} errors={errors} editable={editable} dispatch={dispatch} />
       <DeleteItem id={z.id} editable={editable} dispatch={dispatch} />
     </div>
   )

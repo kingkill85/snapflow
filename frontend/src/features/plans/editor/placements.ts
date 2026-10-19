@@ -1,4 +1,4 @@
-import type { PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import { clamp, type Point, type Size } from '@/canvas'
 
 import { newId } from './document'
@@ -42,11 +42,12 @@ export function duplicatePlacements(placements: PlanPlacement[], dx: number, dy:
  * backend refuses others with plan.outside_image). A drag or nudge past the
  * edge stops at it.
  */
-export function clampMove(doc: { placements: PlanPlacement[]; zones: PlanZone[] }, ids: string[], dx: number, dy: number, image: Size): { dx: number; dy: number } {
+export function clampMove(doc: { placements: PlanPlacement[]; zones: PlanZone[]; needs?: PlanNeed[] }, ids: string[], dx: number, dy: number, image: Size): { dx: number; dy: number } {
   const set = new Set(ids)
   const points: number[][] = [
     ...doc.placements.filter((p) => set.has(p.id)).map((p) => [p.x, p.y]),
     ...doc.zones.filter((z) => set.has(z.id)).flatMap((z) => z.points),
+    ...(doc.needs ?? []).filter((n) => set.has(n.id) && n.x !== null && n.y !== null).map((n) => [n.x as number, n.y as number]),
   ]
   if (points.length === 0) return { dx, dy }
   const xs = points.map((p) => p[0])
