@@ -5,7 +5,9 @@
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count,
+    (SELECT count(*) FROM board_modules m WHERE m.plan_id = p.id) AS module_count,
+    (SELECT coalesce(sum(r.capacity_te), 0)::float8 FROM board_rows r WHERE r.plan_id = p.id) AS capacity_te
 FROM plans p
 WHERE p.version_id = $1
 ORDER BY p.position, p.id;
@@ -14,7 +16,9 @@ ORDER BY p.position, p.id;
 SELECT p.*,
     (SELECT count(*) FROM plan_zones z WHERE z.plan_id = p.id) AS zone_count,
     (SELECT count(*) FROM plan_placements pp WHERE pp.plan_id = p.id) AS placement_count,
-    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count
+    (SELECT coalesce(sum(n.quantity), 0)::bigint FROM plan_needs n WHERE n.plan_id = p.id) AS need_count,
+    (SELECT count(*) FROM board_modules m WHERE m.plan_id = p.id) AS module_count,
+    (SELECT coalesce(sum(r.capacity_te), 0)::float8 FROM board_rows r WHERE r.plan_id = p.id) AS capacity_te
 FROM plans p
 WHERE p.id = $1;
 
@@ -120,9 +124,10 @@ ORDER BY n.plan_id, n.position;
 -- CopyPlan copies a plan's row into another version (version copy): a new
 -- id, the same image file, no lock.
 -- name: CopyPlan :one
-INSERT INTO plans (tenant_id, version_id, kind, name, position, image_file_id, image_width, image_height, scale)
+INSERT INTO plans (tenant_id, version_id, kind, name, position, image_file_id, image_width, image_height, scale,
+    enclosure_variant_id, enclosure_catalog_variant_id)
 SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(version_id)::uuid, kind, name, position, image_file_id, image_width,
-    image_height, scale
+    image_height, scale, enclosure_variant_id, enclosure_catalog_variant_id
 FROM plans WHERE id = sqlc.arg(id)::uuid
 RETURNING id;
 
@@ -133,6 +138,20 @@ SELECT id FROM plans WHERE version_id = $1 ORDER BY position, id;
 -- BOMPlacements).
 -- name: BOMPlans :many
 SELECT id, name FROM plans WHERE version_id = $1 ORDER BY position, id;
+
+-- name: BOMModules :many
+SELECT m.plan_id, m.id, m.catalog_variant_id, (m.variant_id IS NULL)::boolean AS variant_deleted,
+       m.existing, m.addon_variant_ids
+FROM board_modules m JOIN plans p ON p.id = m.plan_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position;
+
+-- name: BOMEnclosures :many
+SELECT id AS plan_id, enclosure_catalog_variant_id, (enclosure_variant_id IS NULL)::boolean AS variant_deleted,
+       enclosure_existing
+FROM plans
+WHERE version_id = $1 AND enclosure_catalog_variant_id IS NOT NULL
+ORDER BY position, id;
 
 -- name: BOMZones :many
 SELECT z.plan_id, z.id, z.name
@@ -151,3 +170,91 @@ ORDER BY pp.plan_id, pp.position;
 -- files feature's reference check, D269).
 -- name: ReferencedFiles :many
 SELECT DISTINCT image_file_id::uuid AS file_id FROM plans WHERE image_file_id = ANY(sqlc.arg(ids)::uuid[]);
+
+
+-- ---------------------------------------------------------------- boards
+
+-- CreateBoard adds a board plan after the version's last plan (the caller
+-- holds the project's lock).
+-- name: CreateBoard :one
+INSERT INTO plans (tenant_id, version_id, kind, name, position, enclosure_variant_id, enclosure_catalog_variant_id)
+VALUES ($1, $2, 'board', $3, (SELECT coalesce(max(position), 0) + 1 FROM plans WHERE version_id = $2), $4, $4)
+RETURNING id;
+
+-- name: RenamePlan :exec
+UPDATE plans SET name = $2, updated_at = now() WHERE id = $1;
+
+-- name: SetEnclosure :exec
+UPDATE plans SET enclosure_variant_id = $2, enclosure_catalog_variant_id = $3, enclosure_existing = $4 WHERE id = $1;
+
+-- name: ListBoardRows :many
+SELECT id, capacity_te::float8 AS capacity_te FROM board_rows WHERE plan_id = $1 ORDER BY position;
+
+-- name: ListBoardModules :many
+SELECT id, row_id, offset_te::float8 AS offset_te, variant_id, catalog_variant_id, label, existing,
+    addon_variant_ids, instance_values
+FROM board_modules WHERE plan_id = $1 ORDER BY position;
+
+-- name: DeleteBoardModules :exec
+DELETE FROM board_modules WHERE plan_id = $1;
+
+-- name: DeleteBoardRows :exec
+DELETE FROM board_rows WHERE plan_id = $1;
+
+-- name: InsertBoardRows :exec
+INSERT INTO board_rows (tenant_id, plan_id, id, capacity_te, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.capacity_te, r.position
+FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb) AS r (id uuid, capacity_te numeric, position integer);
+
+-- name: InsertBoardModules :exec
+INSERT INTO board_modules (tenant_id, plan_id, id, row_id, offset_te, variant_id, catalog_variant_id, label, existing,
+    addon_variant_ids, instance_values, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.row_id, r.offset_te, r.variant_id,
+    r.catalog_variant_id, r.label, r.existing, r.addon_variant_ids, r.instance_values, r.position
+FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
+    AS r (id uuid, row_id uuid, offset_te numeric, variant_id uuid, catalog_variant_id uuid, label text,
+          existing boolean, addon_variant_ids uuid[], instance_values jsonb, position integer);
+
+-- BoardSketchModules returns the modules of a version's boards with their
+-- row's position (plan cards: TE used and the sketch).
+-- name: BoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN plans p ON p.id = m.plan_id JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position;
+
+-- name: BoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r JOIN plans p ON p.id = r.plan_id
+WHERE p.version_id = $1
+ORDER BY r.plan_id, r.position;
+
+-- PlanBoardSketchModules is BoardSketchModules of one board.
+-- name: PlanBoardSketchModules :many
+SELECT m.plan_id, m.variant_id, r.position AS row_position, m.offset_te::float8 AS offset_te, m.existing
+FROM board_modules m JOIN board_rows r ON r.plan_id = m.plan_id AND r.id = m.row_id
+WHERE m.plan_id = $1
+ORDER BY m.position;
+
+-- name: PlanBoardSketchRows :many
+SELECT r.plan_id, r.capacity_te::float8 AS capacity_te
+FROM board_rows r
+WHERE r.plan_id = $1
+ORDER BY r.position;
+
+-- NetworkPlacements returns the placements of a version (networks
+-- feature, through NetworkItems).
+-- name: NetworkPlacements :many
+SELECT pp.plan_id, pp.id, pp.variant_id, pp.label, pp.existing
+FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
+WHERE p.version_id = $1
+ORDER BY pp.plan_id, pp.position;
+
+-- name: NetworkModules :many
+SELECT m.plan_id, m.id, m.variant_id, m.label, m.existing
+FROM board_modules m JOIN plans p ON p.id = m.plan_id
+WHERE p.version_id = $1
+ORDER BY m.plan_id, m.position;
+
+-- name: NetworkPlans :many
+SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY position, id;

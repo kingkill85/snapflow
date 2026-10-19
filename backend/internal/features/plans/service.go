@@ -84,23 +84,35 @@ func (s *Service) List(ctx context.Context, versionID uuid.UUID) ([]Plan, error)
 		return nil, err
 	}
 	var (
-		ref  projects.VersionRef
-		rows []store.ListPlansRow
+		ref       projects.VersionRef
+		rows      []store.ListPlansRow
+		boardRows []store.BoardSketchRowsRow
+		modules   []store.BoardSketchModulesRow
 	)
 	err = s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
 		if ref, err = s.projects.ReadVersion(ctx, tx, versionID); err != nil {
 			return err
 		}
-		rows, err = q.ListPlans(ctx, versionID)
+		if rows, err = q.ListPlans(ctx, versionID); err != nil {
+			return err
+		}
+		if boardRows, err = q.BoardSketchRows(ctx, versionID); err != nil {
+			return err
+		}
+		modules, err = q.BoardSketchModules(ctx, versionID)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
+	used, err := s.boardSummaries(ctx, boardRows, modules)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]Plan, len(rows))
 	for i, r := range rows {
-		if out[i], err = s.planOf(ctx, actor, ref, store.GetPlanRow(r)); err != nil {
+		if out[i], err = s.planOf(ctx, actor, ref, store.GetPlanRow(r), used); err != nil {
 			return nil, err
 		}
 	}
@@ -118,8 +130,10 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Plan, error) {
 
 func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (Plan, error) {
 	var (
-		ref projects.VersionRef
-		row store.GetPlanRow
+		ref       projects.VersionRef
+		row       store.GetPlanRow
+		boardRows []store.BoardSketchRowsRow
+		modules   []store.BoardSketchModulesRow
 	)
 	err := s.inScope(ctx, actor, database.ReadOnlySnapshot, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
@@ -127,13 +141,35 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, id uuid.UUID) (P
 		if err != nil {
 			return err
 		}
-		row, err = q.GetPlan(ctx, id)
-		return notFound(err)
+		if row, err = q.GetPlan(ctx, id); err != nil {
+			return notFound(err)
+		}
+		if row.Kind == KindBoard {
+			rs, err := q.PlanBoardSketchRows(ctx, id)
+			if err != nil {
+				return err
+			}
+			for _, r := range rs {
+				boardRows = append(boardRows, store.BoardSketchRowsRow(r))
+			}
+			ms, err := q.PlanBoardSketchModules(ctx, id)
+			if err != nil {
+				return err
+			}
+			for _, m := range ms {
+				modules = append(modules, store.BoardSketchModulesRow(m))
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return Plan{}, err
 	}
-	return s.planOf(ctx, actor, ref, row)
+	used, err := s.boardSummaries(ctx, boardRows, modules)
+	if err != nil {
+		return Plan{}, err
+	}
+	return s.planOf(ctx, actor, ref, row, used)
 }
 
 // Create adds a plan with its image at the end of the version's plans.
@@ -171,8 +207,8 @@ func (s *Service) Create(ctx context.Context, versionID uuid.UUID, name string, 
 			return err
 		}
 		id, err = q.CreatePlan(ctx, store.CreatePlanParams{
-			TenantID: ref.TenantID, VersionID: versionID, Name: name, ImageFileID: file.ID,
-			ImageWidth: int32(file.Width), ImageHeight: int32(file.Height), //nolint:gosec // bounded by the image limits
+			TenantID: ref.TenantID, VersionID: versionID, Name: name, ImageFileID: &file.ID,
+			ImageWidth: ptr(int32(file.Width)), ImageHeight: ptr(int32(file.Height)), //nolint:gosec // bounded by the image limits
 		})
 		return mapNameErr(err, name)
 	})
@@ -223,6 +259,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in PlanUpdate) (Plan
 		return Plan{}, errStale()
 	}
 	var file *files.File
+	if in.Image != nil && current.Kind != KindFloorplan {
+		return Plan{}, errWrongKind(KindFloorplan)
+	}
 	if in.Image != nil {
 		if err := s.checkLock(ctx, actor, current.LockUserID, current.LockExpiresAt); err != nil {
 			return Plan{}, s.namedLock(ctx, err)
@@ -251,9 +290,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in PlanUpdate) (Plan
 			if err := s.checkLock(ctx, actor, locked.LockUserID, locked.LockExpiresAt); err != nil {
 				return err
 			}
-			params.ImageFileID = file.ID
-			params.ImageWidth, params.ImageHeight = int32(file.Width), int32(file.Height) //nolint:gosec // bounded by the image limits
-			if err := s.scaleContent(ctx, q, locked, params.ImageWidth, params.ImageHeight); err != nil {
+			params.ImageFileID = &file.ID
+			params.ImageWidth, params.ImageHeight = ptr(int32(file.Width)), ptr(int32(file.Height)) //nolint:gosec // bounded by the image limits
+			if err := s.scaleContent(ctx, q, locked, *params.ImageWidth, *params.ImageHeight); err != nil {
 				return err
 			}
 		}
@@ -340,7 +379,7 @@ func (s *Service) Image(ctx context.Context, id, fileID uuid.UUID) (files.File, 
 		if err != nil {
 			return notFound(err)
 		}
-		if row.ImageFileID != fileID {
+		if row.ImageFileID == nil || *row.ImageFileID != fileID {
 			return apperr.NotFound("plan.image_not_found")
 		}
 		return nil
@@ -483,16 +522,24 @@ func (s *Service) readPlanVersion(ctx context.Context, actor auth.Actor, tx pgx.
 	return s.projects.ReadVersion(ctx, tx, versionID)
 }
 
-func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.VersionRef, r store.GetPlanRow) (Plan, error) {
+func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.VersionRef, r store.GetPlanRow, boards map[uuid.UUID]BoardSummary) (Plan, error) {
 	write := actor.Can(auth.PermProjectsWrite) && ref.Writable()
 	p := Plan{
 		ID: r.ID, VersionID: r.VersionID, ProjectID: ref.ProjectID, Kind: r.Kind, Name: r.Name, Position: r.Position,
-		Image: PlanImage{
-			URL: imageURL(r.ID, r.ImageFileID), Width: r.ImageWidth, Height: r.ImageHeight,
-		},
 		Scale: r.Scale, ZoneCount: r.ZoneCount, PlacementCount: r.PlacementCount, NeedCount: r.NeedCount,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, ContentUpdatedAt: r.ContentUpdatedAt,
 		Can: PlanActions{Update: write, BreakLock: write && actor.Can(auth.PermProjectsDelete)},
+	}
+	if r.ImageFileID != nil {
+		p.Image = &NullablePlanImage{PlanImage: PlanImage{URL: imageURL(r.ID, *r.ImageFileID), Width: deref(r.ImageWidth), Height: deref(r.ImageHeight)}}
+	}
+	if r.Kind == KindBoard {
+		b, ok := boards[r.ID]
+		if !ok {
+			b.Sketch = BoardSketch{Rows: []BoardSketchRow{}, Modules: []BoardSketchModule{}}
+		}
+		b.EnclosureVariantID, b.ModuleCount, b.CapacityTE = r.EnclosureVariantID, r.ModuleCount, r.CapacityTe
+		p.Board = &NullableBoardSummary{BoardSummary: b}
 	}
 	if s.live(r.LockUserID, r.LockExpiresAt) {
 		name, err := s.users.DisplayName(ctx, *r.LockUserID)
@@ -502,6 +549,16 @@ func (s *Service) planOf(ctx context.Context, actor auth.Actor, ref projects.Ver
 		p.Lock = &NullablePlanLock{PlanLock: PlanLock{UserID: *r.LockUserID, Name: name, ExpiresAt: *r.LockExpiresAt, Mine: *r.LockUserID == actor.UserID}}
 	}
 	return p, nil
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }
 
 func validateName(name string) (string, error) {

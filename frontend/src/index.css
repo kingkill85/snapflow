@@ -113,3 +113,21 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/* An existing board module (D185): hatched, so it reads as "already there" in both themes. */
+.board-existing {
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in oklab, var(--color-muted) 30%, transparent) 5px 7px);
+}
+
+/* A DIN rail's TE ticks (board editor, D364): a short tick per TE (--te is
+   the width of one TE), a full-height one every 5 TE; drawn as gradients
+   instead of one DOM node per tick. */
+.board-rail-ticks {
+  --tick: color-mix(in oklab, var(--color-muted) 70%, transparent);
+  background-image:
+    repeating-linear-gradient(to right, var(--tick) 0 1px, transparent 1px calc(var(--te) * 5)),
+    repeating-linear-gradient(to right, var(--tick) 0 1px, transparent 1px var(--te));
+  background-size: 100% 100%, 100% 50%;
+  background-position: 0 100%, 0 100%;
+  background-repeat: no-repeat;
+}

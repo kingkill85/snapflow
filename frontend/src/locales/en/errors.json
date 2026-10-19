@@ -56,6 +56,13 @@
     "too_many_attempts": "Too many attempts. Try again in {{seconds}} seconds.",
     "wrong_password": "The current password is wrong."
   },
+  "board": {
+    "overlap": "This module overlaps another module in the row.",
+    "row_not_found": "This row no longer exists.",
+    "offset_invalid": "The position must be 0 to {{max}} TE with at most one decimal.",
+    "capacity_invalid": "A row holds more than 0 and at most {{max}} TE, with at most one decimal.",
+    "enclosure_not_found": "This enclosure no longer exists in the catalog."
+  },
   "bom": {
     "line_kind": "Choose either a catalog product or a name and unit price.",
     "line_not_found": "This line no longer exists.",
@@ -68,6 +75,17 @@
     "unit_price_invalid": "Enter an amount of 0 or more with at most 2 decimals.",
     "variant_not_found": "This product variant no longer exists.",
     "variant_unavailable": "This product is not available (inactive) and cannot be added."
+  },
+  "bus_line": {
+    "not_found": "This bus line no longer exists.",
+    "name_taken": "This system already has a line named \"{{name}}\".",
+    "in_use": "Devices are assigned to this line ({{count}}). Move them to another line first.",
+    "order_mismatch": "The bus lines of this version have changed. Reload and try again.",
+    "not_bus_system": "This system has no bus topology.",
+    "product_type_not_found": "This system no longer exists.",
+    "product_type_inactive": "This system is inactive.",
+    "product_type_not_in_project": "The project does not use this system. Add it to the project first.",
+    "devices_max_invalid": "Enter a number from 1 to {{max}} or leave it empty."
   },
   "catalog_field": {
     "in_use": "Categories link the field \"{{key}}\": its key and type cannot change and it cannot be deleted.",
@@ -178,7 +196,15 @@
     "zone_not_found": "This zone no longer exists."
   },
   "network": {
-    "unavailable": "No connection to the server."
+    "unavailable": "No connection to the server.",
+    "item_not_found": "This device is no longer on a plan of this version.",
+    "both_targets": "Choose a bus line or a gateway, not both.",
+    "not_bus_device": "This device is not a bus device.",
+    "line_mismatch": "This line belongs to another system.",
+    "gateway_partial": "Choose a gateway.",
+    "not_wireless_device": "This device is not a wireless device.",
+    "gateway_not_found": "This gateway is not a gateway of the device's system.",
+    "changed": "A plan or bus line changed in the meantime. Reload and try again."
   },
   "output_kind": {
     "alternative_cycle": "That output kind already has this one as an alternative.",
@@ -209,7 +235,8 @@
     "zone_opacity": "The opacity must be between 0 and 1.",
     "variant_not_found": "This product variant no longer exists.",
     "variant_required": "Choose a product.",
-    "addon_not_linked": "This is not an add-on of the chosen variant."
+    "addon_not_linked": "This is not an add-on of the chosen variant.",
+    "wrong_kind": "This plan is of another kind. Reload the page."
   },
   "pricing": {
     "amount_range": "This amount is too large (at most {{max}}).",

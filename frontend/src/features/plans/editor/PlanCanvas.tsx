@@ -3,7 +3,8 @@ import { type DragEvent, type RefObject, useEffect, useMemo, useRef, useState } 
 import { useTranslation } from 'react-i18next'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text, Wedge } from 'react-konva'
 
-import type { Plan, PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { Floorplan } from '../api'
+import type { PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import {
   angleTo,
   boundsOf,
@@ -34,6 +35,7 @@ import { chromeName } from './export'
 import { type Layers, placementVisible, visibleSymbols, zoneVisible } from './layers'
 import { type SymbolIcon } from './needs'
 import type { CopyItems } from './use-shortcuts'
+import { productDragType } from './catalog'
 import { clampMove, resizeChanges } from './placements'
 import {
   canClose,
@@ -54,7 +56,6 @@ import {
 } from './zones'
 
 /** The data type of a palette product dragged onto the canvas. */
-export const productDragType = 'application/x-snapflow-product'
 
 export type Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate' | 'placeNeed'
 
@@ -79,7 +80,7 @@ type Interaction =
 type Draft = { tool: Tool; points: Point[]; cursor: Point | null; lastClick: number }
 
 type Props = {
-  plan: Plan
+  plan: Floorplan
   document: PlanDocument
   selection: string[]
   variants: Map<string, VariantSearchItem>

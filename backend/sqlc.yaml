@@ -101,6 +101,10 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
           type: Values
+      - column: board_modules.instance_values
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
+          type: Values
       - column: version_items.product_name
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
@@ -277,4 +281,11 @@ sql:
       go:
         <<: *go
         out: internal/features/roomtemplates/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/networks/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/networks/store
   # scaffold:sqlc

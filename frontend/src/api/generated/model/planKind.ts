@@ -10,4 +10,5 @@ export type PlanKind = typeof PlanKind[keyof typeof PlanKind];
 
 export const PlanKind = {
   floorplan: 'floorplan',
+  board: 'board',
 } as const;

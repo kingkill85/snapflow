@@ -54,6 +54,7 @@ function handlers(product: () => Product = () => dimmer, respond?: () => Respons
 }
 
 const searchItem = (n: number, overrides: Partial<VariantSearchItem> = {}): VariantSearchItem => ({
+  capabilities: { mounting: 'floorplan', channels: [], moduleTotalsW: [], busCurrentUsedMaDefault: false, wirelessPlacesUsedDefault: false },
   id: ids.id(n),
   productId: ids.id(n + 100),
   productTypeId: dimmer.productTypeId,

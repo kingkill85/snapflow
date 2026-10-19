@@ -7,7 +7,7 @@ import { renderWithProviders } from '@/test/render'
 import { catalog, zigbeeId } from '../test-fixtures'
 import { paletteProducts } from './catalog'
 import { Palette } from './Palette'
-import { productDragType } from './PlanCanvas'
+import { productDragType } from './catalog'
 
 const products = paletteProducts(catalog, [zigbeeId])
 

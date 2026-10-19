@@ -31,4 +31,8 @@ limit?: number;
  * @maximum 1073741824
  */
 offset?: number;
+/**
+ * Include each variant's capability summary (board and floorplan palettes)
+ */
+withCapabilities?: boolean;
 };

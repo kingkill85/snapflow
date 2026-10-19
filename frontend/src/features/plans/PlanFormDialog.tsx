@@ -117,7 +117,7 @@ export function PlanFormDialog({ open, onOpenChange, versionId, item, onSaved }:
         <Field label={t('dialog.name')} autoComplete="off" required hint={t('dialog.nameHint')} error={fieldError(errors.name?.message)} {...form.register('name')} />
         <ImageUpload
           label={item ? t('dialog.replaceImage') : t('dialog.image')}
-          src={preview ?? item?.image.url}
+          src={preview ?? item?.image?.url}
           accept={planImageTypes.join(',')}
           hint={item ? t('dialog.replaceHint') : t('dialog.imageHint')}
           error={imageError}

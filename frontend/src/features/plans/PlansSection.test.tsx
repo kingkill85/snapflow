@@ -9,7 +9,7 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { PlansSection } from './PlansSection'
-import { plan, projectId, versionId } from './test-fixtures'
+import { boardCaps, plan, projectId, variant, versionId, zigbeeId } from './test-fixtures'
 
 function servePlans(initial: Plan[]) {
   let plans = initial
@@ -158,5 +158,51 @@ describe('PlansSection', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
     expect(await screen.findByText('No plans yet.')).toBeInTheDocument()
     expect(deleted).toBe(true)
+  })
+
+  it('adds a board with rows, lists it with its TE and links to the board editor', async () => {
+    const board = plan(3, { kind: 'board', name: 'Main board', image: null, board: { enclosureVariantId: null, moduleCount: 2, capacityTe: 24, usedTe: 6.5, sketch: { rows: [{ capacityTe: 12 }, { capacityTe: 12 }], modules: [{ row: 0, offsetTe: 0, widthTe: 2, existing: false }, { row: 0, offsetTe: 2, widthTe: 4.5, existing: true }] } } })
+    const setPlans = servePlans([])
+    let body: unknown
+    const enclosure = variant(5, { productName: { en: 'Cabinet' }, capabilities: boardCaps(0, { railWidthTe: undefined, enclosureRows: 2, enclosureTePerRow: 12 }) })
+    let catalogLoads = 0
+    server.use(
+      http.get('/api/variants', () => {
+        catalogLoads++
+        return HttpResponse.json({ items: [enclosure], total: 1 })
+      }),
+      http.post('/api/versions/:versionId/boards', async ({ request }) => {
+        body = await request.json()
+        setPlans([board])
+        return HttpResponse.json(board, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PlansSection projectId={projectId} versionId={versionId} canWrite productTypeIds={[zigbeeId]} />)
+    const add = await screen.findByRole('button', { name: 'Add board' })
+    // The enclosures are loaded only when the dialog opens.
+    expect(catalogLoads).toBe(0)
+    await user.click(add)
+    const dialog = screen.getByRole('dialog', { name: 'Add board' })
+    await waitFor(() => expect(catalogLoads).toBe(1))
+    await user.type(within(dialog).getByLabelText(/Name/), 'Main board')
+    await user.click(within(dialog).getByRole('button', { name: 'Add row' }))
+    const second = within(dialog).getByLabelText('Row 2 in TE')
+    await user.clear(second)
+    await user.type(second, '18')
+    // The enclosure list offers the project's board enclosures of known size.
+    await user.click(within(dialog).getByRole('combobox', { name: 'Enclosure' }))
+    expect(screen.getByRole('option', { name: /Cabinet/ })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(body).toEqual({ name: 'Main board', rows: [{ capacityTe: 12 }, { capacityTe: 18 }] }))
+
+    const link = await screen.findByRole('link', { name: /Main board/ })
+    expect(link).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/boards/${board.id}`)
+    expect(screen.getByText('2 modules · 6.5 of 24 TE')).toBeInTheDocument()
+    // The schematic comes from the list's sketch (no request per card): two rails, an existing module hatched.
+    expect(await screen.findByTestId('board-thumbnail')).toBeInTheDocument()
+    expect(screen.getAllByTestId('sketch-rail')).toHaveLength(2)
+    expect(screen.getAllByTestId('sketch-module').map((m) => m.getAttribute('data-existing'))).toEqual(['false', 'true'])
   })
 })

@@ -4,20 +4,24 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { NullableBoardSummary } from './nullableBoardSummary';
+import type { NullablePlanImage } from './nullablePlanImage';
 import type { NullablePlanLock } from './nullablePlanLock';
 import type { PlanActions } from './planActions';
-import type { PlanImage } from './planImage';
 import type { PlanKind } from './planKind';
 
 export interface Plan {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
+  /** Board facts; null for a floorplan */
+  board: NullableBoardSummary | null;
   can: PlanActions;
   /** The version of the content */
   contentUpdatedAt: string;
   createdAt: string;
   id: string;
-  image: PlanImage;
+  /** The background image of a floorplan; null for a board */
+  image: NullablePlanImage | null;
   kind: PlanKind;
   /** The live edit lock, null when nobody holds it */
   lock: NullablePlanLock | null;

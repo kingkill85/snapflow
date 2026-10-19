@@ -1,4 +1,4 @@
-# Plans (floorplan editor)
+# Plans (floorplan and board editors)
 
 Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338, review fixes D339–D351, click-through D352–D354. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
 
@@ -157,3 +157,33 @@ zone counts, undo/redo, reload, zone corners (drag, add at a midpoint, Alt-click
 take-over, read-only project), the plans section and editor shell in `layout.spec.ts` (German tabs at 768 px), and
 `plans-visual.spec.ts` (`make e2e-visual`: every state and dialog at 390/768/1280 px, light/dark, en/de, with the exported PNG).
 The leave guard (save on leave, ask only when the save fails) is in `editor/PlanEditorPage.test.tsx`.
+
+# Board editor (step 3c)
+
+Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab), D372–D381 (review fixes), D382–D385 (click-through). Spec: `docs/specs/phase-3.md` → 3c.
+
+| Where | What |
+| --- | --- |
+| `board/BoardRoute.tsx` | Lazy entry of `projects/:id/versions/:versionId/boards/:planId` (no Konva) |
+| `board/board.ts` | `BoardDocument` (`enclosureVariantId`, `rows`, `modules`; exactly the PUT body without the expected version), `applyBoardAction`, widths (`moduleWidth`: `railWidthTe`, 1 TE unknown), slots (`nearestSlot`, `slotIn`, `slotAnywhere`, `keyboardMove`, `copyModules`), totals, `fitToEnclosure` (D357 locally), palette and enclosure filters |
+| `board/board-state.ts` | `boardReducer`: document history (the shared `editor/history.ts`) + selected module ids, same actions as the floorplan reducer |
+| `board/BoardEditorPage.tsx` | Loads plan, board content, project, catalog; `BoardEditor` wires lock, autosave, leave guard, shortcuts, toolbar (undo/redo, board totals), grid and panel (Products, Board, Inspector) |
+| `board/BoardGrid.tsx` | The DOM grid (D364): rails with ticks and row totals, module boxes, drag and drop (palette products and modules, preview of the landing slot), arrows/Delete/Enter on a focused module, Enter on a focused rail places the armed product |
+| `board/BoardPanels.tsx` | Board tab (`BoardSettings`: enclosure with the D357 notice, rows editor, `CapacityField`) and `ModuleInspector` (product/variant change refused when wider than the gap, row, add-ons, label, instance values, capability summary and channels, existing, delete) |
+| `board/BoardFormDialog.tsx`, `board/BoardThumbnail.tsx` | Add board (name + enclosure or rows; enclosures loaded only while the dialog is open for create) / rename; the card's SVG schematic from `plan.board.sketch` (no request per card, D379) |
+| `board/board-errors.ts` | `body.modules[i].…` field errors of a refused save by module id |
+
+Rules: placements never overlap (D365) — every drop, move and copy goes through `slotIn`/`slotAnywhere`; a change that
+cannot find a free gap is refused with a notice. Stored modules that overlap after a catalog width change keep their place
+(warning `module_overlap`, D374). Widths are `railWidthTe` rounded to 0.1 TE like the backend (D376); the enclosure fit
+is the backend's rule, and after a save whose rows differ (server-added rows) the editor adopts the saved content (D380).
+Arrow moves of one module merge into one undo step; after Delete the focus goes to a neighbour or the rail (D381).
+Cut/paste between boards gives modules new ids, so 3d connections do not follow them (D378). Widths come from the catalog's capabilities (D367), falling back to the
+last response's `capabilities` for variants no longer listed. Warnings per module come from the last load/save.
+
+Tests: `board/board.test.ts` (document, history, slots, keyboard moves, copies, enclosure fit, palette/enclosure filters,
+save errors), `board/BoardPanels.test.tsx` (rows editor, enclosure, inspector), `board/BoardEditorPage.test.tsx` (palette
+by mounting, keyboard placement and move, undo, autosave, read-only, wrong kind, save errors), the Add board dialog and
+board card in `PlansSection.test.tsx`. E2E: `e2e/specs/boards.spec.ts` (enclosure, drag from the palette, totals, keyboard
+move, undo/redo, reload, BOM lines, Networks: second bus line, gateway reassignment, reload), `boards-visual.spec.ts`
+(`make e2e-visual`). The Networks tab lives in `features/networks` (tests in `NetworksTab.test.tsx`).

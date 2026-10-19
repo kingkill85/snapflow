@@ -32,8 +32,9 @@ type DocumentPlan struct {
 	Placements  []PlanPlacement
 }
 
-// DocumentPlans returns the plans of a version in their order with their
-// content and image. Needs projects.read.
+// DocumentPlans returns the floorplans of a version in their order with
+// their content and image (boards come with the board report, 3e). Needs
+// projects.read.
 func (s *Service) DocumentPlans(ctx context.Context, versionID uuid.UUID) ([]DocumentPlan, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
@@ -52,12 +53,15 @@ func (s *Service) DocumentPlans(ctx context.Context, versionID uuid.UUID) ([]Doc
 			return err
 		}
 		for _, r := range rows {
+			if r.Kind != KindFloorplan || r.ImageFileID == nil {
+				continue
+			}
 			zones, placements, err := readContent(ctx, q, r.ID)
 			if err != nil {
 				return err
 			}
-			out = append(out, DocumentPlan{ID: r.ID, Name: r.Name, Width: r.ImageWidth, Height: r.ImageHeight, Zones: zones, Placements: placements})
-			fileIDs = append(fileIDs, r.ImageFileID)
+			out = append(out, DocumentPlan{ID: r.ID, Name: r.Name, Width: *r.ImageWidth, Height: *r.ImageHeight, Zones: zones, Placements: placements})
+			fileIDs = append(fileIDs, *r.ImageFileID)
 		}
 		return nil
 	})

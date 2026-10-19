@@ -10,6 +10,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
+	"github.com/kingkill85/snapflow/backend/internal/features/networks"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
@@ -71,6 +72,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 		planSvc.OnCopyPlans(c)
 	}
 	plans.Register(api, planSvc)
+	networks.Register(api, networks.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes))
 	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
