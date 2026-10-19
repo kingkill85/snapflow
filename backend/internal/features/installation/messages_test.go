@@ -21,7 +21,7 @@ func TestMessages(t *testing.T) {
 		"bus_line_no_power_supply", "bus_line_current_exceeded", "bus_line_devices_exceeded", "bus_line_current_reserve",
 		"bus_line_devices_reserve", "bus_current_unknown", "bus_device_unassigned", "wireless_no_gateway", "gateway_places_reserve",
 		"gateway_places_exceeded", "gateway_no_router", "network_assignment_dangling", "address_duplicate", "address_outside_line",
-		"bus_line_address_invalid"}
+		"bus_line_address_invalid", "bus_line_address_duplicate", "address_device_zero"}
 	for _, c := range codes {
 		if _, ok := messages["en"]["f-"+c]; !ok {
 			t.Errorf("no text for %s", c)
