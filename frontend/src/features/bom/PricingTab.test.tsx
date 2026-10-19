@@ -1,0 +1,208 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { delay, http, HttpResponse } from 'msw'
+import { describe, expect, it } from 'vitest'
+
+import { getGetPricingQueryKey } from '@/api/generated/bom/bom'
+import type { Pricing } from '@/api/generated/model'
+import { problem } from '@/features/projects/test-fixtures'
+import { chooseOption } from '@/test/select'
+import { renderWithProviders } from '@/test/render'
+import { server } from '@/test/server'
+
+import { PricingTab } from './PricingTab'
+import { bom, versionId } from './test-fixtures'
+
+function serve(pricing: Pricing = bom.pricing) {
+  const previews: unknown[] = []
+  server.use(
+    http.get('/api/versions/:versionId/pricing', () => HttpResponse.json(pricing)),
+    http.post('/api/versions/:versionId/pricing/preview', async ({ request }) => {
+      const body = (await request.json()) as { discountValue: string }
+      previews.push(body)
+      // The API computes; the mock only echoes something recognisable.
+      return HttpResponse.json({ ...bom.totals, discount: body.discountValue === '15' ? '38.25' : bom.totals.discount, grandTotal: body.discountValue === '15' ? '266.75' : bom.totals.grandTotal })
+    }),
+  )
+  return previews
+}
+
+describe('PricingTab', () => {
+  it('shows the saved values and the totals from the preview', async () => {
+    serve()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    expect(await screen.findByRole('combobox', { name: 'Discount' })).toHaveTextContent('Percent')
+    expect(screen.getByRole('textbox', { name: /^Discount value/ })).toHaveValue('10')
+    expect(screen.getByRole('combobox', { name: 'Services' })).toHaveTextContent('Amount (USD)')
+    expect(screen.getByRole('textbox', { name: /^Services value/ })).toHaveValue('50')
+    const totals = await screen.findByRole('region', { name: 'Totals with these values' })
+    expect(within(totals).getByTestId('total-grandTotal')).toHaveTextContent('$279.50')
+    expect(within(totals).getByTestId('total-services')).toHaveTextContent('Programming')
+  })
+
+  it('previews unsaved values (debounced) and saves them', async () => {
+    const previews = serve()
+    let saved: unknown
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json({ ...bom, pricing: { ...bom.pricing, discountValue: '15', updatedAt: '2026-10-19T11:00:00Z' } })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    const discount = await screen.findByRole('textbox', { name: /^Discount value/ })
+    await user.clear(discount)
+    await user.type(discount, '15')
+    const totals = screen.getByRole('region', { name: 'Totals with these values' })
+    await waitFor(() => expect(within(totals).getByTestId('total-grandTotal')).toHaveTextContent('$266.75'), { timeout: 2000 })
+    // Not one request per keystroke.
+    expect(previews.filter((p) => (p as { discountValue: string }).discountValue === '1')).toHaveLength(0)
+
+    await chooseOption(user, screen.getByRole('combobox', { name: 'Services' }), 'None')
+    expect(screen.queryByRole('textbox', { name: /^Services value/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Pricing saved.')).toBeInTheDocument()
+    expect(saved).toEqual({
+      discountKind: 'percent',
+      discountValue: '15',
+      servicesKind: 'none',
+      servicesValue: '0',
+      servicesLabel: { en: 'Programming', de: 'Programmierung' },
+      expectedUpdatedAt: bom.pricing.updatedAt,
+    })
+  })
+
+  it('starts from the fresh pricing, not a cached copy (D44)', async () => {
+    serve()
+    let saved: { expectedUpdatedAt?: string } | undefined
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved = (await request.json()) as typeof saved
+        return HttpResponse.json(bom)
+      }),
+    )
+    const user = userEvent.setup()
+    // The fresh copy arrives a moment later: the form must wait for it.
+    server.use(
+      http.get('/api/versions/:versionId/pricing', async () => {
+        await delay(150)
+        return HttpResponse.json(bom.pricing)
+      }),
+    )
+    // A previous visit left an older pricing in the cache.
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />, {
+      prepare: (client) => client.setQueryData(getGetPricingQueryKey(versionId), { ...bom.pricing, updatedAt: '2026-10-18T09:00:00Z' }),
+    })
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved?.expectedUpdatedAt).toBe(bom.pricing.updatedAt))
+  })
+
+  it('keeps the default services label the default', async () => {
+    // Never saved: the API returns its default label.
+    const defaults: Pricing = { ...bom.pricing, servicesLabel: { en: 'System design', de: 'Systemplanung' }, updatedAt: null }
+    serve(defaults)
+    const saved: unknown[] = []
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved.push(await request.json())
+        return HttpResponse.json({ ...bom, pricing: { ...defaults, updatedAt: '2026-10-19T11:00:00Z' } })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ servicesLabel: {}, expectedUpdatedAt: null })
+
+    // After that save the default is still known; a label of its own is sent as typed.
+    expect(await screen.findByText('Pricing saved.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(2))
+    expect(saved[1]).toMatchObject({ servicesLabel: {} })
+    const label = screen.getByRole('textbox', { name: /^Services label/ })
+    await user.type(label, ' and more')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(3))
+    expect(saved[2]).toMatchObject({ servicesLabel: { en: 'System design and more', de: 'Systemplanung' } })
+  })
+
+  it('sends the default label as {} also for a saved pricing', async () => {
+    // Saved with a label of its own: the default comes from servicesLabelDefault.
+    serve()
+    const saved: unknown[] = []
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved.push(await request.json())
+        return HttpResponse.json(bom)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    const label = await screen.findByRole('textbox', { name: /^Services label/ })
+    await user.clear(label)
+    await user.type(label, 'System design')
+    await user.click(screen.getByRole('tab', { name: 'German' }))
+    const de = screen.getByRole('textbox', { name: /^Services label/ })
+    await user.clear(de)
+    await user.type(de, 'Systemplanung')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ servicesLabel: {} })
+  })
+
+  it('shows API errors at their fields and a stale save', async () => {
+    serve()
+    let calls = 0
+    server.use(
+      http.put('/api/versions/:versionId/pricing', () => {
+        calls++
+        return calls === 1
+          ? problem(422, { code: 'validation.failed', fields: [{ location: 'body.discountValue', code: 'pricing.percent_range', params: { max: 100 } }] })
+          : problem(409, { code: 'pricing.stale' })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    const discount = await screen.findByRole('textbox', { name: /^Discount value/ })
+    await user.clear(discount)
+    await user.type(discount, '150')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(discount).toHaveAttribute('aria-invalid', 'true'))
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText(/changed the pricing|inzwischen|meantime/)).toBeInTheDocument()
+  })
+
+  it('keeps the last totals dimmed while the values are invalid', async () => {
+    serve({ ...bom.pricing, discountValue: '10.00', servicesValue: '50.00' })
+    server.use(
+      http.post('/api/versions/:versionId/pricing/preview', async ({ request }) => {
+        const body = (await request.json()) as { discountValue: string }
+        if (body.discountValue === '150') return problem(422, { code: 'validation.failed', fields: [{ location: 'body.discountValue', code: 'pricing.percent_range', params: { max: 100 } }] })
+        return HttpResponse.json(bom.totals)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    // Whole numbers without zero decimals.
+    const value = await screen.findByRole('textbox', { name: /^Discount value/ })
+    expect(value).toHaveValue('10')
+    expect(screen.getByRole('textbox', { name: /^Services value/ })).toHaveValue('50')
+    const totals = await screen.findByRole('region', { name: 'Totals with these values' })
+    await user.clear(value)
+    await user.type(value, '150')
+    expect(await screen.findByText('The totals update once the values are valid.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Totals with these values' })).toHaveAttribute('aria-busy', 'true')
+    expect(totals).toBeInTheDocument()
+  })
+
+  it('is read-only without write access', async () => {
+    serve()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite={false} />)
+    expect(await screen.findByRole('textbox', { name: /^Discount value/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    // The saved totals, not a preview of values to try.
+    expect(await screen.findByRole('region', { name: 'Totals' })).toBeInTheDocument()
+  })
+})

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 
 import type { Project, ProjectVersion } from '@/api/generated/model'
 import {
@@ -12,8 +12,9 @@ import {
   useGetProject,
   useUpdateProject,
 } from '@/api/generated/projects/projects'
+import { BomTab, PricingTab } from '@/features/bom'
 import { PlansSection } from '@/features/plans'
-import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, TextLink } from '@/components/ui'
+import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, Tabs, TextLink } from '@/components/ui'
 
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
 import { ProjectFormDialog } from './ProjectFormDialog'
@@ -176,7 +177,7 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
       )}
       {version?.notes && <Notes label={t('page.versionNotes')} text={version.notes} />}
 
-      {version && <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} />}
+      {version && <VersionTabs project={project} version={version} canWrite={canWrite} />}
 
       <ProjectFormDialog open={editOpen} onOpenChange={setEditOpen} item={project} />
       {version && (
@@ -200,6 +201,44 @@ function ProjectView({ project, version }: { project: Project; version: ProjectV
         error={<ErrorMessage error={removeVersion.error} />}
       />
     </Page>
+  )
+}
+
+const versionTabs = ['plans', 'bom', 'pricing'] as const
+type VersionTab = (typeof versionTabs)[number]
+
+/** Plans / Bill of materials / Pricing of a version; the tab is in the URL (?tab=bom, D236). */
+function VersionTabs({ project, version, canWrite }: { project: Project; version: ProjectVersion; canWrite: boolean }) {
+  const { t } = useTranslation('bom')
+  const [params, setParams] = useSearchParams()
+  const param = params.get('tab')
+  const tab: VersionTab = versionTabs.find((k) => k === param) ?? 'plans'
+  const select = (next: VersionTab) =>
+    setParams(
+      (p) => {
+        const out = new URLSearchParams(p)
+        if (next === 'plans') out.delete('tab')
+        else out.set('tab', next)
+        return out
+      },
+      { replace: true },
+    )
+  return (
+    <Tabs
+      label={t('tabs.label')}
+      value={tab}
+      onValueChange={select}
+      panelClassName="overflow-visible px-0 pt-6"
+      tabs={[
+        { key: 'plans', label: t('tabs.plans'), content: <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} /> },
+        {
+          key: 'bom',
+          label: t('tabs.bom'),
+          content: <BomTab key={version.id} projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} />,
+        },
+        { key: 'pricing', label: t('tabs.pricing'), content: <PricingTab key={version.id} versionId={version.id} canWrite={canWrite} /> },
+      ]}
+    />
   )
 }
 

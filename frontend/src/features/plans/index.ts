@@ -11,3 +11,4 @@ export const plansFeature: FeatureModule = {
   element: EditorRoute,
   permission: 'projects.read',
 }
+export { groupPalette, type PaletteProduct, paletteProducts, useCatalogVariants } from './editor/catalog'

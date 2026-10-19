@@ -37,7 +37,7 @@ export const plan = (n: number, over: Partial<Plan> = {}): Plan => ({
   createdAt: at,
   updatedAt: at,
   contentUpdatedAt: at,
-  lock: null as unknown as Plan['lock'],
+  lock: null,
   can: { update: true, breakLock: true },
   ...over,
 })

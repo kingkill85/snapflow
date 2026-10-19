@@ -169,6 +169,13 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UserInput) (User,
 		}
 	}
 	email := normalizeEmail(in.Email)
+	// The tenant is looked up before the transaction (D243); a user moved
+	// to another tenant meanwhile makes the update retry.
+	wantTenant := before.TenantID
+	if in.TenantID != nil {
+		wantTenant = *in.TenantID
+	}
+	tenant, lookupErr := s.tenants.Lookup(ctx, wantTenant)
 
 	var out User
 	err = s.inTx(ctx, func(q *store.Queries) error {
@@ -199,7 +206,10 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UserInput) (User,
 				return apperr.New(http.StatusConflict, "user.own_tenant", "you cannot move yourself to another tenant")
 			}
 		}
-		if err := s.checkAssignment(ctx, actor, in.Role, tenantID, &current.TenantID); err != nil {
+		if tenantID != wantTenant {
+			return apperr.ConflictRetry()
+		}
+		if err := checkAssignment(actor, in.Role, tenantID, &current.TenantID, tenant, lookupErr); err != nil {
 			return err
 		}
 		if isActiveAdmin(current) && (in.Role != auth.RoleAdmin || !in.IsActive) {
@@ -376,19 +386,26 @@ func checkVisible(actor auth.Actor, row store.User, err error) (store.User, erro
 // archived tenant (D13) takes no new users: it counts as unknown unless the
 // user already belongs to it (currentTenant).
 func (s *Service) checkAssignment(ctx context.Context, actor auth.Actor, role auth.Role, tenantID uuid.UUID, currentTenant *uuid.UUID) error {
+	tenant, err := s.tenants.Lookup(ctx, tenantID)
+	return checkAssignment(actor, role, tenantID, currentTenant, tenant, err)
+}
+
+// checkAssignment is the check with the tenant already looked up (lookupErr
+// its error), so a transaction never reads through another service's pool
+// connection (D243).
+func checkAssignment(actor auth.Actor, role auth.Role, tenantID uuid.UUID, currentTenant *uuid.UUID, tenant tenants.Tenant, lookupErr error) error {
 	if !actor.CanAssign(role) {
 		return apperr.New(http.StatusForbidden, "user.role_forbidden", "you cannot assign this role").With("role", string(role))
 	}
 	if !actor.SeesTenant(tenantID) {
 		return apperr.New(http.StatusForbidden, "user.tenant_forbidden", "you cannot manage users of another tenant")
 	}
-	tenant, err := s.tenants.Lookup(ctx, tenantID)
-	if err != nil {
+	if lookupErr != nil {
 		var ae *apperr.Error
-		if errors.As(err, &ae) && ae.Status == http.StatusNotFound {
+		if errors.As(lookupErr, &ae) && ae.Status == http.StatusNotFound {
 			return apperr.Invalid("body.tenantId", "user.tenant_not_found", "tenant does not exist")
 		}
-		return err
+		return lookupErr
 	}
 	if tenant.ArchivedAt != nil && (currentTenant == nil || *currentTenant != tenantID) {
 		return apperr.Invalid("body.tenantId", "user.tenant_not_found", "tenant does not exist")

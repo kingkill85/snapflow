@@ -13,8 +13,24 @@ import (
 	"github.com/kingkill85/snapflow/backend/migrations"
 )
 
+// Open opens a pool with pgx's defaults (and pool_max_conns of the URL).
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, url)
+	return OpenWith(ctx, url, 0)
+}
+
+// OpenWith opens a pool of at most maxConns connections (0: pgx's default,
+// max(4, NumCPU), or pool_max_conns of the URL). Code must never take a
+// second pooled connection while it holds a transaction (D243), so a small
+// pool only queues requests.
+func OpenWith(ctx context.Context, url string, maxConns int32) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("parse database url: %w", err)
+	}
+	if maxConns > 0 {
+		cfg.MaxConns = maxConns
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open pool: %w", err)
 	}

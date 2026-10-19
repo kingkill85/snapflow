@@ -53,6 +53,19 @@
     "too_many_attempts": "Zu viele Versuche. Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
     "wrong_password": "Das aktuelle Passwort ist falsch."
   },
+  "bom": {
+    "line_kind": "Wählen Sie entweder ein Katalogprodukt oder einen Namen und einen Stückpreis.",
+    "line_not_found": "Diese Position existiert nicht mehr.",
+    "line_stale": "Jemand anderes hat diese Position inzwischen geändert. Der aktuelle Stand ist jetzt geladen; erneutes Speichern überschreibt ihn.",
+    "nothing_selected": "Wählen Sie mindestens einen Eintrag zum Aktualisieren aus.",
+    "order_mismatch": "Die Positionen wurden inzwischen geändert. Die aktuelle Reihenfolge ist jetzt geladen; versuchen Sie es erneut.",
+    "product_type_not_in_project": "Der Produkttyp dieses Produkts gehört nicht zum Projekt.",
+    "quantity_range": "Geben Sie eine ganze Zahl von {{min}} bis {{max}} ein.",
+    "too_many_lines": "Eine Version kann höchstens {{max}} manuelle Positionen haben.",
+    "unit_price_invalid": "Geben Sie einen Betrag ab 0 mit höchstens 2 Nachkommastellen ein.",
+    "variant_not_found": "Diese Produktvariante existiert nicht mehr.",
+    "variant_unavailable": "Dieses Produkt ist nicht verfügbar (inaktiv) und kann nicht hinzugefügt werden."
+  },
   "category": {
     "in_use": "Diese Kategorie wird noch von Produkten verwendet. Deaktivieren Sie sie stattdessen.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
@@ -140,6 +153,12 @@
     "variant_required": "Wählen Sie ein Produkt.",
     "addon_not_linked": "Dies ist kein Zubehör der gewählten Variante."
   },
+  "pricing": {
+    "amount_range": "Dieser Betrag ist zu groß (höchstens {{max}}).",
+    "percent_range": "Geben Sie einen Prozentsatz von 0 bis {{max}} ein.",
+    "stale": "Jemand anderes hat die Preisgestaltung inzwischen geändert. Der aktuelle Stand ist jetzt geladen; erneutes Speichern überschreibt ihn.",
+    "value_invalid": "Geben Sie eine Zahl ab 0 mit höchstens 2 Nachkommastellen ein."
+  },
   "product": {
     "category_inactive": "Diese Kategorie ist inaktiv. Wählen Sie eine aktive Kategorie.",
     "category_not_found": "Die gewählte Kategorie existiert nicht mehr.",
@@ -178,6 +197,7 @@
   },
   "request": {
     "bad": "Die Anfrage war ungültig.",
+    "canceled": "Die Anfrage wurde abgebrochen.",
     "conflict": "Das widerspricht vorhandenen Daten.",
     "conflict_retry": "Jemand anderes hat dies gleichzeitig geändert. Bitte versuchen Sie es erneut.",
     "failed": "Die Anfrage ist fehlgeschlagen.",

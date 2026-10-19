@@ -32,6 +32,8 @@ export const errorParamNames = {
   'attribute.wrong_scope': ['scope'],
   'auth.too_many_attempts': ['seconds'],
   'category.key_taken': ['key'],
+  'bom.quantity_range': ['min', 'max'],
+  'bom.too_many_lines': ['max'],
   'file.too_large': ['maxMb'],
   'file.too_many_pixels': ['megapixels'],
   'function_type.key_taken': ['key'],
@@ -57,6 +59,8 @@ export const errorParamNames = {
   'plan.locked': ['name', 'expiresAt'],
   'plan.name_taken': ['name'],
   'plan.placement_size': ['max'],
+  'pricing.amount_range': ['max'],
+  'pricing.percent_range': ['max'],
   'plan.zone_points': ['min', 'max'],
   'product.model_number_taken': ['modelNumber'],
   'product_type.key_taken': ['key'],
@@ -101,16 +105,48 @@ export function errorKey<K extends ErrorKey>(key: K, ...params: K extends ParamK
   return encode(key, params[0])
 }
 
+/** An RFC 3339 time as the API sends it (e.g. a lock's expiresAt). */
+const isoTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/
+
+/** Params that are limits (e.g. "at most {{max}}"), shown as localized numbers. */
+const numberParams = new Set(['min', 'max'])
+const decimal = /^-?\d+(\.\d+)?$/
+
+/**
+ * Params as localized text: times (RFC 3339) as the time of day for today
+ * ("14:32"), else date and time; limits (min, max), numbers or decimal strings
+ * as the API sends them (e.g. "9999999999.99"), with the language's digits
+ * ("9.999.999.999,99"). Other params stay as they are (a SKU is no number).
+ */
+export function formatParams(params: Record<string, unknown> | undefined, language: string, now = new Date()) {
+  if (!params) return params
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(params)) {
+    if (numberParams.has(key) && (typeof value === 'number' || (typeof value === 'string' && decimal.test(value)))) {
+      out[key] = new Intl.NumberFormat(language, { maximumFractionDigits: 20 }).format(value as number | Intl.StringNumericLiteral)
+      continue
+    }
+    const date = typeof value === 'string' && isoTime.test(value) ? new Date(value) : undefined
+    if (!date || Number.isNaN(date.getTime())) {
+      out[key] = value
+      continue
+    }
+    const today = date.toDateString() === now.toDateString()
+    out[key] = new Intl.DateTimeFormat(language, today ? { timeStyle: 'short' } : { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+  }
+  return out
+}
+
 const knownError = (code: string): ErrorKey => (i18next.exists(code, { ns: 'errors' }) ? (code as ErrorKey) : 'validation.invalid')
 
 /** Translates a form field's error message (an error key from zod or the API, with its params). */
 export function useFieldError() {
-  const { t } = useTranslation('errors')
+  const { t, i18n } = useTranslation('errors')
   return (message?: string): string | undefined => {
     if (!message) return undefined
     const { key, params } = decodeMessage(message)
     const known = knownError(key)
-    return String(t(known, (known === key ? params : undefined) as never))
+    return String(t(known, (known === key ? formatParams(params, i18n.resolvedLanguage ?? 'en') : undefined) as never))
   }
 }
 

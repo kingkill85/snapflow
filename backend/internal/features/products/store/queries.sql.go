@@ -14,6 +14,64 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+const bOMVariants = `-- name: BOMVariants :many
+SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
+       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id, p.category_id
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY ($1::uuid[])
+`
+
+type BOMVariantsRow struct {
+	ID              uuid.UUID
+	ProductID       uuid.UUID
+	Name            i18n.Text
+	Sku             *string
+	Price           string
+	ImageFileID     *uuid.UUID
+	IsActive        bool
+	ModelNumber     string
+	ProductName     i18n.Text
+	ProductIsActive bool
+	ProductTypeID   uuid.UUID
+	CategoryID      uuid.UUID
+}
+
+// BOMVariants returns what a BOM snapshot keeps of the given variants (bom
+// feature, through BOMVariants).
+func (q *Queries) BOMVariants(ctx context.Context, ids []uuid.UUID) ([]BOMVariantsRow, error) {
+	rows, err := q.db.Query(ctx, bOMVariants, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BOMVariantsRow{}
+	for rows.Next() {
+		var i BOMVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Name,
+			&i.Sku,
+			&i.Price,
+			&i.ImageFileID,
+			&i.IsActive,
+			&i.ModelNumber,
+			&i.ProductName,
+			&i.ProductIsActive,
+			&i.ProductTypeID,
+			&i.CategoryID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const catalogAddons = `-- name: CatalogAddons :many
 SELECT variant_id, addon_variant_id, required, sort_order FROM variant_addons ORDER BY variant_id, sort_order
 `

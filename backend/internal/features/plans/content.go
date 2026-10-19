@@ -84,7 +84,7 @@ func readContent(ctx context.Context, q *store.Queries, id uuid.UUID) ([]PlanZon
 				ID: p.ID, VariantID: p.VariantID, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, Rotation: p.Rotation,
 				Label: p.Label, Existing: p.Existing, AddonVariantIDs: p.AddonVariantIds, InstanceValues: p.InstanceValues,
 			},
-			ZoneID: p.ZoneID,
+			ZoneID: p.ZoneID, CatalogVariantID: p.CatalogVariantID,
 		}
 		if placements[i].AddonVariantIDs == nil {
 			placements[i].AddonVariantIDs = []uuid.UUID{}
@@ -127,10 +127,15 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 		return PlanContent{}, err
 	}
 	assignZones(zones, placements)
+	prepared, err := s.prepareContentHooks(ctx, st.plan.VersionID, placements)
+	if err != nil {
+		return PlanContent{}, err
+	}
 
 	var row store.GetPlanRow
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		if _, err := s.projects.WriteVersion(ctx, tx, st.plan.VersionID, false); err != nil {
+		ref, err := s.projects.WriteVersion(ctx, tx, st.plan.VersionID, false)
+		if err != nil {
 			return err
 		}
 		locked, err := q.LockPlan(ctx, id)
@@ -144,6 +149,9 @@ func (s *Service) SaveContent(ctx context.Context, id uuid.UUID, in PlanContentI
 			return errStale()
 		}
 		if err := writeContent(ctx, q, locked.TenantID, id, zones, placements); err != nil {
+			return err
+		}
+		if err := s.runContentHooks(ctx, tx, ref, prepared); err != nil {
 			return err
 		}
 		if _, err := q.TouchContent(ctx, store.TouchContentParams{ID: id, Scale: in.Scale}); err != nil {
@@ -188,6 +196,7 @@ func writeContent(ctx context.Context, q *store.Queries, tenantID, planID uuid.U
 		type placementRow struct {
 			ID              uuid.UUID         `json:"id"`
 			VariantID       *uuid.UUID        `json:"variant_id"`
+			CatalogVariant  *uuid.UUID        `json:"catalog_variant_id"`
 			X               float64           `json:"x"`
 			Y               float64           `json:"y"`
 			Width           float64           `json:"width"`
@@ -205,7 +214,7 @@ func writeContent(ctx context.Context, q *store.Queries, tenantID, planID uuid.U
 			rows[i] = placementRow{
 				ID: p.ID, VariantID: p.VariantID, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, Rotation: p.Rotation,
 				Label: p.Label, Existing: p.Existing, AddonVariantIDs: p.AddonVariantIDs, InstanceValues: p.InstanceValues,
-				ZoneID: p.ZoneID, Position: i + 1,
+				ZoneID: p.ZoneID, Position: i + 1, CatalogVariant: p.CatalogVariantID,
 			}
 			if rows[i].AddonVariantIDs == nil {
 				rows[i].AddonVariantIDs = []uuid.UUID{}
@@ -348,7 +357,10 @@ func (s *Service) validateContent(ctx context.Context, st stored, in PlanContent
 			p.InstanceValues, valueErrs = instanceValues(v.InstanceAttributes, p.InstanceValues, prevValues, loc+".instanceValues")
 			errs = append(errs, valueErrs...)
 		}
-		placements[i] = PlanPlacement{PlanPlacementInput: p}
+		placements[i] = PlanPlacement{PlanPlacementInput: p, CatalogVariantID: p.VariantID}
+		if p.VariantID == nil && wasStored {
+			placements[i].CatalogVariantID = prev.CatalogVariantID
+		}
 	}
 	if len(errs) > 0 {
 		return nil, nil, apperr.Validation(errs...)

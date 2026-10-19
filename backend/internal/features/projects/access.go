@@ -25,6 +25,10 @@ type VersionRef struct {
 	// ProductTypeIDs are the product types the project uses (filled by
 	// ReadVersion and WriteVersion).
 	ProductTypeIDs []uuid.UUID
+	// Currency (ISO 4217) and ExchangeRate (units per 1 USD, decimal
+	// string) of the project (filled by ReadVersion and WriteVersion).
+	Currency     string
+	ExchangeRate string
 }
 
 // Writable reports whether the version's project takes changes (active).
@@ -95,5 +99,6 @@ func versionRef(ctx context.Context, actor auth.Actor, q *store.Queries, get fun
 	if err != nil {
 		return VersionRef{}, err
 	}
-	return VersionRef{ID: r.ID, ProjectID: r.ProjectID, TenantID: r.TenantID, Status: ProjectStatus(r.Status), ProductTypeIDs: types}, nil
+	return VersionRef{ID: r.ID, ProjectID: r.ProjectID, TenantID: r.TenantID, Status: ProjectStatus(r.Status), ProductTypeIDs: types,
+		Currency: r.Currency, ExchangeRate: r.ExchangeRate}, nil
 }

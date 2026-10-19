@@ -53,6 +53,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       # Reverse proxies (CIDRs) whose X-Forwarded-For header is trusted.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      DATABASE_MAX_CONNS: ${DATABASE_MAX_CONNS:-20}
       # Uploaded files (product images); back up with the database.
       STORAGE_DIR: /data/files
     volumes:

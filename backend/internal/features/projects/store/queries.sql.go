@@ -594,16 +594,18 @@ func (q *Queries) UpdateVersion(ctx context.Context, arg UpdateVersionParams) (P
 }
 
 const versionAccess = `-- name: VersionAccess :one
-SELECT v.id, v.project_id, p.tenant_id, p.status
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 `
 
 type VersionAccessRow struct {
-	ID        uuid.UUID
-	ProjectID uuid.UUID
-	TenantID  uuid.UUID
-	Status    string
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	TenantID     uuid.UUID
+	Status       string
+	Currency     string
+	ExchangeRate string
 }
 
 // VersionAccess reads a version with what other features (plans) need of
@@ -618,22 +620,26 @@ func (q *Queries) VersionAccess(ctx context.Context, id uuid.UUID) (VersionAcces
 		&i.ProjectID,
 		&i.TenantID,
 		&i.Status,
+		&i.Currency,
+		&i.ExchangeRate,
 	)
 	return i, err
 }
 
 const versionAccessLock = `-- name: VersionAccessLock :one
-SELECT v.id, v.project_id, p.tenant_id, p.status
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR UPDATE OF p
 `
 
 type VersionAccessLockRow struct {
-	ID        uuid.UUID
-	ProjectID uuid.UUID
-	TenantID  uuid.UUID
-	Status    string
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	TenantID     uuid.UUID
+	Status       string
+	Currency     string
+	ExchangeRate string
 }
 
 func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionAccessLockRow, error) {
@@ -644,22 +650,26 @@ func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionA
 		&i.ProjectID,
 		&i.TenantID,
 		&i.Status,
+		&i.Currency,
+		&i.ExchangeRate,
 	)
 	return i, err
 }
 
 const versionAccessShare = `-- name: VersionAccessShare :one
-SELECT v.id, v.project_id, p.tenant_id, p.status
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR SHARE OF p
 `
 
 type VersionAccessShareRow struct {
-	ID        uuid.UUID
-	ProjectID uuid.UUID
-	TenantID  uuid.UUID
-	Status    string
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	TenantID     uuid.UUID
+	Status       string
+	Currency     string
+	ExchangeRate string
 }
 
 func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (VersionAccessShareRow, error) {
@@ -670,6 +680,8 @@ func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (Version
 		&i.ProjectID,
 		&i.TenantID,
 		&i.Status,
+		&i.Currency,
+		&i.ExchangeRate,
 	)
 	return i, err
 }

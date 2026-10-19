@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -9,6 +10,9 @@ import { renderRoutes } from '@/test/render'
 import { server } from '@/test/server'
 
 import { editorPath, editorRoute } from '../paths'
+import { getGetPlanContentQueryKey, getGetPlanQueryKey } from '@/api/generated/plans/plans'
+import { getGetProjectQueryKey } from '@/api/generated/projects/projects'
+
 import { catalog, content, placement, plan, projectId, versionId, zigbeeId } from '../test-fixtures'
 import { PlanEditorPage } from './PlanEditorPage'
 
@@ -57,13 +61,13 @@ function serve({ project: p = project, content: c = content(), lockHeld = false 
   return { saved, locks }
 }
 
-const open = () =>
+const open = (prepare?: (client: QueryClient) => void) =>
   renderRoutes(
     [
       { path: `/${editorRoute}`, element: <PlanEditorPage /> },
       { path: '/projects/:id/versions/:versionId', element: <h1>Project page</h1> },
     ],
-    { route: editorPath(projectId, versionId, plan(1).id) },
+    { route: editorPath(projectId, versionId, plan(1).id), prepare },
   )
 
 describe('PlanEditorPage', () => {
@@ -101,6 +105,26 @@ describe('PlanEditorPage', () => {
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-count', '0')
     await waitFor(() => expect(saved).toHaveLength(2))
     expect(saved[1]).toMatchObject({ expectedContentUpdatedAt: '2026-10-18T10:01:00Z', placements: [] })
+  })
+
+  it('starts from the stored content, not from a cached copy of an earlier visit', async () => {
+    const { saved } = serve()
+    const user = userEvent.setup()
+    // The previous visit left an older content in the cache.
+    open((client) => {
+      client.setQueryData(getGetPlanQueryKey(plan(1).id), plan(1))
+      client.setQueryData(getGetProjectQueryKey(projectId), project)
+      client.setQueryData(['/api/variants', 'plan-editor'], catalog)
+      client.setQueryData(getGetPlanContentQueryKey(plan(1).id), { ...content(), contentUpdatedAt: '2026-10-18T09:00:00Z' })
+    })
+
+    const palette = await screen.findByRole('tabpanel', { name: 'Products' })
+    await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
+    await user.click(within(palette).getByRole('button', { name: /Motion sensor/ }))
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ expectedContentUpdatedAt: content().contentUpdatedAt })
   })
 
   it('edits the selected placement in the inspector', async () => {

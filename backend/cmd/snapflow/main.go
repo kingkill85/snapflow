@@ -68,7 +68,7 @@ func serve(ctx context.Context) error {
 	if err := database.Migrate(ctx, cfg.DatabaseURL); err != nil {
 		return err
 	}
-	pool, err := database.Open(ctx, cfg.DatabaseURL)
+	pool, err := database.OpenWith(ctx, cfg.DatabaseURL, cfg.DatabaseMaxConns)
 	if err != nil {
 		return err
 	}

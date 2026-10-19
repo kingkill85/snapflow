@@ -136,21 +136,22 @@ type Plan struct {
 }
 
 type PlanPlacement struct {
-	PlanID          uuid.UUID
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	VariantID       *uuid.UUID
-	X               float64
-	Y               float64
-	Width           float64
-	Height          float64
-	Rotation        float64
-	Label           string
-	Existing        bool
-	AddonVariantIds []uuid.UUID
-	InstanceValues  attrschema.Values
-	ZoneID          *uuid.UUID
-	Position        int32
+	PlanID           uuid.UUID
+	ID               uuid.UUID
+	TenantID         uuid.UUID
+	VariantID        *uuid.UUID
+	X                float64
+	Y                float64
+	Width            float64
+	Height           float64
+	Rotation         float64
+	Label            string
+	Existing         bool
+	AddonVariantIds  []uuid.UUID
+	InstanceValues   attrschema.Values
+	ZoneID           *uuid.UUID
+	Position         int32
+	CatalogVariantID *uuid.UUID
 }
 
 type PlanZone struct {
@@ -283,4 +284,55 @@ type VariantAddon struct {
 	AddonVariantID uuid.UUID
 	Required       bool
 	SortOrder      int32
+}
+
+type VersionItem struct {
+	ID                      uuid.UUID
+	TenantID                uuid.UUID
+	VersionID               uuid.UUID
+	VariantID               uuid.UUID
+	ProductID               uuid.UUID
+	ProductName             i18n.Text
+	VariantName             i18n.Text
+	ModelNumber             string
+	Sku                     *string
+	ProductTypeID           uuid.UUID
+	ProductTypeKey          string
+	ProductTypeName         i18n.Text
+	ProductTypeAbbreviation string
+	ProductTypeColor        string
+	ProductTypePosition     int32
+	CategoryID              uuid.UUID
+	CategoryName            i18n.Text
+	CategoryPosition        int32
+	UnitPrice               string
+	ImageFileID             *uuid.UUID
+	RequiredAddonIds        []uuid.UUID
+	CapturedAt              time.Time
+	UpdatedAt               time.Time
+}
+
+type VersionManualLine struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	VersionID uuid.UUID
+	Position  int32
+	VariantID *uuid.UUID
+	Name      *string
+	UnitPrice *string
+	Quantity  int32
+	Note      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type VersionPricing struct {
+	VersionID     uuid.UUID
+	TenantID      uuid.UUID
+	DiscountKind  string
+	DiscountValue string
+	ServicesKind  string
+	ServicesValue string
+	ServicesLabel *i18n.Text
+	UpdatedAt     time.Time
 }

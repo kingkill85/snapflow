@@ -130,6 +130,13 @@ const internalDetail = "internal server error"
 // Internal logs err as a server error (with the request id) and returns a
 // 500 that reveals nothing about it. msg says what failed, for the log.
 func Internal(ctx context.Context, msg string, err error) *Error {
+	if canceled(ctx, []error{err}) {
+		slog.DebugContext(ctx, msg, "request_id", RequestID(ctx), "error", err)
+		return &Error{Status: StatusClientClosedRequest, Code: "request.canceled", Detail: "request canceled"}
+	}
+	if cancelOther(ctx) {
+		slog.WarnContext(ctx, "canceled request failed with another error", "request_id", RequestID(ctx), "message", msg, "error", err)
+	}
 	slog.ErrorContext(ctx, msg, "request_id", RequestID(ctx), "error", err)
 	return New(http.StatusInternalServerError, "server.error", internalDetail)
 }
@@ -186,6 +193,14 @@ func newError(ctx context.Context, status int, msg string, errs ...error) *Error
 				return ConflictRetry()
 			}
 		}
+		if canceled(ctx, errs) {
+			// The client went away (reload, navigation): not a server error.
+			slog.DebugContext(ctx, "request canceled", "request_id", RequestID(ctx), "error", errors.Join(errs...))
+			return &Error{Status: StatusClientClosedRequest, Code: "request.canceled", Detail: "request canceled"}
+		}
+		if cancelOther(ctx) {
+			slog.WarnContext(ctx, "canceled request failed with another error", "request_id", RequestID(ctx), "message", msg)
+		}
 		slog.ErrorContext(ctx, "server error", "request_id", RequestID(ctx), "status", status,
 			"message", msg, "error", errors.Join(errs...))
 		return &Error{Status: status, Code: codeForStatus(status), Detail: internalDetail}
@@ -207,6 +222,31 @@ func newError(ctx context.Context, status int, msg string, errs ...error) *Error
 	}
 	return e
 }
+
+// StatusClientClosedRequest is the status of a request the client aborted
+// (nginx's 499); the client never sees it, the access log does.
+const StatusClientClosedRequest = 499
+
+// canceled reports whether errs come from the request's context being
+// canceled (the client closed the connection): the context is done and an
+// error says so. A canceled request that failed with another error is a
+// real error (cancelOther).
+func canceled(ctx context.Context, errs []error) bool {
+	if ctx == nil || ctx.Err() == nil {
+		return false
+	}
+	for _, err := range errs {
+		if errors.Is(err, context.Canceled) {
+			return true
+		}
+	}
+	return false
+}
+
+// cancelOther reports a request whose context is canceled but that failed
+// with an error other than the cancellation (logged as a warning besides
+// the 500: it may hide a bug the cancellation only exposed).
+func cancelOther(ctx context.Context) bool { return ctx != nil && ctx.Err() != nil }
 
 func codeForStatus(status int) string {
 	switch status {

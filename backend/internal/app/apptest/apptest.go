@@ -66,7 +66,12 @@ type Session struct {
 // a logged-in admin.
 func New(t *testing.T) *API {
 	t.Helper()
-	pool := testdb.Pool(t)
+	return NewWithPool(t, testdb.Pool(t))
+}
+
+// NewWithPool is New on the given pool (e.g. testdb.SmallPool).
+func NewWithPool(t *testing.T, pool *pgxpool.Pool) *API {
+	t.Helper()
 	if err := app.Bootstrap(context.Background(), pool, app.BootstrapConfig{
 		DistributorName: "Distributor", AdminEmail: AdminEmail, AdminPassword: Password,
 	}); err != nil {

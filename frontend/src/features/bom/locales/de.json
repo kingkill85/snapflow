@@ -1,0 +1,129 @@
+{
+  "tabs": {
+    "label": "Inhalt der Version",
+    "plans": "Pläne",
+    "bom": "Stückliste",
+    "pricing": "Preise"
+  },
+  "bom": {
+    "title": "Stückliste",
+    "empty": "Noch nichts aufzulisten: Platzieren Sie Produkte in einem Plan oder fügen Sie eine manuelle Position hinzu.",
+    "filterPlan": "Plan",
+    "filterZone": "Zone",
+    "allPlans": "Alle Pläne",
+    "allZones": "Alle Zonen",
+    "noZone": "Keine Zone",
+    "filtered": "Nur Mengen des gewählten Plans bzw. der Zone. Preise und Summen gelten für die ganze Version.",
+    "noneInFilter": "Nichts in diesem Plan bzw. dieser Zone.",
+    "columns": {
+      "image": "Bild",
+      "product": "Produkt",
+      "manual": "Manuell",
+      "quantity": "Menge",
+      "unitPrice": "Einzelpreis",
+      "total": "Gesamt"
+    },
+    "addOnFor": "Zubehör für {{names}}",
+    "freeText": "Sonstige Positionen",
+    "subtotal": "Zwischensumme {{amount}}",
+    "status": {
+      "deleted": "Gelöscht",
+      "inactive": "Inaktiv",
+      "outdated": "Veraltet"
+    },
+    "statusAction": "{{statuses}} – aus dem Katalog aktualisieren: {{name}}",
+    "updateFromCatalog": "Aus dem Katalog aktualisieren",
+    "warning": "Eine Platzierung auf „{{plan}}“ hat keinen Preisstand und wird nicht gezählt.",
+    "openPlan": "Plan öffnen",
+    "totals": {
+      "title": "Summen",
+      "subtotal": "Zwischensumme",
+      "discount": "Rabatt",
+      "grandTotal": "Gesamtsumme",
+      "rate": "Wechselkurs: 1 USD = {{rate}} {{currency}}"
+    }
+  },
+  "manual": {
+    "title": "Manuelle Positionen",
+    "description": "Produkte und Posten, die in keinem Plan platziert sind.",
+    "empty": "Keine manuellen Positionen.",
+    "addCatalog": "Produkt hinzufügen",
+    "addFreeText": "Freitext-Position hinzufügen",
+    "newCatalogTitle": "Produkt hinzufügen",
+    "newFreeTextTitle": "Freitext-Position hinzufügen",
+    "editTitle": "Position bearbeiten",
+    "product": "Produkt",
+    "search": "Suche",
+    "searchHint": "Name, Modellnummer oder SKU",
+    "noMatch": "Kein Produkt passt.",
+    "noProducts": "Keine Produkte der Produkttypen dieses Projekts.",
+    "chooseProduct": "Wählen Sie ein Produkt.",
+    "variant": "Variante",
+    "name": "Bezeichnung",
+    "unitPrice": "Einzelpreis (USD)",
+    "unitPriceHint": "z. B. 27,50 oder 27.50",
+    "quantity": "Menge",
+    "note": "Notiz",
+    "moveUp": "{{name}} nach oben",
+    "moveDown": "{{name}} nach unten",
+    "deleteTitle": "Position löschen",
+    "deleteMessage": "„{{name}}“ aus den manuellen Positionen löschen?",
+    "kindCatalog": "Produkt",
+    "kindFreeText": "Freitext",
+    "columns": {
+      "item": "Position",
+      "unitPrice": "Einzelpreis",
+      "quantity": "Menge",
+      "total": "Gesamt",
+      "note": "Notiz"
+    }
+  },
+  "pricing": {
+    "title": "Preise",
+    "discount": "Rabatt",
+    "services": "Dienstleistungen",
+    "kind": "Art",
+    "kinds": {
+      "none": "Keine",
+      "percent": "Prozent",
+      "amount": "Betrag (USD)"
+    },
+    "discountValue": "Rabattwert",
+    "servicesValue": "Wert der Dienstleistungen",
+    "percentHint": "0 bis 100, z. B. 7,5 oder 7.5",
+    "amountHint": "USD, z. B. 250 oder 250,50",
+    "servicesLabel": "Bezeichnung der Dienstleistungen",
+    "servicesLabelHint": "Erscheint im Angebot; leer für die Standardbezeichnung.",
+    "preview": "Summen mit diesen Werten",
+    "previewPending": "Wird aktualisiert …",
+    "previewInvalid": "Die Summen werden aktualisiert, sobald die Werte gültig sind.",
+    "saved": "Preise gespeichert.",
+    "save": "Speichern"
+  },
+  "changes": {
+    "title": "Aus dem Katalog aktualisieren",
+    "description": "Preise und Daten, die sich im Katalog geändert haben, seit sie in diese Version übernommen wurden.",
+    "none": "Alles entspricht dem Katalog.",
+    "selectAll": "Alle auswählen",
+    "apply": "Übernehmen",
+    "effect": "Auswirkung auf die Gesamtsumme: {{amount}}",
+    "totals": "Gesamtsumme {{before}} → {{after}}, wenn alles aktualisiert wird",
+    "notApplicable": "Im Katalog gelöscht: bleibt wie angeboten",
+    "unavailable": "Im Katalog nicht verfügbar",
+    "field": "Feld",
+    "before": "Vorher",
+    "after": "Nachher",
+    "applied": "{{count}} Positionen aktualisiert.",
+    "fields": {
+      "unitPrice": "Preis",
+      "productName": "Produktname",
+      "variantName": "Variantenname",
+      "modelNumber": "Modellnummer",
+      "sku": "SKU",
+      "image": "Bild",
+      "requiredAddons": "Pflicht-Zubehör"
+    },
+    "noImage": "Kein Bild",
+    "noAddons": "Keins"
+  }
+}

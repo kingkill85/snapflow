@@ -4,10 +4,10 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { NullablePlanLock } from './nullablePlanLock';
 import type { PlanActions } from './planActions';
 import type { PlanImage } from './planImage';
 import type { PlanKind } from './planKind';
-import type { PlanLock } from './planLock';
 
 export interface Plan {
   /** A URL to the JSON Schema for this object. */
@@ -20,7 +20,7 @@ export interface Plan {
   image: PlanImage;
   kind: PlanKind;
   /** The live edit lock, null when nobody holds it */
-  lock: PlanLock;
+  lock: NullablePlanLock | null;
   name: string;
   placementCount: number;
   /** Order within the version, 1 first */

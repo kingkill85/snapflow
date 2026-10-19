@@ -101,6 +101,27 @@ overrides:
         go_type:
           import: github.com/kingkill85/snapflow/backend/internal/platform/attrschema
           type: Values
+      - column: version_items.product_name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: version_items.variant_name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: version_items.product_type_name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: version_items.category_name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: version_pricing.services_label
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+          pointer: true
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -176,4 +197,11 @@ sql:
       go:
         <<: *go
         out: internal/features/plans/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/bom/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/bom/store
   # scaffold:sqlc

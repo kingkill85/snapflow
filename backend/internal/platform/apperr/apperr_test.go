@@ -1,9 +1,11 @@
 package apperr_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -62,5 +64,59 @@ func TestRetryableBecomesConflict(t *testing.T) {
 	}
 	if apperr.IsRetryable(&pgError{code: "23505"}) || apperr.IsRetryable(errors.New("x")) {
 		t.Error("other errors are not retryable")
+	}
+}
+
+// A request the client aborted (context canceled) is not a server error:
+// it is answered 499 request.canceled and logged at debug, not as an error.
+func TestCanceledIsNotServerError(t *testing.T) {
+	apperr.Install()
+	var logs strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := fmt.Errorf("list plans: %w", context.Canceled)
+	if got := apperr.Internal(ctx, "list plans", err); got.Status != apperr.StatusClientClosedRequest || got.Code != "request.canceled" {
+		t.Errorf("canceled context, canceled error: %+v", got)
+	}
+	if logs.Len() > 0 {
+		t.Errorf("logged above debug: %s", logs.String())
+	}
+	// A canceled error on a live context is not the client going away.
+	if got := apperr.Internal(context.Background(), "list plans", err); got.Status != http.StatusInternalServerError {
+		t.Errorf("live context, canceled error: %+v", got)
+	}
+	if e := huma.NewErrorWithContext(nil, http.StatusInternalServerError, "unexpected error occurred", err); e.GetStatus() != http.StatusInternalServerError {
+		t.Errorf("no context, canceled error: %+v", e)
+	}
+	// Any other error stays a logged 500.
+	if got := apperr.Internal(context.Background(), "read plan", errors.New("boom")); got.Status != http.StatusInternalServerError {
+		t.Errorf("plain error: %+v", got)
+	}
+	if !strings.Contains(logs.String(), "boom") {
+		t.Errorf("server error not logged")
+	}
+}
+
+// A canceled request that failed with another error is a real error: a 500,
+// logged as error, with a warning that the request was canceled.
+func TestCanceledContextOtherError(t *testing.T) {
+	apperr.Install()
+	var logs strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if got := apperr.Internal(ctx, "read plan", errors.New("conn closed")); got.Status != http.StatusInternalServerError {
+		t.Errorf("canceled context, other error: %+v", got)
+	}
+	out := logs.String()
+	if !strings.Contains(out, "level=WARN") || !strings.Contains(out, "level=ERROR") || !strings.Contains(out, "conn closed") {
+		t.Errorf("logs: %s", out)
 	}
 }
