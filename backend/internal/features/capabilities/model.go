@@ -61,7 +61,7 @@ type OutputKindInput struct {
 	Key             string                 `json:"key" doc:"Lower snake case, 1-64 characters" example:"blind_output"`
 	Name            i18n.Text              `json:"name" doc:"At most 100 characters; \"en\" is required"`
 	IsActive        bool                   `json:"isActive"`
-	FunctionTypeIDs []uuid.UUID            `json:"functionTypeIds" maxItems:"200" doc:"Function types it serves (existing ones, each once)"`
+	FunctionTypeIDs []uuid.UUID            `json:"functionTypeIds,omitempty" maxItems:"200" doc:"Function types it serves (existing ones, each once)"`
 	Alternative     *OutputKindAlternative `json:"alternative,omitempty" doc:"Leave out for none"`
 }
 

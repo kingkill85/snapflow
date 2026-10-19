@@ -523,15 +523,15 @@ func (s *Service) CreateFields(ctx context.Context, in []CatalogFieldInput, loc 
 		for i, f := range in {
 			v, opts, err := s.validateField(ctx, q, f, loc(i))
 			var ae *apperr.Error
-			switch {
-			case errors.As(err, &ae) && len(ae.Fields) > 0:
-				all = append(all, ae.Fields...)
-				continue
-			case err != nil:
+			invalid := errors.As(err, &ae) && len(ae.Fields) > 0
+			if err != nil && !invalid {
 				return err
-			case taken[v.Key]:
+			}
+			if invalid {
+				all = append(all, ae.Fields...)
+			}
+			if taken[v.Key] {
 				all = append(all, apperr.Field(loc(i)+".key", "catalog_field.key_taken", "key already exists").With("key", v.Key))
-				continue
 			}
 			taken[v.Key] = true
 			valid[i], options[i] = v, opts
