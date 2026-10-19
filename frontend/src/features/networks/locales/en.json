@@ -1,0 +1,73 @@
+{
+  "overview": {
+    "title": "Networks",
+    "description": "Bus lines and wireless gateways of this version. Devices go to the first line or the nearest gateway of their system unless assigned to another one.",
+    "empty": "No bus or wireless devices on the plans of this version yet.",
+    "readOnly": "Read only: assignments cannot be changed here."
+  },
+  "columns": {
+    "plan": "Plan",
+    "device": "Device",
+    "label": "Label",
+    "current": "Bus current",
+    "places": "Places",
+    "assignment": "Assignment",
+    "line": "Line",
+    "gateway": "Gateway"
+  },
+  "device": {
+    "existing": "Existing"
+  },
+  "assignment": {
+    "pinned": "Pinned",
+    "default": "Default",
+    "reset": "Reset to default"
+  },
+  "bus": {
+    "systemDescription": "Bus system",
+    "addLine": "Add line",
+    "lines": "Lines of {{system}}",
+    "address": "Address {{address}}",
+    "devices_one": "{{count}} device",
+    "devices_other": "{{count}} devices",
+    "current": "used {{used}} mA / supplied {{supplied}} mA",
+    "unknownCurrent_one": "{{count}} without known current",
+    "unknownCurrent_other": "{{count}} without known current",
+    "noMembers": "No devices on this line.",
+    "used": "{{value}} mA",
+    "usedDefault": "{{value}} mA (system default)",
+    "supplied": "supplies {{value}} mA",
+    "unknown": "Unknown",
+    "powerSupply": "Power supply",
+    "lineOf": "Line of {{device}}",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "editLine": "Edit {{name}}",
+    "deleteLine": "Delete {{name}}",
+    "deleteBlocked": "Devices are assigned to this line explicitly: move them first.",
+    "deleteTitle": "Delete line?",
+    "deleteMessage": "The line \"{{name}}\" will be deleted. Devices that follow the default move to the first remaining line.",
+    "unassigned": "Without line",
+    "unassignedNotice": "These devices have no line yet: the first line is created when someone who may edit the project opens this tab."
+  },
+  "lineDialog": {
+    "newTitle": "New line",
+    "editTitle": "Edit line",
+    "name": "Name",
+    "address": "Address",
+    "addressHint": "Optional, e.g. the KNX area/line or HDL subnet for programming"
+  },
+  "wireless": {
+    "systemDescription": "Wireless system",
+    "gatewayOf": "Gateway of {{device}}",
+    "places": "{{used}} of {{supplied}} places used",
+    "unknownPlaces_one": "{{count}} without known places",
+    "unknownPlaces_other": "{{count}} without known places",
+    "noDevices": "No devices on this gateway.",
+    "usedPlaces": "{{value}}",
+    "usedPlacesDefault": "{{value}} (system default)",
+    "unknown": "Unknown",
+    "unassigned": "Without gateway",
+    "unassignedNotice": "These devices have no gateway: add a gateway of this system to a plan."
+  }
+}

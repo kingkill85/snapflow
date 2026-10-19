@@ -35,6 +35,7 @@ import { chromeName } from './export'
 import { type Layers, placementVisible, visibleSymbols, zoneVisible } from './layers'
 import { type SymbolIcon } from './needs'
 import type { CopyItems } from './use-shortcuts'
+import { productDragType } from './catalog'
 import { clampMove, resizeChanges } from './placements'
 import {
   canClose,
@@ -55,7 +56,6 @@ import {
 } from './zones'
 
 /** The data type of a palette product dragged onto the canvas. */
-export const productDragType = 'application/x-snapflow-product'
 
 export type Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate' | 'placeNeed'
 

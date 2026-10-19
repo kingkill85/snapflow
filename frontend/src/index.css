@@ -113,3 +113,8 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/* An existing board module (D185): hatched, so it reads as "already there" in both themes. */
+.board-existing {
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in oklab, var(--color-muted) 30%, transparent) 5px 7px);
+}

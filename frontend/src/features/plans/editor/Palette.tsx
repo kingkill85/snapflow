@@ -5,8 +5,7 @@ import { Button, Field, Thumbnail, TypeBadge } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
-import { groupPalette, type PaletteProduct } from './catalog'
-import { productDragType } from './PlanCanvas'
+import { groupPalette, type PaletteProduct, paletteDrag, productDragType } from './catalog'
 
 type Props = {
   products: PaletteProduct[]
@@ -14,13 +13,15 @@ type Props = {
   armed: string | null
   onArm: (productId: string | null) => void
   editable: boolean
+  /** The hints above the list (the board editor has its own). */
+  hints?: { hint: string; armedHint: string }
 }
 
 /**
  * The Products tab: the project's products by category with a search. Drag
  * one onto the canvas, or click it and then click the spot.
  */
-export function Palette({ products, armed, onArm, editable }: Props) {
+export function Palette({ products, armed, onArm, editable, hints }: Props) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const [search, setSearch] = useState('')
@@ -29,7 +30,7 @@ export function Palette({ products, armed, onArm, editable }: Props) {
   return (
     <div className="space-y-3">
       <Field label={t('palette.search')} type="search" value={search} onChange={(e) => setSearch(e.target.value)} hint={t('palette.searchHint')} />
-      {editable && <p className="text-xs text-muted">{t(armed ? 'palette.armedHint' : 'palette.hint')}</p>}
+      {editable && <p className="text-xs text-muted">{hints ? (armed ? hints.armedHint : hints.hint) : t(armed ? 'palette.armedHint' : 'palette.hint')}</p>}
       {products.length === 0 ? (
         <p className="text-sm text-muted">{t('palette.empty')}</p>
       ) : groups.length === 0 ? (
@@ -49,6 +50,10 @@ export function Palette({ products, armed, onArm, editable }: Props) {
                     onDragStart={(e) => {
                       e.dataTransfer.setData(productDragType, p.productId)
                       e.dataTransfer.effectAllowed = 'copy'
+                      paletteDrag.productId = p.productId
+                    }}
+                    onDragEnd={() => {
+                      paletteDrag.productId = null
                     }}
                     onClick={() => onArm(armed === p.productId ? null : p.productId)}
                     className={cn('h-auto w-full justify-start px-2 py-1.5 text-left font-normal whitespace-normal', armed === p.productId && 'bg-primary/10 ring-1 ring-primary')}

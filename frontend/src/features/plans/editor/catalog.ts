@@ -6,6 +6,12 @@ import type { Size } from '@/canvas'
 import { fileUrl } from '@/catalog/files'
 import type { LocalizedText } from '@/i18n/localized'
 
+/** The drag data type of a palette product (floorplan canvas, board rails). */
+export const productDragType = 'application/x-snapflow-product'
+
+/** The palette product being dragged: drag data is only readable on drop, the board's drop preview needs its width before. */
+export const paletteDrag: { productId: string | null } = { productId: null }
+
 const pageSize = 200
 
 /**

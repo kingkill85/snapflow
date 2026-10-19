@@ -1,7 +1,8 @@
 import type { FeatureModule } from '@/app/feature'
 
 import { EditorRoute } from './EditorRoute'
-import { editorRoute } from './paths'
+import { BoardRoute } from './board/BoardRoute'
+import { boardRoute, editorRoute } from './paths'
 
 export { PlansSection } from './PlansSection'
 
@@ -9,6 +10,13 @@ export { PlansSection } from './PlansSection'
 export const plansFeature: FeatureModule = {
   path: editorRoute,
   element: EditorRoute,
+  permission: 'projects.read',
+}
+
+/** The board editor (step 3c). */
+export const boardsFeature: FeatureModule = {
+  path: boardRoute,
+  element: BoardRoute,
   permission: 'projects.read',
 }
 export { groupPalette, type PaletteProduct, paletteProducts, useCatalogVariants } from './editor/catalog'

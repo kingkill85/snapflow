@@ -1,0 +1,73 @@
+{
+  "overview": {
+    "title": "Netzwerke",
+    "description": "Buslinien und Funk-Gateways dieser Version. Geräte kommen auf die erste Linie oder an das nächste Gateway ihres Systems, solange sie nicht einer anderen zugeordnet sind.",
+    "empty": "Auf den Plänen dieser Version sind noch keine Bus- oder Funkgeräte.",
+    "readOnly": "Nur lesen: Zuordnungen lassen sich hier nicht ändern."
+  },
+  "columns": {
+    "plan": "Plan",
+    "device": "Gerät",
+    "label": "Bezeichnung",
+    "current": "Busstrom",
+    "places": "Plätze",
+    "assignment": "Zuordnung",
+    "line": "Linie",
+    "gateway": "Gateway"
+  },
+  "device": {
+    "existing": "Bestand"
+  },
+  "assignment": {
+    "pinned": "Fest",
+    "default": "Standard",
+    "reset": "Auf Standard zurücksetzen"
+  },
+  "bus": {
+    "systemDescription": "Bussystem",
+    "addLine": "Linie hinzufügen",
+    "lines": "Linien von {{system}}",
+    "address": "Adresse {{address}}",
+    "devices_one": "{{count}} Gerät",
+    "devices_other": "{{count}} Geräte",
+    "current": "verbraucht {{used}} mA / geliefert {{supplied}} mA",
+    "unknownCurrent_one": "{{count}} ohne bekannten Strom",
+    "unknownCurrent_other": "{{count}} ohne bekannten Strom",
+    "noMembers": "Keine Geräte auf dieser Linie.",
+    "used": "{{value}} mA",
+    "usedDefault": "{{value}} mA (Systemstandard)",
+    "supplied": "liefert {{value}} mA",
+    "unknown": "Unbekannt",
+    "powerSupply": "Spannungsversorgung",
+    "lineOf": "Linie von {{device}}",
+    "moveUp": "{{name}} nach oben",
+    "moveDown": "{{name}} nach unten",
+    "editLine": "{{name}} bearbeiten",
+    "deleteLine": "{{name}} löschen",
+    "deleteBlocked": "Dieser Linie sind Geräte ausdrücklich zugeordnet: zuerst verschieben.",
+    "deleteTitle": "Linie löschen?",
+    "deleteMessage": "Die Linie „{{name}}“ wird gelöscht. Geräte mit Standardzuordnung kommen auf die erste verbleibende Linie.",
+    "unassigned": "Ohne Linie",
+    "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie wird angelegt, wenn jemand mit Bearbeitungsrecht diesen Tab öffnet."
+  },
+  "lineDialog": {
+    "newTitle": "Neue Linie",
+    "editTitle": "Linie bearbeiten",
+    "name": "Name",
+    "address": "Adresse",
+    "addressHint": "Optional, z. B. KNX-Bereich/Linie oder HDL-Subnetz für die Programmierung"
+  },
+  "wireless": {
+    "systemDescription": "Funksystem",
+    "gatewayOf": "Gateway von {{device}}",
+    "places": "{{used}} von {{supplied}} Plätzen belegt",
+    "unknownPlaces_one": "{{count}} ohne bekannte Plätze",
+    "unknownPlaces_other": "{{count}} ohne bekannte Plätze",
+    "noDevices": "Keine Geräte an diesem Gateway.",
+    "usedPlaces": "{{value}}",
+    "usedPlacesDefault": "{{value}} (Systemstandard)",
+    "unknown": "Unbekannt",
+    "unassigned": "Ohne Gateway",
+    "unassignedNotice": "Diese Geräte haben kein Gateway: Fügen Sie einem Plan ein Gateway dieses Systems hinzu."
+  }
+}

@@ -280,7 +280,7 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
  * "Change product": the palette's products with the palette's search; picking
  * one puts its default variant on the placement (D216).
  */
-function ProductPicker({ products, current, onPick }: { products: PaletteProduct[]; current?: string; onPick: (product: PaletteProduct) => void }) {
+export function ProductPicker({ products, current, onPick }: { products: PaletteProduct[]; current?: string; onPick: (product: PaletteProduct) => void }) {
   const { t } = useTranslation('plans')
   const { t: tc } = useTranslation()
   const localize = useLocalized()
@@ -339,7 +339,7 @@ function ProductPicker({ products, current, onPick }: { products: PaletteProduct
 }
 
 /** The placement's warnings with texts (add-on warnings name the add-on when the product is loaded). */
-function Warnings({ warnings, placement, productId }: { warnings: PlanWarning[]; placement: PlanPlacement; productId?: string }) {
+export function Warnings({ warnings, placement, productId }: { warnings: { code: string; addonVariantId?: string }[]; placement: { variantId: string | null }; productId?: string }) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const product = useGetProduct(productId ?? '', { query: { enabled: !!productId && warnings.some((w) => w.addonVariantId) } })
@@ -350,7 +350,7 @@ function Warnings({ warnings, placement, productId }: { warnings: PlanWarning[];
         const addon = w.addonVariantId ? addons.find((a) => a.addonVariantId === w.addonVariantId) : undefined
         return (
           <li key={`${w.code}-${w.addonVariantId ?? ''}`}>
-            {t(`warning.${w.code}`)}
+            {t(`warning.${w.code}` as 'warning.variant_deleted')}
             {addon && ` (${localize(addon.productName)} – ${localize(addon.variantName)})`}
           </li>
         )
@@ -360,7 +360,7 @@ function Warnings({ warnings, placement, productId }: { warnings: PlanWarning[];
 }
 
 /** Add-ons of the variant: optional ones as checkboxes, required ones checked and fixed; unavailable ones say so. */
-function Addons({ placement: p, variant, editable, onChange }: { placement: PlanPlacement; variant: VariantSearchItem; editable: boolean; onChange: (ids: string[]) => void }) {
+export function Addons({ placement: p, variant, editable, onChange }: { placement: { addonVariantIds: string[] }; variant: VariantSearchItem; editable: boolean; onChange: (ids: string[]) => void }) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const product = useGetProduct(variant.productId)
@@ -397,6 +397,18 @@ function Addons({ placement: p, variant, editable, onChange }: { placement: Plan
  * the stored one again).
  */
 function InstanceValues({ placement: p, categoryId, editable, dispatch }: { placement: PlanPlacement; categoryId: string; editable: boolean; dispatch: (action: EditorAction) => void }) {
+  return (
+    <ItemInstanceValues
+      item={p}
+      categoryId={categoryId}
+      editable={editable}
+      onChange={(next, key) => dispatch({ type: 'change', action: { type: 'updatePlacements', changes: [{ id: p.id, patch: { instanceValues: next } }] }, key: `${p.id}:attr:${key}` })}
+    />
+  )
+}
+
+/** Instance values of any item (placement, board module); `onChange` gets the new values and the attribute key (one undo step per attribute). */
+export function ItemInstanceValues({ item: p, categoryId, editable, onChange }: { item: { instanceValues: object }; categoryId: string; editable: boolean; onChange: (next: Record<string, unknown>, key: string) => void }) {
   const { t } = useTranslation('plans')
   const fieldError = useFieldError()
   const separator = useDecimalSeparator()
@@ -428,7 +440,7 @@ function InstanceValues({ placement: p, categoryId, editable, dispatch }: { plac
     const next = { ...stored }
     if (api === undefined) delete next[key]
     else next[key] = api
-    dispatch({ type: 'change', action: { type: 'updatePlacements', changes: [{ id: p.id, patch: { instanceValues: next } }] }, key: `${p.id}:attr:${key}` })
+    onChange(next, key)
   }
 
   return (

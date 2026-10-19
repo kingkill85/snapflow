@@ -1,5 +1,5 @@
 import { ApiError, apiClient } from '@/api/client'
-import type { Plan, PlanContentInput } from '@/api/generated/model'
+import type { BoardContentInput, Plan, PlanContentInput } from '@/api/generated/model'
 
 // Plan create and update take multipart bodies. They go through the shared
 // API client rather than the generated createPlan/updatePlan, which send the
@@ -53,11 +53,11 @@ const keepaliveLimit = 60_000
  * page is gone. Returns false when it cannot be sent (content over the
  * keepalive limit); the `beforeunload` prompt has warned then.
  */
-export function saveOnUnload(planId: string, input: PlanContentInput): boolean {
+export function saveOnUnload(planId: string, input: PlanContentInput | BoardContentInput, part: 'content' | 'board' = 'content'): boolean {
   const body = JSON.stringify(input)
   if (new Blob([body]).size > keepaliveLimit) return false
   try {
-    void fetch(`/api/plans/${planId}/content`, {
+    void fetch(`/api/plans/${planId}/${part}`, {
       method: 'PUT',
       keepalive: true,
       credentials: 'same-origin',

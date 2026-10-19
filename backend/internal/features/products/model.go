@@ -141,6 +141,9 @@ type VariantSearchItem struct {
 	Price         string         `json:"price" example:"27.00"`
 	ImageFileID   *uuid.UUID     `json:"imageFileId,omitempty"`
 	Available     bool           `json:"available"`
+	// Capabilities let the board editor filter its palette by mounting and
+	// place modules by width without another request (step 3c).
+	Capabilities capabilities.Capabilities `json:"capabilities" doc:"As on the variant (mounting, rail width, enclosure size, channels)"`
 }
 
 type VariantPage struct {

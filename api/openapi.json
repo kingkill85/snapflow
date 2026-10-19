@@ -9596,6 +9596,10 @@
           "available": {
             "type": "boolean"
           },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities",
+            "description": "As on the variant (mounting, rail width, enclosure size, channels)"
+          },
           "category": {
             "$ref": "#/components/schemas/CategoryRef"
           },
@@ -9654,7 +9658,8 @@
           "productName",
           "name",
           "price",
-          "available"
+          "available",
+          "capabilities"
         ],
         "type": "object"
       },

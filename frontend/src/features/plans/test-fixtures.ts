@@ -1,4 +1,4 @@
-import type { FunctionType, LoadType, Plan, PlanContent, PlanPlacement, RoomTemplate, VariantSearchItem } from '@/api/generated/model'
+import type { Capabilities, FunctionType, LoadType, Plan, PlanContent, PlanPlacement, RoomTemplate, VariantSearchItem } from '@/api/generated/model'
 
 // Test data of the plans tests (not shipped: only tests import it).
 
@@ -61,7 +61,12 @@ const knxRef = { id: pid(112), key: 'knx', name: { en: 'KNX' }, abbreviation: 'K
 const switches = { id: pid(121), key: 'switch', name: { en: 'Switches', de: 'Schalter' }, isActive: true }
 const sensors = { id: pid(122), key: 'sensor', name: { en: 'Sensors' }, isActive: true }
 
+/** Capabilities of a plain floorplan product; `boardCaps` of a board module of `te` TE. */
+export const floorCaps: Capabilities = { mounting: 'floorplan', channels: [], moduleTotalsW: [], busCurrentUsedMaDefault: false, wirelessPlacesUsedDefault: false }
+export const boardCaps = (te: number, over: Partial<Capabilities> = {}): Capabilities => ({ ...floorCaps, mounting: 'board', railWidthTe: te, ...over })
+
 export const variant = (n: number, over: Partial<VariantSearchItem> = {}): VariantSearchItem => ({
+  capabilities: floorCaps,
   id: pid(700 + n),
   productId: pid(800 + n),
   productName: { en: `Product ${n}` },

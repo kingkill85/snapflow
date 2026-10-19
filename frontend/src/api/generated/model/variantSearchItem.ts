@@ -4,6 +4,7 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
+import type { Capabilities } from './capabilities';
 import type { CategoryRef } from './categoryRef';
 import type { ProductTypeRef } from './productTypeRef';
 import type { VariantSearchItemName } from './variantSearchItemName';
@@ -11,6 +12,8 @@ import type { VariantSearchItemProductName } from './variantSearchItemProductNam
 
 export interface VariantSearchItem {
   available: boolean;
+  /** As on the variant (mounting, rail width, enclosure size, channels) */
+  capabilities: Capabilities;
   category: CategoryRef;
   categoryId: string;
   id: string;

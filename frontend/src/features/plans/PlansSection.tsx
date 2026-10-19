@@ -4,11 +4,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 
+import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
+
 import type { Plan } from '@/api/generated/model'
 import { getListPlansQueryKey, useDeletePlan, useListPlans, useReorderPlans } from '@/api/generated/plans/plans'
-import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, RowAction, Section } from '@/components/ui'
+import { Badge, Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, RowAction, Section } from '@/components/ui'
 
-import { editorPath } from './paths'
+import { BoardFormDialog } from './board/BoardFormDialog'
+import { BoardThumbnail } from './board/BoardThumbnail'
+import { boardPath, editorPath } from './paths'
 import { PlanFormDialog } from './PlanFormDialog'
 
 type Props = {
@@ -16,13 +20,17 @@ type Props = {
   versionId: string
   /** The project may be changed (active, projects.write). */
   canWrite: boolean
+  /** The project's product types: the enclosures offered for a new board. */
+  productTypeIds?: string[]
 }
 
 /** The plans of a version on the project page: cards with thumbnail and counts, add, edit, reorder, delete (D204). */
-export function PlansSection({ projectId, versionId, canWrite }: Props) {
+export function PlansSection({ projectId, versionId, canWrite, productTypeIds = [] }: Props) {
   const { t } = useTranslation('plans')
   const { t: tCommon } = useTranslation()
   const queryClient = useQueryClient()
+  const separator = useDecimalSeparator()
+  const te = (n: number) => formatDecimal(n, separator)
   // Counts and locks change in the editor: fetched on every visit.
   const query = useListPlans(versionId, { query: { staleTime: 0, refetchOnMount: 'always' } })
   const reorder = useReorderPlans()
@@ -30,6 +38,8 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
   // undefined: closed; null: a new plan; a plan: edit it.
   const [editing, setEditing] = useState<Plan | null | undefined>(undefined)
   const [deleting, setDeleting] = useState<Plan | null>(null)
+  // The same for boards (their own dialog: no image, an enclosure or rows).
+  const [editingBoard, setEditingBoard] = useState<Plan | null | undefined>(undefined)
 
   const key = getListPlansQueryKey(versionId)
   const refresh = () => queryClient.invalidateQueries({ queryKey: key })
@@ -64,9 +74,14 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
       title={t('title')}
       actions={
         canWrite ? (
-          <Button onClick={() => setEditing(null)}>
-            <Plus /> {t('add')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setEditingBoard(null)}>
+              <Plus /> {t('addBoard')}
+            </Button>
+            <Button onClick={() => setEditing(null)}>
+              <Plus /> {t('add')}
+            </Button>
+          </div>
         ) : undefined
       }
     >
@@ -80,13 +95,23 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label={t('title')}>
           {plans.map((plan, index) => (
             <li key={plan.id} className="flex flex-col overflow-hidden rounded-control border border-line bg-surface">
-              <Link to={editorPath(projectId, versionId, plan.id)} className="group block focus-visible:outline-2 focus-visible:outline-focus">
+              <Link
+                to={plan.kind === 'board' ? boardPath(projectId, versionId, plan.id) : editorPath(projectId, versionId, plan.id)}
+                className="group block focus-visible:outline-2 focus-visible:outline-focus"
+              >
                 <span className="block aspect-[4/3] border-b border-line bg-canvas">
-                  {plan.image && <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />}
+                  {plan.kind === 'board' ? <BoardThumbnail planId={plan.id} /> : plan.image && <img src={plan.image.url} alt="" loading="lazy" className="size-full object-contain" />}
                 </span>
-                <span className="block px-3 pt-2 font-medium group-hover:underline">{plan.name}</span>
+                <span className="flex items-center gap-2 px-3 pt-2 font-medium group-hover:underline">
+                  {plan.name}
+                  {plan.kind === 'board' && <Badge>{t('boardBadge')}</Badge>}
+                </span>
               </Link>
-              <p className="px-3 text-sm text-muted">{t('counts', { products: plan.placementCount, zones: plan.zoneCount, needs: t('needUnits', { count: plan.needCount }) })}</p>
+              <p className="px-3 text-sm text-muted">
+                {plan.board
+                  ? t('boardCounts', { modules: t('moduleCount', { count: plan.board.moduleCount }), used: te(plan.board.usedTe), capacity: te(plan.board.capacityTe) })
+                  : t('counts', { products: plan.placementCount, zones: plan.zoneCount, needs: t('needUnits', { count: plan.needCount }) })}
+              </p>
               {plan.lock && !plan.lock.mine && <p className="px-3 text-sm text-warning">{t('lockedBy', { name: plan.lock.name })}</p>}
               {canWrite && plan.can.update && (
                 <div className="mt-auto flex flex-wrap items-center gap-1 p-3 pt-2">
@@ -103,7 +128,7 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
                     onClick={() => void move(plans, index, 1)}
                   />
                   <span className="flex-1" />
-                  <RowAction compact icon={<Pencil />} label={tCommon('action.edit')} aria-label={t('editItem', { name: plan.name })} onClick={() => setEditing(plan)} />
+                  <RowAction compact icon={<Pencil />} label={tCommon('action.edit')} aria-label={t('editItem', { name: plan.name })} onClick={() => (plan.kind === 'board' ? setEditingBoard(plan) : setEditing(plan))} />
                   <RowAction
                     compact
                     icon={<Trash2 />}
@@ -128,6 +153,14 @@ export function PlansSection({ projectId, versionId, canWrite }: Props) {
         onOpenChange={(open) => !open && setEditing(undefined)}
         versionId={versionId}
         item={editing ?? null}
+        onSaved={() => void refresh()}
+      />
+      <BoardFormDialog
+        open={editingBoard !== undefined}
+        onOpenChange={(open) => !open && setEditingBoard(undefined)}
+        versionId={versionId}
+        productTypeIds={productTypeIds}
+        item={editingBoard ?? null}
         onSaved={() => void refresh()}
       />
       <ConfirmDialog
