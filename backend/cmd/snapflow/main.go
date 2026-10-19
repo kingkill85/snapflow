@@ -22,6 +22,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/config"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
+	"github.com/kingkill85/snapflow/backend/internal/platform/exchangerate"
 	"github.com/kingkill85/snapflow/backend/internal/platform/httpserver"
 )
 
@@ -87,6 +88,8 @@ func serve(ctx context.Context) error {
 	router, _ := app.New(app.Deps{
 		DB: pool, Cookies: auth.Cookies{Secure: cfg.CookieSecure}, TrustedProxies: cfg.TrustedProxies,
 		Storage: storage, ProposalGenerations: cfg.ProposalGenerations,
+		ExchangeRates:          exchangerate.New(exchangerate.NewHTTP(cfg.ExchangeRateURL)),
+		ExchangeRateMaxAgeDays: cfg.ExchangeRateMaxAgeDays,
 	})
 	if cfg.StaticDir != "" {
 		httpserver.MountSPA(router, cfg.StaticDir)

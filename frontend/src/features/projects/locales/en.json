@@ -45,16 +45,16 @@
     "language": "Language",
     "languageHint": "The language of proposals",
     "currency": "Currency",
-    "currencyHint": "Three-letter code, e.g. EUR",
+    "currencyHint": "Catalog prices are in USD; set the exchange rate later on the BOM or Pricing tab",
     "exchangeRate": "Exchange rate",
     "exchangeRateHint": "{{currency}} per 1 USD",
-    "exchangeRateUsd": "Catalog prices are in USD: the rate is 1",
     "customerName": "Name",
     "customerCompany": "Company",
     "customerEmail": "Email",
     "customerPhone": "Phone",
     "customerAddress": "Address",
-    "notes": "Notes"
+    "notes": "Notes",
+    "currencyNoMatch": "No currency matches."
   },
   "page": {
     "noCustomer": "No customer yet",
@@ -85,5 +85,23 @@
     "emptyOption": "Empty version",
     "emptyHint": "Starts without plans.",
     "copyHint": "Copies everything of {{name}}."
+  },
+  "rate": {
+    "value": "1 USD = {{rate}} {{currency}}",
+    "online": "online, {{date}}",
+    "manual": "entered manually on {{date}}",
+    "none": "No exchange rate yet – fetch or set one",
+    "update": "Update rate",
+    "set": "Set rate",
+    "setTitle": "Set exchange rate",
+    "setHint": "{{currency}} per 1 USD; kept until you change it",
+    "stale_one": "Rate is {{count}} day old (older than {{max}} days). Update it for current prices.",
+    "stale_other": "Rate is {{count}} days old (older than {{max}} days). Update it for current prices.",
+    "fetch": "Fetch current rate",
+    "originTyped": "entered manually",
+    "originOnline": "online rate of {{date}}",
+    "originManual": "entered manually on {{date}}",
+    "originNone": "no exchange rate yet",
+    "noOnline": "No online rate for {{currency}} – enter it by hand."
   }
 }

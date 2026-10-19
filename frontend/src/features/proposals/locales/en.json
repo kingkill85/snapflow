@@ -33,5 +33,7 @@
     "preview": "Totals per document",
     "previewNone": "The totals appear once a product type is chosen.",
     "freeText": "Free-text lines (combined proposal only): {{total}}"
-  }
+  },
+  "rateMissing": "This project has no exchange rate for {{currency}} yet: proposals can be created once it is fetched or set.",
+  "rateMissingLink": "Set the rate on the Pricing tab"
 }

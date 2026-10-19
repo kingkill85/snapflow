@@ -66,7 +66,7 @@ func TestRowLevelSecurity(t *testing.T) {
 		}
 		if _, err := q.UpdateProject(ctx, store.UpdateProjectParams{
 			ID: foreign.ID, TenantID: other, Number: "x", Name: "Hacked", Status: "active",
-			Language: "en", Currency: "USD", ExchangeRate: "1",
+			Language: "en", Currency: "USD", ExchangeRate: new("1"),
 		}); !errors.Is(err, pgx.ErrNoRows) {
 			t.Errorf("foreign update: %v", err)
 		}
@@ -75,14 +75,14 @@ func TestRowLevelSecurity(t *testing.T) {
 	for name, write := range map[string]func(q *store.Queries) error{
 		"insert project": func(q *store.Queries) error {
 			_, err := q.CreateProject(ctx, store.CreateProjectParams{
-				TenantID: other, Number: "x", Name: "Planted", Language: "en", Currency: "USD", ExchangeRate: "1",
+				TenantID: other, Number: "x", Name: "Planted", Language: "en", Currency: "USD", ExchangeRate: new("1"),
 			})
 			return err
 		},
 		"move own project": func(q *store.Queries) error {
 			_, err := q.UpdateProject(ctx, store.UpdateProjectParams{
 				ID: own.ID, TenantID: other, Number: "x", Name: "Moved", Status: "active",
-				Language: "en", Currency: "USD", ExchangeRate: "1",
+				Language: "en", Currency: "USD", ExchangeRate: new("1"),
 			})
 			return err
 		},

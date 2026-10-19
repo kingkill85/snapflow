@@ -228,8 +228,8 @@ func (st *state) currency() *currency { return currencyOf(st.ref) }
 
 // currencyOf is the conversion of a version's amounts (nil for USD).
 func currencyOf(ref projects.VersionRef) *currency {
-	if ref.Currency == "" || ref.Currency == "USD" {
-		return nil
+	if ref.Currency == "" || ref.Currency == "USD" || ref.ExchangeRate == "" {
+		return nil // USD, or no rate yet: amounts in USD only
 	}
 	return &currency{money.Converter{Currency: ref.Currency, Rate: money.MustParse(ref.ExchangeRate)}}
 }
@@ -403,7 +403,11 @@ func (st *state) totals(subtotal, convSubtotal money.Amount, p Pricing) BOMTotal
 		Currency:   "USD", Rate: "1",
 	}
 	if st.ref.Currency != "" {
-		out.Currency, out.Rate = st.ref.Currency, money.MustParse(st.ref.ExchangeRate).String()
+		out.Currency, out.RateDate, out.RateSource = st.ref.Currency, st.ref.ExchangeRateDate, st.ref.ExchangeRateSource
+		out.Rate = ""
+		if st.ref.ExchangeRate != "" {
+			out.Rate = money.MustParse(st.ref.ExchangeRate).String()
+		}
 	}
 	if cur := st.currency(); cur != nil {
 		out.Converted = &NullableBOMAmounts{BOMAmounts: amountsOf(cur.Converter, computeIn(cur.Converter, convSubtotal, p))}

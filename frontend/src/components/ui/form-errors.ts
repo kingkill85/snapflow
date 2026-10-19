@@ -34,6 +34,8 @@ export const errorParamNames = {
   'category.key_taken': ['key'],
   'bom.quantity_range': ['min', 'max'],
   'bom.too_many_lines': ['max'],
+  'exchange_rate.unknown_currency': ['currency'],
+  'exchange_rate.unusable': ['currency'],
   'file.too_large': ['maxMb'],
   'file.too_many_pixels': ['megapixels'],
   'function_type.key_taken': ['key'],
@@ -62,9 +64,12 @@ export const errorParamNames = {
   'pricing.amount_range': ['max'],
   'pricing.percent_range': ['max'],
   'proposal.exporter_unknown': ['exporters'],
+  'proposal.rate_missing': ['currency'],
   'plan.zone_points': ['min', 'max'],
   'product.model_number_taken': ['modelNumber'],
   'product_type.key_taken': ['key'],
+  'project.currency_unknown': ['currency'],
+  'project.exchange_rate_implausible': ['currency', 'online'],
   'project_version.name_taken': ['name'],
   'tenant.has_projects': ['count'],
   'tenant.name_taken': ['name'],
@@ -109,13 +114,13 @@ export function errorKey<K extends ErrorKey>(key: K, ...params: K extends ParamK
 /** An RFC 3339 time as the API sends it (e.g. a lock's expiresAt). */
 const isoTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/
 
-/** Params that are limits (e.g. "at most {{max}}"), shown as localized numbers. */
-const numberParams = new Set(['min', 'max'])
+/** Params that are limits (e.g. "at most {{max}}") or rates (online), shown as localized numbers. */
+const numberParams = new Set(['min', 'max', 'online'])
 const decimal = /^-?\d+(\.\d+)?$/
 
 /**
  * Params as localized text: times (RFC 3339) as the time of day for today
- * ("14:32"), else date and time; limits (min, max), numbers or decimal strings
+ * ("14:32"), else date and time; limits (min, max) and rates (online), numbers or decimal strings
  * as the API sends them (e.g. "9999999999.99"), with the language's digits
  * ("9.999.999.999,99"). Other params stay as they are (a SKU is no number).
  */

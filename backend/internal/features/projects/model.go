@@ -93,19 +93,26 @@ type ProjectPage struct {
 
 // Project is a project with its versions.
 type Project struct {
-	ID             uuid.UUID        `json:"id"`
-	TenantID       uuid.UUID        `json:"tenantId"`
-	Tenant         *ProjectTenant   `json:"tenant,omitempty" doc:"Only for callers who see every tenant"`
-	Number         string           `json:"number" example:"2026-0007" doc:"<year>-<sequence of the tenant in that year>; generated, not editable"`
-	Name           string           `json:"name"`
-	Status         ProjectStatus    `json:"status" enum:"active,completed,cancelled"`
-	Language       string           `json:"language" doc:"Content language of proposals" example:"en"`
-	Currency       string           `json:"currency" example:"EUR"`
-	ExchangeRate   string           `json:"exchangeRate" doc:"Units of the currency per 1 USD, decimal string" example:"0.92"`
-	Customer       ProjectCustomer  `json:"customer"`
-	Notes          string           `json:"notes"`
-	ProductTypeIDs []uuid.UUID      `json:"productTypeIds" doc:"In catalog order; may contain types deactivated since they were chosen"`
-	Versions       []ProjectVersion `json:"versions" doc:"In creation order"`
+	ID           uuid.UUID      `json:"id"`
+	TenantID     uuid.UUID      `json:"tenantId"`
+	Tenant       *ProjectTenant `json:"tenant,omitempty" doc:"Only for callers who see every tenant"`
+	Number       string         `json:"number" example:"2026-0007" doc:"<year>-<sequence of the tenant in that year>; generated, not editable"`
+	Name         string         `json:"name"`
+	Status       ProjectStatus  `json:"status" enum:"active,completed,cancelled"`
+	Language     string         `json:"language" doc:"Content language of proposals" example:"en"`
+	Currency     string         `json:"currency" example:"EUR"`
+	ExchangeRate *string        `json:"exchangeRate" nullable:"true" doc:"Units of the currency per 1 USD, decimal string; null: a non-USD project without a rate yet (amounts are shown in USD only)" example:"0.92"`
+	// The rate's origin (spec "Exchange rates online").
+	ExchangeRateDate       *time.Time       `json:"exchangeRateDate" nullable:"true" doc:"Online: the provider's update time; manual: when it was entered; null for USD and without a rate"`
+	ExchangeRateSource     string           `json:"exchangeRateSource" enum:"none,online,manual" doc:"none for USD projects and without a rate"`
+	ExchangeRateProvider   string           `json:"exchangeRateProvider" doc:"The online provider (host name); empty unless online"`
+	ExchangeRateAgeDays    int              `json:"exchangeRateAgeDays" doc:"Whole days since exchangeRateDate (0 without a date)"`
+	ExchangeRateStale      bool             `json:"exchangeRateStale" doc:"An online rate older than EXCHANGE_RATE_MAX_AGE_DAYS (manual rates never are)"`
+	ExchangeRateMaxAgeDays int              `json:"exchangeRateMaxAgeDays" doc:"Days after which an online rate counts as stale (server configuration)"`
+	Customer               ProjectCustomer  `json:"customer"`
+	Notes                  string           `json:"notes"`
+	ProductTypeIDs         []uuid.UUID      `json:"productTypeIds" doc:"In catalog order; may contain types deactivated since they were chosen"`
+	Versions               []ProjectVersion `json:"versions" doc:"In creation order"`
 	// NextVersionName is what a new version should be called.
 	NextVersionName string         `json:"nextVersionName" doc:"The first free name V<n>, to pre-fill a new version" example:"V2"`
 	CreatedBy       *uuid.UUID     `json:"createdBy,omitempty"`
@@ -135,14 +142,16 @@ type ProjectVersion struct {
 
 // ProjectInput is what create and update share.
 type ProjectInput struct {
-	Name           string                `json:"name" doc:"1-200 characters"`
-	TenantID       *uuid.UUID            `json:"tenantId,omitempty" doc:"Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant"`
-	Language       string                `json:"language,omitempty" doc:"A content language; defaults to en"`
-	Currency       string                `json:"currency,omitempty" doc:"ISO 4217, three upper-case letters; defaults to USD"`
-	ExchangeRate   string                `json:"exchangeRate,omitempty" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD; defaults to 1"`
-	Customer       *ProjectCustomerInput `json:"customer,omitempty" doc:"Left out: the stored customer stays (create: none)"`
-	Notes          *string               `json:"notes,omitempty" doc:"At most 5000 characters; empty clears, left out keeps the stored notes"`
-	ProductTypeIDs []uuid.UUID           `json:"productTypeIds,omitempty" maxItems:"1000" doc:"At least one; new choices must be active. Create without it: every active product type"`
+	Name                  string                `json:"name" doc:"1-200 characters"`
+	TenantID              *uuid.UUID            `json:"tenantId,omitempty" doc:"Defaults to the caller's tenant (create) or the project's (update). Only callers with tenants.access_all may choose another tenant; a moved project gets a new number in its new tenant"`
+	Language              string                `json:"language,omitempty" doc:"A content language; defaults to en"`
+	Currency              string                `json:"currency,omitempty" doc:"ISO 4217, three upper-case letters; defaults to USD"`
+	ExchangeRate          string                `json:"exchangeRate,omitempty" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0; exactly 1 for USD. A changed value is stored as entered manually (today). Left out: the stored rate stays while the currency stays; a new non-USD currency then has no rate yet"`
+	ExchangeRateSource    string                `json:"exchangeRateSource,omitempty" doc:"online: ignore exchangeRate and store the provider's current rate (503 exchange_rate.unavailable when it is not reachable); manual or left out: exchangeRate as above"`
+	ExchangeRateConfirmed bool                  `json:"exchangeRateConfirmed,omitempty" doc:"With a new currency, a manual exchangeRate more than 10 times off the cached online rate is refused (422 project.exchange_rate_implausible) unless this is true"`
+	Customer              *ProjectCustomerInput `json:"customer,omitempty" doc:"Left out: the stored customer stays (create: none)"`
+	Notes                 *string               `json:"notes,omitempty" doc:"At most 5000 characters; empty clears, left out keeps the stored notes"`
+	ProductTypeIDs        []uuid.UUID           `json:"productTypeIds,omitempty" maxItems:"1000" doc:"At least one; new choices must be active. Create without it: every active product type"`
 }
 
 type ProjectCreate struct {
@@ -176,4 +185,37 @@ type ListParams struct {
 	TenantID *uuid.UUID
 	Limit    int
 	Offset   int
+}
+
+// Currency is a currency a project may use.
+type Currency struct {
+	Code       string `json:"code" example:"EUR" doc:"ISO 4217"`
+	MinorUnits int32  `json:"minorUnits" example:"2"`
+	Online     bool   `json:"online" doc:"The online provider has a rate for it (false for all while the provider is not reachable)"`
+}
+
+// CurrencyList are the currencies a project may use.
+type CurrencyList struct {
+	Items       []Currency `json:"items" doc:"Sorted by code"`
+	Recent      []string   `json:"recent" doc:"Currencies other than USD of the tenant's projects (tenantId, else the caller's), most recently changed first (at most 5)"`
+	OnlineKnown bool       `json:"onlineKnown" doc:"false while the provider's rates are not loaded (online is then false for all but USD; they are being fetched, ask again)"`
+}
+
+// ExchangeRate is a provider's current rate of a currency.
+type ExchangeRate struct {
+	Currency string    `json:"currency" example:"EUR"`
+	Rate     string    `json:"rate" example:"0.9237" doc:"Units of the currency per 1 USD, 6 decimals at most"`
+	Date     time.Time `json:"date" doc:"The provider's last update"`
+	Provider string    `json:"provider" example:"open.er-api.com"`
+}
+
+// ExchangeRateSet enters a project's rate by hand.
+type ExchangeRateSet struct {
+	Rate     string `json:"rate" doc:"Units of the currency per 1 USD: up to 8 digits and 6 decimals, above 0"`
+	Currency string `json:"currency" pattern:"^[A-Z]{3}$" doc:"The project's currency as the client saw it: 409 project.stale when it changed meanwhile"`
+}
+
+// ExchangeRateRefresh asks for the provider's current rate.
+type ExchangeRateRefresh struct {
+	Currency string `json:"currency,omitempty" doc:"The project's currency as the client saw it: 409 project.stale when it changed meanwhile"`
 }

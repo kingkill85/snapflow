@@ -38,6 +38,11 @@ type Querier interface {
 	// NextProjectNumber counts up the tenant's project numbers of a year under
 	// the counter row's lock, so parallel creates get distinct numbers.
 	NextProjectNumber(ctx context.Context, arg NextProjectNumberParams) (int32, error)
+	// RecentCurrencies are the currencies other than USD of a tenant's projects,
+	// the most recently changed first.
+	RecentCurrencies(ctx context.Context, tenantID uuid.UUID) ([]string, error)
+	// SetExchangeRate stores a fetched or typed-in rate (refresh, set rate).
+	SetExchangeRate(ctx context.Context, arg SetExchangeRateParams) (Project, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateVersion(ctx context.Context, arg UpdateVersionParams) (ProjectVersion, error)
 	// VersionAccess reads a version with what other features (plans) need of

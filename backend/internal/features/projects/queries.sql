@@ -50,16 +50,37 @@ SELECT * FROM projects WHERE id = $1 FOR UPDATE;
 
 -- name: CreateProject :one
 INSERT INTO projects (tenant_id, number, name, status, language, currency, exchange_rate,
-    customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by)
-VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by,
+    exchange_rate_date, exchange_rate_source, exchange_rate_provider)
+VALUES ($1, $2, $3, 'active', $4, $5, sqlc.narg(exchange_rate), $6, $7, $8, $9, $10, $11, $12,
+    sqlc.narg(exchange_rate_date), sqlc.narg(exchange_rate_source), sqlc.arg(exchange_rate_provider))
 RETURNING *;
 
 -- name: UpdateProject :one
 UPDATE projects SET tenant_id = $2, number = $3, name = $4, status = $5, language = $6, currency = $7,
-    exchange_rate = $8, customer_name = $9, customer_company = $10, customer_email = $11,
-    customer_phone = $12, customer_address = $13, notes = $14, updated_at = now()
+    exchange_rate = sqlc.narg(exchange_rate), customer_name = $8, customer_company = $9, customer_email = $10,
+    customer_phone = $11, customer_address = $12, notes = $13, exchange_rate_date = sqlc.narg(exchange_rate_date),
+    exchange_rate_source = sqlc.narg(exchange_rate_source), exchange_rate_provider = sqlc.arg(exchange_rate_provider),
+    updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- SetExchangeRate stores a fetched or typed-in rate (refresh, set rate).
+-- name: SetExchangeRate :one
+UPDATE projects SET exchange_rate = sqlc.arg(exchange_rate), exchange_rate_date = sqlc.arg(exchange_rate_date),
+    exchange_rate_source = sqlc.arg(exchange_rate_source), exchange_rate_provider = sqlc.arg(exchange_rate_provider),
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
+-- RecentCurrencies are the currencies other than USD of a tenant's projects,
+-- the most recently changed first.
+-- name: RecentCurrencies :many
+SELECT currency::text AS currency FROM projects
+WHERE tenant_id = $1 AND currency <> 'USD'
+GROUP BY currency
+ORDER BY max(updated_at) DESC
+LIMIT 5;
 
 -- name: DeleteProject :execrows
 DELETE FROM projects WHERE id = $1;
@@ -105,18 +126,18 @@ DELETE FROM project_versions WHERE id = $1 AND project_id = $2;
 -- orders content changes against status changes (which update the row),
 -- FOR UPDATE also against each other and against version changes.
 -- name: VersionAccess :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1;
 
 -- name: VersionAccessShare :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR SHARE OF p;
 
 -- name: VersionAccessLock :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR UPDATE OF p;

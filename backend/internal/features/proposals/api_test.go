@@ -235,6 +235,9 @@ func TestGenerate(t *testing.T) {
 	if p.Totals.GrandTotal != b.Totals.GrandTotal || p.Totals.Converted == nil || p.Totals.Converted.GrandTotal != b.Totals.Converted.GrandTotal || p.Totals.Rate != "0.5" {
 		t.Errorf("totals %+v, BOM %+v", p.Totals, b.Totals)
 	}
+	if p.Totals.RateSource != "manual" || p.Totals.RateDate == nil {
+		t.Errorf("rate origin %+v", p.Totals)
+	}
 	if p.FileName != p.Number+" Villa Sommer- Süd.docx" || p.CreatedByName == "" {
 		t.Errorf("file name %q, created by %q", p.FileName, p.CreatedByName)
 	}
@@ -244,7 +247,7 @@ func TestGenerate(t *testing.T) {
 	}
 	doc := parts["word/document.xml"]
 	for _, want := range []string{"Angebot", p.Number, "Vielen Dank für Ihre Anfrage", "Valid 30 days", "Kabelpauschale", "Weitere Positionen",
-		"Kunde GmbH", "Stückliste", "Geräte je Zone", "Living room", "Keine Zone", "Gesamtsumme", "1 USD = 0,5 EUR", "Dimmer", "EG", "OG", `w:orient="landscape"`} {
+		"Kunde GmbH", "Stückliste", "Geräte je Zone", "Living room", "Keine Zone", "Gesamtsumme", "1 USD = 0,5 EUR (Kurs vom ", "Dimmer", "EG", "OG", `w:orient="landscape"`} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("document lacks %q", want)
 		}
@@ -503,4 +506,27 @@ func TestFileName(t *testing.T) {
 	if got := proposals.Disposition("2026 Süd;x.docx"); got != `attachment; filename="2026 S_d;x.docx"; filename*=UTF-8''2026%20S%C3%BCd%3Bx.docx` {
 		t.Errorf("disposition %q", got)
 	}
+}
+
+// A non-USD project without a rate: the BOM is in USD only, proposals are
+// refused until a rate is set.
+func TestRateMissing(t *testing.T) {
+	api := apptest.New(t)
+	typeA, variantA := newType(t, api, "zigbee", "Dimmer", "100.00")
+	resp := api.Post("/api/projects", api.Admin.Cookie, map[string]any{"name": "House", "currency": "EUR", "productTypeIds": []string{typeA}})
+	wantCode(t, resp, http.StatusCreated, "")
+	pr := decode[project](t, resp)
+	v := pr.Versions[0].ID
+	planWith(t, api, api.Admin.Cookie, v, "EG", []any{placement(variantA, 50, 50, false)})
+	b := decode[bom.BOM](t, api.Get("/api/versions/"+v.String()+"/bom", api.Admin.Cookie))
+	if b.Totals.Currency != "EUR" || b.Totals.Rate != "" || b.Totals.Converted != nil || b.Lines[0].Converted != nil || b.Totals.GrandTotal != "100.00" {
+		t.Fatalf("BOM without rate: %+v", b.Totals)
+	}
+	wantCode(t, generate(api, api.Admin.Cookie, v, map[string]any{"exporter": "docx"}), http.StatusConflict, "proposal.rate_missing")
+	wantCode(t, api.Put("/api/projects/"+pr.ID.String()+"/exchange-rate", api.Admin.Cookie, map[string]any{"rate": "0.9", "currency": "EUR"}), http.StatusOK, "")
+	b = decode[bom.BOM](t, api.Get("/api/versions/"+v.String()+"/bom", api.Admin.Cookie))
+	if b.Totals.Converted == nil || b.Totals.Converted.GrandTotal != "90.00" || b.Totals.RateSource != "manual" {
+		t.Fatalf("BOM with rate: %+v", b.Totals)
+	}
+	wantCode(t, generate(api, api.Admin.Cookie, v, map[string]any{"exporter": "docx"}), http.StatusCreated, "")
 }

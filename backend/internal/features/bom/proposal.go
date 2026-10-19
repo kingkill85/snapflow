@@ -80,9 +80,16 @@ func SplitByProductType(b BOM, typeIDs []uuid.UUID) ([]Part, error) {
 				part.Lines = append(part.Lines, lines[k])
 			}
 		}
+		// The part keeps the manual lines of its lines (their notes print).
 		part.ManualLines = []ManualLine{}
+		for _, m := range b.ManualLines {
+			if m.VariantID != nil && slices.ContainsFunc(part.Lines, func(l BOMLine) bool { return l.Key == m.VariantID.String() }) {
+				part.ManualLines = append(part.ManualLines, m)
+			}
+		}
 		part.Warnings = []BOMWarning{}
-		part.Totals = BOMTotals{BOMAmounts: amountsOf(money.USDConverter, totals[gi]), Currency: b.Totals.Currency, Rate: b.Totals.Rate}
+		part.Totals = BOMTotals{BOMAmounts: amountsOf(money.USDConverter, totals[gi]), Currency: b.Totals.Currency, Rate: b.Totals.Rate,
+			RateDate: b.Totals.RateDate, RateSource: b.Totals.RateSource}
 		if cur != nil {
 			part.Totals.Converted = &NullableBOMAmounts{BOMAmounts: amountsOf(cur.Converter, convTotals[gi])}
 		}

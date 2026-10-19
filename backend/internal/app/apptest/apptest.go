@@ -24,6 +24,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/app"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/exchangerate"
 	"github.com/kingkill85/snapflow/backend/internal/platform/testdb"
 )
 
@@ -72,6 +73,18 @@ func New(t *testing.T) *API {
 // NewWithPool is New on the given pool (e.g. testdb.SmallPool).
 func NewWithPool(t *testing.T, pool *pgxpool.Pool) *API {
 	t.Helper()
+	return newAPI(t, pool, nil)
+}
+
+// NewWithRates is New with online exchange rates from rates (e.g. an
+// exchangerate.HTTP of an httptest server).
+func NewWithRates(t *testing.T, rates *exchangerate.Client) *API {
+	t.Helper()
+	return newAPI(t, testdb.Pool(t), rates)
+}
+
+func newAPI(t *testing.T, pool *pgxpool.Pool, rates *exchangerate.Client) *API {
+	t.Helper()
 	if err := app.Bootstrap(context.Background(), pool, app.BootstrapConfig{
 		DistributorName: "Distributor", AdminEmail: AdminEmail, AdminPassword: Password,
 	}); err != nil {
@@ -82,7 +95,7 @@ func NewWithPool(t *testing.T, pool *pgxpool.Pool) *API {
 	if err != nil {
 		t.Fatalf("apptest: storage: %v", err)
 	}
-	_, api := app.New(app.Deps{DB: pool, TrustedProxies: []netip.Prefix{TrustedProxy}, Storage: storage})
+	_, api := app.New(app.Deps{DB: pool, TrustedProxies: []netip.Prefix{TrustedProxy}, Storage: storage, ExchangeRates: rates})
 	a := &API{TestAPI: humatest.Wrap(t, api), t: t, DB: pool, StorageDir: storageDir}
 	a.Admin = a.Login(AdminEmail, Password)
 	a.Distributor = a.Admin.TenantID

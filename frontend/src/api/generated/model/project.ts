@@ -6,6 +6,7 @@
  */
 import type { ProjectActions } from './projectActions';
 import type { ProjectCustomer } from './projectCustomer';
+import type { ProjectExchangeRateSource } from './projectExchangeRateSource';
 import type { ProjectStatus } from './projectStatus';
 import type { ProjectTenant } from './projectTenant';
 import type { ProjectVersion } from './projectVersion';
@@ -18,8 +19,26 @@ export interface Project {
   createdBy?: string;
   currency: string;
   customer: ProjectCustomer;
-  /** Units of the currency per 1 USD, decimal string */
-  exchangeRate: string;
+  /**
+     * Units of the currency per 1 USD, decimal string; null: a non-USD project without a rate yet (amounts are shown in USD only)
+     * @nullable
+     */
+  exchangeRate: string | null;
+  /** Whole days since exchangeRateDate (0 without a date) */
+  exchangeRateAgeDays: number;
+  /**
+     * Online: the provider's update time; manual: when it was entered; null for USD and without a rate
+     * @nullable
+     */
+  exchangeRateDate: string | null;
+  /** Days after which an online rate counts as stale (server configuration) */
+  exchangeRateMaxAgeDays: number;
+  /** The online provider (host name); empty unless online */
+  exchangeRateProvider: string;
+  /** none for USD projects and without a rate */
+  exchangeRateSource: ProjectExchangeRateSource;
+  /** An online rate older than EXCHANGE_RATE_MAX_AGE_DAYS (manual rates never are) */
+  exchangeRateStale: boolean;
   id: string;
   /** Content language of proposals */
   language: string;

@@ -9,7 +9,7 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ProjectPage } from './ProjectPage'
-import { problem, productTypes, tenants, version, villa } from './test-fixtures'
+import { currencies, problem, productTypes, tenants, version, villa } from './test-fixtures'
 
 function Path() {
   return <p data-testid="path">{useLocation().pathname}</p>
@@ -30,6 +30,7 @@ function serveProject(initial: Project = villa) {
     http.get('/api/projects', () => HttpResponse.json({ items: [], total: 0 })),
     http.get('/api/tenants', () => HttpResponse.json({ items: tenants })),
     http.get('/api/product-types', () => HttpResponse.json({ items: productTypes })),
+    http.get('/api/currencies', () => HttpResponse.json(currencies)),
     http.get('/api/versions/:versionId/plans', () => HttpResponse.json([])),
   )
   return (next: Project) => {

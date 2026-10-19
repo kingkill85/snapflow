@@ -24,7 +24,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CurrencyList,
   Error,
+  ExchangeRate,
+  ExchangeRateRefresh,
+  ExchangeRateSet,
+  ListCurrenciesParams,
   ListProjectsParams,
   Project,
   ProjectCreate,
@@ -82,6 +87,192 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+/**
+ * @summary List the currencies a project may use
+ */
+export const listCurrencies = (
+    params?: ListCurrenciesParams,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<CurrencyList>(
+      {url: `/api/currencies`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+
+
+
+
+export const getListCurrenciesQueryKey = (params?: ListCurrenciesParams,) => {
+    return [
+    `/api/currencies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCurrenciesQueryOptions = <TData = Awaited<ReturnType<typeof listCurrencies>>, TError = ErrorType<Error>>(params?: ListCurrenciesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCurrenciesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCurrencies>>> = ({ signal }) => listCurrencies(params, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCurrenciesQueryResult = NonNullable<Awaited<ReturnType<typeof listCurrencies>>>
+export type ListCurrenciesQueryError = ErrorType<Error>
+
+
+export function useListCurrencies<TData = Awaited<ReturnType<typeof listCurrencies>>, TError = ErrorType<Error>>(
+ params: undefined |  ListCurrenciesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCurrencies>>,
+          TError,
+          Awaited<ReturnType<typeof listCurrencies>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCurrencies<TData = Awaited<ReturnType<typeof listCurrencies>>, TError = ErrorType<Error>>(
+ params?: ListCurrenciesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCurrencies>>,
+          TError,
+          Awaited<ReturnType<typeof listCurrencies>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCurrencies<TData = Awaited<ReturnType<typeof listCurrencies>>, TError = ErrorType<Error>>(
+ params?: ListCurrenciesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the currencies a project may use
+ */
+
+export function useListCurrencies<TData = Awaited<ReturnType<typeof listCurrencies>>, TError = ErrorType<Error>>(
+ params?: ListCurrenciesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCurrencies>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCurrenciesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Cached for an hour; 503 exchange_rate.unavailable when the provider is not reachable and no rates of the last 24 hours are cached.
+ * @summary Get the online provider's current rate of a currency
+ */
+export const getExchangeRate = (
+    currency: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<ExchangeRate>(
+      {url: `/api/exchange-rates/${currency}`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetExchangeRateQueryKey = (currency: string,) => {
+    return [
+    `/api/exchange-rates/${currency}`
+    ] as const;
+    }
+
+
+export const getGetExchangeRateQueryOptions = <TData = Awaited<ReturnType<typeof getExchangeRate>>, TError = ErrorType<Error>>(currency: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangeRateQueryKey(currency);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchangeRate>>> = ({ signal }) => getExchangeRate(currency, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: currency !== null && currency !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetExchangeRateQueryResult = NonNullable<Awaited<ReturnType<typeof getExchangeRate>>>
+export type GetExchangeRateQueryError = ErrorType<Error>
+
+
+export function useGetExchangeRate<TData = Awaited<ReturnType<typeof getExchangeRate>>, TError = ErrorType<Error>>(
+ currency: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExchangeRate>>,
+          TError,
+          Awaited<ReturnType<typeof getExchangeRate>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExchangeRate<TData = Awaited<ReturnType<typeof getExchangeRate>>, TError = ErrorType<Error>>(
+ currency: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExchangeRate>>,
+          TError,
+          Awaited<ReturnType<typeof getExchangeRate>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExchangeRate<TData = Awaited<ReturnType<typeof getExchangeRate>>, TError = ErrorType<Error>>(
+ currency: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the online provider's current rate of a currency
+ */
+
+export function useGetExchangeRate<TData = Awaited<ReturnType<typeof getExchangeRate>>, TError = ErrorType<Error>>(
+ currency: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExchangeRate>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetExchangeRateQueryOptions(currency,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
 
 /**
  * One page of the projects the caller sees, the most recently changed first.
@@ -470,6 +661,144 @@ export const useUpdateProject = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getUpdateProjectMutationOptions(options), queryClient);
+    }
+    /**
+ * Non-USD, active projects only. The rate is marked manual with today's date and never replaced automatically.
+ * @summary Enter a project's rate by hand
+ */
+export const setProjectExchangeRate = (
+    id: string,
+    exchangeRateSet: BodyType<NonReadonly<ExchangeRateSet>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Project>(
+      {url: `/api/projects/${id}/exchange-rate`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: exchangeRateSet, signal
+    },
+      );
+    }
+
+
+
+
+export const getSetProjectExchangeRateMutationKey = () => ['setProjectExchangeRate'] as const;
+
+export const getSetProjectExchangeRateMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectExchangeRate>>, TError,SetProjectExchangeRateMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof setProjectExchangeRate>>, TError,SetProjectExchangeRateMutationVariables, TContext> => {
+
+const mutationKey = getSetProjectExchangeRateMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setProjectExchangeRate>>, SetProjectExchangeRateMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setProjectExchangeRate(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetProjectExchangeRateMutationResult = NonNullable<Awaited<ReturnType<typeof setProjectExchangeRate>>>
+    export type SetProjectExchangeRateMutationBody = BodyType<NonReadonly<ExchangeRateSet>>
+    export type SetProjectExchangeRateMutationError = ErrorType<Error>
+    export type SetProjectExchangeRateMutationVariables = {id: string;data: BodyType<NonReadonly<ExchangeRateSet>>}
+
+    /**
+ * @summary Enter a project's rate by hand
+ */
+export const useSetProjectExchangeRate = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectExchangeRate>>, TError,SetProjectExchangeRateMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setProjectExchangeRate>>,
+        TError,
+        SetProjectExchangeRateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetProjectExchangeRateMutationOptions(options), queryClient);
+    }
+    /**
+ * Non-USD, active projects only (409 project.exchange_rate_usd, project.read_only). The rate is marked online with the provider's date.
+ * @summary Store the online provider's current rate in a project
+ */
+export const refreshProjectExchangeRate = (
+    id: string,
+    exchangeRateRefresh?: BodyType<NonReadonly<ExchangeRateRefresh>>,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Project>(
+      {url: `/api/projects/${id}/exchange-rate/refresh`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: exchangeRateRefresh, signal
+    },
+      );
+    }
+
+
+
+
+export const getRefreshProjectExchangeRateMutationKey = () => ['refreshProjectExchangeRate'] as const;
+
+export const getRefreshProjectExchangeRateMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshProjectExchangeRate>>, TError,RefreshProjectExchangeRateMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof refreshProjectExchangeRate>>, TError,RefreshProjectExchangeRateMutationVariables, TContext> => {
+
+const mutationKey = getRefreshProjectExchangeRateMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshProjectExchangeRate>>, RefreshProjectExchangeRateMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  refreshProjectExchangeRate(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshProjectExchangeRateMutationResult = NonNullable<Awaited<ReturnType<typeof refreshProjectExchangeRate>>>
+    export type RefreshProjectExchangeRateMutationBody = BodyType<NonReadonly<ExchangeRateRefresh>> | undefined
+    export type RefreshProjectExchangeRateMutationError = ErrorType<Error>
+    export type RefreshProjectExchangeRateMutationVariables = {id: string;data?: BodyType<NonReadonly<ExchangeRateRefresh>>}
+
+    /**
+ * @summary Store the online provider's current rate in a project
+ */
+export const useRefreshProjectExchangeRate = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshProjectExchangeRate>>, TError,RefreshProjectExchangeRateMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof refreshProjectExchangeRate>>,
+        TError,
+        RefreshProjectExchangeRateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRefreshProjectExchangeRateMutationOptions(options), queryClient);
     }
     /**
  * A full copy of sourceVersionId, or an empty version without it.

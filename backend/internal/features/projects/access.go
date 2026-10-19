@@ -7,6 +7,7 @@ package projects
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,7 +30,15 @@ type VersionRef struct {
 	// string) of the project (filled by ReadVersion and WriteVersion).
 	Currency     string
 	ExchangeRate string
+	// ExchangeRateDate and ExchangeRateSource ("online", "manual"; empty
+	// for USD and without a rate) say where the rate came from.
+	// ExchangeRate is empty for a non-USD project without a rate yet.
+	ExchangeRateDate   *time.Time
+	ExchangeRateSource string
 }
+
+// HasRate reports whether amounts can be converted (USD or a rate set).
+func (v VersionRef) HasRate() bool { return v.Currency == DefaultCurrency || v.ExchangeRate != "" }
 
 // Writable reports whether the version's project takes changes (active).
 func (v VersionRef) Writable() bool { return v.Status == StatusActive }
@@ -127,6 +136,16 @@ func versionRef(ctx context.Context, actor auth.Actor, q *store.Queries, get fun
 	if err != nil {
 		return VersionRef{}, err
 	}
-	return VersionRef{ID: r.ID, ProjectID: r.ProjectID, TenantID: r.TenantID, Status: ProjectStatus(r.Status), ProductTypeIDs: types,
-		Currency: r.Currency, ExchangeRate: r.ExchangeRate}, nil
+	ref := VersionRef{ID: r.ID, ProjectID: r.ProjectID, TenantID: r.TenantID, Status: ProjectStatus(r.Status), ProductTypeIDs: types,
+		Currency: r.Currency}
+	if r.ExchangeRate != nil {
+		ref.ExchangeRate = *r.ExchangeRate
+	}
+	if r.Currency != DefaultCurrency && r.ExchangeRate != nil {
+		ref.ExchangeRateDate = r.ExchangeRateDate
+		if r.ExchangeRateSource != nil {
+			ref.ExchangeRateSource = *r.ExchangeRateSource
+		}
+	}
+	return ref, nil
 }

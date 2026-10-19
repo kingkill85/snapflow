@@ -15,8 +15,10 @@ test('create, edit, versions (copy, empty, rename, delete) and delete a project'
   await page.getByRole('button', { name: 'New project' }).first().click()
   const dialog = page.getByRole('dialog', { name: 'New project' })
   await dialog.getByRole('textbox', { name: 'Name' }).first().fill(name)
-  await dialog.getByLabel('Currency').fill('EUR')
-  await dialog.getByLabel('Exchange rate').fill('0.92')
+  // The currency only: a new project has no exchange rate until one is set (BOM or Pricing tab, edit dialog).
+  await dialog.getByRole('combobox', { name: 'Currency' }).fill('eur')
+  await page.getByRole('option', { name: 'EUR – Euro' }).click()
+  await expect(dialog.getByLabel('Exchange rate')).toHaveCount(0)
   await dialog.getByLabel('Company').fill('Müller GmbH')
   await dialog.getByRole('button', { name: 'Create' }).click()
 
@@ -27,15 +29,21 @@ test('create, edit, versions (copy, empty, rename, delete) and delete a project'
   await expect(page.getByText('No plans yet.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Delete version' })).toBeDisabled()
 
-  // Edit: rename, and the exchange rate comes back as stored.
+  // Edit: rename and enter the exchange rate by hand; it comes back as stored.
   const renamed = unique('Villa Schmidt')
   await page.getByRole('button', { name: 'Edit project' }).click()
   const edit = page.getByRole('dialog', { name: 'Edit project' })
-  await expect(edit.getByLabel('Exchange rate')).toHaveValue('0.92')
+  await expect(edit.getByLabel('Exchange rate')).toHaveValue('')
   await edit.getByRole('textbox', { name: 'Name' }).first().fill(renamed)
+  await edit.getByLabel('Exchange rate').fill('0.92')
   await edit.getByRole('button', { name: 'Update' }).click()
   await expect(edit).toBeHidden()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(renamed)
+  await page.getByRole('button', { name: 'Edit project' }).click()
+  await expect(edit.getByLabel('Exchange rate')).toHaveValue('0.92')
+  await expect(edit.getByText(/entered manually on/)).toBeVisible()
+  await edit.getByRole('button', { name: 'Cancel' }).click()
+  await expect(edit).toBeHidden()
 
   // A copy of V1 (the default), named V2.
   await page.getByRole('button', { name: 'New version' }).click()

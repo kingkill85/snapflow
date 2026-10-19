@@ -69,7 +69,7 @@ func get(t *testing.T, api *apptest.API, cookie string, id uuid.UUID) projects.P
 // updateBody is the project as the edit dialog sends it back.
 func updateBody(p projects.Project) map[string]any {
 	return map[string]any{
-		"name": p.Name, "language": p.Language, "currency": p.Currency, "exchangeRate": p.ExchangeRate,
+		"name": p.Name, "language": p.Language, "currency": p.Currency, "exchangeRate": deref(p.ExchangeRate),
 		"customer": p.Customer, "notes": p.Notes, "productTypeIds": p.ProductTypeIDs,
 		"status": p.Status, "expectedUpdatedAt": p.UpdatedAt,
 	}
@@ -87,7 +87,7 @@ func TestCRUD(t *testing.T) {
 	})
 	year := time.Now().UTC().Year()
 	if p.Number != fmt.Sprintf("%d-0001", year) || p.Name != "Villa Müller" || p.Status != projects.StatusActive ||
-		p.Language != "en" || p.Currency != "USD" || p.ExchangeRate != "1" || p.Customer.Address != "Street 1\nTown" {
+		p.Language != "en" || p.Currency != "USD" || deref(p.ExchangeRate) != "1" || p.Customer.Address != "Street 1\nTown" {
 		t.Errorf("created: %+v", p)
 	}
 	if len(p.ProductTypeIDs) != 2 || p.ProductTypeIDs[0] != zigbee || p.ProductTypeIDs[1] != knx {
@@ -112,7 +112,7 @@ func TestCRUD(t *testing.T) {
 	resp := api.Put("/api/projects/"+p.ID.String(), admin, body)
 	wantCode(t, resp, http.StatusOK, "")
 	u := decode[projects.Project](t, resp)
-	if u.Name != "Villa Schmidt" || u.Currency != "EUR" || u.ExchangeRate != "0.92" || u.Language != "de" ||
+	if u.Name != "Villa Schmidt" || u.Currency != "EUR" || deref(u.ExchangeRate) != "0.92" || u.ExchangeRateSource != "manual" || u.Language != "de" ||
 		u.Customer.Name != "" || u.Customer.Company != "Schmidt GmbH" || u.Customer.Email != "anna@example.com" ||
 		u.Customer.Address != "Street 1\nTown" || u.Notes != "first notes" || len(u.ProductTypeIDs) != 1 || u.Number != p.Number {
 		t.Errorf("updated: %+v", u)
@@ -190,20 +190,21 @@ func TestValidation(t *testing.T) {
 		status         int
 		code, location string
 	}{
-		"blank name":     {map[string]any{"name": "  "}, 422, "validation.required", "body.name"},
-		"long name":      {map[string]any{"name": strings.Repeat("x", 201)}, 422, "validation.too_long", "body.name"},
-		"control chars":  {map[string]any{"name": "a\tb"}, 422, "validation.control_chars", "body.name"},
-		"email":          {map[string]any{"name": "x", "customer": map[string]any{"email": "nope"}}, 422, "validation.email", "body.customer.email"},
-		"phone too long": {map[string]any{"name": "x", "customer": map[string]any{"phone": strings.Repeat("1", 51)}}, 422, "validation.too_long", "body.customer.phone"},
-		"currency":       {map[string]any{"name": "x", "currency": "eur"}, 422, "project.currency_format", "body.currency"},
-		"rate zero":      {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "0"}, 422, "project.exchange_rate", "body.exchangeRate"},
-		"rate format":    {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "1e3"}, 422, "project.exchange_rate", "body.exchangeRate"},
-		"usd rate":       {map[string]any{"name": "x", "exchangeRate": "2"}, 422, "project.exchange_rate", "body.exchangeRate"},
-		"language":       {map[string]any{"name": "x", "language": "fr"}, 422, "validation.locale", "body.language"},
-		"no types":       {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{}}, 422, "project.product_types_required", "body.productTypeIds"},
-		"unknown type":   {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{active, uuid.New()}}, 422, "project.product_type_not_found", "body.productTypeIds[1]"},
-		"inactive type":  {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{inactive}}, 422, "project.product_type_inactive", "body.productTypeIds[0]"},
-		"unknown tenant": {map[string]any{"name": "x", "tenantId": uuid.New()}, 422, "project.tenant_not_found", "body.tenantId"},
+		"blank name":       {map[string]any{"name": "  "}, 422, "validation.required", "body.name"},
+		"long name":        {map[string]any{"name": strings.Repeat("x", 201)}, 422, "validation.too_long", "body.name"},
+		"control chars":    {map[string]any{"name": "a\tb"}, 422, "validation.control_chars", "body.name"},
+		"email":            {map[string]any{"name": "x", "customer": map[string]any{"email": "nope"}}, 422, "validation.email", "body.customer.email"},
+		"phone too long":   {map[string]any{"name": "x", "customer": map[string]any{"phone": strings.Repeat("1", 51)}}, 422, "validation.too_long", "body.customer.phone"},
+		"currency":         {map[string]any{"name": "x", "currency": "eur"}, 422, "project.currency_format", "body.currency"},
+		"rate zero":        {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "0"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"rate format":      {map[string]any{"name": "x", "currency": "EUR", "exchangeRate": "1e3"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"usd rate":         {map[string]any{"name": "x", "exchangeRate": "2"}, 422, "project.exchange_rate", "body.exchangeRate"},
+		"unknown currency": {map[string]any{"name": "x", "currency": "XYZ"}, 422, "project.currency_unknown", "body.currency"},
+		"language":         {map[string]any{"name": "x", "language": "fr"}, 422, "validation.locale", "body.language"},
+		"no types":         {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{}}, 422, "project.product_types_required", "body.productTypeIds"},
+		"unknown type":     {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{active, uuid.New()}}, 422, "project.product_type_not_found", "body.productTypeIds[1]"},
+		"inactive type":    {map[string]any{"name": "x", "productTypeIds": []uuid.UUID{inactive}}, 422, "project.product_type_inactive", "body.productTypeIds[0]"},
+		"unknown tenant":   {map[string]any{"name": "x", "tenantId": uuid.New()}, 422, "project.tenant_not_found", "body.tenantId"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -523,4 +524,11 @@ func TestReferenceDeletedMeanwhile(t *testing.T) {
 	if !strings.Contains(resp.Body.String(), `"location":"body.productTypeIds"`) {
 		t.Errorf("location: %s", resp.Body)
 	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

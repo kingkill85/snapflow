@@ -9,12 +9,20 @@ import type { NullableBOMAmounts } from './nullableBOMAmounts';
 export interface BOMTotals {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** Null for USD projects */
+  /** Null for USD projects and without a rate */
   converted: NullableBOMAmounts | null;
   currency: string;
   discount: string;
   grandTotal: string;
+  /** Units of the currency per 1 USD; empty for a non-USD project without a rate yet */
   rate: string;
+  /**
+     * When the rate was fetched (provider's date) or entered; null for USD and without a rate
+     * @nullable
+     */
+  rateDate: string | null;
+  /** online, manual; empty for USD and without a rate */
+  rateSource: string;
   services: string;
   subtotal: string;
 }

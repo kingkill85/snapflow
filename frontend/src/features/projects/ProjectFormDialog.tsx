@@ -1,24 +1,29 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { ApiError } from '@/api/client'
 import type { Project } from '@/api/generated/model'
 import { useListProductTypes } from '@/api/generated/product-types/product-types'
-import { getGetProjectQueryKey, getListProjectsQueryKey, useCreateProject, useUpdateProject } from '@/api/generated/projects/projects'
+import { getExchangeRate, getGetProjectQueryKey, getListProjectsQueryKey, useCreateProject, useUpdateProject } from '@/api/generated/projects/projects'
 import { useListTenants } from '@/api/generated/tenants/tenants'
 import { useCan, useMe } from '@/app/session'
 import { decimalSeparator, formatDecimal, parseDecimal } from '@/catalog/decimal'
 import {
   apiFields,
+  Button,
   CheckboxGroupField,
   errorKey,
   ErrorMessage,
   Field,
+  FormComboboxField,
   FormDialog,
   FormSelectField,
+  Notice,
   setApiFieldErrors,
   TextareaField,
   TypeBadge,
@@ -27,6 +32,7 @@ import {
 import { contentLocales } from '@/i18n/content-locales'
 import { useLocalized } from '@/i18n/localized'
 
+import { useCurrencyOptions, useFormatRateDate } from './currency'
 import { fresh } from './paths'
 
 const tooLong = (max: number) => errorKey('validation.too_long', { max })
@@ -38,11 +44,8 @@ const schema = z
     status: z.enum(['active', 'completed', 'cancelled']),
     productTypeIds: z.array(z.string()).min(1, errorKey('project.product_types_required')),
     language: z.string(),
-    currency: z
-      .string()
-      .trim()
-      .regex(/^[A-Za-z]{3}$/, errorKey('project.currency_format')),
-    exchangeRate: z.string(),
+    currency: z.string().regex(/^[A-Z]{3}$/, errorKey('project.currency_format')),
+    exchangeRate: z.string().refine((v) => v.trim() === '' || Number(parseDecimal(v) ?? 0) > 0, errorKey('project.exchange_rate')),
     customer: z.object({
       name: z.string().trim().max(200, tooLong(200)),
       company: z.string().trim().max(200, tooLong(200)),
@@ -51,12 +54,6 @@ const schema = z
       address: z.string().trim().max(500, tooLong(500)),
     }),
     notes: z.string().trim().max(5000, tooLong(5000)),
-  })
-  .superRefine((v, ctx) => {
-    const rate = parseDecimal(v.exchangeRate)
-    if (v.currency.trim().toUpperCase() !== 'USD' && (rate === undefined || Number(rate) <= 0)) {
-      ctx.addIssue({ code: 'custom', path: ['exchangeRate'], message: errorKey('project.exchange_rate') })
-    }
   })
 type FormValues = z.infer<typeof schema>
 
@@ -73,7 +70,17 @@ type Props = {
   onSaved?: (project: Project) => void
 }
 
-/** Creates or edits a project: name, tenant (admins), status (edit), product types, language, currency, customer, notes. */
+/**
+ * Where the rate field's value came from: the stored rate, the online
+ * provider (fetched in the dialog), typed by hand, or none.
+ */
+type RateOrigin = { kind: 'stored' } | { kind: 'fetched'; rate: string; date: string } | { kind: 'typed' } | { kind: 'none' }
+
+/**
+ * Creates or edits a project: name, tenant (admins), status (edit), product types, language, currency, customer, notes.
+ * A new project gets its currency only (no rate: set later on the BOM or Pricing tab); editing a non-USD
+ * project shows its rate with its origin and "Fetch current rate". A rate typed in is never replaced.
+ */
 export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, onSaved }: Props) {
   const { t, i18n } = useTranslation('projects')
   const { t: tCommon } = useTranslation()
@@ -118,6 +125,10 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
   useEffect(() => {
     if (!open) return
     const sep = decimalSeparator(uiLanguage)
+    setOrigin({ kind: 'stored' })
+    setFetchError(null)
+    setConfirmRate(null)
+    typedRates.current = {}
     reset({
       name: item?.name ?? '',
       tenantId: item?.tenantId ?? defaultTenantId ?? me.tenantId,
@@ -126,7 +137,7 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
       // A new project's proposals are in the user's language when it is a content language.
       language: item?.language ?? ((contentLocales as readonly string[]).includes(uiLanguage) ? uiLanguage : 'en'),
       currency: item?.currency ?? 'USD',
-      exchangeRate: formatDecimal(item?.exchangeRate ?? '1', sep),
+      exchangeRate: formatDecimal(item?.exchangeRate ?? '', sep),
       customer: {
         name: item?.customer.name ?? '',
         company: item?.customer.company ?? '',
@@ -148,32 +159,106 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
     if (form.getValues('productTypeIds').length === 0) setValue('productTypeIds', activeKey ? activeKey.split(',') : [])
   }, [open, item, activeKey, form, setValue])
 
-  // Catalog prices are USD: for USD the rate is exactly 1.
+  // Catalog prices are USD: USD has no rate to set.
   const currency = useWatch({ control: form.control, name: 'currency' }) ?? ''
-  const isUsd = currency.trim().toUpperCase() === 'USD'
+  const isUsd = currency === 'USD'
+  const tenantId = useWatch({ control: form.control, name: 'tenantId' })
+  const currencies = useCurrencyOptions(open, item?.currency, chooseTenant ? tenantId : item?.tenantId)
+  const formatDate = useFormatRateDate()
+  const [origin, setOrigin] = useState<RateOrigin>({ kind: 'stored' })
+  const [fetchError, setFetchError] = useState<unknown>(null)
+  const [fetching, setFetching] = useState(false)
+  // A rate the server found far off the online rate (project.exchange_rate_implausible): saving it again confirms it.
+  const [confirmRate, setConfirmRate] = useState<string | null>(null)
+  // Rates typed by hand per currency, restored when the currency comes back.
+  const typedRates = useRef<Record<string, string>>({})
+
+  const fetchRate = async (code: string) => {
+    setFetching(true)
+    setFetchError(null)
+    try {
+      const r = await getExchangeRate(code)
+      if (form.getValues('currency') !== code) return // changed again meanwhile
+      setValue('exchangeRate', formatDecimal(r.rate, decimalSeparator(uiLanguage)), { shouldValidate: true })
+      setOrigin({ kind: 'fetched', rate: r.rate, date: r.date })
+    } catch (error) {
+      if (form.getValues('currency') === code) setFetchError(error) // not for a currency left meanwhile
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  // Editing: a rate belongs to its currency. A new currency clears the field and
+  // fetches its online rate, whatever was there (a rate typed for EUR must never
+  // be saved as PKR's); back to a currency, the rate typed for it or else the
+  // stored rate returns.
+  const lastCurrency = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (open && isUsd && parseDecimal(form.getValues('exchangeRate') ?? '') !== '1') setValue('exchangeRate', '1')
-  }, [open, isUsd, form, setValue])
+    if (!open) {
+      lastCurrency.current = undefined
+      return
+    }
+    const previous = lastCurrency.current
+    lastCurrency.current = currency
+    if (!item || previous === undefined || previous === currency) return
+    if (origin.kind === 'typed') typedRates.current[previous] = form.getValues('exchangeRate')
+    setFetchError(null)
+    form.clearErrors('exchangeRate')
+    const typed = typedRates.current[currency]
+    if (typed !== undefined) {
+      setValue('exchangeRate', typed)
+      setOrigin({ kind: 'typed' })
+    } else if (currency === item.currency) {
+      setValue('exchangeRate', formatDecimal(item.exchangeRate ?? '', decimalSeparator(uiLanguage)))
+      setOrigin({ kind: 'stored' })
+    } else {
+      setValue('exchangeRate', '')
+      setOrigin({ kind: 'none' })
+      if (currency !== 'USD' && !currencies.noOnlineRate(currency)) void fetchRate(currency)
+    }
+    // Only a change of the currency triggers this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currency])
+
+  const rateRegister = form.register('exchangeRate', { onChange: () => setOrigin({ kind: 'typed' }) })
+  const rateOrigin = (() => {
+    if (origin.kind === 'typed') return t('rate.originTyped')
+    if (origin.kind === 'fetched') return t('rate.originOnline', { date: formatDate(origin.date) })
+    if (origin.kind === 'stored' && item?.exchangeRate != null && item.exchangeRateDate) {
+      if (item.exchangeRateSource === 'online') return t('rate.originOnline', { date: formatDate(item.exchangeRateDate) })
+      if (item.exchangeRateSource === 'manual') return t('rate.originManual', { date: formatDate(item.exchangeRateDate) })
+    }
+    return t('rate.originNone')
+  })()
+
+  /** The rate fields of an update: online (the server fetches it again), typed, kept or none. */
+  const rateData = (values: FormValues) => {
+    if (values.currency === 'USD') return { exchangeRate: '1' }
+    const typed = parseDecimal(values.exchangeRate) ?? values.exchangeRate.trim()
+    if (origin.kind === 'fetched' && typed === origin.rate) return { exchangeRate: '', exchangeRateSource: 'online' }
+    return { exchangeRate: typed, ...(confirmRate !== null && typed !== '' && confirmRate === `${values.currency} ${typed}` ? { exchangeRateConfirmed: true } : {}) }
+  }
 
   const submit = form.handleSubmit(async (values) => {
-    const code = values.currency.trim().toUpperCase()
     const data = {
       name: values.name,
       ...(chooseTenant ? { tenantId: values.tenantId } : {}),
       productTypeIds: values.productTypeIds,
       language: values.language,
-      currency: code,
-      exchangeRate: code === 'USD' ? '1' : (parseDecimal(values.exchangeRate) ?? values.exchangeRate),
+      currency: values.currency,
       customer: values.customer,
       notes: values.notes,
     }
     let saved: Project
     try {
       saved = item
-        ? await update.mutateAsync({ id: item.id, data: { ...data, status: values.status, expectedUpdatedAt: item.updatedAt } })
+        ? await update.mutateAsync({ id: item.id, data: { ...data, ...rateData(values), status: values.status, expectedUpdatedAt: item.updatedAt } })
         : await create.mutateAsync({ data })
     } catch (error) {
       setApiFieldErrors(error, form.setError, fields)
+      if (error instanceof ApiError && error.fields.some((f) => f.code === 'project.exchange_rate_implausible')) {
+        setConfirmRate(`${values.currency} ${parseDecimal(values.exchangeRate) ?? values.exchangeRate.trim()}`)
+      }
       return // shown by ErrorMessage via mutation.error
     }
     queryClient.setQueryData(getGetProjectQueryKey(saved.id), saved)
@@ -266,27 +351,35 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
         options={contentLocales.map((l) => ({ value: l, label: languageName(l) }))}
         error={fieldError(errors.language?.message)}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label={t('field.currency')}
-          hint={t('field.currencyHint')}
-          autoComplete="off"
-          maxLength={3}
-          required
-          error={fieldError(errors.currency?.message)}
-          {...form.register('currency')}
-        />
-        <Field
-          label={t('field.exchangeRate')}
-          hint={isUsd ? t('field.exchangeRateUsd') : t('field.exchangeRateHint', { currency: currency.trim().toUpperCase() || '…' })}
-          inputMode="decimal"
-          autoComplete="off"
-          readOnly={isUsd}
-          required={!isUsd}
-          error={fieldError(errors.exchangeRate?.message)}
-          {...form.register('exchangeRate')}
-        />
-      </div>
+      <FormComboboxField
+        control={form.control}
+        name="currency"
+        label={t('field.currency')}
+        hint={item ? undefined : t('field.currencyHint')}
+        required
+        options={currencies.options}
+        emptyText={t('field.currencyNoMatch')}
+        error={fieldError(errors.currency?.message)}
+      />
+      <ErrorMessage error={currencies.error} />
+      {item && !isUsd && (
+        <div className="space-y-2">
+          <Field
+            label={t('field.exchangeRate')}
+            hint={`${t('field.exchangeRateHint', { currency })} · ${rateOrigin}`}
+            inputMode="decimal"
+            autoComplete="off"
+            error={fieldError(errors.exchangeRate?.message)}
+            {...rateRegister}
+          />
+          <Button variant="secondary" size="sm" disabled={fetching || currencies.noOnlineRate(currency)} onClick={() => void fetchRate(currency)}>
+            <RefreshCw aria-hidden="true" />
+            {t('rate.fetch')}
+          </Button>
+          {currencies.noOnlineRate(currency) && <Notice tone="warning">{t('rate.noOnline', { currency })}</Notice>}
+          <ErrorMessage error={fetchError} />
+        </div>
+      )}
 
       <Heading>{t('section.customer')}</Heading>
       <Field label={t('field.customerName')} autoComplete="off" error={fieldError(errors.customer?.name?.message)} {...form.register('customer.name')} />

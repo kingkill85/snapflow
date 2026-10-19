@@ -92,6 +92,9 @@ type Run struct {
 	Text   string
 	Bold   bool
 	Italic bool
+	// NoBreakHyphens keeps lines from breaking at the text's hyphens (model
+	// numbers, SKUs).
+	NoBreakHyphens bool
 }
 
 // Column is a table column.

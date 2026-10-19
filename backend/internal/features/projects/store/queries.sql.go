@@ -98,25 +98,30 @@ func (q *Queries) CountVersions(ctx context.Context, projectID uuid.UUID) (int64
 
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (tenant_id, number, name, status, language, currency, exchange_rate,
-    customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by)
-VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at
+    customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by,
+    exchange_rate_date, exchange_rate_source, exchange_rate_provider)
+VALUES ($1, $2, $3, 'active', $4, $5, $13, $6, $7, $8, $9, $10, $11, $12,
+    $14, $15, $16)
+RETURNING id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at, exchange_rate_date, exchange_rate_source, exchange_rate_provider
 `
 
 type CreateProjectParams struct {
-	TenantID        uuid.UUID
-	Number          string
-	Name            string
-	Language        string
-	Currency        string
-	ExchangeRate    string
-	CustomerName    string
-	CustomerCompany string
-	CustomerEmail   string
-	CustomerPhone   string
-	CustomerAddress string
-	Notes           string
-	CreatedBy       *uuid.UUID
+	TenantID             uuid.UUID
+	Number               string
+	Name                 string
+	Language             string
+	Currency             string
+	CustomerName         string
+	CustomerCompany      string
+	CustomerEmail        string
+	CustomerPhone        string
+	CustomerAddress      string
+	Notes                string
+	CreatedBy            *uuid.UUID
+	ExchangeRate         *string
+	ExchangeRateDate     *time.Time
+	ExchangeRateSource   *string
+	ExchangeRateProvider string
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
@@ -126,7 +131,6 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		arg.Name,
 		arg.Language,
 		arg.Currency,
-		arg.ExchangeRate,
 		arg.CustomerName,
 		arg.CustomerCompany,
 		arg.CustomerEmail,
@@ -134,6 +138,10 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		arg.CustomerAddress,
 		arg.Notes,
 		arg.CreatedBy,
+		arg.ExchangeRate,
+		arg.ExchangeRateDate,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateProvider,
 	)
 	var i Project
 	err := row.Scan(
@@ -154,6 +162,9 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateProvider,
 	)
 	return i, err
 }
@@ -234,7 +245,7 @@ func (q *Queries) DeleteVersion(ctx context.Context, arg DeleteVersionParams) (i
 }
 
 const getProject = `-- name: GetProject :one
-SELECT id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at FROM projects WHERE id = $1
+SELECT id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at, exchange_rate_date, exchange_rate_source, exchange_rate_provider FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -258,6 +269,9 @@ func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateProvider,
 	)
 	return i, err
 }
@@ -318,7 +332,7 @@ func (q *Queries) ListProductTypesOfProjects(ctx context.Context, projectIds []u
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT p.id, p.tenant_id, p.number, p.name, p.status, p.language, p.currency, p.exchange_rate, p.customer_name, p.customer_company, p.customer_email, p.customer_phone, p.customer_address, p.notes, p.created_by, p.created_at, p.updated_at, (SELECT count(*) FROM project_versions v WHERE v.project_id = p.id) AS version_count
+SELECT p.id, p.tenant_id, p.number, p.name, p.status, p.language, p.currency, p.exchange_rate, p.customer_name, p.customer_company, p.customer_email, p.customer_phone, p.customer_address, p.notes, p.created_by, p.created_at, p.updated_at, p.exchange_rate_date, p.exchange_rate_source, p.exchange_rate_provider, (SELECT count(*) FROM project_versions v WHERE v.project_id = p.id) AS version_count
 FROM projects p
 WHERE ($1::uuid IS NULL OR p.tenant_id = $1)
   AND ($2::text = '' OR p.status = $2)
@@ -340,24 +354,27 @@ type ListProjectsParams struct {
 }
 
 type ListProjectsRow struct {
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	Number          string
-	Name            string
-	Status          string
-	Language        string
-	Currency        string
-	ExchangeRate    string
-	CustomerName    string
-	CustomerCompany string
-	CustomerEmail   string
-	CustomerPhone   string
-	CustomerAddress string
-	Notes           string
-	CreatedBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	VersionCount    int64
+	ID                   uuid.UUID
+	TenantID             uuid.UUID
+	Number               string
+	Name                 string
+	Status               string
+	Language             string
+	Currency             string
+	ExchangeRate         *string
+	CustomerName         string
+	CustomerCompany      string
+	CustomerEmail        string
+	CustomerPhone        string
+	CustomerAddress      string
+	Notes                string
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ExchangeRateDate     *time.Time
+	ExchangeRateSource   *string
+	ExchangeRateProvider string
+	VersionCount         int64
 }
 
 // ListProjects is one page of the project list, newest change first. search
@@ -396,6 +413,9 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]L
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExchangeRateDate,
+			&i.ExchangeRateSource,
+			&i.ExchangeRateProvider,
 			&i.VersionCount,
 		); err != nil {
 			return nil, err
@@ -442,7 +462,7 @@ func (q *Queries) ListVersions(ctx context.Context, projectID uuid.UUID) ([]Proj
 }
 
 const lockProject = `-- name: LockProject :one
-SELECT id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at FROM projects WHERE id = $1 FOR UPDATE
+SELECT id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at, exchange_rate_date, exchange_rate_source, exchange_rate_provider FROM projects WHERE id = $1 FOR UPDATE
 `
 
 // LockProject locks a project for a change of it or its versions.
@@ -467,6 +487,9 @@ func (q *Queries) LockProject(ctx context.Context, id uuid.UUID) (Project, error
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateProvider,
 	)
 	return i, err
 }
@@ -494,47 +517,60 @@ func (q *Queries) NextProjectNumber(ctx context.Context, arg NextProjectNumberPa
 	return last_number, err
 }
 
-const updateProject = `-- name: UpdateProject :one
-UPDATE projects SET tenant_id = $2, number = $3, name = $4, status = $5, language = $6, currency = $7,
-    exchange_rate = $8, customer_name = $9, customer_company = $10, customer_email = $11,
-    customer_phone = $12, customer_address = $13, notes = $14, updated_at = now()
-WHERE id = $1
-RETURNING id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at
+const recentCurrencies = `-- name: RecentCurrencies :many
+SELECT currency::text AS currency FROM projects
+WHERE tenant_id = $1 AND currency <> 'USD'
+GROUP BY currency
+ORDER BY max(updated_at) DESC
+LIMIT 5
 `
 
-type UpdateProjectParams struct {
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	Number          string
-	Name            string
-	Status          string
-	Language        string
-	Currency        string
-	ExchangeRate    string
-	CustomerName    string
-	CustomerCompany string
-	CustomerEmail   string
-	CustomerPhone   string
-	CustomerAddress string
-	Notes           string
+// RecentCurrencies are the currencies other than USD of a tenant's projects,
+// the most recently changed first.
+func (q *Queries) RecentCurrencies(ctx context.Context, tenantID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, recentCurrencies, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var currency string
+		if err := rows.Scan(&currency); err != nil {
+			return nil, err
+		}
+		items = append(items, currency)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, updateProject,
-		arg.ID,
-		arg.TenantID,
-		arg.Number,
-		arg.Name,
-		arg.Status,
-		arg.Language,
-		arg.Currency,
+const setExchangeRate = `-- name: SetExchangeRate :one
+UPDATE projects SET exchange_rate = $1, exchange_rate_date = $2,
+    exchange_rate_source = $3, exchange_rate_provider = $4,
+    updated_at = now()
+WHERE id = $5
+RETURNING id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at, exchange_rate_date, exchange_rate_source, exchange_rate_provider
+`
+
+type SetExchangeRateParams struct {
+	ExchangeRate         *string
+	ExchangeRateDate     *time.Time
+	ExchangeRateSource   *string
+	ExchangeRateProvider string
+	ID                   uuid.UUID
+}
+
+// SetExchangeRate stores a fetched or typed-in rate (refresh, set rate).
+func (q *Queries) SetExchangeRate(ctx context.Context, arg SetExchangeRateParams) (Project, error) {
+	row := q.db.QueryRow(ctx, setExchangeRate,
 		arg.ExchangeRate,
-		arg.CustomerName,
-		arg.CustomerCompany,
-		arg.CustomerEmail,
-		arg.CustomerPhone,
-		arg.CustomerAddress,
-		arg.Notes,
+		arg.ExchangeRateDate,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateProvider,
+		arg.ID,
 	)
 	var i Project
 	err := row.Scan(
@@ -555,6 +591,85 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateProvider,
+	)
+	return i, err
+}
+
+const updateProject = `-- name: UpdateProject :one
+UPDATE projects SET tenant_id = $2, number = $3, name = $4, status = $5, language = $6, currency = $7,
+    exchange_rate = $14, customer_name = $8, customer_company = $9, customer_email = $10,
+    customer_phone = $11, customer_address = $12, notes = $13, exchange_rate_date = $15,
+    exchange_rate_source = $16, exchange_rate_provider = $17,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, tenant_id, number, name, status, language, currency, exchange_rate, customer_name, customer_company, customer_email, customer_phone, customer_address, notes, created_by, created_at, updated_at, exchange_rate_date, exchange_rate_source, exchange_rate_provider
+`
+
+type UpdateProjectParams struct {
+	ID                   uuid.UUID
+	TenantID             uuid.UUID
+	Number               string
+	Name                 string
+	Status               string
+	Language             string
+	Currency             string
+	CustomerName         string
+	CustomerCompany      string
+	CustomerEmail        string
+	CustomerPhone        string
+	CustomerAddress      string
+	Notes                string
+	ExchangeRate         *string
+	ExchangeRateDate     *time.Time
+	ExchangeRateSource   *string
+	ExchangeRateProvider string
+}
+
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProject,
+		arg.ID,
+		arg.TenantID,
+		arg.Number,
+		arg.Name,
+		arg.Status,
+		arg.Language,
+		arg.Currency,
+		arg.CustomerName,
+		arg.CustomerCompany,
+		arg.CustomerEmail,
+		arg.CustomerPhone,
+		arg.CustomerAddress,
+		arg.Notes,
+		arg.ExchangeRate,
+		arg.ExchangeRateDate,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateProvider,
+	)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Number,
+		&i.Name,
+		&i.Status,
+		&i.Language,
+		&i.Currency,
+		&i.ExchangeRate,
+		&i.CustomerName,
+		&i.CustomerCompany,
+		&i.CustomerEmail,
+		&i.CustomerPhone,
+		&i.CustomerAddress,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateProvider,
 	)
 	return i, err
 }
@@ -594,18 +709,20 @@ func (q *Queries) UpdateVersion(ctx context.Context, arg UpdateVersionParams) (P
 }
 
 const versionAccess = `-- name: VersionAccess :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 `
 
 type VersionAccessRow struct {
-	ID           uuid.UUID
-	ProjectID    uuid.UUID
-	TenantID     uuid.UUID
-	Status       string
-	Currency     string
-	ExchangeRate string
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	TenantID           uuid.UUID
+	Status             string
+	Currency           string
+	ExchangeRate       *string
+	ExchangeRateDate   *time.Time
+	ExchangeRateSource *string
 }
 
 // VersionAccess reads a version with what other features (plans) need of
@@ -622,24 +739,28 @@ func (q *Queries) VersionAccess(ctx context.Context, id uuid.UUID) (VersionAcces
 		&i.Status,
 		&i.Currency,
 		&i.ExchangeRate,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
 	)
 	return i, err
 }
 
 const versionAccessLock = `-- name: VersionAccessLock :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR UPDATE OF p
 `
 
 type VersionAccessLockRow struct {
-	ID           uuid.UUID
-	ProjectID    uuid.UUID
-	TenantID     uuid.UUID
-	Status       string
-	Currency     string
-	ExchangeRate string
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	TenantID           uuid.UUID
+	Status             string
+	Currency           string
+	ExchangeRate       *string
+	ExchangeRateDate   *time.Time
+	ExchangeRateSource *string
 }
 
 func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionAccessLockRow, error) {
@@ -652,24 +773,28 @@ func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionA
 		&i.Status,
 		&i.Currency,
 		&i.ExchangeRate,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
 	)
 	return i, err
 }
 
 const versionAccessShare = `-- name: VersionAccessShare :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR SHARE OF p
 `
 
 type VersionAccessShareRow struct {
-	ID           uuid.UUID
-	ProjectID    uuid.UUID
-	TenantID     uuid.UUID
-	Status       string
-	Currency     string
-	ExchangeRate string
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	TenantID           uuid.UUID
+	Status             string
+	Currency           string
+	ExchangeRate       *string
+	ExchangeRateDate   *time.Time
+	ExchangeRateSource *string
 }
 
 func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (VersionAccessShareRow, error) {
@@ -682,6 +807,8 @@ func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (Version
 		&i.Status,
 		&i.Currency,
 		&i.ExchangeRate,
+		&i.ExchangeRateDate,
+		&i.ExchangeRateSource,
 	)
 	return i, err
 }

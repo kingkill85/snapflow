@@ -2,6 +2,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { keepDialogOnComboboxEscape } from './combobox-escape'
 import { IconButton } from './icon-button'
 
 type SheetProps = {
@@ -19,6 +20,7 @@ export function Sheet({ open, onOpenChange, title, closeLabel, children }: Sheet
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
         <DialogPrimitive.Content
+          onEscapeKeyDown={keepDialogOnComboboxEscape}
           aria-describedby={undefined}
           className="fixed inset-y-0 right-0 z-40 flex w-[min(20rem,calc(100vw-3rem))] flex-col border-l border-edge bg-raised shadow-2xl"
         >

@@ -10,7 +10,7 @@ import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
 import { ProjectsPage } from './ProjectsPage'
-import { acmeId, knx, problem, productTypes, tenant, tenants, villa, villaRow, zigbee } from './test-fixtures'
+import { acmeId, currencies, knx, problem, productTypes, tenant, tenants, villa, villaRow, zigbee } from './test-fixtures'
 
 const oldId = '00000000-0000-4000-8000-0000000000a9'
 
@@ -36,6 +36,7 @@ function serveList(items: ProjectListItem[] = [villaRow]) {
     }),
     http.get('/api/tenants', () => HttpResponse.json({ items: tenants })),
     http.get('/api/product-types', () => HttpResponse.json({ items: productTypes })),
+    http.get('/api/currencies', () => HttpResponse.json(currencies)),
   )
   return queries
 }
@@ -146,25 +147,30 @@ describe('ProjectsPage', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /KNX/ }))
 
     await user.type(within(dialog).getByLabelText(/^Name/, { selector: 'input[name="name"]' }), 'Villa Müller')
-    const currency = within(dialog).getByLabelText(/Currency/)
-    await user.clear(currency)
-    await user.type(currency, 'eur')
-    const rate = within(dialog).getByLabelText(/Exchange rate/)
-    await user.clear(rate)
-    await user.type(rate, '0,92')
+    // A new project gets its currency only: no rate field, no rate fetched (set later on the BOM or Pricing tab).
+    const currency = within(dialog).getByRole('combobox', { name: /Currency/ })
+    expect(currency).toHaveValue('USD – US Dollar')
+    await user.click(currency)
+    // USD first, then the tenant's recent currencies, then the rest by code.
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'USD – US Dollar', 'PKR – Pakistani Rupee', 'EUR – Euro', 'CHF – Swiss Franc', 'JPY – Japanese Yen',
+    ])
+    await user.keyboard('euro')
+    await user.click(screen.getByRole('option', { name: 'EUR – Euro' }))
+    expect(within(dialog).queryByLabelText(/Exchange rate/)).not.toBeInTheDocument()
     await user.type(within(dialog).getByLabelText('Company'), 'Müller GmbH')
     // The email is trimmed before it is checked, like the other fields.
     await user.type(within(dialog).getByLabelText('Email'), '  anna@example.com ')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     expect(await screen.findByText(`at /projects/${villa.id}`)).toBeInTheDocument()
+    expect(posted).not.toHaveProperty('exchangeRate')
     expect(posted).toMatchObject({
       name: 'Villa Müller',
       tenantId: '00000000-0000-4000-8000-0000000000d1',
       productTypeIds: [zigbee.id],
       language: 'en',
       currency: 'EUR',
-      exchangeRate: '0.92',
       customer: { name: '', company: 'Müller GmbH', email: 'anna@example.com', phone: '', address: '' },
       notes: '',
     })

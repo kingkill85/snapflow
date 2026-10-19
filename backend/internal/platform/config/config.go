@@ -36,6 +36,12 @@ type Config struct {
 	// ProposalGenerations is how many proposal generations run at once
 	// (default 2); more wait briefly, then get 503 server.busy.
 	ProposalGenerations int
+	// ExchangeRateURL is the online exchange rate provider's endpoint
+	// (open.er-api.com format; default exchangerate.DefaultURL).
+	ExchangeRateURL string
+	// ExchangeRateMaxAgeDays is when an online project rate counts as
+	// stale (default 7).
+	ExchangeRateMaxAgeDays int
 }
 
 func Load() (Config, error) {
@@ -63,6 +69,12 @@ func Load() (Config, error) {
 		return c, errors.New("PROPOSAL_GENERATIONS must be a number of at least 1")
 	}
 	c.ProposalGenerations = gens
+	c.ExchangeRateURL = os.Getenv("EXCHANGE_RATE_URL")
+	maxAge, err := strconv.Atoi(getenv("EXCHANGE_RATE_MAX_AGE_DAYS", "7"))
+	if err != nil || maxAge < 1 {
+		return c, errors.New("EXCHANGE_RATE_MAX_AGE_DAYS must be a number of at least 1")
+	}
+	c.ExchangeRateMaxAgeDays = maxAge
 	if c.TrustedProxies, err = clientip.ParseProxies(os.Getenv("TRUSTED_PROXIES")); err != nil {
 		return c, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
