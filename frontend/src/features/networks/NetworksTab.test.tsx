@@ -48,6 +48,7 @@ describe('NetworksTab', () => {
     expect(actuatorRow).toHaveTextContent('Kitchen')
     expect(actuatorRow).toHaveTextContent('12 mA')
     const two = within(bus).getByRole('table', { name: 'KNX 2' })
+    expect(within(bus).getByText(/^1 of max. 32 devices · /)).toBeInTheDocument()
     expect(rows(two)[0]).toHaveTextContent('Pinned')
     expect(rows(two)[0]).toHaveTextContent('Unknown')
 

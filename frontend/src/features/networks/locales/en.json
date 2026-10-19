@@ -29,6 +29,7 @@
     "lines": "Lines of {{system}}",
     "address": "Address {{address}}",
     "devices_one": "{{count}} device",
+    "devicesOfMax": "{{count}} of max. {{max}} devices",
     "devices_other": "{{count}} devices",
     "current": "used {{used}} mA / supplied {{supplied}} mA",
     "unknownCurrent_one": "{{count}} without known current",
@@ -48,7 +49,7 @@
     "deleteTitle": "Delete line?",
     "deleteMessage": "The line \"{{name}}\" will be deleted. Devices that follow the default move to the first remaining line.",
     "unassigned": "Without line",
-    "unassignedNotice": "These devices have no line yet: the first line is created when someone who may edit the project opens this tab."
+    "unassignedNotice": "These devices have no line yet: the first line is created with the next save of a plan that contains them."
   },
   "lineDialog": {
     "newTitle": "New line",

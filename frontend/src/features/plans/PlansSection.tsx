@@ -9,6 +9,7 @@ import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import type { Plan } from '@/api/generated/model'
 import { getListPlansQueryKey, useDeletePlan, useListPlans, useReorderPlans } from '@/api/generated/plans/plans'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, RowAction, Section } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 import { BoardFormDialog } from './board/BoardFormDialog'
 import { BoardThumbnail } from './board/BoardThumbnail'
@@ -107,9 +108,10 @@ export function PlansSection({ projectId, versionId, canWrite, productTypeIds = 
                   {plan.kind === 'board' && <Badge>{t('boardBadge')}</Badge>}
                 </span>
               </Link>
-              <p className="px-3 text-sm text-muted">
+              <p className={cn('px-3 text-sm', plan.board && plan.board.usedTe > plan.board.capacityTe ? 'text-warning' : 'text-muted')}>
                 {plan.board
-                  ? t('boardCounts', { modules: t('moduleCount', { count: plan.board.moduleCount }), used: te(plan.board.usedTe), capacity: te(plan.board.capacityTe) })
+                  ? t('boardCounts', { modules: t('moduleCount', { count: plan.board.moduleCount }), used: te(plan.board.usedTe), capacity: te(plan.board.capacityTe) }) +
+                    (plan.board.usedTe > plan.board.capacityTe ? ` · ${t('board.overflow')}` : '')
                   : t('counts', { products: plan.placementCount, zones: plan.zoneCount, needs: t('needUnits', { count: plan.needCount }) })}
               </p>
               {plan.lock && !plan.lock.mine && <p className="px-3 text-sm text-warning">{t('lockedBy', { name: plan.lock.name })}</p>}

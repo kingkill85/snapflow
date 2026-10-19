@@ -93,7 +93,7 @@ const line = (lineId: string, name: string, position: number, members: BusMember
 })
 
 export const lineOne = line(knx1, 'KNX 1', 1, [supply, actuator], { address: '1.1', busCurrentUsedMa: 12, busCurrentSuppliedMa: 640 })
-export const lineTwo = line(knx2, 'KNX 2', 2, [pinnedSensor], { unknownCurrentCount: 1 })
+export const lineTwo = line(knx2, 'KNX 2', 2, [pinnedSensor], { unknownCurrentCount: 1, devicesMax: 32 })
 
 export const networks: Networks = {
   versionId,

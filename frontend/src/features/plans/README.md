@@ -160,7 +160,7 @@ The leave guard (save on leave, ask only when the save fails) is in `editor/Plan
 
 # Board editor (step 3c)
 
-Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab), D372–D381 (review fixes). Spec: `docs/specs/phase-3.md` → 3c.
+Decisions: D355–D363 (backend), D364–D371 (editor, Networks tab), D372–D381 (review fixes), D382–D385 (click-through). Spec: `docs/specs/phase-3.md` → 3c.
 
 | Where | What |
 | --- | --- |

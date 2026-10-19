@@ -186,17 +186,17 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
                       }
                     }}
                   >
-                    {/* The DIN rail with a tick per TE (every 5th longer), drawn by CSS gradients. */}
+                    {/* The DIN rail behind the modules, and below them a TE scale (a tick per TE, every 5th longer, CSS gradients) that stays readable with modules on the rail. */}
+                    <div aria-hidden="true" data-testid="rail" className="pointer-events-none absolute inset-x-0 top-[calc(50%-0.5rem)] h-3 -translate-y-1/2 border-y border-line bg-canvas" style={{ width }} />
                     <div
                       aria-hidden="true"
-                      data-testid="rail"
-                      className="board-rail-ticks pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 border-y border-line bg-canvas"
+                      className="board-rail-ticks pointer-events-none absolute bottom-0 left-0 h-2"
                       style={{ width, '--te': `${pxPerTe}px` } as CSSProperties}
                     />
                     {/* Beyond the capacity: overflowing modules sit on a marked area. */}
                     {reach > width && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 border-l-2 border-dashed border-warning" style={{ left: width }} />}
                     {preview?.rowId === row.id && (
-                      <div aria-hidden="true" className="pointer-events-none absolute inset-y-1 rounded-sm border-2 border-dashed border-primary" style={{ left: preview.offsetTe * pxPerTe, width: preview.width * pxPerTe }} />
+                      <div aria-hidden="true" className="pointer-events-none absolute top-1 bottom-3 rounded-sm border-2 border-dashed border-primary" style={{ left: preview.offsetTe * pxPerTe, width: preview.width * pxPerTe }} />
                     )}
                     {modules.map((m) => (
                       <ModuleBox
@@ -265,7 +265,7 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
       onClick={(e) => onSelect(e.shiftKey)}
       onKeyDown={onKeyDown}
       className={cn(
-        'absolute inset-y-1 flex flex-col overflow-hidden rounded-sm border bg-surface px-1 py-0.5 text-left text-[11px] leading-tight shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-focus',
+        'absolute top-1 bottom-3 flex flex-col overflow-hidden rounded-sm border bg-surface px-1 py-0.5 text-left text-[11px] leading-tight shadow-sm focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
         editable && 'cursor-grab',
         selected ? 'border-primary ring-2 ring-primary' : warned ? 'border-warning' : 'border-ink/40',
         failed && 'border-danger ring-2 ring-danger',
@@ -275,7 +275,8 @@ function ModuleBox({ module: m, width, pxPerTe, variant, selected, warned, faile
     >
       {/* The product type's colour as a strip (the colour is data, like TypeBadge's). */}
       {variant && <span aria-hidden="true" className="-mx-1 -mt-0.5 mb-0.5 block h-1 shrink-0" style={{ backgroundColor: variant.productType.color }} />}
-      <span className="truncate font-medium">{name}</span>
+      {/* Two lines (hyphenated by the document language) before the ellipsis; the full name is in the tooltip. */}
+      <span className="line-clamp-2 font-medium break-words hyphens-auto">{name}</span>
       {m.label && <span className="truncate text-muted">{m.label}</span>}
       <span className="mt-auto flex items-center gap-0.5 truncate text-muted tabular-nums">
         {warned && <TriangleAlert aria-hidden="true" className="size-3 shrink-0 text-warning" />}

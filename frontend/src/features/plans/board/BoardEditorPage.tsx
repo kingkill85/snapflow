@@ -13,6 +13,7 @@ import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
+import { cn } from '@/lib/cn'
 
 import { saveOnUnload } from '../api'
 import { useCatalogVariants } from '../editor/catalog'
@@ -391,7 +392,10 @@ function BoardEditor({ plan, content, project, variants }: Props) {
         <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1">
           <div className="min-w-0 flex-1">{back}</div>
           <h1 className="w-full truncate px-2 pb-1 font-semibold">{plan.name}</h1>
-          <p className="w-full px-2 pb-1 text-sm text-muted">{totals}</p>
+          <p className={cn('w-full px-2 pb-1 text-sm tabular-nums', overfull ? 'font-medium text-warning' : 'text-muted')}>
+            {totals}
+            {overfull && ` · ${t('board.overflow')}`}
+          </p>
         </div>
         <div className="space-y-2 px-2 empty:hidden">{project.status !== 'active' && <Notice tone="warning">{t('editor.readOnlyProject')}</Notice>}</div>
         <p className="px-4 pt-2 text-sm text-muted">{t('board.phoneHint')}</p>

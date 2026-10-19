@@ -29,6 +29,7 @@
     "lines": "Linien von {{system}}",
     "address": "Adresse {{address}}",
     "devices_one": "{{count}} Gerät",
+    "devicesOfMax": "{{count}} von max. {{max}} Geräten",
     "devices_other": "{{count}} Geräte",
     "current": "verbraucht {{used}} mA / geliefert {{supplied}} mA",
     "unknownCurrent_one": "{{count}} ohne bekannten Strom",
@@ -48,7 +49,7 @@
     "deleteTitle": "Linie löschen?",
     "deleteMessage": "Die Linie „{{name}}“ wird gelöscht. Geräte mit Standardzuordnung kommen auf die erste verbleibende Linie.",
     "unassigned": "Ohne Linie",
-    "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie wird angelegt, wenn jemand mit Bearbeitungsrecht diesen Tab öffnet."
+    "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie entsteht beim nächsten Speichern eines Plans, der sie enthält."
   },
   "lineDialog": {
     "newTitle": "Neue Linie",

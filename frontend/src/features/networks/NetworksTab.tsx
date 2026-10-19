@@ -239,7 +239,7 @@ function LineBlock({ line, lines, first, last, actions, onEdit, onDelete }: Line
           <h3 className="font-medium break-words">{line.name}</h3>
           {line.address && <p className="text-xs text-muted">{t('bus.address', { address: line.address })}</p>}
           <p className="text-sm text-muted tabular-nums">
-            {t('bus.devices', { count: line.deviceCount })} · {t('bus.current', { used: line.busCurrentUsedMa, supplied: line.busCurrentSuppliedMa })}
+            {line.devicesMax == null ? t('bus.devices', { count: line.deviceCount }) : t('bus.devicesOfMax', { count: line.deviceCount, max: line.devicesMax })} · {t('bus.current', { used: line.busCurrentUsedMa, supplied: line.busCurrentSuppliedMa })}
             {line.unknownCurrentCount > 0 && <> · {t('bus.unknownCurrent', { count: line.unknownCurrentCount })}</>}
           </p>
         </div>
