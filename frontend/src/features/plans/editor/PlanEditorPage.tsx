@@ -443,6 +443,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           onActiveVertex={setActiveVertex}
           variants={variantsById}
           allVariants={variants}
+          products={products}
           warnings={warnings}
           errors={saveErrors}
           editable={editable}

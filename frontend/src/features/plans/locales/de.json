@@ -92,6 +92,7 @@
     "many_one": "{{count}} Element ausgewählt.",
     "many_other": "{{count}} Elemente ausgewählt.",
     "product": "Produkt",
+    "changeProduct": "Produkt ändern",
     "deleted": "Gelöschtes Produkt",
     "variant": "Variante",
     "label": "Beschriftung",

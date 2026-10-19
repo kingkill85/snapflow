@@ -98,3 +98,15 @@ export function resizeChanges(
   }
   return changes
 }
+
+/**
+ * The patch that puts another product (its variant `to`) on a placement
+ * (inspector product picker, D216): position, size, rotation, label and
+ * "existing" stay; add-ons belong to the old variant and are dropped;
+ * instance values are defined by the category and stay only when the new
+ * product is of the same category.
+ */
+export function changeProduct(p: PlanPlacement, to: VariantSearchItem, from: VariantSearchItem | undefined): Partial<PlanPlacement> {
+  const sameCategory = from !== undefined && from.categoryId === to.categoryId
+  return { variantId: to.id, addonVariantIds: [], instanceValues: sameCategory ? p.instanceValues : {} }
+}

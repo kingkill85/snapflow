@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export). Spec: `docs/specs/phase-2.md` → 2b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker). Spec: `docs/specs/phase-2.md` → 2b.
 
 ## Files
 
@@ -13,15 +13,15 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D21
 | `editor/history.ts`, `editor/editor-state.ts` | Undo history and the editor reducer (document history + selection) |
 | `editor/PlanCanvas.tsx` | The floorplan canvas: layers, pointer interactions, drop target |
 | `editor/Palette.tsx`, `editor/catalog.ts` | Products tab, catalog loading, palette grouping, default sizes |
-| `editor/Inspector.tsx` | Inspector tab: one placement (add-ons, instance values, resize all), one zone, multi-selection |
+| `editor/Inspector.tsx` | Inspector tab: one placement (Change product, variant, add-ons, instance values, resize all), one zone, multi-selection |
 | `editor/zones.ts`, `editor/ZonesPanel.tsx` | Zone geometry (area, ray casting, smallest containing zone, corner edits, names, colours) and the Zones tab |
 | `editor/layers.ts`, `editor/LayersPanel.tsx` | Layer visibility (view state) and the Layers tab |
 | `editor/calibration.ts`, `editor/CalibrateDialog.tsx` | Scale from two points, metres parsing, scale bar |
-| `editor/export.ts` | PNG export at natural size, file name |
+| `editor/export.ts` | PNG export at natural size (blob + object URL), file name |
 | `editor/use-autosave.ts`, `editor/save-errors.ts`, `editor/SaveIndicator.tsx` | Autosave state machine and error mapping (D201) |
 | `editor/use-plan-lock.ts`, `editor/LockBanner.tsx` | Edit lock (D202) |
-| `editor/use-shortcuts.ts` | Keyboard shortcuts |
-| `editor/placements.ts` | New placements, duplicates |
+| `editor/use-shortcuts.ts` | Keyboard shortcuts (plain keys only off controls, `isCanvasKeyTarget`, D212) |
+| `editor/placements.ts` | New placements, duplicates, `clampMove` / `clampGeometry` (edits stay inside the image, D213), `changeProduct` (D216) |
 | `src/canvas/` | Shared canvas base for all plan kinds: stage, viewport, image layer, geometry, theme (D198) |
 
 ## Document model
@@ -56,10 +56,23 @@ pointer up, so a drag is one undo step.
 `contentUpdatedAt`, keeps the response (warnings, zone assignment) in `server`, and maps field errors to
 items with `saveErrorsByItem`.
 
-`usePlanLock(planId, wanted, beforeRelease)` takes the lock on open, beats every 30 s, releases on
-unmount after `beforeRelease` (the autosave flush) and with a keepalive request on `pagehide`. The editor
-is `editable` only while the lock state is `mine`; everything else (held by another user, read-only
-project, no permission, phone width) renders the same editor read-only.
+`usePlanLock(planId, wanted, { beforeRelease, onPageHide })` takes the lock on open, beats every 30 s,
+releases on unmount after `beforeRelease` (the autosave's flush). Only a heartbeat without an answer or with a 5xx
+keeps the lock; `plan.locked` → `held` (taken over), `project.read_only` → `readOnly` (notice), anything else →
+`error`. A lock that arrives after unmount is released at once (a generation counter drops late answers). On
+`pagehide`, `onPageHide` sends pending changes with a keepalive PUT (`saveOnUnload`, ≤ 60 KB) and then the lock is
+left to expire (a release could overtake the save); otherwise a keepalive DELETE releases it (D215). The editor is
+`editable` only while the lock state is `mine`; everything else (held by another user, read-only project, no
+permission, phone width) renders the same editor read-only.
+
+Leaving in the app: a router blocker flushes pending changes and proceeds; only when they cannot be saved (failed,
+stale) it asks "Discard unsaved changes?" (D28, D215).
+
+Ordinary edits stay inside the image (D213): canvas drags and nudges use `clampMove`, duplicates/pastes clamp per
+copy, `resizeBox(..., bounds)` caps sizes at the image, the inspector uses `clampGeometry`.
+
+The plan image is served at `plan.image.url` = `/api/plans/{id}/images/{fileId}`: it changes when the image is
+replaced, so it is cached immutably (D211).
 
 ## Canvas layers
 
@@ -95,15 +108,15 @@ Select-all uses `visibleIds`. Warnings per placement come from the last load/sav
 ## Zone counts
 
 The Zones tab shows counts from `server.placements[].zoneId` (the last save's response) and, when
-different, a live estimate from `zoneAt` (same rule as the backend: smallest containing polygon by
-shoelace area, ray casting).
+different, a live estimate from `zoneAt`, an exact port of the backend's `geometry.go` (a point on an edge or
+corner is inside; smallest containing polygon by shoelace area, ties go to the zone drawn last).
 
 ## Tests
 
 Vitest: `PlansSection.test.tsx` (list, dialogs), `editor/PlanEditorPage.test.tsx` (MSW; the Konva canvas
 is replaced by a stand-in), `editor/editor-state.test.ts` (document, history, reducer),
 `editor/use-autosave.test.ts`, `editor/Palette.test.tsx`, `editor/editor-helpers.test.ts`
-(palette data, default size, save errors, shortcuts), `src/canvas/geometry.test.ts`; part B: `editor/zones.test.ts`, `editor/part-b-helpers.test.ts` (calibration,
+(palette data, default size, save errors, shortcuts, clamping), `editor/use-shortcuts.test.ts` (key scoping, nudge at the edge), `editor/use-plan-lock.test.ts`, `src/canvas/geometry.test.ts`, `src/canvas/keyboard.test.ts`; part B: `editor/zones.test.ts`, `editor/part-b-helpers.test.ts` (calibration,
 layers, export name, resize all), `editor/Inspector.test.tsx`, `editor/ZonesPanel.test.tsx` (with the Layers
 tab), `editor/CalibrateDialog.test.tsx`.
 

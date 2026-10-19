@@ -37,7 +37,7 @@ type Options = {
 }
 
 /**
- * The edit lock of an open plan (D202, D215): taken when the editor opens,
+ * The edit lock of an open plan (D202, D214): taken when the editor opens,
  * renewed every 30 s, released when it closes (and with a keepalive request
  * when the page unloads; `beforeRelease`, e.g. the autosave's flush, runs
  * first). Held by someone else, the editor is read-only; `takeOver` breaks

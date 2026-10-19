@@ -92,6 +92,7 @@
     "many_one": "{{count}} item selected.",
     "many_other": "{{count}} items selected.",
     "product": "Product",
+    "changeProduct": "Change product",
     "deleted": "Deleted product",
     "variant": "Variant",
     "label": "Label",

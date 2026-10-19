@@ -13,10 +13,11 @@ import type { Size } from '@/canvas'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
 
+import { groupPalette, type PaletteProduct } from './catalog'
 import type { PlacementPatch, ZonePatch } from './document'
 import type { EditorAction } from './editor-state'
 import type { ActiveVertex } from './PlanCanvas'
-import { clampGeometry, resizeChanges } from './placements'
+import { changeProduct, clampGeometry, resizeChanges } from './placements'
 import { minZonePoints, removeVertex, zoneColors } from './zones'
 
 type Props = {
@@ -26,6 +27,8 @@ type Props = {
   allPlacements: PlanPlacement[]
   variants: Map<string, VariantSearchItem>
   allVariants: VariantSearchItem[]
+  /** The palette's products (available products of the project's types): the product picker offers them. */
+  products: PaletteProduct[]
   /** The plan image: positions and sizes stay inside it. */
   image: Size
   warnings: Map<string, PlanWarning[]>
@@ -169,7 +172,7 @@ function ZoneInspector({ zone: z, errors, editable, dispatch, activeVertex, onAc
 }
 
 /** One placement: product, variant, add-ons, instance values, label, geometry, existing. */
-function PlacementInspector({ placement: p, allPlacements, variants, allVariants, image, warnings, errors, editable, dispatch, resizeAll, onResizeAll }: Props & { placement: PlanPlacement }) {
+function PlacementInspector({ placement: p, allPlacements, variants, allVariants, products, image, warnings, errors, editable, dispatch, resizeAll, onResizeAll }: Props & { placement: PlanPlacement }) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
 
@@ -191,6 +194,13 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
         <p className="font-medium">{variant ? localize(variant.productName) : t('inspector.deleted')}</p>
         {variant && <p className="text-sm text-muted">{variant.modelNumber}</p>}
       </div>
+      {editable && (
+        <ProductPicker
+          products={products}
+          current={variant?.productId}
+          onPick={(product) => update(changeProduct(p, product.defaultVariant, variant))}
+        />
+      )}
       <ErrorList messages={errors.get(p.id) ?? []} />
       {itemWarnings.length > 0 && <Warnings warnings={itemWarnings} placement={p} productId={variant?.productId} />}
       {variant && (
@@ -223,6 +233,68 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
         />
       )}
       <SwitchField label={t('inspector.existing')} hint={t('inspector.existingHint')} checked={p.existing} disabled={!editable} onChange={(e) => update({ existing: e.target.checked })} />
+    </div>
+  )
+}
+
+/**
+ * "Change product": the palette's products with the palette's search; picking
+ * one puts its default variant on the placement (D216).
+ */
+function ProductPicker({ products, current, onPick }: { products: PaletteProduct[]; current?: string; onPick: (product: PaletteProduct) => void }) {
+  const { t } = useTranslation('plans')
+  const { t: tc } = useTranslation()
+  const localize = useLocalized()
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  if (!open) {
+    return (
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        {t('inspector.changeProduct')}
+      </Button>
+    )
+  }
+  const groups = groupPalette(products, search, localize)
+  return (
+    <div className="space-y-2 rounded-control border border-line p-2">
+      <Field label={t('inspector.changeProduct')} type="search" value={search} autoFocus onChange={(e) => setSearch(e.target.value)} hint={t('palette.searchHint')} />
+      {groups.length === 0 ? (
+        <p className="text-sm text-muted">{t('palette.noMatch')}</p>
+      ) : (
+        <div className="max-h-64 space-y-2 overflow-y-auto">
+          {groups.map((group) => (
+            <section key={group.category.id} aria-label={localize(group.category.name)} className="space-y-1">
+              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">{localize(group.category.name)}</h3>
+              <ul className="space-y-1">
+                {group.products.map((product) => (
+                  <li key={product.productId}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-current={product.productId === current || undefined}
+                      disabled={product.productId === current}
+                      className="h-auto w-full justify-start py-1 text-left font-normal whitespace-normal"
+                      onClick={() => {
+                        onPick(product)
+                        setOpen(false)
+                        setSearch('')
+                      }}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{localize(product.name)}</span>
+                        <span className="block truncate text-xs text-muted">{product.modelNumber}</span>
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+      <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
+        {tc('action.cancel')}
+      </Button>
     </div>
   )
 }

@@ -8,7 +8,8 @@ import type { PlanPlacement, PlanZone } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { server } from '@/test/server'
 
-import { catalog, pid, placement } from '../test-fixtures'
+import { catalog, pid, placement, zigbeeId } from '../test-fixtures'
+import { paletteProducts } from './catalog'
 import { type PlanDocument } from './document'
 import { type EditorAction, editorReducer, initEditor } from './editor-state'
 import { Inspector } from './Inspector'
@@ -70,6 +71,7 @@ function Harness({ doc, selection, spy, initialVertex = null, resizeAll: initial
       variants={variants}
       allVariants={catalog}
       image={{ width: 1000, height: 800 }}
+      products={paletteProducts(catalog, [zigbeeId])}
       warnings={new Map()}
       errors={new Map()}
       editable
@@ -224,6 +226,44 @@ describe('Inspector', () => {
         },
         key: `${a.id}:width`,
       })
+    })
+  })
+
+  describe('product and geometry', () => {
+    it('changes the product in one step, keeping the placement and dropping what does not apply', async () => {
+      serveCatalog()
+      const spy = vi.fn()
+      const user = userEvent.setup()
+      const p = placement(1, { variantId: catalog[0].id, label: 'Hall', existing: true, addonVariantIds: [optional], instanceValues: { address: '1.1.5' } })
+      renderWithProviders(<Harness doc={docOf([p])} selection={[p.id]} spy={spy} />)
+
+      await user.click(screen.getByRole('button', { name: 'Change product' }))
+      await user.type(screen.getByRole('searchbox', { name: 'Change product' }), 'motion')
+      expect(screen.queryByRole('button', { name: /Wall switch/ })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /Motion sensor/ }))
+      // Another category: add-ons and instance values go; position, size, label and existing stay (not in the patch).
+      expect(lastChange(spy)).toEqual({
+        type: 'change',
+        action: { type: 'updatePlacements', changes: [{ id: p.id, patch: { variantId: catalog[2].id, addonVariantIds: [], instanceValues: {} } }] },
+        key: undefined,
+      })
+      expect(screen.getByText('Motion sensor')).toBeInTheDocument()
+    })
+
+    it('keeps positions and sizes inside the image', async () => {
+      serveCatalog()
+      const spy = vi.fn()
+      const user = userEvent.setup()
+      const p = placement(1, { variantId: catalog[0].id })
+      renderWithProviders(<Harness doc={docOf([p])} selection={[p.id]} spy={spy} />)
+      const width = screen.getByLabelText('Width')
+      await user.clear(width)
+      await user.type(width, '2000')
+      expect(lastChange(spy).action).toEqual({ type: 'updatePlacements', changes: [{ id: p.id, patch: { width: 1000 } }] })
+      const x = screen.getByLabelText('X')
+      await user.clear(x)
+      await user.type(x, '1500')
+      expect(lastChange(spy).action).toEqual({ type: 'updatePlacements', changes: [{ id: p.id, patch: { x: 1000 } }] })
     })
   })
 
