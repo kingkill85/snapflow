@@ -48,6 +48,8 @@ type Service struct {
 	users    *users.Service
 	// now is the clock of edit locks.
 	now func() time.Time
+	// contentHooks run when a plan's content is saved (OnContentSave).
+	contentHooks []ContentHook
 }
 
 func NewService(db DB, projectSvc *projects.Service, productSvc *products.Service, fileSvc *files.Service, userSvc *users.Service) *Service {

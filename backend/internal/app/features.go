@@ -4,6 +4,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/bom"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	filesstore "github.com/kingkill85/snapflow/backend/internal/features/files/store"
@@ -53,5 +54,6 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	planSvc := plans.NewService(deps.DB, projectSvc, productSvc, fileSvc, c.users)
 	projectSvc.OnCopyVersion(planSvc.CopyVersion)
 	plans.Register(api, planSvc)
+	bom.Register(api, bom.NewService(deps.DB, projectSvc, planSvc, productSvc))
 	// scaffold:features
 }

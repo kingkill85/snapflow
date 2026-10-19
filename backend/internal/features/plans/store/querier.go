@@ -12,6 +12,11 @@ import (
 )
 
 type Querier interface {
+	BOMPlacements(ctx context.Context, versionID uuid.UUID) ([]BOMPlacementsRow, error)
+	// BOMPlans returns the plans of a version for the BOM (bom feature, through
+	// BOMPlacements).
+	BOMPlans(ctx context.Context, versionID uuid.UUID) ([]BOMPlansRow, error)
+	BOMZones(ctx context.Context, versionID uuid.UUID) ([]BOMZonesRow, error)
 	// CopyPlan copies a plan's row into another version (version copy): a new
 	// id, the same image file, no lock.
 	CopyPlan(ctx context.Context, arg CopyPlanParams) (uuid.UUID, error)

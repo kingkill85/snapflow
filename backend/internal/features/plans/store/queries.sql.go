@@ -12,6 +12,116 @@ import (
 	"github.com/google/uuid"
 )
 
+const bOMPlacements = `-- name: BOMPlacements :many
+SELECT pp.plan_id, pp.id, pp.catalog_variant_id, (pp.variant_id IS NULL)::boolean AS variant_deleted,
+       pp.existing, pp.addon_variant_ids, pp.zone_id
+FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
+WHERE p.version_id = $1
+ORDER BY pp.plan_id, pp.position
+`
+
+type BOMPlacementsRow struct {
+	PlanID           uuid.UUID
+	ID               uuid.UUID
+	CatalogVariantID *uuid.UUID
+	VariantDeleted   bool
+	Existing         bool
+	AddonVariantIds  []uuid.UUID
+	ZoneID           *uuid.UUID
+}
+
+func (q *Queries) BOMPlacements(ctx context.Context, versionID uuid.UUID) ([]BOMPlacementsRow, error) {
+	rows, err := q.db.Query(ctx, bOMPlacements, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BOMPlacementsRow{}
+	for rows.Next() {
+		var i BOMPlacementsRow
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.CatalogVariantID,
+			&i.VariantDeleted,
+			&i.Existing,
+			&i.AddonVariantIds,
+			&i.ZoneID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const bOMPlans = `-- name: BOMPlans :many
+SELECT id, name FROM plans WHERE version_id = $1 ORDER BY position, id
+`
+
+type BOMPlansRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// BOMPlans returns the plans of a version for the BOM (bom feature, through
+// BOMPlacements).
+func (q *Queries) BOMPlans(ctx context.Context, versionID uuid.UUID) ([]BOMPlansRow, error) {
+	rows, err := q.db.Query(ctx, bOMPlans, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BOMPlansRow{}
+	for rows.Next() {
+		var i BOMPlansRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const bOMZones = `-- name: BOMZones :many
+SELECT z.plan_id, z.id, z.name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY z.plan_id, z.position
+`
+
+type BOMZonesRow struct {
+	PlanID uuid.UUID
+	ID     uuid.UUID
+	Name   string
+}
+
+func (q *Queries) BOMZones(ctx context.Context, versionID uuid.UUID) ([]BOMZonesRow, error) {
+	rows, err := q.db.Query(ctx, bOMZones, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BOMZonesRow{}
+	for rows.Next() {
+		var i BOMZonesRow
+		if err := rows.Scan(&i.PlanID, &i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const copyPlan = `-- name: CopyPlan :one
 INSERT INTO plans (tenant_id, version_id, kind, name, position, image_file_id, image_width, image_height, scale)
 SELECT $1::uuid, $2::uuid, kind, name, position, image_file_id, image_width,
@@ -150,12 +260,12 @@ func (q *Queries) GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error)
 }
 
 const insertPlacements = `-- name: InsertPlacements :exec
-INSERT INTO plan_placements (tenant_id, plan_id, id, variant_id, x, y, width, height, rotation, label, existing,
-    addon_variant_ids, instance_values, zone_id, position)
-SELECT $1::uuid, $2::uuid, r.id, r.variant_id, r.x, r.y, r.width, r.height,
-    r.rotation, r.label, r.existing, r.addon_variant_ids, r.instance_values, r.zone_id, r.position
+INSERT INTO plan_placements (tenant_id, plan_id, id, variant_id, catalog_variant_id, x, y, width, height, rotation,
+    label, existing, addon_variant_ids, instance_values, zone_id, position)
+SELECT $1::uuid, $2::uuid, r.id, r.variant_id, r.catalog_variant_id, r.x, r.y, r.width,
+    r.height, r.rotation, r.label, r.existing, r.addon_variant_ids, r.instance_values, r.zone_id, r.position
 FROM jsonb_to_recordset($3::jsonb)
-    AS r (id uuid, variant_id uuid, x double precision, y double precision, width double precision,
+    AS r (id uuid, variant_id uuid, catalog_variant_id uuid, x double precision, y double precision, width double precision,
           height double precision, rotation double precision, label text, existing boolean,
           addon_variant_ids uuid[], instance_values jsonb, zone_id uuid, position integer)
 `
@@ -194,7 +304,7 @@ func (q *Queries) InsertZones(ctx context.Context, arg InsertZonesParams) error 
 }
 
 const listPlacements = `-- name: ListPlacements :many
-SELECT plan_id, id, tenant_id, variant_id, x, y, width, height, rotation, label, existing, addon_variant_ids, instance_values, zone_id, position FROM plan_placements WHERE plan_id = $1 ORDER BY position
+SELECT plan_id, id, tenant_id, variant_id, x, y, width, height, rotation, label, existing, addon_variant_ids, instance_values, zone_id, position, catalog_variant_id FROM plan_placements WHERE plan_id = $1 ORDER BY position
 `
 
 func (q *Queries) ListPlacements(ctx context.Context, planID uuid.UUID) ([]PlanPlacement, error) {
@@ -222,6 +332,7 @@ func (q *Queries) ListPlacements(ctx context.Context, planID uuid.UUID) ([]PlanP
 			&i.InstanceValues,
 			&i.ZoneID,
 			&i.Position,
+			&i.CatalogVariantID,
 		); err != nil {
 			return nil, err
 		}

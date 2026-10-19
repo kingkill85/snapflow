@@ -293,3 +293,12 @@ SELECT v.id, v.product_id, v.is_active, p.is_active AS product_is_active, p.prod
 FROM product_variants v
 JOIN products p ON p.id = v.product_id
 WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);
+
+-- BOMVariants returns what a BOM snapshot keeps of the given variants (bom
+-- feature, through BOMVariants).
+-- name: BOMVariants :many
+SELECT v.id, v.product_id, v.name, v.sku, v.price, v.image_file_id, v.is_active,
+       p.model_number, p.name AS product_name, p.is_active AS product_is_active, p.product_type_id, p.category_id
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);

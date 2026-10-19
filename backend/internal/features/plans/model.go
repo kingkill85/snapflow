@@ -94,6 +94,9 @@ type PlanPlacementInput struct {
 type PlanPlacement struct {
 	PlanPlacementInput
 	ZoneID *uuid.UUID `json:"zoneId" nullable:"true" doc:"The smallest zone containing the centre (computed on every save); null for none"`
+	// CatalogVariantID is the variant as last saved, kept after a catalog
+	// deletion (the BOM still finds its snapshot); not part of the API.
+	CatalogVariantID *uuid.UUID `json:"-"`
 }
 
 // PlanWarningCode says what is wrong with a placement's catalog

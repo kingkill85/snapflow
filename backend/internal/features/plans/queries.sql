@@ -81,12 +81,12 @@ FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
 -- InsertPlacements inserts the placements of a JSON array (one statement for
 -- up to 2000 placements).
 -- name: InsertPlacements :exec
-INSERT INTO plan_placements (tenant_id, plan_id, id, variant_id, x, y, width, height, rotation, label, existing,
-    addon_variant_ids, instance_values, zone_id, position)
-SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.variant_id, r.x, r.y, r.width, r.height,
-    r.rotation, r.label, r.existing, r.addon_variant_ids, r.instance_values, r.zone_id, r.position
+INSERT INTO plan_placements (tenant_id, plan_id, id, variant_id, catalog_variant_id, x, y, width, height, rotation,
+    label, existing, addon_variant_ids, instance_values, zone_id, position)
+SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(plan_id)::uuid, r.id, r.variant_id, r.catalog_variant_id, r.x, r.y, r.width,
+    r.height, r.rotation, r.label, r.existing, r.addon_variant_ids, r.instance_values, r.zone_id, r.position
 FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
-    AS r (id uuid, variant_id uuid, x double precision, y double precision, width double precision,
+    AS r (id uuid, variant_id uuid, catalog_variant_id uuid, x double precision, y double precision, width double precision,
           height double precision, rotation double precision, label text, existing boolean,
           addon_variant_ids uuid[], instance_values jsonb, zone_id uuid, position integer);
 
@@ -101,3 +101,21 @@ RETURNING id;
 
 -- name: PlanIDsForCopy :many
 SELECT id FROM plans WHERE version_id = $1 ORDER BY position, id;
+
+-- BOMPlans returns the plans of a version for the BOM (bom feature, through
+-- BOMPlacements).
+-- name: BOMPlans :many
+SELECT id, name FROM plans WHERE version_id = $1 ORDER BY position, id;
+
+-- name: BOMZones :many
+SELECT z.plan_id, z.id, z.name
+FROM plan_zones z JOIN plans p ON p.id = z.plan_id
+WHERE p.version_id = $1
+ORDER BY z.plan_id, z.position;
+
+-- name: BOMPlacements :many
+SELECT pp.plan_id, pp.id, pp.catalog_variant_id, (pp.variant_id IS NULL)::boolean AS variant_deleted,
+       pp.existing, pp.addon_variant_ids, pp.zone_id
+FROM plan_placements pp JOIN plans p ON p.id = pp.plan_id
+WHERE p.version_id = $1
+ORDER BY pp.plan_id, pp.position;
