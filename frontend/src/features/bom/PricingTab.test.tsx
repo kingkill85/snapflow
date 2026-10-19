@@ -101,6 +101,30 @@ describe('PricingTab', () => {
     expect(saved[2]).toMatchObject({ servicesLabel: { en: 'System design and more', de: 'Systemplanung' } })
   })
 
+  it('sends the default label as {} also for a saved pricing', async () => {
+    // Saved with a label of its own: the default comes from servicesLabelDefault.
+    serve()
+    const saved: unknown[] = []
+    server.use(
+      http.put('/api/versions/:versionId/pricing', async ({ request }) => {
+        saved.push(await request.json())
+        return HttpResponse.json(bom)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<PricingTab versionId={versionId} canWrite />)
+    const label = await screen.findByRole('textbox', { name: /^Services label/ })
+    await user.clear(label)
+    await user.type(label, 'System design')
+    await user.click(screen.getByRole('tab', { name: 'German' }))
+    const de = screen.getByRole('textbox', { name: /^Services label/ })
+    await user.clear(de)
+    await user.type(de, 'Systemplanung')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ servicesLabel: {} })
+  })
+
   it('shows API errors at their fields and a stale save', async () => {
     serve()
     let calls = 0

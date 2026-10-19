@@ -3731,6 +3731,13 @@
             },
             "type": "object"
           },
+          "servicesLabelDefault": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The default services label; send servicesLabel {} to use it",
+            "type": "object"
+          },
           "servicesValue": {
             "description": "Percent (0-100, 2 decimals) or USD amount",
             "type": "string"
@@ -3750,6 +3757,7 @@
           "servicesKind",
           "servicesValue",
           "servicesLabel",
+          "servicesLabelDefault",
           "updatedAt"
         ],
         "type": "object"

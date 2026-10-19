@@ -157,6 +157,9 @@ type Pricing struct {
 	ServicesKind  string    `json:"servicesKind" enum:"none,percent,amount"`
 	ServicesValue string    `json:"servicesValue" doc:"Percent (0-100, 2 decimals) or USD amount"`
 	ServicesLabel i18n.Text `json:"servicesLabel"`
+	// ServicesLabelDefault is the label a version without a label of its own
+	// shows; a form sends {} for it, so the version keeps following the default.
+	ServicesLabelDefault i18n.Text `json:"servicesLabelDefault" doc:"The default services label; send servicesLabel {} to use it"`
 	// UpdatedAt is null while the version has the defaults.
 	UpdatedAt *time.Time `json:"updatedAt" nullable:"true" doc:"Send it back as expectedUpdatedAt"`
 }

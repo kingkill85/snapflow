@@ -181,6 +181,7 @@ export * from './pricingInputServicesKind';
 export * from './pricingInputServicesLabel';
 export * from './pricingServicesKind';
 export * from './pricingServicesLabel';
+export * from './pricingServicesLabelDefault';
 export * from './pricingUpdate';
 export * from './pricingUpdateDiscountKind';
 export * from './pricingUpdateServicesKind';

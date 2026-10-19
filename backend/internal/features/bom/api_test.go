@@ -247,10 +247,26 @@ func TestBOM(t *testing.T) {
 	wantCode(t, resp, http.StatusOK, "")
 	saved := decode[bom.BOM](t, resp)
 	if saved.Totals.Discount != "141.00" || saved.Totals.Services != "0.00" || saved.Totals.GrandTotal != "0.00" || saved.Pricing.UpdatedAt == nil ||
-		saved.Pricing.ServicesLabel["de"] != "Systemplanung, Programmierung & Inbetriebnahme" {
+		saved.Pricing.ServicesLabel["de"] != "Systemplanung, Programmierung & Inbetriebnahme" ||
+		saved.Pricing.ServicesLabelDefault["en"] != "System design, programming & commissioning" {
 		t.Errorf("saved pricing: %+v %+v", saved.Totals, saved.Pricing)
 	}
 	wantCode(t, api.Put("/api/versions/"+vs+"/pricing", admin, put), http.StatusConflict, "pricing.stale")
+
+	// A label of its own; the default stays known, and {} follows it again.
+	put = map[string]any{"discountKind": "amount", "discountValue": "500", "servicesKind": "percent", "servicesValue": "10", "servicesLabel": map[string]string{"en": "Programming"}, "expectedUpdatedAt": saved.Pricing.UpdatedAt}
+	resp = api.Put("/api/versions/"+vs+"/pricing", admin, put)
+	wantCode(t, resp, http.StatusOK, "")
+	saved = decode[bom.BOM](t, resp)
+	if saved.Pricing.ServicesLabel["en"] != "Programming" || saved.Pricing.ServicesLabelDefault["en"] != "System design, programming & commissioning" {
+		t.Errorf("own label: %+v", saved.Pricing)
+	}
+	put["servicesLabel"], put["expectedUpdatedAt"] = map[string]string{}, saved.Pricing.UpdatedAt
+	resp = api.Put("/api/versions/"+vs+"/pricing", admin, put)
+	wantCode(t, resp, http.StatusOK, "")
+	if saved = decode[bom.BOM](t, resp); saved.Pricing.ServicesLabel["en"] != "System design, programming & commissioning" {
+		t.Errorf("default label again: %+v", saved.Pricing)
+	}
 
 	// A catalog change never changes the snapshot implicitly, also not on the
 	// next content save; the BOM marks it outdated.

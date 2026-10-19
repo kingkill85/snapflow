@@ -7,6 +7,7 @@
 import type { PricingDiscountKind } from './pricingDiscountKind';
 import type { PricingServicesKind } from './pricingServicesKind';
 import type { PricingServicesLabel } from './pricingServicesLabel';
+import type { PricingServicesLabelDefault } from './pricingServicesLabelDefault';
 
 export interface Pricing {
   /** A URL to the JSON Schema for this object. */
@@ -16,6 +17,8 @@ export interface Pricing {
   discountValue: string;
   servicesKind: PricingServicesKind;
   servicesLabel: PricingServicesLabel;
+  /** The default services label; send servicesLabel {} to use it */
+  servicesLabelDefault: PricingServicesLabelDefault;
   /** Percent (0-100, 2 decimals) or USD amount */
   servicesValue: string;
   /**

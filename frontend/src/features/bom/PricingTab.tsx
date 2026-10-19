@@ -69,10 +69,11 @@ const sameText = (a: LocalizedText, b: LocalizedText) => contentLocales.every((l
 
 /**
  * The API body of the form values; undefined while a value cannot be sent.
- * A services label equal to the API's default is sent as {} (= no label of
- * its own), so the version keeps following the default.
+ * A services label equal to the API's default (servicesLabelDefault) is sent
+ * as {} (= no label of its own), so the version keeps following the default,
+ * also after it was saved once or when a label of its own is typed back to it.
  */
-function toInput(v: FormValues, defaultLabel: LocalizedText | undefined): PricingInput | undefined {
+function toInput(v: FormValues, defaultLabel: LocalizedText): PricingInput | undefined {
   const parse = (kind: Kind, text: string) => (kind === 'none' ? '0' : parseDecimal(text))
   const discountValue = parse(v.discountKind, v.discountValue)
   const servicesValue = parse(v.servicesKind, v.servicesValue)
@@ -83,7 +84,7 @@ function toInput(v: FormValues, defaultLabel: LocalizedText | undefined): Pricin
     discountValue,
     servicesKind: v.servicesKind,
     servicesValue,
-    servicesLabel: label && !(defaultLabel && sameText(label, defaultLabel)) ? label : {},
+    servicesLabel: label && !sameText(label, defaultLabel) ? label : {},
   }
 }
 
@@ -114,11 +115,6 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
   // The pricing the next save expects: the loaded one, or the one a stale error made us reload.
   const base = useRef(pricing)
   base.current = pricing
-  // The API's default services label: what it returns while the version has no pricing saved
-  // (updatedAt null). The API does not say whether a saved version's label is the default.
-  const defaultLabel = useRef<LocalizedText | undefined>(undefined)
-  if (pricing.updatedAt === null) defaultLabel.current = pricing.servicesLabel
-
   const toForm = (p: Pricing): FormValues => ({
     discountKind: p.discountKind,
     discountValue: p.discountKind === 'none' ? '' : formatDecimal(p.discountValue, separator),
@@ -131,7 +127,7 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
   const values = useWatch({ control: form.control }) as FormValues
 
   // Debounced preview of the totals for the values as typed.
-  const input = toInput(values, defaultLabel.current)
+  const input = toInput(values, pricing.servicesLabelDefault)
   const [debounced, setDebounced] = useState(input)
   const inputKey = JSON.stringify(input)
   useEffect(() => {
@@ -149,7 +145,7 @@ function PricingForm({ versionId, canWrite, pricing, refetch }: Props & { pricin
 
   const submit = form.handleSubmit(async (v) => {
     setSaved(false)
-    const body = toInput(v, defaultLabel.current)!
+    const body = toInput(v, base.current.servicesLabelDefault)!
     try {
       const bom = await save.mutateAsync({ versionId, data: { ...body, expectedUpdatedAt: base.current.updatedAt } })
       queryClient.setQueryData(getGetBomQueryKey(versionId), bom)

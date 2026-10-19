@@ -28,7 +28,7 @@ const maxLabelLength = 200
 
 func (st *state) pricingOut() Pricing {
 	if st.pricing == nil {
-		return Pricing{DiscountKind: "none", DiscountValue: "0.00", ServicesKind: "none", ServicesValue: "0.00", ServicesLabel: DefaultServicesLabel}
+		return Pricing{DiscountKind: "none", DiscountValue: "0.00", ServicesKind: "none", ServicesValue: "0.00", ServicesLabel: DefaultServicesLabel, ServicesLabelDefault: DefaultServicesLabel}
 	}
 	p := st.pricing
 	label := DefaultServicesLabel
@@ -39,7 +39,7 @@ func (st *state) pricingOut() Pricing {
 	return Pricing{
 		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
 		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)),
-		ServicesLabel: label, UpdatedAt: &at,
+		ServicesLabel: label, ServicesLabelDefault: DefaultServicesLabel, UpdatedAt: &at,
 	}
 }
 
@@ -98,6 +98,7 @@ func pricingOf(p store.UpsertPricingParams) Pricing {
 	return Pricing{
 		DiscountKind: p.DiscountKind, DiscountValue: money.USD(money.MustParse(p.DiscountValue)),
 		ServicesKind: p.ServicesKind, ServicesValue: money.USD(money.MustParse(p.ServicesValue)), ServicesLabel: label,
+		ServicesLabelDefault: DefaultServicesLabel,
 	}
 }
 
