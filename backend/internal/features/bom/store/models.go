@@ -13,6 +13,41 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
+type BoardModule struct {
+	PlanID           uuid.UUID
+	ID               uuid.UUID
+	TenantID         uuid.UUID
+	RowID            uuid.UUID
+	OffsetTe         string
+	VariantID        *uuid.UUID
+	CatalogVariantID *uuid.UUID
+	Label            string
+	Existing         bool
+	AddonVariantIds  []uuid.UUID
+	InstanceValues   attrschema.Values
+	Position         int32
+}
+
+type BoardRow struct {
+	PlanID     uuid.UUID
+	ID         uuid.UUID
+	TenantID   uuid.UUID
+	CapacityTe string
+	Position   int32
+}
+
+type BusLine struct {
+	VersionID     uuid.UUID
+	ID            uuid.UUID
+	TenantID      uuid.UUID
+	ProductTypeID uuid.UUID
+	Name          string
+	Address       string
+	Position      int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type CatalogField struct {
 	ID           uuid.UUID
 	Key          string
@@ -161,6 +196,17 @@ type LoadType struct {
 	UpdatedAt time.Time
 }
 
+type NetworkAssignment struct {
+	PlanID        uuid.UUID
+	ItemID        uuid.UUID
+	TenantID      uuid.UUID
+	VersionID     uuid.UUID
+	BusLineID     *uuid.UUID
+	GatewayPlanID *uuid.UUID
+	GatewayItemID *uuid.UUID
+	Pinned        bool
+}
+
 type OutputKind struct {
 	ID        uuid.UUID
 	Key       string
@@ -183,21 +229,23 @@ type OutputKindFunctionType struct {
 }
 
 type Plan struct {
-	ID               uuid.UUID
-	TenantID         uuid.UUID
-	VersionID        uuid.UUID
-	Kind             string
-	Name             string
-	Position         int32
-	ImageFileID      uuid.UUID
-	ImageWidth       int32
-	ImageHeight      int32
-	Scale            *float64
-	LockUserID       *uuid.UUID
-	LockExpiresAt    *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ContentUpdatedAt time.Time
+	ID                        uuid.UUID
+	TenantID                  uuid.UUID
+	VersionID                 uuid.UUID
+	Kind                      string
+	Name                      string
+	Position                  int32
+	ImageFileID               *uuid.UUID
+	ImageWidth                *int32
+	ImageHeight               *int32
+	Scale                     *float64
+	LockUserID                *uuid.UUID
+	LockExpiresAt             *time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	ContentUpdatedAt          time.Time
+	EnclosureVariantID        *uuid.UUID
+	EnclosureCatalogVariantID *uuid.UUID
 }
 
 type PlanNeed struct {

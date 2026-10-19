@@ -93,7 +93,7 @@ func TestRowLevelSecurity(t *testing.T) {
 	for name, write := range map[string]func(q *store.Queries) error{
 		"plan": func(q *store.Queries) error {
 			_, err := q.CreatePlan(ctx, store.CreatePlanParams{
-				TenantID: other, VersionID: foreignVersion, Name: "Planted", ImageFileID: uuid.MustParse(path.Base(foreign.Image.URL)), ImageWidth: 1, ImageHeight: 1,
+				TenantID: other, VersionID: foreignVersion, Name: "Planted", ImageFileID: ptr(uuid.MustParse(path.Base(foreign.Image.URL))), ImageWidth: ptr(int32(1)), ImageHeight: ptr(int32(1)),
 			})
 			return err
 		},

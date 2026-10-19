@@ -88,6 +88,20 @@ type contentInput struct {
 	Body PlanContentInput
 }
 
+type boardOutput struct {
+	Body BoardContent
+}
+
+type boardInput struct {
+	ID   uuid.UUID `path:"id" format:"uuid"`
+	Body BoardContentInput
+}
+
+type createBoardInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	Body      BoardCreate
+}
+
 type lockInput struct {
 	ID    uuid.UUID `path:"id" format:"uuid"`
 	Force bool      `query:"force" doc:"Take the lock from another user (needs projects.delete)"`
@@ -271,6 +285,56 @@ func Register(api huma.API, svc *Service) {
 			return nil, err
 		}
 		return &contentOutput{Body: c}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "createBoard",
+		Method:      http.MethodPost,
+		Path:        "/api/versions/{versionId}/boards",
+		Summary:     "Add a distribution board",
+		Description: "A plan of kind board after the version's last plan: with an enclosure of known size its rows " +
+			"(enclosureRows x enclosureTePerRow), else the rows given.",
+		Tags:          []string{tag},
+		DefaultStatus: http.StatusCreated,
+	}, func(ctx context.Context, in *createBoardInput) (*planOutput, error) {
+		p, err := svc.CreateBoard(ctx, in.VersionID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &planOutput{Body: p}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getBoardContent",
+		Method:      http.MethodGet,
+		Path:        "/api/plans/{id}/board",
+		Summary:     "Get a board's enclosure, rows and modules",
+		Description: "With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *idParam) (*boardOutput, error) {
+		c, err := svc.BoardContent(ctx, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return &boardOutput{Body: c}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "saveBoardContent",
+		Method:      http.MethodPut,
+		Path:        "/api/plans/{id}/board",
+		Summary:     "Replace a board's enclosure, rows and modules",
+		Description: "Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it " +
+			"with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the " +
+			"caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+		Tags:         []string{tag},
+		MaxBodyBytes: maxContentBytes,
+	}, func(ctx context.Context, in *boardInput) (*boardOutput, error) {
+		c, err := svc.SaveBoard(ctx, in.ID, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &boardOutput{Body: c}, nil
 	})
 
 	huma.Register(api, huma.Operation{

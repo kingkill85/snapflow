@@ -23,9 +23,14 @@ const (
 	// LockTTL is how long a lock lives after its last heartbeat; the editor
 	// renews it every 30 s.
 	LockTTL = 2 * time.Minute
-	// KindFloorplan is the only plan kind of phase 2 ("board" comes in
-	// phase 3).
+	// Plan kinds: a floorplan (image, zones, placements, needs) or a
+	// distribution board (rows of DIN rail with modules, step 3c).
 	KindFloorplan = "floorplan"
+	KindBoard     = "board"
+	// Board limits.
+	MaxBoardRows    = 50
+	MaxBoardModules = 1000
+	MaxRowTE        = 999.9
 )
 
 // PlanActions are what the caller may do with a plan.
@@ -55,24 +60,45 @@ type PlanImage struct {
 	Height int32  `json:"height"`
 }
 
+// NullablePlanImage is a PlanImage that may be null (boards have none).
+type NullablePlanImage struct {
+	_ struct{} `nullable:"true"`
+	PlanImage
+}
+
+// BoardSummary is what a plan card shows of a board.
+type BoardSummary struct {
+	EnclosureVariantID *uuid.UUID `json:"enclosureVariantId" nullable:"true" doc:"The enclosure (catalog variant); null for none"`
+	ModuleCount        int64      `json:"moduleCount"`
+	CapacityTE         float64    `json:"capacityTe" doc:"Sum of the rows' capacity in TE"`
+	UsedTE             float64    `json:"usedTe" doc:"Sum of the modules' widths in TE (unknown width counts 1 TE)"`
+}
+
+// NullableBoardSummary is a BoardSummary that may be null.
+type NullableBoardSummary struct {
+	_ struct{} `nullable:"true"`
+	BoardSummary
+}
+
 // Plan is a plan of a project version, without its content.
 type Plan struct {
-	ID               uuid.UUID         `json:"id"`
-	VersionID        uuid.UUID         `json:"versionId"`
-	ProjectID        uuid.UUID         `json:"projectId"`
-	Kind             string            `json:"kind" enum:"floorplan"`
-	Name             string            `json:"name"`
-	Position         int32             `json:"position" doc:"Order within the version, 1 first"`
-	Image            PlanImage         `json:"image"`
-	Scale            *float64          `json:"scale,omitempty" doc:"Metres per image pixel (calibration); absent when not calibrated"`
-	ZoneCount        int64             `json:"zoneCount"`
-	PlacementCount   int64             `json:"placementCount"`
-	NeedCount        int64             `json:"needCount"`
-	CreatedAt        time.Time         `json:"createdAt"`
-	UpdatedAt        time.Time         `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when renaming or replacing the image"`
-	ContentUpdatedAt time.Time         `json:"contentUpdatedAt" doc:"The version of the content"`
-	Lock             *NullablePlanLock `json:"lock" doc:"The live edit lock, null when nobody holds it"`
-	Can              PlanActions       `json:"can"`
+	ID               uuid.UUID             `json:"id"`
+	VersionID        uuid.UUID             `json:"versionId"`
+	ProjectID        uuid.UUID             `json:"projectId"`
+	Kind             string                `json:"kind" enum:"floorplan,board"`
+	Name             string                `json:"name"`
+	Position         int32                 `json:"position" doc:"Order within the version, 1 first"`
+	Image            *NullablePlanImage    `json:"image" doc:"The background image of a floorplan; null for a board"`
+	Board            *NullableBoardSummary `json:"board" doc:"Board facts; null for a floorplan"`
+	Scale            *float64              `json:"scale,omitempty" doc:"Metres per image pixel (calibration); absent when not calibrated"`
+	ZoneCount        int64                 `json:"zoneCount"`
+	PlacementCount   int64                 `json:"placementCount"`
+	NeedCount        int64                 `json:"needCount"`
+	CreatedAt        time.Time             `json:"createdAt"`
+	UpdatedAt        time.Time             `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when renaming or replacing the image"`
+	ContentUpdatedAt time.Time             `json:"contentUpdatedAt" doc:"The version of the content"`
+	Lock             *NullablePlanLock     `json:"lock" doc:"The live edit lock, null when nobody holds it"`
+	Can              PlanActions           `json:"can"`
 }
 
 // PlanZone is a zone (room, area) of a plan: a polygon in image pixels.

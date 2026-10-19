@@ -35,15 +35,21 @@ func (s *Service) OnContentSave(h ContentHook) { s.contentHooks = append(s.conte
 
 // prepareContentHooks runs the hooks' Prepare outside any transaction.
 func (s *Service) prepareContentHooks(ctx context.Context, versionID uuid.UUID, placements []PlanPlacement) ([]any, error) {
-	if len(s.contentHooks) == 0 {
-		return nil, nil
-	}
 	var ids []uuid.UUID
 	for _, p := range placements {
 		if p.VariantID != nil {
 			ids = append(ids, *p.VariantID)
 		}
 		ids = append(ids, p.AddonVariantIDs...)
+	}
+	return s.prepareContentHooksIDs(ctx, versionID, ids)
+}
+
+// prepareContentHooksIDs runs the hooks' Prepare for the variants of ids
+// (board saves: modules, their add-ons and the enclosure).
+func (s *Service) prepareContentHooksIDs(ctx context.Context, versionID uuid.UUID, ids []uuid.UUID) ([]any, error) {
+	if len(s.contentHooks) == 0 {
+		return nil, nil
 	}
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	ids = slices.Compact(ids)
@@ -95,7 +101,7 @@ type BOMPlacement struct {
 }
 
 // BOMPlacements returns the plans of a version in their order with their
-// zones and placements, read in tx (a transaction scoped to the caller in
+// zones and placements (for a board: its enclosure and modules), read in tx (a transaction scoped to the caller in
 // which the version was checked with projects.Service.ReadVersion or
 // WriteVersion). Needs projects.read.
 func (s *Service) BOMPlacements(ctx context.Context, tx pgx.Tx, versionID uuid.UUID) ([]BOMPlan, error) {
@@ -112,6 +118,14 @@ func (s *Service) BOMPlacements(ctx context.Context, tx pgx.Tx, versionID uuid.U
 		return nil, err
 	}
 	placements, err := q.BOMPlacements(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	modules, err := q.BOMModules(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	enclosures, err := q.BOMEnclosures(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +146,98 @@ func (s *Service) BOMPlacements(ctx context.Context, tx pgx.Tx, versionID uuid.U
 				ID: p.ID, VariantID: p.CatalogVariantID, VariantDeleted: p.VariantDeleted, Existing: p.Existing,
 				AddonVariantIDs: p.AddonVariantIds, ZoneID: p.ZoneID,
 			})
+		}
+	}
+	// Board modules count like placements without a zone; the enclosure is
+	// one more item of its board, with the board's id (step 3c).
+	for _, e := range enclosures {
+		if i, ok := index[e.PlanID]; ok {
+			out[i].Placements = append(out[i].Placements, BOMPlacement{
+				ID: e.PlanID, VariantID: e.EnclosureCatalogVariantID, VariantDeleted: e.VariantDeleted, AddonVariantIDs: []uuid.UUID{},
+			})
+		}
+	}
+	for _, m := range modules {
+		if i, ok := index[m.PlanID]; ok {
+			out[i].Placements = append(out[i].Placements, BOMPlacement{
+				ID: m.ID, VariantID: m.CatalogVariantID, VariantDeleted: m.VariantDeleted, Existing: m.Existing,
+				AddonVariantIDs: m.AddonVariantIds,
+			})
+		}
+	}
+	// Board modules count like placements without a zone; the enclosure is
+	// one more item of its board, with the board's id (step 3c).
+	for _, e := range enclosures {
+		if i, ok := index[e.PlanID]; ok {
+			out[i].Placements = append(out[i].Placements, BOMPlacement{
+				ID: e.PlanID, VariantID: e.EnclosureCatalogVariantID, VariantDeleted: e.VariantDeleted, AddonVariantIDs: []uuid.UUID{},
+			})
+		}
+	}
+	for _, m := range modules {
+		if i, ok := index[m.PlanID]; ok {
+			out[i].Placements = append(out[i].Placements, BOMPlacement{
+				ID: m.ID, VariantID: m.CatalogVariantID, VariantDeleted: m.VariantDeleted, Existing: m.Existing,
+				AddonVariantIDs: m.AddonVariantIds,
+			})
+		}
+	}
+	return out, nil
+}
+
+// NetworkPlan is a plan of a version with its items as the networks feature
+// (bus lines, gateways) sees them.
+type NetworkPlan struct {
+	ID       uuid.UUID
+	Name     string
+	Kind     string
+	Position int32
+	Items    []NetworkItem
+}
+
+// NetworkItem is a placement (floorplan) or a module (board).
+type NetworkItem struct {
+	ID        uuid.UUID
+	VariantID *uuid.UUID
+	Label     string
+	Existing  bool
+}
+
+// NetworkItems returns the plans of a version in their order with their
+// placements and modules, read in tx (a transaction scoped to the caller in
+// which the version was checked with projects.Service.ReadVersion or
+// WriteVersion). Needs projects.read.
+func (s *Service) NetworkItems(ctx context.Context, tx pgx.Tx, versionID uuid.UUID) ([]NetworkPlan, error) {
+	if _, err := auth.Require(ctx, auth.PermProjectsRead); err != nil {
+		return nil, err
+	}
+	q := s.q.WithTx(tx)
+	plans, err := q.NetworkPlans(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	placements, err := q.NetworkPlacements(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	modules, err := q.NetworkModules(ctx, versionID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]NetworkPlan, len(plans))
+	index := make(map[uuid.UUID]int, len(plans))
+	for i, p := range plans {
+		out[i] = NetworkPlan{ID: p.ID, Name: p.Name, Kind: p.Kind, Position: p.Position}
+		index[p.ID] = i
+	}
+	for _, p := range placements {
+		if i, ok := index[p.PlanID]; ok {
+			out[i].Items = append(out[i].Items, NetworkItem{ID: p.ID, VariantID: p.VariantID, Label: p.Label, Existing: p.Existing})
+		}
+	}
+	for _, m := range modules {
+		if i, ok := index[m.PlanID]; ok {
+			out[i].Items = append(out[i].Items, NetworkItem{ID: m.ID, VariantID: m.VariantID, Label: m.Label, Existing: m.Existing})
 		}
 	}
 	return out, nil

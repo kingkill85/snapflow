@@ -12,22 +12,35 @@ import (
 )
 
 type Querier interface {
+	BOMEnclosures(ctx context.Context, versionID uuid.UUID) ([]BOMEnclosuresRow, error)
+	BOMModules(ctx context.Context, versionID uuid.UUID) ([]BOMModulesRow, error)
 	BOMPlacements(ctx context.Context, versionID uuid.UUID) ([]BOMPlacementsRow, error)
 	// BOMPlans returns the plans of a version for the BOM (bom feature, through
 	// BOMPlacements).
 	BOMPlans(ctx context.Context, versionID uuid.UUID) ([]BOMPlansRow, error)
 	BOMZones(ctx context.Context, versionID uuid.UUID) ([]BOMZonesRow, error)
+	// BoardModuleVariants returns the variant of every module of a version's
+	// boards (plan cards: TE used).
+	BoardModuleVariants(ctx context.Context, versionID uuid.UUID) ([]BoardModuleVariantsRow, error)
 	// CopyPlan copies a plan's row into another version (version copy): a new
 	// id, the same image file, no lock.
 	CopyPlan(ctx context.Context, arg CopyPlanParams) (uuid.UUID, error)
+	// ---------------------------------------------------------------- boards
+	// CreateBoard adds a board plan after the version's last plan (the caller
+	// holds the project's lock).
+	CreateBoard(ctx context.Context, arg CreateBoardParams) (uuid.UUID, error)
 	// CreatePlan adds a plan after the version's last one (the caller holds the
 	// project's lock).
 	CreatePlan(ctx context.Context, arg CreatePlanParams) (uuid.UUID, error)
+	DeleteBoardModules(ctx context.Context, planID uuid.UUID) error
+	DeleteBoardRows(ctx context.Context, planID uuid.UUID) error
 	DeleteNeeds(ctx context.Context, planID uuid.UUID) error
 	DeletePlacements(ctx context.Context, planID uuid.UUID) error
 	DeletePlan(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteZones(ctx context.Context, planID uuid.UUID) error
 	GetPlan(ctx context.Context, id uuid.UUID) (GetPlanRow, error)
+	InsertBoardModules(ctx context.Context, arg InsertBoardModulesParams) error
+	InsertBoardRows(ctx context.Context, arg InsertBoardRowsParams) error
 	// InsertNeeds inserts the needs of a JSON array (one statement for up to
 	// 2000 needs).
 	InsertNeeds(ctx context.Context, arg InsertNeedsParams) error
@@ -37,6 +50,8 @@ type Querier interface {
 	// InsertZones inserts the zones of a JSON array (one statement for up to
 	// 200 zones).
 	InsertZones(ctx context.Context, arg InsertZonesParams) error
+	ListBoardModules(ctx context.Context, planID uuid.UUID) ([]ListBoardModulesRow, error)
+	ListBoardRows(ctx context.Context, planID uuid.UUID) ([]ListBoardRowsRow, error)
 	ListNeeds(ctx context.Context, planID uuid.UUID) ([]PlanNeed, error)
 	ListPlacements(ctx context.Context, planID uuid.UUID) ([]PlanPlacement, error)
 	// Every query of this feature runs in database.InScope: row-level security
@@ -46,12 +61,19 @@ type Querier interface {
 	// LockPlan locks a plan for a change of it, its content or its edit lock
 	// (after its project, WriteVersion).
 	LockPlan(ctx context.Context, id uuid.UUID) (Plan, error)
+	NetworkModules(ctx context.Context, versionID uuid.UUID) ([]NetworkModulesRow, error)
+	// NetworkPlacements returns the placements of a version (networks
+	// feature, through NetworkItems).
+	NetworkPlacements(ctx context.Context, versionID uuid.UUID) ([]NetworkPlacementsRow, error)
+	NetworkPlans(ctx context.Context, versionID uuid.UUID) ([]NetworkPlansRow, error)
 	PlanIDsForCopy(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanIDsOfVersion(ctx context.Context, versionID uuid.UUID) ([]uuid.UUID, error)
 	PlanVersion(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// ReferencedFiles returns those of the files that rows reference (the
 	// files feature's reference check, D269).
 	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	RenamePlan(ctx context.Context, arg RenamePlanParams) error
+	SetEnclosure(ctx context.Context, arg SetEnclosureParams) error
 	SetLock(ctx context.Context, arg SetLockParams) error
 	// SetPlanOrder sets the positions to the order of ids (1..n).
 	SetPlanOrder(ctx context.Context, ids []uuid.UUID) error

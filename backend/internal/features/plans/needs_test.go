@@ -250,7 +250,7 @@ func TestNeeds(t *testing.T) {
 
 func TestNeedsSummaryAndCopy(t *testing.T) {
 	var copiedPlans map[uuid.UUID]uuid.UUID
-	api := apptest.NewWithPlanCopier(t, func(_ context.Context, _ pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, _ projects.VersionRef) error {
+	api := apptest.NewWithPlanCopier(t, func(_ context.Context, _ pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, _, _ projects.VersionRef) error {
 		copiedPlans = planIDs
 		return nil
 	})

@@ -61,6 +61,9 @@ func (s *Service) stored(ctx context.Context, actor auth.Actor, id uuid.UUID) (s
 		if st.plan, err = q.GetPlan(ctx, id); err != nil {
 			return notFound(err)
 		}
+		if st.plan.Kind != KindFloorplan {
+			return errWrongKind(KindFloorplan)
+		}
 		if st.zones, st.placements, err = readContent(ctx, q, id); err != nil {
 			return err
 		}
@@ -255,7 +258,7 @@ func writeContent(ctx context.Context, q *store.Queries, tenantID, planID uuid.U
 // image and the catalog. All problems are returned together, located at
 // body.zones[i].… and body.placements[i].….
 func (s *Service) validateContent(ctx context.Context, st stored, cat needCatalog, in PlanContentInput) ([]PlanZone, []PlanPlacement, []PlanNeed, error) {
-	w, h := float64(st.plan.ImageWidth), float64(st.plan.ImageHeight)
+	w, h := float64(deref(st.plan.ImageWidth)), float64(deref(st.plan.ImageHeight))
 	var errs []apperr.FieldError
 	add := func(loc, code, detail string, params ...any) {
 		f := apperr.Field(loc, code, detail)
@@ -529,17 +532,26 @@ func (s *Service) warnings(ctx context.Context, ref projects.VersionRef, placeme
 	}
 	out := []PlanWarning{}
 	for _, p := range placements {
+		out = append(out, placementWarnings(ref, variants, p)...)
+	}
+	return out, nil
+}
+
+// placementWarnings are the warnings of one placement (or board module).
+func placementWarnings(ref projects.VersionRef, variants map[uuid.UUID]products.PlacementVariant, p PlanPlacement) []PlanWarning {
+	out := []PlanWarning{}
+	{
 		warn := func(code PlanWarningCode, addon *uuid.UUID) {
 			out = append(out, PlanWarning{PlacementID: p.ID, Code: code, AddonVariantID: addon})
 		}
 		if p.VariantID == nil {
 			warn(WarnVariantDeleted, nil)
-			continue
+			return out
 		}
 		v, ok := variants[*p.VariantID]
 		if !ok {
 			warn(WarnVariantDeleted, nil)
-			continue
+			return out
 		}
 		switch {
 		case !v.TypeActive:
@@ -569,7 +581,7 @@ func (s *Service) warnings(ctx context.Context, ref projects.VersionRef, placeme
 			}
 		}
 	}
-	return out, nil
+	return out
 }
 
 // scaleContent fits a plan's content to a new image size (D194): positions
@@ -580,8 +592,8 @@ func (s *Service) warnings(ctx context.Context, ref projects.VersionRef, placeme
 // cleared (the calibration no longer holds). The content version moves on,
 // so an open editor reloads.
 func (s *Service) scaleContent(ctx context.Context, q *store.Queries, plan store.Plan, width, height int32) error {
-	sx := float64(width) / float64(plan.ImageWidth)
-	sy := float64(height) / float64(plan.ImageHeight)
+	sx := float64(width) / float64(deref(plan.ImageWidth))
+	sy := float64(height) / float64(deref(plan.ImageHeight))
 	scale := plan.Scale
 	if sx != 1 || sy != 1 {
 		zones, placements, err := readContent(ctx, q, plan.ID)
@@ -637,14 +649,14 @@ func (s *Service) scaleContent(ctx context.Context, q *store.Queries, plan store
 // connections, keyed by plan id and need id) in tx, after the plans and their
 // content were copied. planIDs maps every source plan id to its copy; zone,
 // placement and need ids are kept (D339).
-type PlanCopier func(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, target projects.VersionRef) error
+type PlanCopier func(ctx context.Context, tx pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, source, target projects.VersionRef) error
 
 // OnCopyPlans registers a plan copier; CopyVersion runs every one. Call it
 // while wiring the features, not concurrently with requests.
 func (s *Service) OnCopyPlans(c PlanCopier) { s.planCopiers = append(s.planCopiers, c) }
 
-// CopyVersion copies the plans of source with their zones, placements and
-// needs into target (projects.Service.OnCopyVersion): new plan ids, the same
+// CopyVersion copies the plans of source with their zones, placements,
+// needs, board rows and modules into target (projects.Service.OnCopyVersion): new plan ids, the same
 // zone, placement and need ids (they are unique per plan, D339), the same
 // image files (files are immutable), no locks. Then it runs the plan
 // copiers with the map of plan ids.
@@ -678,9 +690,16 @@ func (s *Service) CopyVersion(ctx context.Context, tx pgx.Tx, source, target pro
 		if err := writeNeeds(ctx, q, target.TenantID, newID, needs); err != nil {
 			return err
 		}
+		rows, modules, err := readBoard(ctx, q, id)
+		if err != nil {
+			return err
+		}
+		if err := writeBoard(ctx, q, target.TenantID, newID, rows, modules); err != nil {
+			return err
+		}
 	}
 	for _, c := range s.planCopiers {
-		if err := c(ctx, tx, planIDs, target); err != nil {
+		if err := c(ctx, tx, planIDs, source, target); err != nil {
 			return err
 		}
 	}
