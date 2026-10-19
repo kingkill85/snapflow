@@ -60,9 +60,9 @@ type OutputKindAlternative struct {
 }
 
 type OutputKindInput struct {
-	Key             string                 `json:"key" doc:"Lower snake case, 1-64 characters" example:"blind_output"`
-	Name            i18n.Text              `json:"name" doc:"At most 100 characters; \"en\" is required"`
-	IsActive        bool                   `json:"isActive"`
+	Key             string                  `json:"key" doc:"Lower snake case, 1-64 characters" example:"blind_output"`
+	Name            i18n.Text               `json:"name" doc:"At most 100 characters; \"en\" is required"`
+	IsActive        bool                    `json:"isActive"`
 	FunctionTypeIDs []uuid.UUID             `json:"functionTypeIds,omitempty" maxItems:"200" doc:"Function types it serves (existing ones, each once); left out = none"`
 	Alternatives    []OutputKindAlternative `json:"alternatives,omitempty" maxItems:"50" doc:"Each other kind once; left out = none (lists of new endpoints are replaced, D306)"`
 }
@@ -98,7 +98,6 @@ const (
 	// (D303).
 	MeaningAlternativeAllowed Meaning = "alternative_allowed"
 )
-
 
 // MeaningSpec describes a meaning: its parameters and the value types it
 // accepts.
@@ -168,18 +167,18 @@ type CatalogField struct {
 	Options     []attrschema.AttributeOption `json:"options" doc:"Allowed values of an enum field"`
 	EtimFeature string                       `json:"etimFeature,omitempty" doc:"ETIM feature code, informational" example:"EF000008"`
 	// Meaning empty = just information.
-	Meaning        Meaning      `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"What the value means for the checks; empty = just information"`
-	OutputKindID   *uuid.UUID   `json:"outputKindId,omitempty" doc:"Parameter of the channel meanings"`
-	LoadTypeID     *uuid.UUID   `json:"loadTypeId,omitempty" doc:"Parameter of channel_limit_w (required) and channel_limit_a, channel_min_load_w, module_total_w (optional: empty = any load type)"`
-	ProductTypeIDs []uuid.UUID  `json:"productTypeIds" doc:"The meaning applies only to products of these product types; empty = all"`
-	SortOrder      int32        `json:"sortOrder"`
+	Meaning        Meaning     `json:"meaning,omitempty" enum:"channels_supplied,channel_limit_w,channel_limit_a,channel_min_load_w,module_total_a,module_total_w,bus_current_used_ma,bus_current_supplied_ma,bus_devices_max,rail_width_te,enclosure_rows,enclosure_te_per_row,wireless_places_supplied,wireless_place_used,zigbee_router,motor_type,alternative_allowed" doc:"What the value means for the checks; empty = just information"`
+	OutputKindID   *uuid.UUID  `json:"outputKindId,omitempty" doc:"Parameter of the channel meanings"`
+	LoadTypeID     *uuid.UUID  `json:"loadTypeId,omitempty" doc:"Parameter of channel_limit_w (required) and channel_limit_a, channel_min_load_w, module_total_w (optional: empty = any load type)"`
+	ProductTypeIDs []uuid.UUID `json:"productTypeIds" doc:"The meaning applies only to products of these product types; empty = all"`
+	SortOrder      int32       `json:"sortOrder"`
 	// InUse counts the categories that link the field (UsedBy names them);
 	// its key and type are then locked (catalog_field.in_use).
-	InUse  int         `json:"inUse" doc:"Categories linking the field; while > 0 its key and type cannot change and it cannot be deleted"`
-	UsedBy []FieldUser `json:"usedBy" doc:"The categories linking the field"`
-	CreatedAt      time.Time    `json:"createdAt"`
-	UpdatedAt      time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can            auth.Actions `json:"can"`
+	InUse     int          `json:"inUse" doc:"Categories linking the field; while > 0 its key and type cannot change and it cannot be deleted"`
+	UsedBy    []FieldUser  `json:"usedBy" doc:"The categories linking the field"`
+	CreatedAt time.Time    `json:"createdAt"`
+	UpdatedAt time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can       auth.Actions `json:"can"`
 }
 
 type CatalogFieldInput struct {

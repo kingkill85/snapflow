@@ -37,28 +37,28 @@ type ProductType struct {
 	SortOrder    int32     `json:"sortOrder" doc:"Position in the catalog, 1 first"`
 	IsActive     bool      `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
 	// System settings for the board checks (step 3a).
-	DefaultBusCurrentMa *int32       `json:"defaultBusCurrentMa,omitempty" doc:"Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown"`
-	ReservePercent      int32        `json:"reservePercent" doc:"Capacity kept in reserve: amber above 100 − reserve %, red when exceeded"`
-	BusDevicesMax       *int32       `json:"busDevicesMax,omitempty" doc:"Default maximum devices per bus line; empty = not checked"`
+	DefaultBusCurrentMa *int32 `json:"defaultBusCurrentMa,omitempty" doc:"Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown"`
+	ReservePercent      int32  `json:"reservePercent" doc:"Capacity kept in reserve: amber above 100 − reserve %, red when exceeded"`
+	BusDevicesMax       *int32 `json:"busDevicesMax,omitempty" doc:"Default maximum devices per bus line; empty = not checked"`
 	// Topology selects the defaults capabilities fall back to (D304).
-	Topology                  string `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
-	DefaultWirelessPlacesUsed *int32 `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
-	CreatedAt           time.Time    `json:"createdAt"`
-	UpdatedAt           time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can                 auth.Actions `json:"can"`
+	Topology                  string       `json:"topology" enum:"bus,wireless,none" doc:"How devices connect: bus (defaultBusCurrentMa applies), wireless (defaultWirelessPlacesUsed applies) or none"`
+	DefaultWirelessPlacesUsed *int32       `json:"defaultWirelessPlacesUsed,omitempty" doc:"Wireless places a device of this system uses without its own value (wireless topology); empty = unknown"`
+	CreatedAt                 time.Time    `json:"createdAt"`
+	UpdatedAt                 time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can                       auth.Actions `json:"can"`
 }
 
 type ProductTypeInput struct {
-	Key                 string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
-	Name                i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
-	Abbreviation        string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
-	Color               string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
-	IsActive            bool      `json:"isActive"`
-	DefaultBusCurrentMa *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
-	ReservePercent      *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20; on update, left out keeps the stored value (D294)"`
-	BusDevicesMax       *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
-	Topology                  string `json:"topology,omitempty" enum:"bus,wireless,none" doc:"Default none; on update, left out keeps the stored value (D294)"`
-	DefaultWirelessPlacesUsed *int32 `json:"defaultWirelessPlacesUsed,omitempty" doc:"1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	Key                       string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
+	Name                      i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
+	Abbreviation              string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
+	Color                     string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
+	IsActive                  bool      `json:"isActive"`
+	DefaultBusCurrentMa       *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	ReservePercent            *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20; on update, left out keeps the stored value (D294)"`
+	BusDevicesMax             *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
+	Topology                  string    `json:"topology,omitempty" enum:"bus,wireless,none" doc:"Default none; on update, left out keeps the stored value (D294)"`
+	DefaultWirelessPlacesUsed *int32    `json:"defaultWirelessPlacesUsed,omitempty" doc:"1-1000; 0 for none; leave out for none (create) or to keep the stored value (update, D294)"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it

@@ -31,27 +31,29 @@ Spec written 2026-10-19. The user decided to build phase 3 as planned now and ad
 ### Model (global catalog configuration, admin = `catalog.write`)
 - **Load types** (`load_types`): key, translatable name, position, active. Seed: resistive, LED, halogen / incandescent, inductive (transformer), capacitive, AC motor, DC motor, pushbutton contact. Admin-editable like function types.
 - **Function types** (exist, D-catalog): add `allowsCircuit` (several needs may share one channel — lights, sockets: yes; blinds, inputs: no) and the load types a need of this function may have (subset; empty = any). Seed reasonable flags for existing keys if present (dimmer, switching, blind, input …).
-- **Output kinds** (`output_kinds`): key, translatable name, position, active; the function types it serves (e.g. dimmer output → dimmer, switching; relay output → switching; blind output → blind; input → pushbutton/contact); optional alternative: "N of kind X can act as 1 of this kind" (blind output ← 2 relay outputs), so a module's relay pairs can be used as blinds per pair (mixed use).
+- **Output kinds** (`output_kinds`): key, translatable name, position, active; the function types it serves (e.g. dimmer output → dimmer, switching; relay output → switching; blind output → blind; input → pushbutton/contact); alternatives: "N of kind X can act as 1 of this kind" (blind output ← 2 relay outputs), several per kind, in fixed groups (1+2, 3+4, …), so a module's relay pairs can be used as blinds per pair (mixed use) — only for products that opt in with a field of meaning `alternative_allowed` (D303). Universal channels ("each channel dimmer or relay") = relay output ← 1 dimmer output with the opt-in; channels count once.
 - **Field meanings** (the core of D187/D188): a catalog-wide registry of known columns/fields (`catalog_fields`): key (lower snake case), translatable label, value type (number, whole number, text, yes/no, choice), unit (display), optional `etimFeature` code (R13, informational), and an optional **meaning** for the checks with parameters:
   - `channels_supplied` (output kind) — number of channels of that kind the product supplies
   - `channel_limit_w` (output kind, load type) — max W per channel for that load type
-  - `channel_limit_a` (output kind) — max A per channel
-  - `channel_min_load_w` (output kind) — minimum load per channel
-  - `module_total_a` / `module_total_w` — limit for the whole module
+  - `channel_limit_a` (output kind, optional load type) — max A per channel
+  - `channel_min_load_w` (output kind, optional load type) — minimum load per channel
+  - `module_total_a` / `module_total_w` (optional load type) — limit for the whole module
+  - `alternative_allowed` (output kind = target kind, yes/no) — the product's channels may act as that kind through its alternatives (D303)
+  - counts (`channels_supplied`, `bus_devices_max`, `enclosure_rows`, `wireless_places_supplied`) are whole numbers (D307)
   - `bus_current_used_ma`, `bus_current_supplied_ma`, `bus_devices_max` (on power supplies / couplers / lines)
   - `rail_width_te`, `enclosure_rows`, `enclosure_te_per_row`
   - `wireless_places_supplied`, `wireless_place_used` (fixed value, may be limited to product types), `zigbee_router` (yes/no)
-  - `motor_type` (choice AC/DC, on blind outputs)
+  - `motor_type` (choice with exactly `ac`/`dc`: which motors the blind outputs drive; `channel_limit_w` for motor load types is an optional limit on top, D310)
   - none = "just information"
   - A meaning may be limited to product types (D191: "uses 1 wireless place – only Zigbee").
-- **Category attribute schemas** keep working as today (D99), but an attribute definition can be linked to a catalog field (`fieldKey`), taking its type, unit and meaning from there; a category created by the import links its attributes to the known fields automatically.
+- **Category attribute schemas** keep working as today (D99), but an attribute definition can be linked to a catalog field (`fieldKey`), taking its type, unit and meaning from there (resolved when read, D308; links stored in `category_field_links`, D305); a category created by the import links its attributes to the known fields automatically.
 - **Mounting** (`mounting`: floorplan | board | both) on categories, and an optional per-product override (product field + import target "mounting").
 - **Empty values**: an empty field does not count (D187), except a bus product without `bus_current_used_ma` is reported later as "bus current unknown" (R3; the check, not the catalog, does this in 3d). A per-system default bus current (e.g. KNX 10 mA) is a product type setting (`defaultBusCurrentMa`, optional).
-- Product types gain optional system settings: `defaultBusCurrentMa`, `reservePercent` (default 20), `busDevicesMax` (optional default per line).
+- Product types gain optional system settings: `topology` (bus / wireless / none), `defaultBusCurrentMa` (used for bus systems), `defaultWirelessPlacesUsed` (used for wireless systems), `reservePercent` (default 20), `busDevicesMax` (optional default per line) (D304).
 
 ### Import (D188)
 - On the mapping page, every mapped column that targets a category attribute is matched against the catalog fields (by key / header text, ignoring case and spacing). Known → type, unit and meaning are taken over. Unknown → listed under "New columns – what do they mean?": the user chooses label, type, unit and meaning (or "just information"); saving creates the catalog field, and the preview continues. The mapping profile remembers the links.
-- Categories created by the import get attributes linked to these fields (instead of text attributes, D133 amended).
+- Categories created by the import get attributes linked to these fields (instead of text attributes, D133 amended). Existing categories with an unlinked attribute of the column's key get it linked at apply when the types match, shown in the preview as a category change; another type is a warning (D314). Answers can also link an existing field or override an automatic match (D315).
 
 ### API and UI
 - CRUD + order for load types, output kinds, catalog fields (Catalog section: new pages "Output kinds", "Load types", "Fields"), function type editor gains the new flags; category editor: mounting select, and per attribute an optional link to a catalog field (showing its meaning read-only); product editor: mounting override.
