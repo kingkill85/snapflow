@@ -12,6 +12,8 @@ type Options = {
   editable: boolean
   /** Esc also disarms a palette product. */
   onEscape: () => void
+  /** What select-all selects (visible placements and zones); all placements by default. */
+  selectable?: () => string[]
 }
 
 /** The command a key press means, or undefined. Exported for tests. */
@@ -35,11 +37,11 @@ export function shortcutOf(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' 
  * the arrows (1 px, shift 10 px), duplicate, copy/paste within the plan,
  * select all, Esc. Never while typing in a field or with a dialog open.
  */
-export function useShortcuts({ state, dispatch, editable, onEscape }: Options) {
+export function useShortcuts({ state, dispatch, editable, onEscape, selectable }: Options) {
   const clipboard = useRef<PlanPlacement[]>([])
-  const latest = useRef({ state, editable, onEscape })
+  const latest = useRef({ state, editable, onEscape, selectable })
   useEffect(() => {
-    latest.current = { state, editable, onEscape }
+    latest.current = { state, editable, onEscape, selectable }
   })
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export function useShortcuts({ state, dispatch, editable, onEscape }: Options) {
       if (e.defaultPrevented || isTypingTarget(e.target)) return
       const command = shortcutOf(e)
       if (!command) return
-      const { state, editable, onEscape } = latest.current
+      const { state, editable, onEscape, selectable } = latest.current
       const doc = state.history.present
       const selected = doc.placements.filter((p) => state.selection.includes(p.id))
       const ids = state.selection
@@ -58,7 +60,7 @@ export function useShortcuts({ state, dispatch, editable, onEscape }: Options) {
           return
         case 'selectAll':
           e.preventDefault()
-          dispatch({ type: 'select', ids: doc.placements.map((p) => p.id) })
+          dispatch({ type: 'select', ids: selectable ? selectable() : doc.placements.map((p) => p.id) })
           return
         case 'copy':
           if (selected.length > 0) clipboard.current = selected

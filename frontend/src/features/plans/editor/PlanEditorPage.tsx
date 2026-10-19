@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Hand, Maximize, MousePointer2, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import type Konva from 'konva'
+import { ArrowLeft, Download, Hand, Hexagon, Maximize, MousePointer2, Redo2, Ruler, Square, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
@@ -8,7 +9,7 @@ import { ApiError } from '@/api/client'
 import type { Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
 import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
-import { type Point, useViewport } from '@/canvas'
+import { type Point, useViewport, type Viewport } from '@/canvas'
 import { Button, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
@@ -18,16 +19,22 @@ import { defaultPlacementSize, imageAspect, paletteProducts, useCatalogVariants 
 import { documentOf, type PlanDocument, toContentInput } from './document'
 import { editorReducer, initEditor } from './editor-state'
 import { canRedo, canUndo } from './history'
+import { CalibrateDialog } from './CalibrateDialog'
+import { scaleBar } from './calibration'
+import { download, exportFileName, stageToPng } from './export'
 import { Inspector } from './Inspector'
+import { allVisible, type Layers, visibleIds } from './layers'
+import { LayersPanel } from './LayersPanel'
 import { LockBanner } from './LockBanner'
 import { Palette } from './Palette'
-import { PlanCanvas, type Tool } from './PlanCanvas'
+import { type ActiveVertex, PlanCanvas, type Tool } from './PlanCanvas'
 import { newPlacement } from './placements'
 import { SaveIndicator } from './SaveIndicator'
 import { saveErrorsByItem } from './save-errors'
 import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { useShortcuts } from './use-shortcuts'
+import { ZonesPanel } from './ZonesPanel'
 
 /** /projects/:id/versions/:versionId/plans/:planId: loads what the editor needs. */
 export function PlanEditorPage() {
@@ -85,7 +92,7 @@ function useFillHeight() {
   return { ref, height }
 }
 
-type PanelTab = 'products' | 'zones' | 'inspector'
+type PanelTab = 'products' | 'zones' | 'layers' | 'inspector'
 
 type Props = { plan: Plan; content: PlanContent; project: Project; variants: VariantSearchItem[] }
 
@@ -109,6 +116,12 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const [tool, setTool] = useState<Tool>('select')
   const [tab, setTab] = useState<PanelTab>('products')
   const [armed, setArmed] = useState<string | null>(null)
+  // View state beside the document (not saved, not in the history).
+  const [layers, setLayers] = useState<Layers>(allVisible)
+  const [resizeAll, setResizeAll] = useState(false)
+  const [activeVertex, setActiveVertex] = useState<ActiveVertex | null>(null)
+  const [calibration, setCalibration] = useState<[Point, Point] | null>(null)
+  const stageRef = useRef<Konva.Stage>(null)
 
   // What the last load or save returned: the content version to send back, warnings and zone assignments.
   const [server, setServer] = useState(content)
@@ -117,6 +130,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   const variantsById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants])
   const products = useMemo(() => paletteProducts(variants, project.productTypeIds), [variants, project.productTypeIds])
+  /** Hiding a layer also drops its items from the selection (hidden items cannot be handled). */
+  const changeLayers = (next: Layers) => {
+    setLayers(next)
+    const visible = new Set(visibleIds(state.history.present, next, variantsById))
+    const kept = state.selection.filter((id) => visible.has(id))
+    if (kept.length !== state.selection.length) dispatch({ type: 'select', ids: kept })
+  }
   const warnings = useMemo(() => {
     const map = new Map<string, PlanWarning[]>()
     for (const w of server.warnings) map.set(w.placementId, [...(map.get(w.placementId) ?? []), w])
@@ -178,7 +198,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     }
   }, [lock.state.status, reload])
 
-  useShortcuts({ state, dispatch, editable, onEscape: () => setArmed(null) })
+  useShortcuts({
+    state,
+    dispatch,
+    editable,
+    onEscape: () => setArmed(null),
+    selectable: () => visibleIds(state.history.present, layers, variantsById),
+  })
 
   const { viewport, setViewport, setStage, fit, zoomBy } = useViewport(plan.image)
 
@@ -194,6 +220,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   }
 
   const selectedPlacements = doc.placements.filter((p) => state.selection.includes(p.id))
+  const selectedZones = doc.zones.filter((z) => state.selection.includes(z.id))
+
+  const exportPng = () => {
+    const stage = stageRef.current
+    if (!stage) return
+    download(stageToPng(stage, plan.image), exportFileName(project.number, plan.name))
+  }
   const errorIds = useMemo(() => new Set(saveErrors.keys()), [saveErrors])
 
   const canvas = (
@@ -206,13 +239,31 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       errorIds={errorIds}
       editable={editable}
       tool={wide ? tool : 'pan'}
+      onToolChange={setTool}
       viewport={viewport}
       onViewportChange={setViewport}
       onSize={setStage}
       dispatch={dispatch}
       placing={armed !== null}
       onPlace={(point, productId) => void place(point, productId)}
+      layers={layers}
+      resizeAll={resizeAll}
+      activeVertex={activeVertex}
+      onActiveVertex={setActiveVertex}
+      onCalibrate={(a, b) => setCalibration([a, b])}
+      stageRef={stageRef}
     />
+  )
+  const canvasArea = (
+    <div className="relative h-full w-full">
+      {canvas}
+      {doc.scale !== null && <ScaleBar scale={doc.scale} viewport={viewport} />}
+      {wide && toolHint(tool, t) && (
+        <p aria-live="polite" className="pointer-events-none absolute top-2 left-1/2 max-w-[90%] -translate-x-1/2 rounded-control border border-line bg-surface/90 px-2 py-1 text-xs">
+          {toolHint(tool, t)}
+        </p>
+      )}
+    </div>
   )
 
   const back = (
@@ -281,10 +332,22 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           {zoomControls}
         </div>
         <div className="space-y-2 px-2 empty:hidden">{project.status !== 'active' && <Notice tone="warning">{t('editor.readOnlyProject')}</Notice>}</div>
-        <div className="h-[55%] shrink-0 border-b border-line">{canvas}</div>
+        <div className="h-[55%] shrink-0 border-b border-line">{canvasArea}</div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <p className="text-sm text-muted">{t('editor.phoneHint')}</p>
           <ProductList doc={doc} variants={variantsById} />
+          <section aria-label={t('panel.zones')} className="space-y-2">
+            <h2 className="font-semibold">{t('panel.zones')}</h2>
+            <ZonesPanel
+              zones={doc.zones}
+              saved={server.placements}
+              placements={doc.placements}
+              selection={state.selection}
+              layers={layers}
+              onLayers={changeLayers}
+              onSelect={(id) => dispatch({ type: 'select', ids: [id] })}
+            />
+          </section>
         </div>
       </div>
     )
@@ -292,14 +355,41 @@ function PlanEditor({ plan, content, project, variants }: Props) {
 
   const tabs: TabItem<PanelTab>[] = [
     { key: 'products', label: t('panel.products'), content: <Palette products={products} armed={armed} onArm={setArmed} editable={editable} /> },
-    // Part B: the zone list (show/hide, counts) and zone tools.
-    { key: 'zones', label: t('panel.zones'), content: <p className="text-sm text-muted">{t('zones.empty')}</p> },
+    {
+      key: 'zones',
+      label: t('panel.zones'),
+      content: (
+        <ZonesPanel
+          zones={doc.zones}
+          saved={server.placements}
+          placements={doc.placements}
+          selection={state.selection}
+          layers={layers}
+          onLayers={changeLayers}
+          onSelect={(id) => {
+            dispatch({ type: 'select', ids: [id] })
+            setTab('inspector')
+          }}
+        />
+      ),
+    },
+    {
+      key: 'layers',
+      label: t('panel.layers'),
+      content: <LayersPanel placements={doc.placements} products={products} variants={variantsById} layers={layers} onLayers={changeLayers} />,
+    },
     {
       key: 'inspector',
       label: t('panel.inspector'),
       content: (
         <Inspector
           placements={selectedPlacements}
+          zones={selectedZones}
+          allPlacements={doc.placements}
+          resizeAll={resizeAll}
+          onResizeAll={setResizeAll}
+          activeVertex={activeVertex}
+          onActiveVertex={setActiveVertex}
           variants={variantsById}
           allVariants={variants}
           warnings={warnings}
@@ -319,22 +409,50 @@ function PlanEditor({ plan, content, project, variants }: Props) {
         <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
         <IconButton label={t('toolbar.select')} icon={<MousePointer2 />} aria-pressed={tool === 'select'} className={cn(tool === 'select' && 'bg-canvas text-primary')} onClick={() => setTool('select')} />
         <IconButton label={t('toolbar.pan')} icon={<Hand />} aria-pressed={tool === 'pan'} className={cn(tool === 'pan' && 'bg-canvas text-primary')} onClick={() => setTool('pan')} />
-        {/* Part B: zone rectangle / polygon tools, calibrate, export PNG. */}
+        <IconButton label={t('toolbar.zoneRect')} icon={<Square />} aria-pressed={tool === 'zoneRect'} disabled={!editable} className={cn(tool === 'zoneRect' && 'bg-canvas text-primary')} onClick={() => setTool('zoneRect')} />
+        <IconButton label={t('toolbar.zonePolygon')} icon={<Hexagon />} aria-pressed={tool === 'zonePolygon'} disabled={!editable} className={cn(tool === 'zonePolygon' && 'bg-canvas text-primary')} onClick={() => setTool('zonePolygon')} />
+        <IconButton label={t('toolbar.calibrate')} icon={<Ruler />} aria-pressed={tool === 'calibrate'} disabled={!editable} className={cn(tool === 'calibrate' && 'bg-canvas text-primary')} onClick={() => setTool('calibrate')} />
         <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
         {zoomControls}
         <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
         <IconButton label={t('toolbar.undo')} icon={<Undo2 />} disabled={!editable || !canUndo(state.history)} onClick={() => dispatch({ type: 'undo' })} />
         <IconButton label={t('toolbar.redo')} icon={<Redo2 />} disabled={!editable || !canRedo(state.history)} onClick={() => dispatch({ type: 'redo' })} />
+        <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
+        <IconButton label={t('toolbar.export')} icon={<Download />} onClick={exportPng} />
         <span className="flex-1" />
         {editable ? <SaveIndicator status={autosave.status} onRetry={() => void autosave.retry()} /> : <span className="text-sm text-muted">{t('editor.viewOnly')}</span>}
       </div>
       <div className="space-y-2 px-2 pt-2 empty:hidden">{banners}</div>
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : canvas}</div>
-        <aside aria-label={t('panel.label')} className="flex w-80 shrink-0 flex-col border-l border-line bg-surface lg:w-96">
+        <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : canvasArea}</div>
+        <aside aria-label={t('panel.label')} className="flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
           <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
+      <CalibrateDialog
+        points={calibration}
+        onClose={() => setCalibration(null)}
+        onScale={(scale) => dispatch({ type: 'change', action: { type: 'setScale', scale } })}
+      />
+    </div>
+  )
+}
+
+/** What the active drawing tool expects (announced, and shown over the canvas). */
+function toolHint(tool: Tool, t: (key: 'tools.zoneRect' | 'tools.zonePolygon' | 'tools.calibrate') => string) {
+  return tool === 'zoneRect' || tool === 'zonePolygon' || tool === 'calibrate' ? t(`tools.${tool}`) : undefined
+}
+
+/** A scale bar over the canvas when the plan is calibrated (not part of the export). */
+function ScaleBar({ scale, viewport }: { scale: number; viewport: Viewport }) {
+  const { t, i18n } = useTranslation('plans')
+  const bar = scaleBar(scale, viewport.scale)
+  if (!bar) return null
+  const label = `${new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 3 }).format(bar.metres)} m`
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 rounded-control border border-line bg-surface/90 px-2 py-1 text-xs" aria-label={t('scale.bar', { label })}>
+      <div className="h-1.5 border-x-2 border-b-2 border-ink" style={{ width: bar.px }} />
+      <span className="tabular-nums">{label}</span>
     </div>
   )
 }

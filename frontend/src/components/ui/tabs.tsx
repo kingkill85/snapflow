@@ -34,7 +34,7 @@ export function Tabs<K extends string>({ label, tabs, value, onValueChange, clas
 
   return (
     <div className={cn('flex min-h-0 flex-col', className)}>
-      <div role="tablist" aria-label={label} className="flex shrink-0 gap-1 border-b border-line px-2">
+      <div role="tablist" aria-label={label} className="flex shrink-0 overflow-x-auto border-b border-line px-1">
         {tabs.map((tab, index) => {
           const selected = tab.key === active?.key
           return (
@@ -52,7 +52,7 @@ export function Tabs<K extends string>({ label, tabs, value, onValueChange, clas
               onClick={() => onValueChange(tab.key)}
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+                '-mb-px shrink-0 border-b-2 px-2 py-2 text-sm font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
                 selected ? 'border-primary text-ink' : 'border-transparent text-muted hover:text-ink',
               )}
             >

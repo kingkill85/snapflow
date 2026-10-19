@@ -42,16 +42,42 @@
     "zoomLevel": "Zoom level",
     "fit": "Fit to screen",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "zoneRect": "Draw rectangle zone",
+    "zonePolygon": "Draw polygon zone",
+    "calibrate": "Calibrate scale",
+    "export": "Export PNG"
   },
   "panel": {
     "label": "Plan panel",
     "products": "Products",
     "zones": "Zones",
-    "inspector": "Inspector"
+    "inspector": "Inspector",
+    "layers": "Layers"
   },
   "zones": {
-    "empty": "No zones yet."
+    "empty": "No zones yet.",
+    "newName": "Zone",
+    "zone": "Zone",
+    "name": "Name",
+    "palette": "Colour",
+    "useColor": "Use colour {{color}}",
+    "color": "Custom colour",
+    "opacity": "Opacity",
+    "corners_one": "{{count}} corner",
+    "corners_other": "{{count}} corners",
+    "cornerHint": "Drag a corner to move it, drag or click an edge's middle dot to add one, Alt-click a corner to remove it.",
+    "removeCorner": "Remove selected corner",
+    "count_one": "{{count}} device",
+    "count_other": "{{count}} devices",
+    "estimate_one": "(now ≈ {{count}})",
+    "estimate_other": "(now ≈ {{count}})",
+    "countTitle": "As last saved; the estimate in brackets counts the current drawing",
+    "countHint": "Devices as last saved.",
+    "showAll": "Show all",
+    "hideAll": "Hide all",
+    "show": "Show {{name}}",
+    "hide": "Hide {{name}}"
   },
   "palette": {
     "search": "Search products",
@@ -62,7 +88,7 @@
     "noMatch": "No products match the search."
   },
   "inspector": {
-    "none": "Select a product on the plan to see its details.",
+    "none": "Select a product or zone on the plan to see its details.",
     "many_one": "{{count}} item selected.",
     "many_other": "{{count}} items selected.",
     "product": "Product",
@@ -75,7 +101,18 @@
     "height": "Height",
     "rotation": "Rotation",
     "existing": "Existing",
-    "existingHint": "The customer already has it: counted technically, never invoiced"
+    "existingHint": "The customer already has it: counted technically, never invoiced",
+    "manyDetail": "Products: {{products}} · Zones: {{zones}}",
+    "existingManyHint": "On for every selected product",
+    "deleteSelected_one": "Delete {{count}} item",
+    "deleteSelected_other": "Delete {{count}} items",
+    "addons": "Add-ons",
+    "addonRequired": "Required: always included",
+    "addonUnavailable": "Not available",
+    "instanceValues": "Values of this device",
+    "resizeAll": "Resize all of this product",
+    "resizeAllHint_one": "Size changes apply to the {{count}} placement of this product on the plan",
+    "resizeAllHint_other": "Size changes apply to all {{count}} placements of this product on the plan"
   },
   "warning": {
     "variant_deleted": "This product was deleted from the catalog.",
@@ -105,5 +142,27 @@
     "takenOver": "{{name}} has taken over this plan. Changes not saved yet are lost; you can view it.",
     "takeOver": "Take over",
     "retry": "Try again"
+  },
+  "tools": {
+    "zoneRect": "Drag a rectangle on the plan.",
+    "zonePolygon": "Click the corners. Double-click, Enter or a click on the first corner closes the zone; Esc cancels.",
+    "calibrate": "Click two points whose real distance you know; Esc cancels."
+  },
+  "layers": {
+    "hint": "Hidden items are not shown, selectable or exported. This view is not saved.",
+    "zones": "Zones",
+    "productTypes": "Product types",
+    "categories": "Categories"
+  },
+  "calibrate": {
+    "title": "Calibrate scale",
+    "pixels": "The two points are {{px}} px apart on the image.",
+    "distance": "Real distance",
+    "hint": "In metres, e.g. 3.5",
+    "invalid": "Enter a distance above 0 in metres.",
+    "apply": "Apply"
+  },
+  "scale": {
+    "bar": "Scale: the bar is {{label}}"
   }
 }

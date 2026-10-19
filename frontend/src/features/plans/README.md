@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor). Spec: `docs/specs/phase-2.md` → 2b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export). Spec: `docs/specs/phase-2.md` → 2b.
 
 ## Files
 
@@ -13,7 +13,11 @@ Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor). Spec: `docs/spe
 | `editor/history.ts`, `editor/editor-state.ts` | Undo history and the editor reducer (document history + selection) |
 | `editor/PlanCanvas.tsx` | The floorplan canvas: layers, pointer interactions, drop target |
 | `editor/Palette.tsx`, `editor/catalog.ts` | Products tab, catalog loading, palette grouping, default sizes |
-| `editor/Inspector.tsx` | Inspector tab (part A: one placement) |
+| `editor/Inspector.tsx` | Inspector tab: one placement (add-ons, instance values, resize all), one zone, multi-selection |
+| `editor/zones.ts`, `editor/ZonesPanel.tsx` | Zone geometry (area, ray casting, smallest containing zone, corner edits, names, colours) and the Zones tab |
+| `editor/layers.ts`, `editor/LayersPanel.tsx` | Layer visibility (view state) and the Layers tab |
+| `editor/calibration.ts`, `editor/CalibrateDialog.tsx` | Scale from two points, metres parsing, scale bar |
+| `editor/export.ts` | PNG export at natural size, file name |
 | `editor/use-autosave.ts`, `editor/save-errors.ts`, `editor/SaveIndicator.tsx` | Autosave state machine and error mapping (D201) |
 | `editor/use-plan-lock.ts`, `editor/LockBanner.tsx` | Edit lock (D202) |
 | `editor/use-shortcuts.ts` | Keyboard shortcuts |
@@ -28,7 +32,7 @@ draw order. Documents are immutable; `applyDocumentAction(doc, action)` returns 
 same object when nothing changes. Ids are client uuids (`newId()`).
 
 `DocumentAction` already covers zones: `addZones`, `updateZones`, `remove` (placements and zones by id),
-`moveBy` (moves zone points too) and `setScale`. Part B mostly adds UI that dispatches these; new kinds of
+`moveBy` (moves zone points too) and `setScale`. The editor's UI dispatches these; new kinds of
 change go into `DocumentAction` + `applyDocumentAction` (with a test in `editor-state.test.ts`).
 
 ## Reducer, history, selection
@@ -62,34 +66,47 @@ project, no permission, phone width) renders the same editor read-only.
 `PlanCanvas` renders inside `CanvasStage` (zoom, pan, pointer events in image pixels):
 
 1. `ImageLayer` (the plan image, not listening)
-2. **zones layer — part B** (comment marks the spot, below the placements)
-3. placements layer: `PlacementNode` per placement (`name="placement"`, `id=placement id`; hit-testing uses
+2. zones: `ZoneNode` per visible zone (`name="zone"`, `id=zone id`), `VertexHandles` for one selected zone
+   (`name="vertex-i"` corners, `name="mid-i"` edge midpoints)
+3. placements: `PlacementNode` per visible placement (`name="placement"`; hit-testing uses
    `findAncestor('.placement')`), alt-drag copies, `Handles` for one selected placement
-   (`name="handle-nw|ne|se|sw|rotate"`), the rubber band
+   (`name="handle-nw|ne|se|sw|rotate"`), then the rubber band and drawing drafts
 
+Nodes that are UI and not content are named `chrome` (`export.ts`): the PNG export hides them.
 Strokes and labels are scaled by `k = 1 / viewport.scale` so they keep their screen size.
 `useCanvasTheme()` gives token colours for Konva.
 
-## Where part B plugs in
+## Tools and interactions
 
-- **Zones**: a zone layer in `PlanCanvas` (between image and placements) and new tools in `Tool`
-  (`'select' | 'pan'` today) with toolbar buttons in `PlanEditor` (marked "Part B"); drawing/vertex
-  edits as new `Interaction` kinds committing `addZones` / `updateZones`. The Zones tab placeholder in
-  `PlanEditor`'s `tabs`. Rubber band and select-all currently consider placements only.
-- **Inspector**: `Inspector.tsx` handles one placement; add add-ons, instance attributes
-  (`AttributeValuesEditor`), "resize all of this product" (one `updatePlacements` with many changes),
-  multi-selection (delete, existing toggle) and zone properties there.
-- **Layers** (visibility per product type, category, zones): view state beside the reducer (not
-  in the document/history), passed to `PlanCanvas` as a filter.
-- **Calibration**: `setScale` already exists in `DocumentAction`.
-- **PNG export**: `PlanCanvas` has a `stageRef`; export at natural resolution by rendering with
-  viewport `{ x: 0, y: 0, scale: 1 }` and the image size (or `stage.toDataURL({ pixelRatio })`).
-- **Warnings**: per placement in `warnings` (from the last load/save); texts in `locales/*/warning.*`.
-- **E2E**: `e2e/specs/plans-smoke.spec.ts` is a small part A smoke; part B writes the real spec.
+`Tool = 'select' | 'pan' | 'zoneRect' | 'zonePolygon' | 'calibrate'`. Drags are `Interaction`s with a local
+preview committed as one change on pointer up: `move` (placements and zones), `resize`, `rotate`, `band`,
+`drawRect`, `vertex` (corner drag, also after inserting at an edge midpoint). Click tools (polygon,
+calibration) collect points in a `Draft` tied to the tool (switching tools drops it); Enter closes a
+polygon, Esc drops a draft. Drawing a zone or picking the calibration points returns to Select.
+
+## View state (not in the document)
+
+`PlanEditor` keeps beside the reducer: `layers` (`Layers`: hidden product types, categories, zones; hidden
+items are filtered before drawing, so they are not hit-testable, and dropped from the selection),
+`resizeAll` (inspector switch, also used by canvas resizes via `resizeChanges`), `activeVertex` (the
+picked zone corner the inspector can remove) and the calibration points (open `CalibrateDialog`).
+Select-all uses `visibleIds`. Warnings per placement come from the last load/save (`server.warnings`).
+
+## Zone counts
+
+The Zones tab shows counts from `server.placements[].zoneId` (the last save's response) and, when
+different, a live estimate from `zoneAt` (same rule as the backend: smallest containing polygon by
+shoelace area, ray casting).
 
 ## Tests
 
 Vitest: `PlansSection.test.tsx` (list, dialogs), `editor/PlanEditorPage.test.tsx` (MSW; the Konva canvas
 is replaced by a stand-in), `editor/editor-state.test.ts` (document, history, reducer),
 `editor/use-autosave.test.ts`, `editor/Palette.test.tsx`, `editor/editor-helpers.test.ts`
-(palette data, default size, save errors, shortcuts), `src/canvas/geometry.test.ts`.
+(palette data, default size, save errors, shortcuts), `src/canvas/geometry.test.ts`; part B: `editor/zones.test.ts`, `editor/part-b-helpers.test.ts` (calibration,
+layers, export name, resize all), `editor/Inspector.test.tsx`, `editor/ZonesPanel.test.tsx` (with the Layers
+tab), `editor/CalibrateDialog.test.tsx`.
+
+E2E: `e2e/specs/plans.spec.ts` (place by click and drop, move/resize/rotate, rectangle and polygon zones,
+zone counts, undo/redo, reload, calibration, layers, PNG export, lock and take-over, read-only project) and
+the plans section and editor shell in `layout.spec.ts`.

@@ -30,7 +30,7 @@ export const toContentInput = (doc: PlanDocument, expectedContentUpdatedAt: stri
 export type PlacementPatch = Partial<Omit<PlanPlacement, 'id' | 'zoneId'>>
 export type ZonePatch = Partial<Omit<PlanZone, 'id'>>
 
-/** Every content change the editor makes. Part B adds zone tools on top of the zone actions. */
+/** Every content change the editor makes. */
 export type DocumentAction =
   | { type: 'addPlacements'; placements: PlanPlacement[] }
   | { type: 'updatePlacements'; changes: { id: string; patch: PlacementPatch }[] }

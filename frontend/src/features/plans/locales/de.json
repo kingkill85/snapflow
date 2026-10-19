@@ -42,16 +42,42 @@
     "zoomLevel": "Zoomstufe",
     "fit": "An Bildschirm anpassen",
     "undo": "Rückgängig",
-    "redo": "Wiederholen"
+    "redo": "Wiederholen",
+    "zoneRect": "Rechteckige Zone zeichnen",
+    "zonePolygon": "Polygon-Zone zeichnen",
+    "calibrate": "Maßstab kalibrieren",
+    "export": "Als PNG exportieren"
   },
   "panel": {
     "label": "Planbereich",
     "products": "Produkte",
     "zones": "Zonen",
-    "inspector": "Eigenschaften"
+    "inspector": "Eigenschaften",
+    "layers": "Ebenen"
   },
   "zones": {
-    "empty": "Noch keine Zonen."
+    "empty": "Noch keine Zonen.",
+    "newName": "Zone",
+    "zone": "Zone",
+    "name": "Name",
+    "palette": "Farbe",
+    "useColor": "Farbe {{color}} verwenden",
+    "color": "Eigene Farbe",
+    "opacity": "Deckkraft",
+    "corners_one": "{{count}} Ecke",
+    "corners_other": "{{count}} Ecken",
+    "cornerHint": "Ecke ziehen verschiebt sie, den Punkt in der Kantenmitte ziehen oder anklicken fügt eine hinzu, Alt-Klick auf eine Ecke entfernt sie.",
+    "removeCorner": "Gewählte Ecke entfernen",
+    "count_one": "{{count}} Gerät",
+    "count_other": "{{count}} Geräte",
+    "estimate_one": "(jetzt ≈ {{count}})",
+    "estimate_other": "(jetzt ≈ {{count}})",
+    "countTitle": "Stand der letzten Speicherung; die Schätzung in Klammern zählt die aktuelle Zeichnung",
+    "countHint": "Geräte laut letzter Speicherung.",
+    "showAll": "Alle einblenden",
+    "hideAll": "Alle ausblenden",
+    "show": "{{name}} einblenden",
+    "hide": "{{name}} ausblenden"
   },
   "palette": {
     "search": "Produkte suchen",
@@ -62,7 +88,7 @@
     "noMatch": "Keine Produkte passen zur Suche."
   },
   "inspector": {
-    "none": "Wählen Sie ein Produkt auf dem Plan aus, um seine Details zu sehen.",
+    "none": "Wählen Sie ein Produkt oder eine Zone auf dem Plan, um Details zu sehen.",
     "many_one": "{{count}} Element ausgewählt.",
     "many_other": "{{count}} Elemente ausgewählt.",
     "product": "Produkt",
@@ -75,7 +101,18 @@
     "height": "Höhe",
     "rotation": "Drehung",
     "existing": "Bestand",
-    "existingHint": "Der Kunde hat es bereits: zählt technisch, wird nie berechnet"
+    "existingHint": "Der Kunde hat es bereits: zählt technisch, wird nie berechnet",
+    "manyDetail": "Produkte: {{products}} · Zonen: {{zones}}",
+    "existingManyHint": "Für alle gewählten Produkte",
+    "deleteSelected_one": "{{count}} Element löschen",
+    "deleteSelected_other": "{{count}} Elemente löschen",
+    "addons": "Zubehör",
+    "addonRequired": "Pflicht: immer enthalten",
+    "addonUnavailable": "Nicht verfügbar",
+    "instanceValues": "Werte dieses Geräts",
+    "resizeAll": "Alle dieses Produkts anpassen",
+    "resizeAllHint_one": "Größenänderungen gelten für die {{count}} Platzierung dieses Produkts auf dem Plan",
+    "resizeAllHint_other": "Größenänderungen gelten für alle {{count}} Platzierungen dieses Produkts auf dem Plan"
   },
   "warning": {
     "variant_deleted": "Dieses Produkt wurde aus dem Katalog gelöscht.",
@@ -105,5 +142,27 @@
     "takenOver": "{{name}} hat diesen Plan übernommen. Noch nicht gespeicherte Änderungen sind verloren; Sie können ihn ansehen.",
     "takeOver": "Übernehmen",
     "retry": "Erneut versuchen"
+  },
+  "tools": {
+    "zoneRect": "Ziehen Sie ein Rechteck auf dem Plan auf.",
+    "zonePolygon": "Klicken Sie die Ecken an. Doppelklick, Enter oder ein Klick auf die erste Ecke schließt die Zone; Esc bricht ab.",
+    "calibrate": "Klicken Sie zwei Punkte an, deren echten Abstand Sie kennen; Esc bricht ab."
+  },
+  "layers": {
+    "hint": "Ausgeblendetes wird nicht angezeigt, ist nicht auswählbar und wird nicht exportiert. Diese Ansicht wird nicht gespeichert.",
+    "zones": "Zonen",
+    "productTypes": "Produkttypen",
+    "categories": "Kategorien"
+  },
+  "calibrate": {
+    "title": "Maßstab kalibrieren",
+    "pixels": "Die beiden Punkte liegen auf dem Bild {{px}} px auseinander.",
+    "distance": "Echter Abstand",
+    "hint": "In Metern, z. B. 3,5",
+    "invalid": "Geben Sie einen Abstand über 0 in Metern ein.",
+    "apply": "Übernehmen"
+  },
+  "scale": {
+    "bar": "Maßstab: der Balken entspricht {{label}}"
   }
 }
