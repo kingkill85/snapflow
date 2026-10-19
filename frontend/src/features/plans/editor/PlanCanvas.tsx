@@ -527,6 +527,27 @@ export function PlanCanvas({
               existingLabel=""
             />
           ))}
+          {editable && singleShown && interaction?.kind !== 'move' && <Handles placement={singleShown} k={k} color={theme.primary} surface={theme.surface} />}
+          <Group name={chromeName} listening={false}>
+            {band && <Rect x={band.x} y={band.y} width={band.width} height={band.height} stroke={theme.primary} strokeWidth={k} dash={[4 * k, 4 * k]} fill={theme.primary} opacity={0.15} />}
+            {drawnRect && <Rect x={drawnRect.x} y={drawnRect.y} width={drawnRect.width} height={drawnRect.height} stroke={theme.primary} strokeWidth={2 * k} fill={theme.primary} opacity={0.2} />}
+            {draft && draftLine.length >= 4 && <Line points={draftLine} stroke={theme.primary} strokeWidth={2 * k} dash={tool === 'calibrate' ? [6 * k, 4 * k] : undefined} />}
+            {measured && <Line points={measured.flatMap((p) => [p.x, p.y])} stroke={theme.primary} strokeWidth={2 * k} dash={[6 * k, 4 * k]} />}
+            {measured?.map((p, i) => (
+              <Circle key={`m${i}`} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
+            ))}
+            {draft?.points.map((p, i) => (
+              <Circle key={i} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
+            ))}
+          </Group>
+        </Layer>
+        <Layer listening={false}>
+          {zones.map((z) => (
+            <ZoneLabel key={z.id} zone={shownZone(z)} symbols={symbols} k={k} theme={theme} />
+          ))}
+        </Layer>
+        {/* Load symbols above the zone names: a symbol near a zone's centre stays legible and clickable (D352). */}
+        <Layer>
           {symbols.map((n) => (
             <NeedNode
               key={n.id}
@@ -551,24 +572,6 @@ export function PlanCanvas({
               theme={theme}
             />
           ))}
-          {editable && singleShown && interaction?.kind !== 'move' && <Handles placement={singleShown} k={k} color={theme.primary} surface={theme.surface} />}
-          <Group name={chromeName} listening={false}>
-            {band && <Rect x={band.x} y={band.y} width={band.width} height={band.height} stroke={theme.primary} strokeWidth={k} dash={[4 * k, 4 * k]} fill={theme.primary} opacity={0.15} />}
-            {drawnRect && <Rect x={drawnRect.x} y={drawnRect.y} width={drawnRect.width} height={drawnRect.height} stroke={theme.primary} strokeWidth={2 * k} fill={theme.primary} opacity={0.2} />}
-            {draft && draftLine.length >= 4 && <Line points={draftLine} stroke={theme.primary} strokeWidth={2 * k} dash={tool === 'calibrate' ? [6 * k, 4 * k] : undefined} />}
-            {measured && <Line points={measured.flatMap((p) => [p.x, p.y])} stroke={theme.primary} strokeWidth={2 * k} dash={[6 * k, 4 * k]} />}
-            {measured?.map((p, i) => (
-              <Circle key={`m${i}`} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
-            ))}
-            {draft?.points.map((p, i) => (
-              <Circle key={i} x={p.x} y={p.y} radius={4 * k} fill={theme.surface} stroke={theme.primary} strokeWidth={1.5 * k} />
-            ))}
-          </Group>
-        </Layer>
-        <Layer listening={false}>
-          {zones.map((z) => (
-            <ZoneLabel key={z.id} zone={shownZone(z)} k={k} theme={theme} />
-          ))}
         </Layer>
       </CanvasStage>
     </div>
@@ -588,8 +591,8 @@ function ZoneNode({ zone: z, selected, error, k, theme }: { zone: PlanZone; sele
 }
 
 /** A zone's name with a halo (D221), in its own layer above the placements so a product never hides it (D224). */
-function ZoneLabel({ zone: z, k, theme }: { zone: PlanZone; k: number; theme: PlanColors }) {
-  const label = labelPoint(z)
+function ZoneLabel({ zone: z, symbols, k, theme }: { zone: PlanZone; symbols: PlanNeed[]; k: number; theme: PlanColors }) {
+  const label = zoneLabelPoint(labelPoint(z), z.name, symbols, k)
   return (
     <Text
       text={z.name}
@@ -607,6 +610,22 @@ function ZoneLabel({ zone: z, k, theme }: { zone: PlanZone; k: number; theme: Pl
       listening={false}
     />
   )
+}
+
+/**
+ * Where a zone's name goes: its label point, or just above a load symbol that
+ * would cover it there (symbols are drawn above the names, D352). The name's
+ * width is estimated from its length; `k` = one screen px.
+ */
+function zoneLabelPoint(point: Point, name: string, symbols: Pick<PlanNeed, 'x' | 'y'>[], k: number): Point {
+  const halfWidth = name.length * 4.5 * k
+  const r = symbolRadius * k
+  for (const s of symbols) {
+    if (s.x === null || s.y === null) continue
+    // The symbol's circle and a one-line caption below it.
+    if (Math.abs(s.x - point.x) < halfWidth + r && point.y > s.y - r - 10 * k && point.y < s.y + r + 20 * k) return { x: point.x, y: s.y - r - 12 * k }
+  }
+  return point
 }
 
 const frameCursors: Record<FrameHandle, string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }

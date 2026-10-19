@@ -1,6 +1,6 @@
 # Plans (floorplan editor)
 
-Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338, review fixes D339–D351. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
+Step 2b. Decisions: D193–D197 (backend), D198–D204 (editor core), D205–D210 (zones, inspector, layers, calibration, export), D211–D216 (review fixes: image URL, key scoping, clamping, lock lifecycle, leaving, product picker), D217–D226 (click-through and screenshot review: export sizing, paper colours, zone names above placements, docked calibration, compact card actions), D252 (resize a zone as a whole); step 3b (zone needs, load symbols): D324–D338, review fixes D339–D351, click-through D352–D354. Spec: `docs/specs/phase-2.md` → 2b, `docs/specs/phase-3.md` → 3b.
 
 ## Files
 
@@ -95,9 +95,11 @@ replaced, so it is cached immutably (D211).
 3. placements: `PlacementNode` per visible placement (`name="placement"`; hit-testing uses
    `findAncestor('.placement')`), alt-drag copies, `Handles` for one selected placement
    (`name="handle-nw|ne|se|sw|rotate"`), then the rubber band, drawing drafts and the measured calibration line
-   followed by `NeedNode` per visible load symbol (`name="need"`, hit-testing `findAncestor('.need')`, moved and
-   copied with the placements; screen-sized pictogram from `symbolIcon(key)` or the first letter, caption below, D333)
-4. zone names: `ZoneLabel` per visible zone, not listening, above the placements so a product never hides them (D224)
+4. zone names: `ZoneLabel` per visible zone, not listening, above the placements so a product never hides them (D224);
+   a name a load symbol would cover moves just above that symbol (`zoneLabelPoint`, D352)
+5. load symbols: `NeedNode` per visible load symbol (`name="need"`, hit-testing `findAncestor('.need')`, moved and
+   copied with the placements; screen-sized pictogram from `symbolIcon(key)` or the first letter, caption below, D333),
+   above the zone names (D352)
 
 Nodes that are UI and not content are named `chrome` (`export.ts`): the PNG export hides them.
 Strokes and labels are scaled by `k = 1 / viewport.scale` so they keep their screen size (while the PNG export draws, `k = exportPixel(image)`, D217).
