@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
@@ -26,7 +27,8 @@ func service(t *testing.T, api *apptest.API) (*products.Service, context.Context
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := products.NewService(api.DB, producttypes.NewService(api.DB), categories.NewService(api.DB), files.NewService(api.DB, storage))
+	caps := capabilities.NewService(api.DB)
+	svc := products.NewService(api.DB, producttypes.NewService(api.DB), categories.NewService(api.DB, caps), files.NewService(api.DB, storage), caps)
 	ctx := auth.WithActor(context.Background(), auth.Actor{UserID: api.Admin.UserID, TenantID: api.Admin.TenantID, Role: auth.RoleAdmin})
 	return svc, ctx
 }
@@ -90,7 +92,7 @@ func TestCatalogAndLookups(t *testing.T) {
 
 	// Normalisers report bare locations with an empty prefix.
 	types, _ := producttypes.NewService(api.DB).List(ctx, true)
-	cats, _ := categories.NewService(api.DB).List(ctx, true)
+	cats, _ := categories.NewService(api.DB, capabilities.NewService(api.DB)).List(ctx, true)
 	_, errs := products.NormalizeProduct(types[0], cats[0], products.ProductInput{ProductTypeID: types[0].ID, CategoryID: cats[0].ID}, nil, "")
 	locations := []string{}
 	for _, e := range errs {

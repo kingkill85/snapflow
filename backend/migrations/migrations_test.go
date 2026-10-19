@@ -51,7 +51,8 @@ INSERT INTO products (product_type_id, model_number, name, attributes) VALUES
   ($1, 'DIM-2', '{"en":"Dimmer 2"}', '{"width_te":6,"stale":true}'),
   ($2, 'GW-1', '{"en":"Gateway 1"}', '{}')`, dimmer, gateway)
 
-	if err := database.Migrate(ctx, url); err != nil {
+	// The shape 00007 left (later migrations add columns).
+	if err := database.MigrateTo(ctx, url, 7); err != nil {
 		t.Fatal(err)
 	}
 

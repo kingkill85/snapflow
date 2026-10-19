@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
+
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
@@ -48,7 +50,10 @@ type Product struct {
 	AttributeErrors []apperr.FieldError `json:"attributeErrors" doc:"Problems of the stored values against the current schema, at attributes.<key>"`
 	IsActive        bool                `json:"isActive" doc:"The product's own flag"`
 	Available       bool                `json:"available" doc:"Product, product type and category are active"`
-	Variants        []Variant           `json:"variants" doc:"In variant order"`
+	Mounting        string              `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"The product's own mounting; empty = the category's (capabilities.mounting is the effective one)"`
+	// Capabilities are computed from the product-scope values (D187).
+	Capabilities capabilities.Capabilities `json:"capabilities" doc:"What SnapFlow knows about the product for the board checks, from its values and the linked fields' meanings"`
+	Variants     []Variant                 `json:"variants" doc:"In variant order"`
 	// VariantsWithProblems summarises the variants' attributeErrors and
 	// staleAttributes, e.g. after a category change: variant values are
 	// flagged against the current category, never re-validated or refused.
@@ -73,9 +78,11 @@ type Variant struct {
 	IsActive        bool                `json:"isActive" doc:"The variant's own flag"`
 	Available       bool                `json:"available" doc:"Variant, product, product type and category are active"`
 	Addons          []Addon             `json:"addons" doc:"In add-on order"`
-	CreatedAt       time.Time           `json:"createdAt"`
-	UpdatedAt       time.Time           `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can             auth.Actions        `json:"can"`
+	// Capabilities are computed from the product's and the variant's values.
+	Capabilities capabilities.Capabilities `json:"capabilities" doc:"As on the product, with the variant's own values"`
+	CreatedAt    time.Time                 `json:"createdAt"`
+	UpdatedAt    time.Time                 `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can          auth.Actions              `json:"can"`
 }
 
 // Addon is a link from a variant to another variant that goes with it.
@@ -149,6 +156,7 @@ type ProductInput struct {
 	Description   i18n.Text         `json:"description,omitempty" doc:"At most 5000 characters; if set, \"en\" is required"`
 	Attributes    attrschema.Values `json:"attributes,omitempty" doc:"Product-scope values by key; stale values are kept only if they are sent back"`
 	IsActive      bool              `json:"isActive"`
+	Mounting      string            `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"Override of the category's mounting; leave out for the category's"`
 }
 
 type ProductUpdate struct {

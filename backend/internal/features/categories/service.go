@@ -9,14 +9,17 @@ package categories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories/store"
 	"github.com/kingkill85/snapflow/backend/internal/platform/apperr"
 	"github.com/kingkill85/snapflow/backend/internal/platform/attrschema"
@@ -35,9 +38,12 @@ type Category struct {
 	Attributes  attrschema.Schema `json:"attributes" doc:"Values stored on each product, or on each variant (scope)"`
 	// InstanceAttributes are filled in per installed unit in projects.
 	InstanceAttributes attrschema.InstanceSchema `json:"instanceAttributes" doc:"Values per installed unit (bus address, MAC, ...), filled in projects"`
-	CreatedAt          time.Time                 `json:"createdAt"`
-	UpdatedAt          time.Time                 `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can                auth.Actions              `json:"can"`
+	// Mounting is where the category's products are placed (D189); a
+	// product may override it.
+	Mounting  string       `json:"mounting" enum:"floorplan,board,both" doc:"Where products are placed: the floorplan, the distribution board, or both"`
+	CreatedAt time.Time    `json:"createdAt"`
+	UpdatedAt time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can       auth.Actions `json:"can"`
 }
 
 type CategoryInput struct {
@@ -47,6 +53,7 @@ type CategoryInput struct {
 	IsActive           bool                      `json:"isActive"`
 	Attributes         attrschema.Schema         `json:"attributes" doc:"At most 200"`
 	InstanceAttributes attrschema.InstanceSchema `json:"instanceAttributes" doc:"At most 200"`
+	Mounting           string                    `json:"mounting,omitempty" enum:"floorplan,board,both" doc:"Default floorplan"`
 }
 
 // CategoryUpdate is the body of an update: the input plus the version it
@@ -76,18 +83,27 @@ type DB interface {
 }
 
 type Service struct {
-	db DB
-	q  *store.Queries
+	db     DB
+	q      *store.Queries
+	fields *capabilities.Service
 }
 
-func NewService(db DB) *Service {
-	return &Service{db: db, q: store.New(db)}
+// NewService needs the capabilities service for the catalog fields that
+// attributes link (fieldKey).
+func NewService(db DB, fields *capabilities.Service) *Service {
+	return &Service{db: db, q: store.New(db), fields: fields}
 }
 
 // WithTx returns the service working inside tx (see database.Nested): its
 // transactions become savepoints, so a refused write leaves tx usable.
 func (s *Service) WithTx(tx pgx.Tx) *Service {
-	return NewService(database.NewNested(tx))
+	return NewService(database.NewNested(tx), s.fields.WithTx(tx))
+}
+
+// FieldInUse reports whether a category attribute links the catalog field
+// key (capabilities.FieldUsage).
+func (s *Service) FieldInUse(ctx context.Context, key string) (bool, error) {
+	return s.q.FieldInUse(ctx, key)
 }
 
 // inTx runs fn in one transaction; any error rolls it back. A transaction
@@ -131,7 +147,7 @@ func (s *Service) Create(ctx context.Context, in CategoryInput) (Category, error
 	if err != nil {
 		return Category{}, err
 	}
-	in, err = validate(in)
+	in, err = s.validate(ctx, in)
 	if err != nil {
 		return Category{}, err
 	}
@@ -143,6 +159,7 @@ func (s *Service) Create(ctx context.Context, in CategoryInput) (Category, error
 		row, err = q.CreateCategory(ctx, store.CreateCategoryParams{
 			Key: in.Key, Name: in.Name, Description: textPtr(in.Description),
 			IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
+			Mounting: in.Mounting,
 		})
 		return err
 	})
@@ -160,7 +177,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 	if err != nil {
 		return Category{}, err
 	}
-	in.CategoryInput, err = validate(in.CategoryInput)
+	in.CategoryInput, err = s.validate(ctx, in.CategoryInput)
 	if err != nil {
 		return Category{}, err
 	}
@@ -170,7 +187,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CategoryUpdate) (
 		row, err = q.UpdateCategory(ctx, store.UpdateCategoryParams{
 			ID: id, Key: in.Key, Name: in.Name, Description: textPtr(in.Description),
 			IsActive: in.IsActive, Attributes: in.Attributes, InstanceAttributes: in.InstanceAttributes,
-			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
+			Mounting: in.Mounting, ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
 	})
@@ -263,8 +280,21 @@ func sameSet(ids, existing []uuid.UUID) bool {
 
 // validate checks the input and returns it normalised. Every problem is
 // reported at once, at its exact location (e.g. body.attributes[2].key).
-func validate(in CategoryInput) (CategoryInput, error) {
+// Attributes linked to a catalog field take its unit and options (and must
+// have its type).
+func (s *Service) validate(ctx context.Context, in CategoryInput) (CategoryInput, error) {
 	var errs []apperr.FieldError
+	if in.Mounting == "" {
+		in.Mounting = string(capabilities.MountingFloorplan)
+	}
+	if !capabilities.ValidMounting(in.Mounting) {
+		errs = append(errs, apperr.Field("body.mounting", "validation.invalid", "mounting must be floorplan, board or both"))
+	}
+	linkErrs, err := s.linkFields(ctx, &in)
+	if err != nil {
+		return in, err
+	}
+	errs = append(errs, linkErrs...)
 	if len(in.Key) > MaxKeyLength || !keyPattern.MatchString(in.Key) {
 		errs = append(errs, apperr.Field("body.key", "category.key_format", "key must be lower snake case, 1-64 characters"))
 	}
@@ -287,6 +317,52 @@ func validate(in CategoryInput) (CategoryInput, error) {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
+}
+
+// linkFields applies the catalog fields that attributes link: the type must
+// be the field's (attribute.field_type), unit and options come from the
+// field; an unknown key is attribute.field_not_found.
+func (s *Service) linkFields(ctx context.Context, in *CategoryInput) ([]apperr.FieldError, error) {
+	linked := false
+	for _, a := range in.Attributes {
+		linked = linked || strings.TrimSpace(a.FieldKey) != ""
+	}
+	for _, a := range in.InstanceAttributes {
+		linked = linked || strings.TrimSpace(a.FieldKey) != ""
+	}
+	if !linked {
+		return nil, nil
+	}
+	fields, err := s.fields.FieldsByKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var errs []apperr.FieldError
+	link := func(d *attrschema.Definition, loc string) {
+		d.FieldKey = strings.TrimSpace(d.FieldKey)
+		if d.FieldKey == "" {
+			return
+		}
+		f, ok := fields[d.FieldKey]
+		if !ok {
+			errs = append(errs, apperr.Field(loc+".fieldKey", "attribute.field_not_found", "no such catalog field").With("key", d.FieldKey))
+			return
+		}
+		if d.Type != f.Type {
+			errs = append(errs, apperr.Field(loc+".type", "attribute.field_type", "the linked field has another type").
+				With("expected", string(f.Type)).With("key", f.Key))
+			return
+		}
+		linkedDef := f.Definition(d.Key)
+		d.Unit, d.Options = linkedDef.Unit, linkedDef.Options
+	}
+	for i := range in.Attributes {
+		link(&in.Attributes[i].Definition, fmt.Sprintf("body.attributes[%d]", i))
+	}
+	for i := range in.InstanceAttributes {
+		link(&in.InstanceAttributes[i].Definition, fmt.Sprintf("body.instanceAttributes[%d]", i))
+	}
+	return errs, nil
 }
 
 func textPtr(t i18n.Text) *i18n.Text {
@@ -324,7 +400,7 @@ func fromRow(actor auth.Actor, r store.Category) Category {
 	write := actor.Can(auth.PermCatalogWrite)
 	c := Category{
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
-		Attributes: r.Attributes, InstanceAttributes: r.InstanceAttributes,
+		Attributes: r.Attributes, InstanceAttributes: r.InstanceAttributes, Mounting: r.Mounting,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Can: auth.Actions{Update: write, Delete: write},
 	}

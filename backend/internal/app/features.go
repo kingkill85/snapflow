@@ -5,10 +5,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom"
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/functiontypes"
-	functiontypesstore "github.com/kingkill85/snapflow/backend/internal/features/functiontypes/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/imports"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
@@ -40,15 +40,18 @@ func newCore(db *pgxpool.Pool) core {
 func registerFeatures(api huma.API, deps Deps, c core) {
 	tenants.Register(api, c.tenants)
 	users.Register(api, c.users, deps.Cookies)
-	functiontypes.Register(api, functiontypes.NewService(functiontypesstore.New(deps.DB)))
+	functiontypes.Register(api, functiontypes.NewService(deps.DB))
 	productTypes := producttypes.NewService(deps.DB)
 	producttypes.Register(api, productTypes)
-	cats := categories.NewService(deps.DB)
+	capSvc := capabilities.NewService(deps.DB)
+	capabilities.Register(api, capSvc)
+	cats := categories.NewService(deps.DB, capSvc)
+	capSvc.OnFieldUsage(cats.FieldInUse)
 	categories.Register(api, cats)
 	fileSvc := files.NewService(deps.DB, deps.Storage)
 	files.Register(api, fileSvc)
 	c.tenants.UseFiles(fileSvc)
-	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc)
+	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc, capSvc)
 	products.Register(api, productSvc)
 	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users)
 	imports.Register(api, importSvc)

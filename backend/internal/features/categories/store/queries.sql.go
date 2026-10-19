@@ -26,9 +26,9 @@ func (q *Queries) CategoryExists(ctx context.Context, id uuid.UUID) (bool, error
 }
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories (key, name, description, is_active, attributes, instance_attributes, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(sort_order), 0) + 1 FROM categories))
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+INSERT INTO categories (key, name, description, is_active, attributes, instance_attributes, mounting, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(sort_order), 0) + 1 FROM categories))
+RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting
 `
 
 type CreateCategoryParams struct {
@@ -38,6 +38,7 @@ type CreateCategoryParams struct {
 	IsActive           bool
 	Attributes         attrschema.Schema
 	InstanceAttributes attrschema.InstanceSchema
+	Mounting           string
 }
 
 // New categories go to the end of the order (under LockCategoryOrder, so two
@@ -50,6 +51,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
+		arg.Mounting,
 	)
 	var i Category
 	err := row.Scan(
@@ -63,6 +65,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -79,8 +82,24 @@ func (q *Queries) DeleteCategory(ctx context.Context, id uuid.UUID) (int64, erro
 	return result.RowsAffected(), nil
 }
 
+const fieldInUse = `-- name: FieldInUse :one
+SELECT EXISTS (
+    SELECT 1 FROM categories c, jsonb_array_elements(c.attributes || c.instance_attributes) a
+    WHERE a ->> 'fieldKey' = $1::text
+)
+`
+
+// FieldInUse reports whether any category attribute (product or instance)
+// links the catalog field key.
+func (q *Queries) FieldInUse(ctx context.Context, fieldKey string) (bool, error) {
+	row := q.db.QueryRow(ctx, fieldInUse, fieldKey)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getCategory = `-- name: GetCategory :one
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM categories WHERE id = $1
+SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting FROM categories WHERE id = $1
 `
 
 func (q *Queries) GetCategory(ctx context.Context, id uuid.UUID) (Category, error) {
@@ -97,12 +116,13 @@ func (q *Queries) GetCategory(ctx context.Context, id uuid.UUID) (Category, erro
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at FROM categories
+SELECT id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting FROM categories
 WHERE is_active OR $1::boolean
 ORDER BY sort_order, key
 `
@@ -127,6 +147,7 @@ func (q *Queries) ListCategories(ctx context.Context, includeInactive bool) ([]C
 			&i.InstanceAttributes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Mounting,
 		); err != nil {
 			return nil, err
 		}
@@ -190,10 +211,10 @@ func (q *Queries) SetCategoryOrder(ctx context.Context, ids []uuid.UUID) error {
 
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE categories
-SET key = $2, name = $3, description = $4, is_active = $5, attributes = $6, instance_attributes = $7,
+SET key = $2, name = $3, description = $4, is_active = $5, attributes = $6, instance_attributes = $7, mounting = $8,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $8
-RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at
+WHERE id = $1 AND updated_at = $9
+RETURNING id, key, name, description, sort_order, is_active, attributes, instance_attributes, created_at, updated_at, mounting
 `
 
 type UpdateCategoryParams struct {
@@ -204,6 +225,7 @@ type UpdateCategoryParams struct {
 	IsActive           bool
 	Attributes         attrschema.Schema
 	InstanceAttributes attrschema.InstanceSchema
+	Mounting           string
 	ExpectedUpdatedAt  time.Time
 }
 
@@ -219,6 +241,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		arg.IsActive,
 		arg.Attributes,
 		arg.InstanceAttributes,
+		arg.Mounting,
 		arg.ExpectedUpdatedAt,
 	)
 	var i Category
@@ -233,6 +256,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		&i.InstanceAttributes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Mounting,
 	)
 	return i, err
 }

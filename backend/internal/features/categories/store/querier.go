@@ -16,6 +16,9 @@ type Querier interface {
 	// creates never get the same sort order).
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	DeleteCategory(ctx context.Context, id uuid.UUID) (int64, error)
+	// FieldInUse reports whether any category attribute (product or instance)
+	// links the catalog field key.
+	FieldInUse(ctx context.Context, fieldKey string) (bool, error)
 	GetCategory(ctx context.Context, id uuid.UUID) (Category, error)
 	ListCategories(ctx context.Context, includeInactive bool) ([]Category, error)
 	// LockCategoryIDs locks every category row for a reorder, so none can

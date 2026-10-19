@@ -137,6 +137,18 @@ overrides:
           import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
           type: Text
           pointer: true
+      - column: load_types.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: output_kinds.name
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
+      - column: catalog_fields.label
+        go_type:
+          import: github.com/kingkill85/snapflow/backend/internal/platform/i18n
+          type: Text
       # scaffold:overrides
 sql:
   - engine: postgresql
@@ -226,4 +238,11 @@ sql:
       go:
         <<: *go
         out: internal/features/proposals/store
+  - engine: postgresql
+    schema: migrations
+    queries: internal/features/capabilities/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/features/capabilities/store
   # scaffold:sqlc

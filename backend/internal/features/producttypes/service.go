@@ -29,24 +29,31 @@ import (
 )
 
 type ProductType struct {
-	ID           uuid.UUID    `json:"id"`
-	Key          string       `json:"key" doc:"Stable identifier, lower snake case" example:"zigbee"`
-	Name         i18n.Text    `json:"name" doc:"Display name per locale"`
-	Abbreviation string       `json:"abbreviation,omitempty" doc:"Badge text, upper case, at most 6 characters" example:"ZB"`
-	Color        string       `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
-	SortOrder    int32        `json:"sortOrder" doc:"Position in the catalog, 1 first"`
-	IsActive     bool         `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
-	CreatedAt    time.Time    `json:"createdAt"`
-	UpdatedAt    time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
-	Can          auth.Actions `json:"can"`
+	ID           uuid.UUID `json:"id"`
+	Key          string    `json:"key" doc:"Stable identifier, lower snake case" example:"zigbee"`
+	Name         i18n.Text `json:"name" doc:"Display name per locale"`
+	Abbreviation string    `json:"abbreviation,omitempty" doc:"Badge text, upper case, at most 6 characters" example:"ZB"`
+	Color        string    `json:"color,omitempty" doc:"Badge colour, #rrggbb" example:"#1f6feb"`
+	SortOrder    int32     `json:"sortOrder" doc:"Position in the catalog, 1 first"`
+	IsActive     bool      `json:"isActive" doc:"Inactive types are hidden from lists unless asked for"`
+	// System settings for the board checks (step 3a).
+	DefaultBusCurrentMa *int32       `json:"defaultBusCurrentMa,omitempty" doc:"Bus current (mA) assumed for a bus device of this system without its own value (e.g. KNX 10); empty = unknown"`
+	ReservePercent      int32        `json:"reservePercent" doc:"Capacity kept in reserve: amber above 100 − reserve %, red when exceeded"`
+	BusDevicesMax       *int32       `json:"busDevicesMax,omitempty" doc:"Default maximum devices per bus line; empty = not checked"`
+	CreatedAt           time.Time    `json:"createdAt"`
+	UpdatedAt           time.Time    `json:"updatedAt" doc:"Send it back as expectedUpdatedAt when updating"`
+	Can                 auth.Actions `json:"can"`
 }
 
 type ProductTypeInput struct {
-	Key          string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
-	Name         i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
-	Abbreviation string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
-	Color        string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
-	IsActive     bool      `json:"isActive"`
+	Key                 string    `json:"key" doc:"Lower snake case, 1-64 characters" example:"zigbee"`
+	Name                i18n.Text `json:"name" doc:"Display name per locale (at most 100 characters); \"en\" is required"`
+	Abbreviation        string    `json:"abbreviation,omitempty" doc:"Badge text: at most 6 characters, no control characters; stored trimmed and upper case; empty for none" example:"ZB"`
+	Color               string    `json:"color,omitempty" doc:"Badge colour, #rrggbb (stored lower case); empty for none" example:"#1f6feb"`
+	IsActive            bool      `json:"isActive"`
+	DefaultBusCurrentMa *int32    `json:"defaultBusCurrentMa,omitempty" doc:"1-100000 mA; leave out for none"`
+	ReservePercent      *int32    `json:"reservePercent,omitempty" doc:"0-90; default 20"`
+	BusDevicesMax       *int32    `json:"busDevicesMax,omitempty" doc:"1-100000; leave out for none"`
 }
 
 // ProductTypeUpdate is the body of an update: the input plus the version it
@@ -145,7 +152,8 @@ func (s *Service) Create(ctx context.Context, in ProductTypeInput) (ProductType,
 		}
 		row, err = q.CreateProductType(ctx, store.CreateProductTypeParams{
 			Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
-			IsActive: in.IsActive,
+			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
+			BusDevicesMax: in.BusDevicesMax,
 		})
 		return err
 	})
@@ -172,7 +180,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in ProductTypeUpdate
 		var err error
 		row, err = q.UpdateProductType(ctx, store.UpdateProductTypeParams{
 			ID: id, Key: in.Key, Name: in.Name, Abbreviation: strPtr(in.Abbreviation), Color: strPtr(in.Color),
-			IsActive:          in.IsActive,
+			IsActive: in.IsActive, DefaultBusCurrentMa: in.DefaultBusCurrentMa, ReservePercent: *in.ReservePercent,
+			BusDevicesMax:     in.BusDevicesMax,
 			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
@@ -288,11 +297,27 @@ func validate(in ProductTypeInput) (ProductTypeInput, error) {
 	if in.Color != "" && !colorPattern.MatchString(in.Color) {
 		errs = append(errs, apperr.Field("body.color", "product_type.color_format", "colour must be #rrggbb"))
 	}
+	if in.ReservePercent == nil {
+		in.ReservePercent = ptr(int32(DefaultReservePercent))
+	}
+	rangeErr := func(loc string, v *int32, lo, hi int32) {
+		if v != nil && (*v < lo || *v > hi) {
+			errs = append(errs, apperr.Field(loc, "validation.range", "out of range").With("min", lo).With("max", hi))
+		}
+	}
+	rangeErr("body.defaultBusCurrentMa", in.DefaultBusCurrentMa, 1, 100000)
+	rangeErr("body.reservePercent", in.ReservePercent, 0, 90)
+	rangeErr("body.busDevicesMax", in.BusDevicesMax, 1, 100000)
 	if len(errs) > 0 {
 		return in, apperr.Validation(errs...)
 	}
 	return in, nil
 }
+
+// DefaultReservePercent is the reserve of a product type unless set (spec 3a, Q9).
+const DefaultReservePercent = 20
+
+func ptr[T any](v T) *T { return &v }
 
 func strPtr(s string) *string {
 	if s == "" {
@@ -330,6 +355,7 @@ func fromRow(actor auth.Actor, r store.ProductType) ProductType {
 	pt := ProductType{
 		ID: r.ID, Key: r.Key, Name: r.Name, SortOrder: r.SortOrder, IsActive: r.IsActive,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		DefaultBusCurrentMa: r.DefaultBusCurrentMa, ReservePercent: r.ReservePercent, BusDevicesMax: r.BusDevicesMax,
 		Can: auth.Actions{Update: write, Delete: write},
 	}
 	if r.Abbreviation != nil {

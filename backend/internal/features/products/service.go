@@ -27,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/kingkill85/snapflow/backend/internal/features/capabilities"
 	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/files"
 	"github.com/kingkill85/snapflow/backend/internal/features/products/store"
@@ -67,17 +68,18 @@ type Service struct {
 	types *producttypes.Service
 	cats  *categories.Service
 	files *files.Service
+	caps  *capabilities.Service
 }
 
-func NewService(db DB, types *producttypes.Service, cats *categories.Service, files *files.Service) *Service {
-	return &Service{db: db, q: store.New(db), types: types, cats: cats, files: files}
+func NewService(db DB, types *producttypes.Service, cats *categories.Service, files *files.Service, caps *capabilities.Service) *Service {
+	return &Service{db: db, q: store.New(db), types: types, cats: cats, files: files, caps: caps}
 }
 
 // WithTx returns the service working inside tx (see database.Nested), with
 // product types, categories and files read and written in tx too. Its transactions
 // become savepoints, so a refused write (a taken SKU, say) leaves tx usable.
 func (s *Service) WithTx(tx pgx.Tx) *Service {
-	return NewService(database.NewNested(tx), s.types.WithTx(tx), s.cats.WithTx(tx), s.files.WithTx(tx))
+	return NewService(database.NewNested(tx), s.types.WithTx(tx), s.cats.WithTx(tx), s.files.WithTx(tx), s.caps.WithTx(tx))
 }
 
 // inSnapshot runs the reads of fn in one read-only REPEATABLE READ
@@ -235,7 +237,7 @@ func (s *Service) createProduct(ctx context.Context, in ProductInput, known Know
 		var err error
 		row, err = q.CreateProduct(ctx, store.CreateProductParams{
 			ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
-			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: strPtr(in.Mounting),
 		})
 		return err
 	})
@@ -284,7 +286,7 @@ func (s *Service) updateProduct(ctx context.Context, id uuid.UUID, in ProductUpd
 		var err error
 		row, err = q.UpdateProduct(ctx, store.UpdateProductParams{
 			ID: id, ProductTypeID: in.ProductTypeID, CategoryID: in.CategoryID, ModelNumber: in.ModelNumber, Name: in.Name,
-			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive,
+			Description: textPtr(in.Description), Attributes: in.Attributes, IsActive: in.IsActive, Mounting: strPtr(in.Mounting),
 			ExpectedUpdatedAt: in.ExpectedUpdatedAt,
 		})
 		return err
@@ -394,20 +396,27 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Produc
 	if err != nil {
 		return Product{}, err
 	}
+	reg, err := s.caps.Registry(ctx)
+	if err != nil {
+		return Product{}, err
+	}
 	write := actor.Can(auth.PermCatalogWrite)
 	p := Product{
 		ID: row.ID, ProductTypeID: row.ProductTypeID, ProductType: typeRef(pt),
 		CategoryID: row.CategoryID, Category: categoryRef(c), ModelNumber: row.ModelNumber,
 		Name: row.Name, IsActive: row.IsActive, Available: row.IsActive && pt.IsActive && c.IsActive,
+		Mounting:  deref(row.Mounting),
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Can: auth.Actions{Update: write, Delete: write},
 	}
 	if row.Description != nil {
 		p.Description = *row.Description
 	}
 	p.Attributes, p.StaleAttributes, p.AttributeErrors = readValues(c.Attributes, attrschema.ScopeProduct, row.Attributes)
+	p.Capabilities = capabilities.Compute(reg, capabilityInput(row.ProductTypeID, row.Mounting, c, row.Attributes, nil))
 	p.Variants = make([]Variant, len(variants))
 	for i, v := range variants {
 		p.Variants[i] = variantOut(actor, v, c.Attributes, p.Available, addons[v.ID])
+		p.Variants[i].Capabilities = capabilities.Compute(reg, capabilityInput(row.ProductTypeID, row.Mounting, c, row.Attributes, v.Attributes))
 		if len(p.Variants[i].AttributeErrors) > 0 || len(p.Variants[i].StaleAttributes) > 0 {
 			p.VariantsWithProblems++
 		}
@@ -644,7 +653,13 @@ func (s *Service) variantDetail(ctx context.Context, actor auth.Actor, product s
 	if err != nil {
 		return Variant{}, err
 	}
-	return variantOut(actor, v, c.Attributes, product.IsActive && pt.IsActive && c.IsActive, addons[v.ID]), nil
+	reg, err := s.caps.Registry(ctx)
+	if err != nil {
+		return Variant{}, err
+	}
+	out := variantOut(actor, v, c.Attributes, product.IsActive && pt.IsActive && c.IsActive, addons[v.ID])
+	out.Capabilities = capabilities.Compute(reg, capabilityInput(product.ProductTypeID, product.Mounting, c, product.Attributes, v.Attributes))
+	return out, nil
 }
 
 // SearchVariants lists variants across the catalog (add-on picker) in
@@ -889,6 +904,61 @@ func (c *catalog) categoryOf(ctx context.Context, s *Service, id uuid.UUID) (cat
 	}
 	c.categories[id] = k
 	return k, nil
+}
+
+// capabilityInput is what capabilities.Compute needs of a product (variant
+// values nil) or a variant: the effective mounting and the values of both.
+func capabilityInput(productTypeID uuid.UUID, mounting *string, c categories.Category, product, variant attrschema.Values) capabilities.Input {
+	values := attrschema.Values{}
+	for k, v := range product {
+		values[k] = v
+	}
+	for k, v := range variant {
+		values[k] = v
+	}
+	return capabilities.Input{ProductTypeID: productTypeID, Mounting: EffectiveMounting(mounting, c), Schema: c.Attributes, Values: values}
+}
+
+// EffectiveMounting is the product's mounting override, else its
+// category's (D189).
+func EffectiveMounting(override *string, c categories.Category) string {
+	if override != nil && *override != "" {
+		return *override
+	}
+	if c.Mounting == "" {
+		return string(capabilities.MountingFloorplan)
+	}
+	return c.Mounting
+}
+
+// Capabilities computes the capabilities of variants (with their product's
+// values), by id; unknown ids are left out. Later steps (boards, checks)
+// call it. Needs catalog.read.
+func (s *Service) Capabilities(ctx context.Context, variantIDs []uuid.UUID) (map[uuid.UUID]capabilities.Capabilities, error) {
+	if _, err := auth.Require(ctx, auth.PermCatalogRead); err != nil {
+		return nil, err
+	}
+	rows, err := s.q.CapabilityVariants(ctx, variantIDs)
+	if err != nil {
+		return nil, err
+	}
+	cats, err := s.cats.List(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[uuid.UUID]categories.Category, len(cats))
+	for _, c := range cats {
+		byID[c.ID] = c
+	}
+	reg, err := s.caps.Registry(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]capabilities.Capabilities, len(rows))
+	for _, r := range rows {
+		out[r.ID] = capabilities.Compute(reg, capabilityInput(r.ProductTypeID, r.Mounting, byID[r.CategoryID], r.ProductAttributes, r.Attributes))
+	}
+	return out, nil
 }
 
 func typeRef(t producttypes.ProductType) ProductTypeRef {

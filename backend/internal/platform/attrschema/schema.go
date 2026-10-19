@@ -84,6 +84,10 @@ type Definition struct {
 	Max         *float64          `json:"max,omitempty" doc:"number/integer: largest value; text: longest length; list: most items"`
 	Options     []AttributeOption `json:"options,omitempty" doc:"Allowed values of an enum, or of a list of enums (at most 500)"`
 	ItemType    Type              `json:"itemType,omitempty" enum:"text,number,integer,enum" doc:"Type of a list's items"`
+	// FieldKey links the attribute to a catalog field (features/capabilities):
+	// the category takes the field's type, unit and options, and the field's
+	// meaning applies to the values (D188).
+	FieldKey string `json:"fieldKey,omitempty" maxLength:"64" doc:"Key of the catalog field the attribute is linked to (type, unit, options and meaning come from it); empty for none"`
 }
 
 // AttributeDefinition defines one product attribute.
@@ -220,6 +224,7 @@ func normalizeDefinition(d Definition, loc string) (Definition, []apperr.FieldEr
 			add(apperr.Field(loc+".description.en", "validation.required", "English description is required when a description is set"))
 		}
 	}
+	d.FieldKey = strings.TrimSpace(d.FieldKey)
 	d.Unit = strings.TrimSpace(d.Unit)
 	if utf8.RuneCountInString(d.Unit) > MaxUnitLength {
 		add(tooLong(loc+".unit", MaxUnitLength))

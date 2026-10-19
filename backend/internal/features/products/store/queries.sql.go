@@ -72,6 +72,51 @@ func (q *Queries) BOMVariants(ctx context.Context, ids []uuid.UUID) ([]BOMVarian
 	return items, nil
 }
 
+const capabilityVariants = `-- name: CapabilityVariants :many
+SELECT v.id, v.attributes, p.attributes AS product_attributes, p.product_type_id, p.category_id, p.mounting
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY ($1::uuid[])
+`
+
+type CapabilityVariantsRow struct {
+	ID                uuid.UUID
+	Attributes        attrschema.Values
+	ProductAttributes attrschema.Values
+	ProductTypeID     uuid.UUID
+	CategoryID        uuid.UUID
+	Mounting          *string
+}
+
+// CapabilityVariants returns what the capabilities of variants are computed
+// from: their values and their product's.
+func (q *Queries) CapabilityVariants(ctx context.Context, ids []uuid.UUID) ([]CapabilityVariantsRow, error) {
+	rows, err := q.db.Query(ctx, capabilityVariants, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CapabilityVariantsRow{}
+	for rows.Next() {
+		var i CapabilityVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Attributes,
+			&i.ProductAttributes,
+			&i.ProductTypeID,
+			&i.CategoryID,
+			&i.Mounting,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const catalogAddons = `-- name: CatalogAddons :many
 SELECT variant_id, addon_variant_id, required, sort_order FROM variant_addons ORDER BY variant_id, sort_order
 `
@@ -103,7 +148,7 @@ func (q *Queries) CatalogAddons(ctx context.Context) ([]VariantAddon, error) {
 
 const catalogProducts = `-- name: CatalogProducts :many
 
-SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products ORDER BY lower(model_number), id
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting FROM products ORDER BY lower(model_number), id
 `
 
 // Bulk reads and business-key lookups for other features (the import):
@@ -128,6 +173,7 @@ func (q *Queries) CatalogProducts(ctx context.Context) ([]Product, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CategoryID,
+			&i.Mounting,
 		); err != nil {
 			return nil, err
 		}
@@ -249,9 +295,9 @@ func (q *Queries) CountVariants(ctx context.Context, arg CountVariantsParams) (i
 }
 
 const createProduct = `-- name: CreateProduct :one
-INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
+INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active, mounting)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting
 `
 
 type CreateProductParams struct {
@@ -262,6 +308,7 @@ type CreateProductParams struct {
 	Description   *i18n.Text
 	Attributes    attrschema.Values
 	IsActive      bool
+	Mounting      *string
 }
 
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
@@ -273,6 +320,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		arg.Description,
 		arg.Attributes,
 		arg.IsActive,
+		arg.Mounting,
 	)
 	var i Product
 	err := row.Scan(
@@ -286,6 +334,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CategoryID,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -478,7 +527,7 @@ func (q *Queries) ExistingVariantIDs(ctx context.Context, ids []uuid.UUID) ([]uu
 }
 
 const findProductByModelNumber = `-- name: FindProductByModelNumber :one
-SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products WHERE lower(model_number) = lower($1::text)
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting FROM products WHERE lower(model_number) = lower($1::text)
 `
 
 func (q *Queries) FindProductByModelNumber(ctx context.Context, modelNumber string) (Product, error) {
@@ -495,6 +544,7 @@ func (q *Queries) FindProductByModelNumber(ctx context.Context, modelNumber stri
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CategoryID,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -555,7 +605,7 @@ func (q *Queries) FindVariantBySKU(ctx context.Context, sku string) (ProductVari
 const getProduct = `-- name: GetProduct :one
 
 
-SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id FROM products WHERE id = $1
+SELECT id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting FROM products WHERE id = $1
 `
 
 // Products, variants and add-ons are one aggregate. Product type and category
@@ -576,6 +626,7 @@ func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (Product, error)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CategoryID,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -719,7 +770,7 @@ func (q *Queries) ListAddons(ctx context.Context, variantIds []uuid.UUID) ([]Lis
 }
 
 const listProducts = `-- name: ListProducts :many
-SELECT p.id, p.product_type_id, p.model_number, p.name, p.description, p.attributes, p.is_active, p.created_at, p.updated_at, p.category_id
+SELECT p.id, p.product_type_id, p.model_number, p.name, p.description, p.attributes, p.is_active, p.created_at, p.updated_at, p.category_id, p.mounting
 FROM products p
 LEFT JOIN unnest($1::uuid[]) WITH ORDINALITY AS t (id, ord) ON t.id = p.product_type_id
 LEFT JOIN unnest($2::uuid[]) WITH ORDINALITY AS c (id, ord) ON c.id = p.category_id
@@ -789,6 +840,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]P
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CategoryID,
+			&i.Mounting,
 		); err != nil {
 			return nil, err
 		}
@@ -1050,7 +1102,7 @@ const setProductActive = `-- name: SetProductActive :one
 UPDATE products
 SET is_active = $2, updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = $3
-RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting
 `
 
 type SetProductActiveParams struct {
@@ -1075,6 +1127,7 @@ func (q *Queries) SetProductActive(ctx context.Context, arg SetProductActivePara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CategoryID,
+		&i.Mounting,
 	)
 	return i, err
 }
@@ -1235,9 +1288,10 @@ func (q *Queries) TouchVariantsAddons(ctx context.Context, arg TouchVariantsAddo
 const updateProduct = `-- name: UpdateProduct :one
 UPDATE products
 SET product_type_id = $2, category_id = $3, model_number = $4, name = $5, description = $6, attributes = $7, is_active = $8,
+    mounting = $9,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
-WHERE id = $1 AND updated_at = $9
-RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id
+WHERE id = $1 AND updated_at = $10
+RETURNING id, product_type_id, model_number, name, description, attributes, is_active, created_at, updated_at, category_id, mounting
 `
 
 type UpdateProductParams struct {
@@ -1249,6 +1303,7 @@ type UpdateProductParams struct {
 	Description       *i18n.Text
 	Attributes        attrschema.Values
 	IsActive          bool
+	Mounting          *string
 	ExpectedUpdatedAt time.Time
 }
 
@@ -1264,6 +1319,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		arg.Description,
 		arg.Attributes,
 		arg.IsActive,
+		arg.Mounting,
 		arg.ExpectedUpdatedAt,
 	)
 	var i Product
@@ -1278,6 +1334,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CategoryID,
+		&i.Mounting,
 	)
 	return i, err
 }

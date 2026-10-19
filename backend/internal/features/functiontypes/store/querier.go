@@ -13,7 +13,10 @@ import (
 type Querier interface {
 	CreateFunctionType(ctx context.Context, arg CreateFunctionTypeParams) (FunctionType, error)
 	DeleteFunctionType(ctx context.Context, id uuid.UUID) (int64, error)
+	DeleteFunctionTypeLoadTypes(ctx context.Context, functionTypeID uuid.UUID) error
 	GetFunctionType(ctx context.Context, id uuid.UUID) (FunctionType, error)
+	InsertFunctionTypeLoadTypes(ctx context.Context, arg InsertFunctionTypeLoadTypesParams) error
+	ListFunctionTypeLoadTypes(ctx context.Context) ([]FunctionTypeLoadType, error)
 	ListFunctionTypes(ctx context.Context) ([]FunctionType, error)
 	UpdateFunctionType(ctx context.Context, arg UpdateFunctionTypeParams) (FunctionType, error)
 }

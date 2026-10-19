@@ -22,8 +22,8 @@ SELECT id FROM products WHERE id = $1 FOR UPDATE;
 SELECT id FROM products WHERE id = $1 FOR KEY SHARE;
 
 -- name: CreateProduct :one
-INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO products (product_type_id, category_id, model_number, name, description, attributes, is_active, mounting)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- UpdateProduct changes the product only if nobody else has since it was
@@ -31,6 +31,7 @@ RETURNING *;
 -- name: UpdateProduct :one
 UPDATE products
 SET product_type_id = $2, category_id = $3, model_number = $4, name = $5, description = $6, attributes = $7, is_active = $8,
+    mounting = $9,
     updated_at = greatest(now(), updated_at + interval '1 microsecond')
 WHERE id = $1 AND updated_at = sqlc.arg(expected_updated_at)
 RETURNING *;
@@ -307,3 +308,11 @@ WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);
 -- files feature's reference check, D269).
 -- name: ReferencedFiles :many
 SELECT DISTINCT image_file_id::uuid AS file_id FROM product_variants WHERE image_file_id = ANY(sqlc.arg(ids)::uuid[]);
+
+-- CapabilityVariants returns what the capabilities of variants are computed
+-- from: their values and their product's.
+-- name: CapabilityVariants :many
+SELECT v.id, v.attributes, p.attributes AS product_attributes, p.product_type_id, p.category_id, p.mounting
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.id = ANY (sqlc.arg(ids)::uuid[]);
