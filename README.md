@@ -56,6 +56,18 @@ make feature name=product_types
 
 This creates the migration, SQL queries, Go service and API with tests, plus the frontend page, form dialog, translations and tests, and wires everything in. Extend it from there; `make check` must stay green.
 
+## Running on a server
+
+`deploy/` holds a compose file with Postgres and the published image, independent of this checkout (copy the folder to the server):
+
+```bash
+cd deploy
+cp .env.example .env     # set POSTGRES_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD (at least 8 characters)
+docker compose up -d     # http://<host>:8000
+```
+
+The first start migrates the database and creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; later starts leave users alone while an active admin exists. Update with `docker compose pull && docker compose up -d`. Serve it over HTTPS behind a reverse proxy (`SNAPFLOW_BIND=127.0.0.1`, `TRUSTED_PROXIES`); for a quick try over plain HTTP on another host set `COOKIE_SECURE=false`. Back up the volumes `db-data` and `app-files`.
+
 ## Licence
 
 [MIT](LICENSE)
