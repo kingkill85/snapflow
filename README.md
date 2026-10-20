@@ -24,7 +24,7 @@ Production-like stack in one container:
 docker compose --profile app up --build   # http://localhost:8000
 ```
 
-CI publishes the image to `ghcr.io/kingkill85/snapflow` after the checks pass: every push to `main` as `main`, `latest` and `sha-<short>`, every tag `v1.2.3` as `1.2.3` and `1.2`. Run the published image instead of building it (the package is private like the repository, so `docker login ghcr.io` first with a token that has `read:packages`):
+CI publishes the image to `ghcr.io/kingkill85/snapflow` after the checks pass: every push to `main` as `main`, `latest` and `sha-<short>`, every tag `v1.2.3` as `1.2.3` and `1.2`. Run the published image instead of building it:
 
 ```bash
 docker compose --profile app pull && docker compose --profile app up   # SNAPFLOW_TAG=1.2.3 for a release
@@ -55,3 +55,7 @@ make feature name=product_types
 ```
 
 This creates the migration, SQL queries, Go service and API with tests, plus the frontend page, form dialog, translations and tests, and wires everything in. Extend it from there; `make check` must stay green.
+
+## Licence
+
+[MIT](LICENSE)
