@@ -24,6 +24,12 @@ Production-like stack in one container:
 docker compose --profile app up --build   # http://localhost:8000
 ```
 
+CI publishes the image to `ghcr.io/kingkill85/snapflow` after the checks pass: every push to `main` as `main`, `latest` and `sha-<short>`, every tag `v1.2.3` as `1.2.3` and `1.2`. Run the published image instead of building it (the package is private like the repository, so `docker login ghcr.io` first with a token that has `read:packages`):
+
+```bash
+docker compose --profile app pull && docker compose --profile app up   # SNAPFLOW_TAG=1.2.3 for a release
+```
+
 Set `POSTGRES_PASSWORD` for anything beyond local use, and `ADMIN_EMAIL` + `ADMIN_PASSWORD` for the first start: the server creates that admin when no active admin exists. Other settings: `DISTRIBUTOR_NAME` (name of the distributor tenant on first start, default "Distributor"), `COOKIE_SECURE=false` (only for plain HTTP on a host other than localhost) `TRUSTED_PROXIES` (comma-separated CIDRs or addresses of reverse proxies whose `X-Forwarded-For` header determines the client address for login rate limits; empty by default, i.e. the header is ignored) `DATABASE_MAX_CONNS` (size of the database connection pool, default 20) and `STORAGE_DIR` (where uploaded files such as product images are stored, content-addressed by SHA-256; default `./data/files` relative to the working directory, i.e. `backend/data/files` for `make dev-backend` and `/data/files` on the `app-files` volume in the container; back it up together with the database). If no active admin exists and `ADMIN_EMAIL` belongs to an existing user, that user is promoted to admin with `ADMIN_PASSWORD`.
 
 ## End-to-end tests

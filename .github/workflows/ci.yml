@@ -1,6 +1,7 @@
 name: CI
 
 # check: every push to main and every pull request.
+# image: after check on main and on v* tags, pushes ghcr.io/kingkill85/snapflow.
 # e2e: pull requests only, in two shards (the layout matrix left out, D107).
 # e2e-visual: the full layout matrix, on pull requests labelled "visual" or by hand.
 on:
@@ -8,6 +9,7 @@ on:
     types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +37,45 @@ jobs:
       - name: Generate, lint, test, check generated code is committed
         run: nix develop -c make check
       - name: Build image
+        # On main and tags the image job builds (and pushes) it.
+        if: github.event_name == 'pull_request'
         run: docker build -t snapflow:ci .
+
+  image:
+    needs: [check, documents]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # main: "main" + "latest"; tag v1.2.3: "1.2.3" + "1.2"; always "sha-<short>".
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   documents:
     # Generated documents must open in a real word processor: LibreOffice

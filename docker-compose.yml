@@ -42,6 +42,8 @@ services:
       retries: 60
 
   app:
+    # `--build` builds it locally; `pull` fetches the image CI publishes (SNAPFLOW_TAG: main, latest, 1.2.3, sha-<short>).
+    image: ghcr.io/kingkill85/snapflow:${SNAPFLOW_TAG:-latest}
     build: .
     profiles: [app]
     environment:
