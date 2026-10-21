@@ -9,7 +9,7 @@ export const importsFeature: FeatureModule = {
   element: ImportsPage,
   // The import writes the catalog: everything in it needs catalog.write (D134).
   permission: 'catalog.write',
-  nav: { section: 'catalog', namespace: 'imports', labelKey: 'title', order: 5 },
+  nav: { section: 'catalog', namespace: 'imports', labelKey: 'title', order: 3 },
   pages: [
     { path: 'new', element: NewImportPage },
     { path: ':id', element: ImportRunPage },

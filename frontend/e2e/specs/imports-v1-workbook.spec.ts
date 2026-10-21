@@ -32,7 +32,7 @@ async function uploadWithStarterProfile(page: Page, file: string) {
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Choose file' }).click()
   await (await chooser).setFiles(file)
-  await chooseOption(page.getByRole('combobox', { name: 'Profile' }), 'SnapFlow 1 workbook')
+  await chooseOption(page.getByRole('combobox', { name: 'Saved mapping' }), 'SnapFlow 1 workbook')
   await page.getByRole('button', { name: 'Upload and preview' }).click()
   await expect(page.getByRole('heading', { name: 'Preview', exact: true })).toBeVisible({ timeout: 60_000 })
 }

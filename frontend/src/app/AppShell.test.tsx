@@ -87,15 +87,18 @@ describe('AppShell', () => {
     expect(called).toBe(true)
   })
 
-  it('groups the navigation into sections: catalog, then administration', async () => {
+  it('groups the navigation into sections: catalog, setup, then administration', async () => {
     const user = userEvent.setup()
     renderWithProviders(routes)
 
     expect(within(await screen.findByRole('navigation', { name: 'Main navigation' })).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Catalog',
+      'Setup',
       'Administration',
     ])
-    expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types', 'Room templates', 'Import'])
+    // The catalog holds the data, Setup what it builds on (D442).
+    expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories', 'Import'])
+    expect(await sectionItems(user, 'Setup')).toEqual(['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'])
     expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Tenants', 'Roles', 'Company profile'])
   })
 
@@ -104,12 +107,28 @@ describe('AppShell', () => {
     renderWithProviders(routes, { me: tenantAdminMe })
     await screen.findByRole('navigation', { name: 'Main navigation' })
     expect(await sectionItems(user, 'Administration')).toEqual(['Users', 'Roles', 'Company profile'])
+    // Import needs catalog.write.
+    expect(await sectionItems(user, 'Catalog')).toEqual(['Products', 'Categories'])
+    expect(await sectionItems(user, 'Setup')).toEqual(['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'])
+  })
+
+  it('hides a section without entries the role may open', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(routes, { me: { ...userMe, permissions: ['projects.read'] } })
+    const nav = await screen.findByRole('navigation', { name: 'Main navigation' })
+    // Without catalog.read the catalog is gone; Setup keeps Functions (open to every user), as a plain link.
+    expect(within(nav).queryByRole('button', { name: 'Catalog' })).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Functions' })).toHaveAttribute('href', '/catalog/function-types')
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Menu' })
+    expect(within(sheet).queryByRole('region', { name: 'Catalog' })).not.toBeInTheDocument()
+    expect(within(within(sheet).getByRole('region', { name: 'Setup' })).getAllByRole('link').map((l) => l.textContent)).toEqual(['Functions'])
   })
 
   it('links a single page of a section directly', async () => {
     renderWithProviders(routes, { me: userMe })
     const nav = await screen.findByRole('navigation', { name: 'Main navigation' })
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Catalog'])
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Catalog', 'Setup'])
     expect(within(nav).getByRole('link', { name: 'Roles' })).toHaveAttribute('href', '/admin/roles')
   })
 
@@ -145,7 +164,21 @@ describe('AppShell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Menu' }))
     const sheet = await screen.findByRole('dialog', { name: 'Menu' })
-    expect(within(sheet).getByRole('region', { name: 'Catalog' })).toBeInTheDocument()
+    expect(within(sheet).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Projects',
+      'Catalog',
+      'Setup',
+      'Administration',
+      'Account',
+    ])
+    expect(within(within(sheet).getByRole('region', { name: 'Setup' })).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'Systems',
+      'Functions',
+      'Fields',
+      'Room templates',
+      'Channel kinds',
+      'Load types',
+    ])
     expect(within(within(sheet).getByRole('region', { name: 'Administration' })).getAllByRole('link').map((l) => l.textContent)).toEqual([
       'Users',
       'Tenants',

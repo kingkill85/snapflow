@@ -31,7 +31,7 @@ const labels = {
     edit: 'Edit',
     applyTemplate: 'Apply template',
     placeNeed: 'Place need',
-    placeFunction: 'Function type of the next symbol',
+    placeFunction: 'Function of the next symbol',
     exportPng: 'Export PNG',
     plan: 'Ground floor',
     zone: { living: 'Living room', kitchen: 'Kitchen', bedroom: 'Bedroom', hall: 'Hallway', bath: 'Bathroom' },
@@ -45,7 +45,7 @@ const labels = {
     edit: 'Bearbeiten',
     applyTemplate: 'Vorlage anwenden',
     placeNeed: 'Bedarf platzieren',
-    placeFunction: 'Funktionstyp des nächsten Symbols',
+    placeFunction: 'Funktion des nächsten Symbols',
     exportPng: 'Als PNG exportieren',
     plan: 'Erdgeschoss',
     zone: { living: 'Wohnzimmer', kitchen: 'Küche', bedroom: 'Schlafzimmer', hall: 'Flur', bath: 'Badezimmer' },
@@ -228,7 +228,7 @@ for (const lang of ['en', 'de'] as const) {
         act: async (p) => {
           await p.getByRole('row').filter({ hasText: s.names.bath[lang] }).last().getByRole('button', { name: l.edit }).click()
           await expect(p.getByRole('dialog')).toBeVisible()
-          await p.getByRole('dialog').getByText(lang === 'de' ? /Inaktiver Funktionstyp/ : /Inactive function type/).scrollIntoViewIfNeeded()
+          await p.getByRole('dialog').getByText(lang === 'de' ? /Inaktive Funktion/ : /Inactive function/).scrollIntoViewIfNeeded()
         },
       },
       {

@@ -70,7 +70,7 @@ async function upload(page: Page, file: string, profile?: string) {
   await page.getByRole('button', { name: 'Choose file' }).click()
   await (await chooser).setFiles(file)
   if (profile) {
-    await chooseOption(page.getByRole('combobox', { name: 'Profile' }), profile)
+    await chooseOption(page.getByRole('combobox', { name: 'Saved mapping' }), profile)
     await page.getByRole('button', { name: 'Upload and preview' }).click()
   } else {
     await page.getByRole('button', { name: 'Upload and map columns' }).click()
@@ -154,7 +154,7 @@ test('a CSV with a title line is mapped by hand, saved as a profile and imported
   await page.getByLabel('Header row').fill('2')
   await expect(page.getByLabel('First data row')).toHaveValue('3')
   await expect(page.getByText('2 data rows, 6 columns, 0 pictures')).toBeVisible()
-  await chooseOption(page.getByRole('combobox', { name: 'Product type', exact: true }), type.name.en)
+  await chooseOption(page.getByRole('combobox', { name: 'System', exact: true }), type.name.en)
   await chooseOption(page.getByRole('combobox', { name: 'Category', exact: true }), category.name.en)
   await chooseOption(target(page, 'Model'), 'Model number (required)')
   await chooseOption(target(page, 'Name'), 'Product name (English)')
@@ -163,11 +163,11 @@ test('a CSV with a title line is mapped by hand, saved as a profile and imported
   await chooseOption(target(page, 'Price'), 'Price (USD)')
   await chooseOption(target(page, 'Width'), 'Width (width_te)')
 
-  await page.getByRole('button', { name: 'Save as new profile' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Save as profile' })
-  await dialog.getByLabel('Profile name').fill(profileName)
+  await page.getByRole('button', { name: 'Save as new mapping' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Save mapping' })
+  await dialog.getByLabel('Name of the mapping').fill(profileName)
   await dialog.getByRole('button', { name: 'Create' }).click()
-  await expect(page.getByText(`Profile "${profileName}" created.`)).toBeVisible()
+  await expect(page.getByText(`Saved mapping "${profileName}" created.`)).toBeVisible()
 
   await page.getByRole('button', { name: 'Preview', exact: true }).click()
   await expect(page.getByText('The file has no errors or warnings.')).toBeVisible()

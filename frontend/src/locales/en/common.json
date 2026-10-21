@@ -4,6 +4,7 @@
   },
   "nav": {
     "catalog": "Catalog",
+    "setup": "Setup",
     "projects": "Projects",
     "admin": "Administration",
     "main": "Main navigation",

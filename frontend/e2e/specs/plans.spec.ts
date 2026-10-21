@@ -162,7 +162,7 @@ test('plans: calibration, layers and PNG export', async ({ page, api }) => {
   // Layers: hiding the product type leaves nothing to select.
   await page.getByRole('tab', { name: 'Layers' }).click()
   const layers = page.getByRole('tabpanel', { name: 'Layers' })
-  const typeSwitch = layers.getByRole('group', { name: 'Product types' }).getByRole('switch', { name: kind.type.name.en })
+  const typeSwitch = layers.getByRole('group', { name: 'Systems' }).getByRole('switch', { name: kind.type.name.en })
   await typeSwitch.click()
   await page.mouse.click(p.x, p.y)
   await page.getByRole('tab', { name: 'Inspector' }).click()

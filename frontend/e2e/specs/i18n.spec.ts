@@ -8,7 +8,8 @@ test('switching to Deutsch translates the UI and survives a reload', async ({ pa
   await expect(page.getByRole('heading', { name: 'Mandanten' })).toBeVisible()
   expect(await navEntries(page)).toEqual({
     Projekte: ['Projekte'],
-    Katalog: ['Produkte', 'Kategorien', 'Produkttypen', 'Funktionstypen', 'Felder', 'Ausgangsarten', 'Lastarten', 'Raumvorlagen', 'Import'],
+    Katalog: ['Produkte', 'Kategorien', 'Import'],
+    Einrichtung: ['Systeme', 'Funktionen', 'Felder', 'Raumvorlagen', 'Kanalarten', 'Lastarten'],
     Verwaltung: ['Benutzer', 'Mandanten', 'Rollen', 'Firmenprofil'],
   })
   await expect(page.getByRole('button', { name: 'Neuer Mandant' })).toBeVisible()
