@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import type { Product, ProductInput, ProductUpdate } from '@/api/generated/model'
+import type { Product, ProductCreate, ProductUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
 import i18n from '@/i18n'
 import { adminMe, userMe } from '@/test/fixtures'
@@ -80,13 +80,13 @@ describe('ProductEditorPage', () => {
   })
 
   it('creates a product with a value of every attribute type, sending exactly what is set', async () => {
-    let posted: ProductInput | undefined
+    let posted: ProductCreate | undefined
     const created = { ...dimmer, id: ids.id(299), variants: [] }
     server.use(
       http.get('/api/product-types', () => HttpResponse.json({ items: types })),
       http.get('/api/categories', () => HttpResponse.json({ items: categories })),
       http.post('/api/products', async ({ request }) => {
-        posted = (await request.json()) as ProductInput
+        posted = (await request.json()) as ProductCreate
         return HttpResponse.json(created, { status: 201 })
       }),
       http.get('/api/products/:id', () => HttpResponse.json(created)),
@@ -121,13 +121,19 @@ describe('ProductEditorPage', () => {
     // Variant attributes are not set on the product.
     expect(within(attributes()).queryByLabelText('Colour')).not.toBeInTheDocument()
 
+    // The first variant's price is required (D449); the SKU is optional.
+    await u.click(screen.getByRole('button', { name: 'Create' }))
+    expect(screen.getByLabelText(/^Price/)).toHaveAttribute('aria-invalid', 'true')
+    expect(posted).toBeUndefined()
+    await u.type(screen.getByLabelText(/^Price/), '27,5')
+    await u.type(screen.getByLabelText('SKU'), ' M1-STD ')
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
     // The new product's page, to add its variants.
-    expect(await screen.findByText('Product created. Add its variants below.')).toBeInTheDocument()
+    expect(await screen.findByText('Product created with its first variant.')).toBeInTheDocument()
     // Read once: removed from the history entry, so a reload does not show it again.
     await waitFor(() => expect(router.state.location.state).not.toHaveProperty('notice'))
-    expect(screen.getByText('Product created. Add its variants below.')).toBeInTheDocument()
+    expect(screen.getByText('Product created with its first variant.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
     expect(posted).toEqual({
       productTypeId: zigbeeType.id,
@@ -146,7 +152,45 @@ describe('ProductEditorPage', () => {
       },
       isActive: true,
       mounting: '',
+      firstVariant: { price: '27.5', sku: 'M1-STD' },
     })
+  })
+
+  it('shows a product with one variant as a "Price and variant" section that saves through the variant API', async () => {
+    const product: Product = { ...dimmer, variants: [ivory] }
+    let putVariant: Record<string, unknown> | undefined
+    editHandlers(() => product)
+    server.use(
+      http.put('/api/products/:id/variants/:variantId', async ({ request }) => {
+        putVariant = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ ...ivory, price: '29.00', updatedAt: '2026-10-21T12:00:00Z' })
+      }),
+    )
+    const u = userEvent.setup()
+    await openEditor(() => product)
+
+    const single = region('Price and variant')
+    expect(screen.queryByRole('region', { name: 'Variants' })).not.toBeInTheDocument()
+    expect(within(single).getByLabelText(/^Price/)).toHaveValue('27.00')
+    expect(within(single).getByLabelText('SKU')).toHaveValue('M485-IW')
+    expect(within(single).getByRole('link', { name: /Add variant/ })).toHaveAttribute('href', `/catalog/products/${dimmer.id}/variants/new`)
+    expect(within(single).getByRole('link', { name: /Name and add-ons/ })).toHaveAttribute('href', `/catalog/products/${dimmer.id}/variants/${ivory.id}`)
+
+    await u.clear(within(single).getByLabelText(/^Price/))
+    await u.type(within(single).getByLabelText(/^Price/), '29')
+    // Unsaved: adding a variant waits for the save.
+    expect(within(single).getByRole('button', { name: /Add variant/ })).toBeDisabled()
+    await u.click(within(single).getByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    // The variant keeps its name and status; the product is not saved.
+    expect(putVariant).toMatchObject({ name: ivory.name, price: '29', sku: 'M485-IW', isActive: true, expectedUpdatedAt: ivory.updatedAt })
+    expect(within(region('Price and variant')).getByLabelText(/^Price/)).toHaveValue('29.00')
+  })
+
+  it('lists the variants from the second one on', async () => {
+    await openEditor(() => ({ ...dimmer, variants: [ivory, black] }))
+    expect(screen.queryByRole('region', { name: 'Price and variant' })).not.toBeInTheDocument()
+    expect(within(region('Variants')).getByText('Black')).toBeInTheDocument()
   })
 
   it('renders one input per attribute type with its unit, bounds and required mark', async () => {

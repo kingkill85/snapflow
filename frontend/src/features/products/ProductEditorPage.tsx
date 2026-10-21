@@ -20,6 +20,7 @@ import { useCan } from '@/app/session'
 import { definitionsFor, extraKeys, storedValueErrors } from '@/catalog/attribute-values'
 import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEditor'
 import { useDecimalSeparator } from '@/catalog/decimal'
+import { catalogCurrency } from '@/catalog/money'
 import {
   type ApiFieldMap,
   Button,
@@ -49,9 +50,11 @@ import { useLocalized } from '@/i18n/localized'
 import {
   editorFields,
   type ProductFormValues,
+  productCreateSchema,
   productSchema,
   storedValues,
   toAttributes,
+  toProductCreate,
   toProductFormValues,
   toProductInput,
 } from './form'
@@ -68,6 +71,7 @@ import {
   useFreshProductTypes,
 } from './paths'
 import { CapabilitiesSection } from './CapabilitiesSection'
+import { SingleVariantSection } from './SingleVariantSection'
 import { VariantsSection } from './VariantsSection'
 
 /** catalog/products/new and catalog/products/:id */
@@ -142,7 +146,8 @@ function ExistingProduct({ id }: { id: string }) {
   const [generation, setGeneration] = useState(0)
   const [notice, setNotice] = useSaveNotice()
   const [dirty, setDirty] = useState(false)
-  const unsaved = useUnsavedChanges(dirty)
+  const [variantDirty, setVariantDirty] = useState(false)
+  const unsaved = useUnsavedChanges(dirty || variantDirty)
 
   if (query.isError) return <LoadFailed error={query.error} />
   if (types.isError) return <LoadFailed error={types.error} />
@@ -192,7 +197,24 @@ function ExistingProduct({ id }: { id: string }) {
         }}
         onLeave={unsaved.allow}
       />
-      <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
+      {/* One variant: its price and values right here; the list from two on (D449). */}
+      {product.variants.length === 1 ? (
+        <SingleVariantSection
+          product={product}
+          variant={product.variants[0]}
+          category={categories.data.items.find((c) => c.id === product.categoryId)}
+          locked={dirty}
+          linkState={{ listSearch }}
+          onDirtyChange={(changed) => {
+            setVariantDirty(changed)
+            if (changed) setNotice(null)
+          }}
+          onSaved={() => setNotice('saved')}
+          onLeave={unsaved.allow}
+        />
+      ) : (
+        <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
+      )}
       <CapabilitiesSection product={product} />
       {unsaved.dialog}
     </Page>
@@ -245,7 +267,7 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
       : undefined,
   )
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(loaded ? productSchema : productCreateSchema),
     defaultValues: defaults,
     errors: storedErrors,
     // Focus goes to the first error in page order.
@@ -292,13 +314,16 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
     try {
       result = loaded
         ? await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
-        : await create.mutateAsync({ data })
+        : await create.mutateAsync({ data: toProductCreate(v, attributes) })
     } catch (error) {
       setErrorFields(fields)
       setApiFieldErrors(error, form.setError, fields)
       // A taken model number comes without a location (409), but belongs to its field.
       if (error instanceof ApiError && error.code === 'product.model_number_taken') {
         form.setError('modelNumber', { type: 'server', message: errorKey('product.model_number_taken', { modelNumber: data.modelNumber }) })
+      }
+      if (!loaded && error instanceof ApiError && error.code === 'variant.sku_taken') {
+        form.setError('sku', { type: 'server', message: errorKey('variant.sku_taken', { sku: v.sku.trim() }) })
       }
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
@@ -392,6 +417,27 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
             />
           </div>
           {categoryChanged && <Notice tone="warning">{t('categoryChange')}</Notice>}
+          {!loaded && (
+            <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field
+                label={t('field.price')}
+                hint={t('field.priceHint')}
+                required
+                suffix={catalogCurrency}
+                inputMode="decimal"
+                autoComplete="off"
+                error={fieldError(errors.price?.message)}
+                {...form.register('price')}
+              />
+              <Field
+                label={t('variant.field.sku')}
+                hint={t('field.skuHint')}
+                autoComplete="off"
+                error={fieldError(errors.sku?.message)}
+                {...form.register('sku')}
+              />
+            </div>
+          )}
           <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FormSelectField
               control={form.control}

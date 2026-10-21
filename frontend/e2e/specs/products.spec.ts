@@ -40,6 +40,10 @@ const region = (page: Page, name: string) => page.getByRole('region', { name, ex
 const basics = (page: Page) => region(page, 'Basics')
 const attributes = (page: Page) => region(page, 'Attributes')
 const variants = (page: Page) => region(page, 'Variants')
+/** A product with one variant shows it in this section instead of the list (D449). */
+const single = (page: Page) => region(page, 'Price and variant')
+/** The product form's Update (first on the page; the one-variant section has its own). */
+const updateProduct = (page: Page) => page.getByRole('button', { name: 'Update' }).first()
 const addons = (page: Page) => region(page, 'Add-ons')
 const linked = (page: Page) => page.getByRole('list', { name: 'Linked add-ons' })
 const results = (page: Page) => page.getByRole('region', { name: 'Search results' })
@@ -148,13 +152,19 @@ test('an admin creates a product with every kind of attribute; the values persis
   await attrs.getByLabel('Tags', { exact: true }).fill('flush mounted')
   await attrs.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(attrs.getByRole('button', { name: 'Remove flush mounted' })).toBeVisible()
+  // The first variant's price and SKU come with the product (D449).
+  const sku = modelNumber('SKU')
+  await basics(page).getByLabel('Price').fill('27.50')
+  await basics(page).getByLabel('SKU').fill(sku)
 
   await page.getByRole('button', { name: 'Create' }).click()
-  // Create continues on the product's page, where variants are added (D84).
+  // Create continues on the product's page (D84), with its one variant in place of the list.
   await expect(page).toHaveURL(/\/catalog\/products\/[0-9a-f-]{36}$/)
-  await expect(page.getByText('Product created. Add its variants below.')).toBeVisible()
+  await expect(page.getByText('Product created with its first variant.')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Edit product', level: 1 })).toBeVisible()
-  await expect(variants(page)).toContainText('No variants yet.')
+  await expect(single(page).getByLabel('Price')).toHaveValue('27.50')
+  await expect(single(page).getByLabel('SKU')).toHaveValue(sku)
+  await expect(variants(page)).toHaveCount(0)
   const id = page.url().split('/').pop()!
 
   const stored = await api.product(id)
@@ -167,6 +177,13 @@ test('an admin creates a product with every kind of attribute; the values persis
     isActive: true,
     attributes: { model_name: 'DA-2', power: 2.5, width_te: 4, dimmable: true, colour: 'white', protocols: ['knx', 'matter'], tags: ['smart', 'flush mounted'] },
   })
+  expect(stored.variants).toMatchObject([{ name: { en: 'Standard', de: 'Standard' }, sku, price: '27.50', isActive: true }])
+
+  // The one variant is edited right here; a second one turns the section into the list.
+  await single(page).getByLabel('Price').fill('29')
+  await single(page).getByRole('button', { name: 'Update' }).click()
+  await expect(page.getByText('Saved.')).toBeVisible()
+  expect((await api.product(id)).variants[0].price).toBe('29.00')
 
   // A reload shows the stored version.
   await page.reload()
@@ -184,11 +201,20 @@ test('an admin creates a product with every kind of attribute; the values persis
   // An edit: back to "not set" for the colour, one tag less.
   await chooseOption(attrs.getByLabel('Colour'), 'Not set')
   await attrs.getByRole('button', { name: 'Remove smart' }).click()
-  await page.getByRole('button', { name: 'Update' }).click()
+  await updateProduct(page).click()
   await expect(page.getByText('Saved.')).toBeVisible()
   const updated = await api.product(id)
   expect(updated.attributes).not.toHaveProperty('colour')
   expect(updated.attributes.tags).toEqual(['flush mounted'])
+
+  await single(page).getByRole('link', { name: 'Add variant' }).click()
+  await (await translation(basics(page), 'Name', 'en')).fill('Black')
+  await basics(page).getByLabel('Price').fill('31')
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByText('Variant created.')).toBeVisible()
+  await page.getByRole('link', { name: 'Back to product' }).click()
+  await expect(single(page)).toHaveCount(0)
+  await expect(variantRows(page)).toHaveCount(2)
 
   await page.getByRole('link', { name: 'Back to list' }).click()
   // Other specs fill the list: find it.
@@ -219,20 +245,22 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
   await attrs.getByLabel('Modellname').fill('DA-2')
   await attrs.getByLabel('Leistung').fill('2,5')
   expect(await optionTexts(attrs.getByLabel('Farbe'))).toEqual(['Nicht gesetzt', 'Weiß', 'Schwarz'])
+  await grunddaten.getByLabel('Preis').fill('12,5')
   await page.getByRole('button', { name: 'Erstellen' }).click()
-  await expect(page.getByText('Produkt erstellt. Fügen Sie unten seine Varianten hinzu.')).toBeVisible()
+  await expect(page.getByText('Produkt mit seiner ersten Variante erstellt.')).toBeVisible()
+  await expect(region(page, 'Preis und Variante').getByLabel('Preis')).toHaveValue('12,50')
   const id = page.url().split('/').pop()!
   expect((await api.product(id)).attributes).toMatchObject({ power: 2.5 })
 
   // A whole number does not take decimals.
   await attrs.getByLabel('Breite').fill('2,5')
-  await page.getByRole('button', { name: 'Aktualisieren' }).click()
+  await page.getByRole('button', { name: 'Aktualisieren' }).first().click()
   await expect(attrs.getByLabel('Breite')).toHaveAccessibleDescription(/eine ganze Zahl/)
   await attrs.getByLabel('Breite').fill('')
-  await page.getByRole('button', { name: 'Aktualisieren' }).click()
+  await page.getByRole('button', { name: 'Aktualisieren' }).first().click()
   await expect(page.getByText('Gespeichert.')).toBeVisible()
 
-  await region(page, 'Varianten').getByRole('link', { name: 'Variante hinzufügen' }).click()
+  await region(page, 'Preis und Variante').getByRole('link', { name: 'Variante hinzufügen' }).click()
   await expect(page.getByRole('heading', { name: 'Neue Variante', level: 1 })).toBeVisible()
   await (await translation(region(page, 'Grunddaten'), 'Name', 'en', 'de')).fill('Ivory White')
   await (await translation(region(page, 'Grunddaten'), 'Name', 'de', 'de')).fill('Elfenbeinweiß')
@@ -240,7 +268,7 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
   await region(page, 'Attribute').getByLabel('Oberfläche').fill('matt')
   await page.getByRole('button', { name: 'Erstellen' }).click()
   await expect(page.getByText('Variante erstellt. Sie können jetzt ihr Zubehör hinzufügen.')).toBeVisible()
-  const [variant] = (await api.product(id)).variants
+  const [, variant] = (await api.product(id)).variants
   expect(variant).toMatchObject({ name: { en: 'Ivory White', de: 'Elfenbeinweiß' }, price: '27.50', attributes: { finish: 'matt' } })
 
   await page.getByRole('link', { name: 'Zurück zum Produkt' }).click()
@@ -627,6 +655,8 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   await expect(typeSelect).toBeFocused()
   await expect(basics(page).getByLabel('Model number')).toHaveAccessibleDescription('This field is required.')
   await expect(await translation(basics(page), 'Name', 'en')).toHaveAccessibleDescription('This field is required.')
+  await expect(basics(page).getByLabel('Price')).toHaveAccessibleDescription(/This field is required\./)
+  await basics(page).getByLabel('Price').fill('10')
 
   // The server: invisible characters in the model number, a required attribute.
   await chooseOption(typeSelect, type.name.en)
@@ -651,8 +681,8 @@ test('the product editor reports each mistake at its field', async ({ page, api 
 
   // Variant: price format and a taken SKU.
   const other = await api.createVariant(taken.id, { sku: modelNumber('SKU') })
-  await variants(page).getByRole('link', { name: 'Add variant' }).click()
-  await (await translation(basics(page), 'Name', 'en')).fill('Standard')
+  await single(page).getByRole('link', { name: 'Add variant' }).click()
+  await (await translation(basics(page), 'Name', 'en')).fill('Second')
   const price = basics(page).getByLabel('Price')
   for (const wrong of ['12.345', '1e3', '-1', '27,5,0']) {
     await price.fill(wrong)
@@ -667,8 +697,8 @@ test('the product editor reports each mistake at its field', async ({ page, api 
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByText('Variant created.')).toBeVisible()
   const productId = page.url().split('/')[5]
-  expect((await api.product(productId)).variants[0]).toMatchObject({ name: { en: 'Standard' }, price: '27.50' })
-  expect((await api.product(productId)).variants[0]).not.toHaveProperty('sku')
+  expect((await api.product(productId)).variants[1]).toMatchObject({ name: { en: 'Second' }, price: '27.50' })
+  expect((await api.product(productId)).variants[1]).not.toHaveProperty('sku')
 })
 
 test('a product save over a newer version is refused, and Reload shows that version', async ({ page, api, sessionFor }) => {
@@ -829,7 +859,7 @@ test('the list pages by 50 and moves back from a page past the end', async ({ pa
 })
 
 test('the product editor: Back to list or Cancel, the prompt, and variants locked while unsaved', async ({ page, api }) => {
-  const { product } = await seedProduct(api, ['Standard'])
+  const { product } = await seedProduct(api, ['Standard', 'White'])
   await page.goto(`${listPath}/${product.id}`)
   await expect(page.getByRole('link', { name: 'Back to list' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Cancel' })).toHaveCount(0)
@@ -841,7 +871,7 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
   // Variants cannot be opened or added until the product is saved (D88).
   await expect(variants(page).getByText('Save the product first to open or add variants.').first()).toBeVisible()
   await expect(variantRows(page).getByRole('link', { name: 'Standard' })).toHaveCount(0)
-  await expect(variantRows(page).getByRole('button', { name: 'Edit' })).toBeDisabled()
+  await expect(variantRows(page).getByRole('button', { name: 'Edit' }).first()).toBeDisabled()
   await expect(variants(page).getByRole('button', { name: 'Add variant' })).toBeDisabled()
 
   await navigate(page, 'Setup', 'Systems')
@@ -859,7 +889,7 @@ test('the product editor: Back to list or Cancel, the prompt, and variants locke
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Back to list' })).toBeVisible()
-  await variantRows(page).getByRole('link', { name: 'Edit' }).click()
+  await variantRows(page).filter({ hasText: 'Standard' }).getByRole('link', { name: 'Edit' }).click()
   await expect(page.getByRole('heading', { name: 'Edit variant', level: 1 })).toBeVisible()
   await expect(page.getByText('Variant of')).toContainText('Saved name')
 
@@ -905,7 +935,10 @@ for (const role of ['user', 'tenant_admin'] as const) {
     await expect(page.getByRole('button', { name: /Update|Create|Add variant|Delete|Move/ })).toHaveCount(0)
     await expect(variants(page).getByRole('link', { name: 'Add variant' })).toHaveCount(0)
 
-    await variantRows(page).getByRole('link', { name: 'Standard' }).click()
+    // One variant: shown on the product page, read-only as well (D449).
+    await expect(single(page).getByLabel('Price')).toBeDisabled()
+    await expect(single(page).getByLabel('Price')).toHaveValue('27.50')
+    await single(page).getByRole('link', { name: 'Name and add-ons' }).click()
     await expect(page.getByRole('heading', { name: 'Standard', level: 1 })).toBeVisible()
     await expect(page.getByText('You can view this variant but not change it.')).toBeVisible()
     await expect(basics(page).getByLabel('Price')).toBeDisabled()

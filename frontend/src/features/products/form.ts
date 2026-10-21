@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { Product, ProductInput, Variant, VariantInput } from '@/api/generated/model'
+import type { Product, ProductCreate, Variant, VariantInput } from '@/api/generated/model'
 import {
   type AttributeFormValue,
   type AttributeFormValues,
@@ -51,6 +51,9 @@ export const productSchema = z.object({
   mounting: z.string(),
   values: attributeValues,
   keep,
+  /** The first variant's price and SKU: asked only on create (D449), unchecked on update. */
+  price: z.string(),
+  sku: z.string(),
 })
 export type ProductFormValues = z.infer<typeof productSchema>
 
@@ -60,13 +63,19 @@ export function apiPrice(text: string): string | undefined {
   return decimal !== undefined && pricePattern.test(decimal) ? decimal : undefined
 }
 
+const priceField = z
+  .string()
+  .refine((v) => v.trim() !== '', errorKey('validation.required'))
+  .refine((v) => v.trim() === '' || apiPrice(v) !== undefined, errorKey('variant.price_format'))
+const skuField = z.string().refine((v) => v.trim().length <= limits.sku, tooLong(limits.sku))
+
+/** The new-product form: the product plus its first variant's price and SKU (D449). */
+export const productCreateSchema = productSchema.extend({ price: priceField, sku: skuField })
+
 export const variantSchema = z.object({
   name: requiredText(limits.variantName),
-  sku: z.string().refine((v) => v.trim().length <= limits.sku, tooLong(limits.sku)),
-  price: z
-    .string()
-    .refine((v) => v.trim() !== '', errorKey('validation.required'))
-    .refine((v) => v.trim() === '' || apiPrice(v) !== undefined, errorKey('variant.price_format')),
+  sku: skuField,
+  price: priceField,
   imageFileId: z.string(),
   isActive: z.boolean(),
   values: attributeValues,
@@ -92,6 +101,8 @@ export function toProductFormValues(item: Product | null, defs: Definition[], se
     mounting: item?.mounting ?? '',
     values: toFormValues(defs, item?.attributes, separator),
     keep: keepAll(storedValues(item)),
+    price: '',
+    sku: '',
   }
 }
 
@@ -119,6 +130,8 @@ export function toAttributes(defs: Definition[], values: AttributeFormValues, ke
   return { attributes, errors: Object.entries(errors).map(([key, message]) => ({ name: `values.${key}` as const, message })) }
 }
 
+export type ProductInput = Omit<ProductCreate, 'firstVariant'>
+
 export function toProductInput(v: ProductFormValues, attributes: Record<string, unknown>): ProductInput {
   const description = optionalTranslatable(v.description)
   return {
@@ -131,6 +144,15 @@ export function toProductInput(v: ProductFormValues, attributes: Record<string, 
     isActive: v.isActive,
     // Always sent: '' clears the override (D294).
     mounting: v.mounting,
+  }
+}
+
+/** A new product with its first variant (D449): the variant's name is the server's "Standard". */
+export function toProductCreate(v: ProductFormValues, attributes: Record<string, unknown>): ProductCreate {
+  const sku = v.sku.trim()
+  return {
+    ...toProductInput(v, attributes),
+    firstVariant: { price: apiPrice(v.price) ?? v.price.trim(), ...(sku ? { sku } : {}) },
   }
 }
 
@@ -149,6 +171,8 @@ export function toVariantInput(v: VariantFormValues, attributes: Record<string, 
 }
 
 const productFields = ['productTypeId', 'categoryId', 'modelNumber', 'mounting']
+/** The first variant's fields on the new-product form (D449). */
+const firstVariantFields = { 'firstVariant.price': 'price', 'firstVariant.sku': 'sku' }
 const variantFields = ['sku', 'price', 'imageFileId']
 
 /** API error locations shown at the form's fields, for the definitions shown and the stored values outside them. */
@@ -156,5 +180,6 @@ export function editorFields(kind: 'product' | 'variant', defs: Definition[], va
   const own = Object.fromEntries((kind === 'product' ? productFields : variantFields).map((f) => [f, f]))
   const texts =
     kind === 'product' ? { ...translatableApiFields('name'), ...translatableApiFields('description') } : translatableApiFields('name')
-  return { ...own, ...texts, ...attributeFieldMap(defs, values, extraKeys(defs, stored)) }
+  const first = kind === 'product' ? firstVariantFields : {}
+  return { ...own, ...first, ...texts, ...attributeFieldMap(defs, values, extraKeys(defs, stored)) }
 }

@@ -6,7 +6,7 @@
   "new": "New product",
   "edit": "Edit product",
   "readOnly": "You can view this product but not change it.",
-  "created": "Product created. Add its variants below.",
+  "created": "Product created with its first variant.",
   "showInactive": "Show inactive",
   "search": "Search",
   "searchHint": "Model number, name or SKU",
@@ -51,7 +51,10 @@
     "name": "Name",
     "description": "Description",
     "mounting": "Mounting",
-    "mountingHint": "Where this product is placed; by default as its category."
+    "mountingHint": "Where this product is placed; by default as its category.",
+    "price": "Price",
+    "priceHint": "List price in USD of the first variant, \"Standard\"; more variants can be added after creating",
+    "skuHint": "Optional; unique in the catalog"
   },
   "categoryChange": "You changed the category. When you save, this product's values are checked against the new category's attributes; values the new category does not have stay stored as values no longer in the schema. Its variants' values are never refused or removed by the change: values that do not match the new category are flagged on the variants.",
   "chooseCategoryFirst": "Choose a category to fill in its attributes.",
@@ -174,5 +177,10 @@
     "moduleTotalsW": "max {{limits}} for the whole module",
     "systemDefault": "{{text}} (system default)",
     "missing": "Still missing"
+  },
+  "single": {
+    "title": "Price and variant",
+    "description": "The product's only variant. Add a second one and the variants are listed here.",
+    "open": "Name and add-ons"
   }
 }

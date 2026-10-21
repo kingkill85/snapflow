@@ -6,6 +6,6 @@
  */
 
 /**
- * At most 5000 characters; if set, "en" is required
+ * Variant-scope values by key
  */
-export type ProductInputDescription = {[key: string]: string};
+export type FirstVariantInputAttributes = {[key: string]: unknown};
