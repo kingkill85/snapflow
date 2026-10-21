@@ -87,6 +87,7 @@ func (q *Queries) GetProposal(ctx context.Context, id uuid.UUID) (Proposal, erro
 }
 
 const insertProposal = `-- name: InsertProposal :one
+
 INSERT INTO proposals (tenant_id, version_id, seq, number, exporter, language, product_type_id, product_type_name,
     file_id, file_name, currency, exchange_rate, subtotal, discount, services, grand_total, converted_subtotal,
     converted_discount, converted_services, converted_grand_total, created_by, exchange_rate_date, exchange_rate_source)
@@ -125,6 +126,8 @@ type InsertProposalParams struct {
 	ExchangeRateSource  *string
 }
 
+// Every query of this feature runs in database.InScope: row-level security
+// limits it to the tenants the caller may see.
 func (q *Queries) InsertProposal(ctx context.Context, arg InsertProposalParams) (Proposal, error) {
 	row := q.db.QueryRow(ctx, insertProposal,
 		arg.TenantID,
@@ -230,30 +233,6 @@ func (q *Queries) ListProposals(ctx context.Context, versionID uuid.UUID) ([]Pro
 		return nil, err
 	}
 	return items, nil
-}
-
-const nextSeq = `-- name: NextSeq :one
-
-INSERT INTO proposal_counters (version_id, tenant_id, last_seq)
-VALUES ($1, $2, 1)
-ON CONFLICT (version_id) DO UPDATE SET last_seq = proposal_counters.last_seq + 1
-RETURNING last_seq
-`
-
-type NextSeqParams struct {
-	VersionID uuid.UUID
-	TenantID  uuid.UUID
-}
-
-// Every query of this feature runs in database.InScope: row-level security
-// limits it to the tenants the caller may see.
-// NextSeq reserves the next proposal sequence of a version (atomic under
-// concurrency: the counter row is locked by the upsert).
-func (q *Queries) NextSeq(ctx context.Context, arg NextSeqParams) (int32, error) {
-	row := q.db.QueryRow(ctx, nextSeq, arg.VersionID, arg.TenantID)
-	var last_seq int32
-	err := row.Scan(&last_seq)
-	return last_seq, err
 }
 
 const referencedFiles = `-- name: ReferencedFiles :many

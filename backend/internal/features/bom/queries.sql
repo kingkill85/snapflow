@@ -10,12 +10,10 @@ SELECT variant_id FROM version_items WHERE version_id = $1;
 -- (concurrent first appearances: the first one wins, never an update).
 -- name: InsertItem :exec
 INSERT INTO version_items (tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku,
-    product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color,
-    product_type_position, category_id, category_name, category_position, unit_price, image_file_id, required_addon_ids)
+    product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price, image_file_id, required_addon_ids)
 VALUES (sqlc.arg(tenant_id), sqlc.arg(version_id), sqlc.arg(variant_id), sqlc.arg(product_id), sqlc.arg(product_name),
     sqlc.arg(variant_name), sqlc.arg(model_number), sqlc.narg(sku), sqlc.arg(product_type_id), sqlc.arg(product_type_key),
-    sqlc.arg(product_type_name), sqlc.arg(product_type_abbreviation), sqlc.arg(product_type_color),
-    sqlc.arg(product_type_position), sqlc.arg(category_id), sqlc.arg(category_name), sqlc.arg(category_position),
+    sqlc.arg(product_type_name), sqlc.arg(category_id), sqlc.arg(category_name),
     sqlc.arg(unit_price), sqlc.narg(image_file_id), sqlc.arg(required_addon_ids))
 ON CONFLICT (version_id, variant_id) DO NOTHING;
 
@@ -24,21 +22,17 @@ ON CONFLICT (version_id, variant_id) DO NOTHING;
 UPDATE version_items SET product_id = sqlc.arg(product_id), product_name = sqlc.arg(product_name),
     variant_name = sqlc.arg(variant_name), model_number = sqlc.arg(model_number), sku = sqlc.narg(sku),
     product_type_id = sqlc.arg(product_type_id), product_type_key = sqlc.arg(product_type_key),
-    product_type_name = sqlc.arg(product_type_name), product_type_abbreviation = sqlc.arg(product_type_abbreviation),
-    product_type_color = sqlc.arg(product_type_color), product_type_position = sqlc.arg(product_type_position),
-    category_id = sqlc.arg(category_id), category_name = sqlc.arg(category_name),
-    category_position = sqlc.arg(category_position), unit_price = sqlc.arg(unit_price),
+    product_type_name = sqlc.arg(product_type_name),
+    category_id = sqlc.arg(category_id), category_name = sqlc.arg(category_name), unit_price = sqlc.arg(unit_price),
     image_file_id = sqlc.narg(image_file_id), required_addon_ids = sqlc.arg(required_addon_ids), updated_at = now()
 WHERE version_id = sqlc.arg(version_id) AND variant_id = sqlc.arg(variant_id);
 
 -- name: CopyItems :exec
 INSERT INTO version_items (tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku,
-    product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color,
-    product_type_position, category_id, category_name, category_position, unit_price, image_file_id, required_addon_ids,
+    product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price, image_file_id, required_addon_ids,
     captured_at, updated_at)
 SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, variant_id, product_id, product_name, variant_name,
-    model_number, sku, product_type_id, product_type_key, product_type_name, product_type_abbreviation,
-    product_type_color, product_type_position, category_id, category_name, category_position, unit_price,
+    model_number, sku, product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price,
     image_file_id, required_addon_ids, captured_at, updated_at
 FROM version_items WHERE version_id = sqlc.arg(source_id)::uuid;
 

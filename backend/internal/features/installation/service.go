@@ -496,12 +496,8 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Document
 		return GeneratedDocument{}, err
 	}
 	var seq int32
-	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		ref, err := s.projects.ReadVersion(ctx, tx, versionID)
-		if err != nil {
-			return err
-		}
-		seq, err = q.NextSeq(ctx, store.NextSeqParams{VersionID: versionID, Kind: in.Kind, TenantID: ref.TenantID})
+	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, _ *store.Queries) error {
+		seq, err = s.NextSeq(ctx, tx, versionID, in.Kind)
 		return err
 	})
 	if err != nil {
@@ -606,4 +602,19 @@ func text(t i18n.Text, lang tr) string {
 		return s
 	}
 	return t[i18n.DefaultLocale]
+}
+
+// NextSeq reserves the next sequence of a version and document kind (an
+// installation kind or proposals.KindProposal) in the caller's transaction
+// tx: installation owns the document counters, proposals reserve through
+// here (proposals.Sequencer, D456). Numbers are never reused.
+func (s *Service) NextSeq(ctx context.Context, tx pgx.Tx, versionID uuid.UUID, kind string) (int32, error) {
+	if _, err := auth.Require(ctx, auth.PermProjectsWrite); err != nil {
+		return 0, err
+	}
+	ref, err := s.projects.ReadVersion(ctx, tx, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return s.q.WithTx(tx).NextSeq(ctx, store.NextSeqParams{VersionID: versionID, Kind: kind, TenantID: ref.TenantID})
 }

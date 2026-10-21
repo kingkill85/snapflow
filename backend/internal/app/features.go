@@ -83,7 +83,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	networks.RegisterAddresses(api, networkSvc)
 	wiringSvc := wiring.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, capSvc, functionTypeSvc, networkSvc)
 	wiring.Register(api, wiringSvc)
-	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc)
+	bomSvc := bom.NewService(deps.DB, projectSvc, planSvc, productSvc, productTypes, cats)
 	bom.Register(api, bomSvc)
 	proposalSvc := proposals.NewService(deps.DB, projectSvc, bomSvc, planSvc, c.tenants, fileSvc, c.users,
 		document.NewRegistry(docx.Exporter{}))
@@ -99,6 +99,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 		Networks: networkSvc, Products: productSvc, Capabilities: capSvc, FunctionTypes: functionTypeSvc, Tenants: c.tenants,
 		Files: fileSvc, Users: c.users, DOCX: docx.Exporter{}})
 	installationSvc.UseLimiter(limiter)
+	proposalSvc.UseSequencer(installationSvc)
 	projectSvc.OnDeleteVersions(installationSvc.DeleteVersionFiles)
 	installation.Register(api, installationSvc)
 	// Every feature with a file id column answers the files feature's

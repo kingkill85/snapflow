@@ -86,7 +86,23 @@ type Service struct {
 	// generating holds a slot per running generation (shared with the
 	// installation documents).
 	generating *generation.Limiter
+	// sequencer reserves the proposal numbers (installation owns the
+	// document counters, D456).
+	sequencer Sequencer
 }
+
+// KindProposal is the document counter kind of proposals.
+const KindProposal = "proposal"
+
+// Sequencer reserves the next sequence of a version and document kind in
+// the caller's transaction. Installation implements it (it imports this
+// package, so the implementation is registered at wiring time, D456).
+type Sequencer interface {
+	NextSeq(ctx context.Context, tx pgx.Tx, versionID uuid.UUID, kind string) (int32, error)
+}
+
+// UseSequencer registers the owner of the document counters.
+func (s *Service) UseSequencer(q Sequencer) { s.sequencer = q }
 
 func NewService(db DB, projectSvc *projects.Service, bomSvc *bom.Service, planSvc *plans.Service, tenantSvc *tenants.Service,
 	fileSvc *files.Service, userSvc *users.Service, exporters *document.Registry) *Service {
@@ -365,6 +381,9 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	if err != nil {
 		return nil, err
 	}
+	if s.sequencer == nil {
+		return nil, errors.New("proposals: no sequencer registered")
+	}
 	exp, ok := s.exporters.Get(in.Exporter)
 	if !ok {
 		return nil, apperr.Invalid("body.exporter", "proposal.exporter_unknown", "unknown exporter").With("exporters", strings.Join(s.exporters.Keys(), ", "))
@@ -390,12 +409,8 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	}
 	// Reserve the sequence (short transaction; a failed run leaves a gap).
 	var seq int32
-	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
-		ref, err := s.projects.ReadVersion(ctx, tx, versionID)
-		if err != nil {
-			return err
-		}
-		seq, err = q.NextSeq(ctx, store.NextSeqParams{VersionID: versionID, TenantID: ref.TenantID})
+	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, _ *store.Queries) error {
+		seq, err = s.sequencer.NextSeq(ctx, tx, versionID, KindProposal)
 		return err
 	})
 	if err != nil {

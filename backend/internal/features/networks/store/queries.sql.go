@@ -53,9 +53,9 @@ func (q *Queries) CopyAddresses(ctx context.Context, arg CopyAddressesParams) er
 }
 
 const copyAssignments = `-- name: CopyAssignments :exec
-INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
+INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id)
 SELECT $1::uuid, $2::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.bus_line_id,
-    (m.map ->> a.gateway_plan_id::text)::uuid, a.gateway_item_id, a.pinned
+    (m.map ->> a.gateway_plan_id::text)::uuid, a.gateway_item_id
 FROM network_assignments a, (SELECT $3::jsonb AS map) m
 WHERE a.version_id = $4::uuid AND m.map ? a.plan_id::text
     AND (a.gateway_plan_id IS NULL OR m.map ? a.gateway_plan_id::text)
@@ -268,7 +268,7 @@ func (q *Queries) ListAddresses(ctx context.Context, versionID uuid.UUID) ([]Dev
 }
 
 const listAssignments = `-- name: ListAssignments :many
-SELECT plan_id, item_id, tenant_id, version_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned FROM network_assignments WHERE version_id = $1 ORDER BY plan_id, item_id
+SELECT plan_id, item_id, tenant_id, version_id, bus_line_id, gateway_plan_id, gateway_item_id FROM network_assignments WHERE version_id = $1 ORDER BY plan_id, item_id
 `
 
 func (q *Queries) ListAssignments(ctx context.Context, versionID uuid.UUID) ([]NetworkAssignment, error) {
@@ -288,7 +288,6 @@ func (q *Queries) ListAssignments(ctx context.Context, versionID uuid.UUID) ([]N
 			&i.BusLineID,
 			&i.GatewayPlanID,
 			&i.GatewayItemID,
-			&i.Pinned,
 		); err != nil {
 			return nil, err
 		}
@@ -339,7 +338,7 @@ func (q *Queries) ListBusLines(ctx context.Context, versionID uuid.UUID) ([]BusL
 }
 
 const listLineAssignments = `-- name: ListLineAssignments :many
-SELECT plan_id, item_id, tenant_id, version_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2
+SELECT plan_id, item_id, tenant_id, version_id, bus_line_id, gateway_plan_id, gateway_item_id FROM network_assignments WHERE version_id = $1 AND bus_line_id = $2
 `
 
 type ListLineAssignmentsParams struct {
@@ -366,7 +365,6 @@ func (q *Queries) ListLineAssignments(ctx context.Context, arg ListLineAssignmen
 			&i.BusLineID,
 			&i.GatewayPlanID,
 			&i.GatewayItemID,
-			&i.Pinned,
 		); err != nil {
 			return nil, err
 		}
@@ -486,10 +484,10 @@ func (q *Queries) UpsertAddress(ctx context.Context, arg UpsertAddressParams) er
 }
 
 const upsertAssignment = `-- name: UpsertAssignment :exec
-INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
-VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (plan_id, item_id) DO UPDATE SET bus_line_id = EXCLUDED.bus_line_id,
-    gateway_plan_id = EXCLUDED.gateway_plan_id, gateway_item_id = EXCLUDED.gateway_item_id, pinned = true
+    gateway_plan_id = EXCLUDED.gateway_plan_id, gateway_item_id = EXCLUDED.gateway_item_id
 `
 
 type UpsertAssignmentParams struct {

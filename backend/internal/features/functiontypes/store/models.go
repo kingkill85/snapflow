@@ -123,6 +123,13 @@ type DeviceAddress struct {
 	UpdatedAt time.Time
 }
 
+type DocumentCounter struct {
+	VersionID uuid.UUID
+	Kind      string
+	TenantID  uuid.UUID
+	LastSeq   int32
+}
+
 type File struct {
 	ID          uuid.UUID
 	Sha256      string
@@ -169,13 +176,6 @@ type GeneratedDocument struct {
 	FileName  string
 	CreatedBy *uuid.UUID
 	CreatedAt time.Time
-}
-
-type GeneratedDocumentCounter struct {
-	VersionID uuid.UUID
-	Kind      string
-	TenantID  uuid.UUID
-	LastSeq   int32
 }
 
 type GroupAddress struct {
@@ -285,7 +285,6 @@ type NetworkAssignment struct {
 	BusLineID     *uuid.UUID
 	GatewayPlanID *uuid.UUID
 	GatewayItemID *uuid.UUID
-	Pinned        bool
 }
 
 type OutputKind struct {
@@ -499,12 +498,6 @@ type Proposal struct {
 	ExchangeRateSource  *string
 }
 
-type ProposalCounter struct {
-	VersionID uuid.UUID
-	TenantID  uuid.UUID
-	LastSeq   int32
-}
-
 type RoomTemplate struct {
 	ID             uuid.UUID
 	Key            string
@@ -571,29 +564,25 @@ type VariantAddon struct {
 }
 
 type VersionItem struct {
-	ID                      uuid.UUID
-	TenantID                uuid.UUID
-	VersionID               uuid.UUID
-	VariantID               uuid.UUID
-	ProductID               uuid.UUID
-	ProductName             i18n.Text
-	VariantName             i18n.Text
-	ModelNumber             string
-	Sku                     *string
-	ProductTypeID           uuid.UUID
-	ProductTypeKey          string
-	ProductTypeName         i18n.Text
-	ProductTypeAbbreviation string
-	ProductTypeColor        string
-	ProductTypePosition     int32
-	CategoryID              uuid.UUID
-	CategoryName            i18n.Text
-	CategoryPosition        int32
-	UnitPrice               string
-	ImageFileID             *uuid.UUID
-	RequiredAddonIds        []uuid.UUID
-	CapturedAt              time.Time
-	UpdatedAt               time.Time
+	ID               uuid.UUID
+	TenantID         uuid.UUID
+	VersionID        uuid.UUID
+	VariantID        uuid.UUID
+	ProductID        uuid.UUID
+	ProductName      i18n.Text
+	VariantName      i18n.Text
+	ModelNumber      string
+	Sku              *string
+	ProductTypeID    uuid.UUID
+	ProductTypeKey   string
+	ProductTypeName  i18n.Text
+	CategoryID       uuid.UUID
+	CategoryName     i18n.Text
+	UnitPrice        string
+	ImageFileID      *uuid.UUID
+	RequiredAddonIds []uuid.UUID
+	CapturedAt       time.Time
+	UpdatedAt        time.Time
 }
 
 type VersionManualLine struct {

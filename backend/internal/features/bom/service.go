@@ -5,13 +5,15 @@
 //
 // The tables are tenant-owned (row-level security, database.InScope).
 // Versions are checked through projects.Service, placements are read
-// through plans.Service, catalog facts through products.Service; this
+// through plans.Service, catalog facts through products.Service, badges,
+// colours and order through producttypes and categories (D456); this
 // feature never reads their tables (CLAUDE.md rule 3, D197).
 package bom
 
 import (
 	"context"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 
@@ -19,8 +21,10 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/bom/store"
+	"github.com/kingkill85/snapflow/backend/internal/features/categories"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/products"
+	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
@@ -39,12 +43,15 @@ type Service struct {
 	projects *projects.Service
 	plans    *plans.Service
 	products *products.Service
+	types    *producttypes.Service
+	cats     *categories.Service
 }
 
 // NewService wires the BOM: it registers the version copier with projects
 // and the content hook with plans.
-func NewService(db DB, projectSvc *projects.Service, planSvc *plans.Service, productSvc *products.Service) *Service {
-	s := &Service{db: db, q: store.New(db), projects: projectSvc, plans: planSvc, products: productSvc}
+func NewService(db DB, projectSvc *projects.Service, planSvc *plans.Service, productSvc *products.Service,
+	types *producttypes.Service, cats *categories.Service) *Service {
+	s := &Service{db: db, q: store.New(db), projects: projectSvc, plans: planSvc, products: productSvc, types: types, cats: cats}
 	projectSvc.OnCopyVersion(s.CopyVersion)
 	planSvc.OnContentSave(s.snapshotHook())
 	return s
@@ -149,17 +156,11 @@ func insertSnapshots(ctx context.Context, q *store.Queries, ref projects.Version
 }
 
 func insertParams(ref projects.VersionRef, f products.BOMVariant) store.InsertItemParams {
-	color := ""
-	if f.ProductType.Color != "" {
-		color = f.ProductType.Color
-	}
 	return store.InsertItemParams{
 		TenantID: ref.TenantID, VersionID: ref.ID, VariantID: f.ID, ProductID: f.ProductID,
 		ProductName: f.ProductName, VariantName: f.VariantName, ModelNumber: f.ModelNumber, Sku: f.SKU,
 		ProductTypeID: f.ProductType.ID, ProductTypeKey: f.ProductType.Key, ProductTypeName: f.ProductType.Name,
-		ProductTypeAbbreviation: f.ProductType.Abbreviation, ProductTypeColor: color,
-		ProductTypePosition: f.ProductType.SortOrder, CategoryID: f.Category.ID, CategoryName: f.Category.Name,
-		CategoryPosition: f.Category.SortOrder, UnitPrice: f.Price, ImageFileID: f.ImageFileID,
+		CategoryID: f.Category.ID, CategoryName: f.Category.Name, UnitPrice: f.Price, ImageFileID: f.ImageFileID,
 		RequiredAddonIds: f.RequiredAddonIDs,
 	}
 }
@@ -193,6 +194,8 @@ type state struct {
 	// catalog are the live catalog facts of the snapshots' variants
 	// (deleted ones missing).
 	catalog map[uuid.UUID]products.BOMVariant
+	// live are the catalog's systems and categories (badge, colour, order).
+	live live
 }
 
 func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUID) (state, error) {
@@ -211,7 +214,10 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 	for id := range st.items {
 		ids = append(ids, id)
 	}
-	st.catalog, err = s.products.BOMVariants(ctx, ids)
+	if st.catalog, err = s.products.BOMVariants(ctx, ids); err != nil {
+		return st, err
+	}
+	st.live, err = s.liveCatalog(ctx)
 	return st, err
 }
 
@@ -266,16 +272,64 @@ func imageURL(id *uuid.UUID) *string {
 	return &u
 }
 
-func snapshotOf(it store.VersionItem) ItemSnapshot {
+// live are the product types (systems) and categories of the catalog by id,
+// active or not: a BOM's badges, colours and order follow them, the names
+// stay the snapshot's (D456).
+type live struct {
+	types map[uuid.UUID]producttypes.ProductType
+	cats  map[uuid.UUID]categories.Category
+}
+
+// lastPosition orders a deleted system or category after every other one.
+const lastPosition = math.MaxInt32
+
+// liveCatalog reads the systems and categories through their services.
+func (s *Service) liveCatalog(ctx context.Context) (live, error) {
+	types, err := s.types.List(ctx, true)
+	if err != nil {
+		return live{}, err
+	}
+	cats, err := s.cats.List(ctx, true)
+	if err != nil {
+		return live{}, err
+	}
+	l := live{types: make(map[uuid.UUID]producttypes.ProductType, len(types)), cats: make(map[uuid.UUID]categories.Category, len(cats))}
+	for _, t := range types {
+		l.types[t.ID] = t
+	}
+	for _, c := range cats {
+		l.cats[c.ID] = c
+	}
+	return l, nil
+}
+
+func (l live) typePosition(id uuid.UUID) int32 {
+	if t, ok := l.types[id]; ok {
+		return t.SortOrder
+	}
+	return lastPosition
+}
+
+func (l live) categoryPosition(id uuid.UUID) int32 {
+	if c, ok := l.cats[id]; ok {
+		return c.SortOrder
+	}
+	return lastPosition
+}
+
+// snapshotOf is the shown snapshot of an item: the frozen names, the live
+// badge and colour (none for a deleted system).
+func (l live) snapshotOf(it store.VersionItem) ItemSnapshot {
 	sku := ""
 	if it.Sku != nil {
 		sku = *it.Sku
 	}
+	t := l.types[it.ProductTypeID]
 	return ItemSnapshot{
 		ProductName: it.ProductName, VariantName: it.VariantName, ModelNumber: it.ModelNumber, SKU: sku,
 		ProductType: SnapshotProductType{
 			ID: it.ProductTypeID, Key: it.ProductTypeKey, Name: it.ProductTypeName,
-			Abbreviation: it.ProductTypeAbbreviation, Color: it.ProductTypeColor,
+			Abbreviation: t.Abbreviation, Color: t.Color,
 		},
 		Category: SnapshotCategory{ID: it.CategoryID, Name: it.CategoryName},
 		ImageURL: imageURL(it.ImageFileID),

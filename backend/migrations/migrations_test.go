@@ -348,3 +348,150 @@ VALUES ('c', '{"en":"C"}', '[{"key":"w","label":{"en":"W"},"type":"number","fiel
 		t.Errorf("after down/up %v", got)
 	}
 }
+
+// 00025–00027 (D456): network assignments lose pinned, the two document
+// counter tables become document_counters (numbers kept), version items lose
+// badge, colour and positions; Down restores all three.
+func TestModelCleanups(t *testing.T) {
+	ctx := context.Background()
+	url := testdb.NewDatabase(t)
+	if err := database.MigrateTo(ctx, url, 24); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	const (
+		tenant  = "00000000-0000-0000-0000-0000000000a1"
+		project = "00000000-0000-0000-0000-0000000000a2"
+		version = "00000000-0000-0000-0000-0000000000a3"
+		plan    = "00000000-0000-0000-0000-0000000000a4"
+		line    = "00000000-0000-0000-0000-0000000000a5"
+		ptype   = "00000000-0000-0000-0000-0000000000a6"
+		cat     = "00000000-0000-0000-0000-0000000000a7"
+		item    = "00000000-0000-0000-0000-0000000000a8"
+		variant = "00000000-0000-0000-0000-0000000000a9"
+	)
+	mustExec(t, db, `INSERT INTO tenants (id, name) VALUES ($1, 'Acme')`, tenant)
+	mustExec(t, db, `INSERT INTO projects (id, tenant_id, number, name, language) VALUES ($1, $2, 'P-1', 'House', 'en')`, project, tenant)
+	mustExec(t, db, `INSERT INTO project_versions (id, tenant_id, project_id, name, position) VALUES ($1, $2, $3, 'V1', 1)`, version, tenant, project)
+	mustExec(t, db, `INSERT INTO plans (id, tenant_id, version_id, kind, name, position) VALUES ($1, $2, $3, 'board', 'Board', 1)`, plan, tenant, version)
+	mustExec(t, db, `INSERT INTO product_types (id, key, name, abbreviation, color, sort_order) VALUES ($1, 'knx', '{"en":"KNX"}', 'KNX', '#1f6feb', 3)`, ptype)
+	mustExec(t, db, `INSERT INTO categories (id, key, name, sort_order) VALUES ($1, 'dimmer', '{"en":"Dimmer"}', 5)`, cat)
+	mustExec(t, db, `INSERT INTO bus_lines (version_id, id, tenant_id, product_type_id, name, position) VALUES ($1, $2, $3, $4, 'Line 1', 1)`, version, line, tenant, ptype)
+	mustExec(t, db, `INSERT INTO network_assignments (plan_id, item_id, tenant_id, version_id, bus_line_id) VALUES ($1, $2, $3, $4, $5)`, plan, item, tenant, version, line)
+	mustExec(t, db, `INSERT INTO proposal_counters (version_id, tenant_id, last_seq) VALUES ($1, $2, 4)`, version, tenant)
+	mustExec(t, db, `INSERT INTO generated_document_counters (version_id, kind, tenant_id, last_seq) VALUES ($1, 'installation_manual', $2, 2), ($1, 'channel_labels', $2, 7)`, version, tenant)
+	mustExec(t, db, `
+INSERT INTO version_items (tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number,
+    product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color, product_type_position,
+    category_id, category_name, category_position, unit_price)
+VALUES ($1, $2, $3, $3, '{"en":"Dimmer"}', '{"en":"4x"}', 'DIM-4', $4, 'knx', '{"en":"KNX"}', 'OLD', '#000000', 9, $5, '{"en":"Dimmer"}', 9, 10)`,
+		tenant, version, variant, ptype, cat)
+
+	counters := func(table string) map[string]int {
+		t.Helper()
+		q := `SELECT kind, last_seq FROM ` + table
+		if table == "proposal_counters" {
+			q = `SELECT 'proposal', last_seq FROM proposal_counters`
+		}
+		rows, err := db.Query(ctx, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		out := map[string]int{}
+		for rows.Next() {
+			var k string
+			var n int
+			if err := rows.Scan(&k, &n); err != nil {
+				t.Fatal(err)
+			}
+			out[k] = n
+		}
+		return out
+	}
+	hasColumn := func(table, column string) bool {
+		t.Helper()
+		var n int
+		if err := db.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`, table, column).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n == 1
+	}
+
+	if err := database.MigrateTo(ctx, url, 27); err != nil {
+		t.Fatal(err)
+	}
+	if hasColumn("network_assignments", "pinned") {
+		t.Error("network_assignments.pinned still there")
+	}
+	var assignments int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM network_assignments`).Scan(&assignments); err != nil || assignments != 1 {
+		t.Errorf("assignments: %d %v", assignments, err)
+	}
+	if got, want := counters("document_counters"), map[string]int{"proposal": 4, "installation_manual": 2, "channel_labels": 7}; !reflect.DeepEqual(got, want) {
+		t.Errorf("document_counters: %v, want %v", got, want)
+	}
+	for _, table := range []string{"proposal_counters", "generated_document_counters"} {
+		var n int
+		if err := db.QueryRow(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_name = $1`, table).Scan(&n); err != nil || n != 0 {
+			t.Errorf("%s still there: %d %v", table, n, err)
+		}
+	}
+	// The next proposal number continues after the copied one.
+	var next int
+	if err := db.QueryRow(ctx, `INSERT INTO document_counters (version_id, kind, tenant_id, last_seq) VALUES ($1, 'proposal', $2, 1)
+ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = document_counters.last_seq + 1 RETURNING last_seq`, version, tenant).Scan(&next); err != nil || next != 5 {
+		t.Errorf("next proposal seq: %d %v", next, err)
+	}
+	var policy, insert bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'document_counters' AND policyname = 'tenant_isolation'),
+    has_table_privilege('snapflow_app', 'document_counters', 'INSERT')`).Scan(&policy, &insert); err != nil || !policy || !insert {
+		t.Errorf("document_counters policy %v, app insert %v: %v", policy, insert, err)
+	}
+	var rls bool
+	if err := db.QueryRow(ctx, `SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE relname = 'document_counters'`).Scan(&rls); err != nil || !rls {
+		t.Errorf("document_counters row-level security: %v %v", rls, err)
+	}
+	for _, c := range []string{"product_type_abbreviation", "product_type_color", "product_type_position", "category_position"} {
+		if hasColumn("version_items", c) {
+			t.Errorf("version_items.%s still there", c)
+		}
+	}
+
+	// Down: the columns and tables are back, the counters split again, the
+	// item facts are the catalog's now.
+	if err := database.MigrateDownTo(ctx, url, 24); err != nil {
+		t.Fatal(err)
+	}
+	var pinned bool
+	if err := db.QueryRow(ctx, `SELECT pinned FROM network_assignments`).Scan(&pinned); err != nil || !pinned {
+		t.Errorf("pinned after down: %v %v", pinned, err)
+	}
+	if got, want := counters("proposal_counters"), map[string]int{"proposal": 5}; !reflect.DeepEqual(got, want) {
+		t.Errorf("proposal_counters: %v", got)
+	}
+	if got, want := counters("generated_document_counters"), map[string]int{"installation_manual": 2, "channel_labels": 7}; !reflect.DeepEqual(got, want) {
+		t.Errorf("generated_document_counters: %v", got)
+	}
+	var abbr, color string
+	var typePos, catPos int
+	if err := db.QueryRow(ctx, `SELECT product_type_abbreviation, product_type_color, product_type_position, category_position FROM version_items`).
+		Scan(&abbr, &color, &typePos, &catPos); err != nil {
+		t.Fatal(err)
+	}
+	if abbr != "KNX" || color != "#1f6feb" || typePos != 3 || catPos != 5 {
+		t.Errorf("version item after down: %q %q %d %d", abbr, color, typePos, catPos)
+	}
+	// And up again.
+	if err := database.MigrateTo(ctx, url, 27); err != nil {
+		t.Fatal(err)
+	}
+	if got := counters("document_counters"); got["proposal"] != 5 || got["channel_labels"] != 7 {
+		t.Errorf("document_counters after re-up: %v", got)
+	}
+}

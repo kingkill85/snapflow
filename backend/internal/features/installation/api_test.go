@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -17,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
@@ -24,6 +26,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/installation/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/networks"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
+	"github.com/kingkill85/snapflow/backend/internal/features/proposals"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 	"github.com/kingkill85/snapflow/backend/internal/platform/database"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document/docx/docxtest"
@@ -482,6 +485,52 @@ func TestDocuments(t *testing.T) {
 	}
 	if rows, err := store.New(tx).ListDocuments(ctx, w.version); err != nil || len(rows) != 0 {
 		t.Errorf("foreign documents: %v %v", rows, err)
+	}
+	// The document counters (owned here, shared with proposals, D456): the
+	// row of another tenant is out of reach for every kind.
+	var tenant uuid.UUID
+	if err := w.api.DB.QueryRow(ctx, `SELECT tenant_id FROM project_versions WHERE id = $1`, w.version).Scan(&tenant); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"installation_manual", proposals.KindProposal} {
+		if _, err := tx.Exec(ctx, "SAVEPOINT counter"); err != nil {
+			t.Fatal(err)
+		}
+		_, err := store.New(tx).NextSeq(ctx, store.NextSeqParams{VersionID: w.version, Kind: kind, TenantID: tenant})
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
+			t.Errorf("foreign %s counter: %v", kind, err)
+		}
+		if _, err := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT counter"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Proposals and installation documents of one version share the counter
+// table but count per kind: neither sequence moves the other (D456).
+func TestNumbersPerKind(t *testing.T) {
+	w := setup(t, "en")
+	proposal := func() proposals.Proposal {
+		t.Helper()
+		resp := w.api.Post(w.url("/proposals"), w.user.Cookie, map[string]any{"exporter": "docx"})
+		want(t, resp, http.StatusCreated, "")
+		return decode[[]proposals.Proposal](t, resp)[0]
+	}
+	if p := proposal(); p.Sequence != 1 {
+		t.Errorf("first proposal %+v", p)
+	}
+	if d, _ := generate(t, w, "installation_manual"); d.Sequence != 1 || !strings.HasSuffix(d.Number, "-IM01") {
+		t.Errorf("first manual %+v", d)
+	}
+	if p := proposal(); p.Sequence != 2 || !strings.Contains(p.Number, "-02") {
+		t.Errorf("second proposal %+v", p)
+	}
+	if d, _ := generate(t, w, "installation_manual"); d.Sequence != 2 || !strings.HasSuffix(d.Number, "-IM02") {
+		t.Errorf("second manual %+v", d)
+	}
+	if d, _ := generate(t, w, "channel_labels"); d.Sequence != 1 {
+		t.Errorf("first labels %+v", d)
 	}
 }
 

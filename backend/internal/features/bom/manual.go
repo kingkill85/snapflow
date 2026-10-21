@@ -32,14 +32,14 @@ func (st *state) manualLines() []ManualLine {
 	out := make([]ManualLine, 0, len(st.manual))
 	cur := st.currency()
 	for _, m := range st.manual {
-		out = append(out, manualLineOf(m, st.items, cur))
+		out = append(out, manualLineOf(m, st.items, st.live, cur))
 	}
 	return out
 }
 
 // manualLineOf is a manual line with its amounts: unit price and total in
 // USD and, for another project currency (cur), converted like BOM lines.
-func manualLineOf(m store.VersionManualLine, items map[uuid.UUID]store.VersionItem, cur *currency) ManualLine {
+func manualLineOf(m store.VersionManualLine, items map[uuid.UUID]store.VersionItem, cat live, cur *currency) ManualLine {
 	l := ManualLine{ID: m.ID, Kind: KindFreeText, VariantID: m.VariantID, Name: deref(m.Name), Quantity: m.Quantity, Note: m.Note, UpdatedAt: m.UpdatedAt}
 	var unit money.Amount
 	if m.VariantID != nil {
@@ -48,7 +48,7 @@ func manualLineOf(m store.VersionManualLine, items map[uuid.UUID]store.VersionIt
 		if !ok {
 			return l // no snapshot (cannot happen: the line's insert takes one)
 		}
-		l.Snapshot = &NullableItemSnapshot{ItemSnapshot: snapshotOf(it)}
+		l.Snapshot = &NullableItemSnapshot{ItemSnapshot: cat.snapshotOf(it)}
 		unit = money.MustParse(it.UnitPrice)
 	} else {
 		unit = money.MustParse(deref(m.UnitPrice))
@@ -178,6 +178,10 @@ func (s *Service) CreateManualLine(ctx context.Context, versionID uuid.UUID, in 
 	if err != nil {
 		return ManualLine{}, err
 	}
+	l, err := s.liveCatalog(ctx)
+	if err != nil {
+		return ManualLine{}, err
+	}
 	var out ManualLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, err := s.projects.WriteVersion(ctx, tx, versionID, true)
@@ -201,13 +205,13 @@ func (s *Service) CreateManualLine(ctx context.Context, versionID uuid.UUID, in 
 		if err != nil {
 			return err
 		}
-		out, err = s.lineOut(ctx, q, ref, row)
+		out, err = s.lineOut(ctx, q, ref, row, l)
 		return err
 	})
 	return out, err
 }
 
-func (s *Service) lineOut(ctx context.Context, q *store.Queries, ref projects.VersionRef, row store.VersionManualLine) (ManualLine, error) {
+func (s *Service) lineOut(ctx context.Context, q *store.Queries, ref projects.VersionRef, row store.VersionManualLine, l live) (ManualLine, error) {
 	items := map[uuid.UUID]store.VersionItem{}
 	if row.VariantID != nil {
 		rows, err := q.ListItems(ctx, row.VersionID)
@@ -218,7 +222,7 @@ func (s *Service) lineOut(ctx context.Context, q *store.Queries, ref projects.Ve
 			items[r.VariantID] = r
 		}
 	}
-	return manualLineOf(row, items, currencyOf(ref)), nil
+	return manualLineOf(row, items, l, currencyOf(ref)), nil
 }
 
 // lockLine locks a manual line of the version for a change.
@@ -249,6 +253,10 @@ func (s *Service) UpdateManualLine(ctx context.Context, versionID, id uuid.UUID,
 	if err != nil {
 		return ManualLine{}, err
 	}
+	l, err := s.liveCatalog(ctx)
+	if err != nil {
+		return ManualLine{}, err
+	}
 	var out ManualLine
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		ref, row, err := s.lockLine(ctx, tx, q, versionID, id)
@@ -267,7 +275,7 @@ func (s *Service) UpdateManualLine(ctx context.Context, versionID, id uuid.UUID,
 		if err != nil {
 			return err
 		}
-		out, err = s.lineOut(ctx, q, ref, row)
+		out, err = s.lineOut(ctx, q, ref, row, l)
 		return err
 	})
 	return out, err

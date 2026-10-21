@@ -580,12 +580,79 @@ func TestGroupsAfterReorder(t *testing.T) {
 		}
 	}
 	check("live order")
-	// With the type's variants deleted, the newest snapshot's position
-	// counts for all of them.
+	// With the type's variants deleted, the type's live position still
+	// counts for all of them (D456).
 	if _, err := api.DB.Exec(t.Context(), `DELETE FROM product_variants WHERE product_id = $1`, a.ProductID); err != nil {
 		t.Fatal(err)
 	}
 	check("snapshot order")
+}
+
+// Badge, colour and order of a BOM follow the catalog's systems and
+// categories, not the snapshots; a deleted system or category keeps its
+// frozen name, no badge and comes last (D456).
+func TestLiveCatalogFacts(t *testing.T) {
+	api := apptest.New(t)
+	admin := api.Admin.Cookie
+	a, b := newCatalog(t, api, "alpha"), newCatalog(t, api, "beta")
+	v := newProject(t, api, admin, map[string]any{"name": "House", "productTypeIds": []string{a.TypeID, b.TypeID}}).Versions[0].ID
+	vs := v.String()
+	for _, id := range []string{a.Other, b.Other} {
+		wantCode(t, api.Post("/api/versions/"+vs+"/manual-lines", admin, map[string]any{"variantId": id, "quantity": 1}), http.StatusCreated, "")
+	}
+	groups := func() []bom.SnapshotProductType {
+		t.Helper()
+		var out []bom.SnapshotProductType
+		for _, g := range getBOM(t, api, admin, v).Groups {
+			if g.Kind == "productType" {
+				out = append(out, g.ProductType.SnapshotProductType)
+			}
+		}
+		return out
+	}
+	if g := groups(); len(g) != 2 || g[0].ID.String() != a.TypeID || g[0].Abbreviation != "" {
+		t.Fatalf("before: %+v", g)
+	}
+
+	// Recolour and reorder in the catalog: the BOM follows.
+	resp := api.Get("/api/product-types/"+a.TypeID, admin)
+	wantCode(t, resp, http.StatusOK, "")
+	pt := decode[struct {
+		UpdatedAt string `json:"updatedAt"`
+	}](t, resp)
+	wantCode(t, api.Put("/api/product-types/"+a.TypeID, admin, map[string]any{"key": "alpha", "name": text("alpha"),
+		"abbreviation": "AL", "color": "#123456", "isActive": true, "expectedUpdatedAt": pt.UpdatedAt}), http.StatusOK, "")
+	wantCode(t, api.Put("/api/product-types/order", admin, map[string]any{"ids": []string{b.TypeID, a.TypeID}}), http.StatusOK, "")
+	g := groups()
+	if len(g) != 2 || g[0].ID.String() != b.TypeID || g[1].ID.String() != a.TypeID {
+		t.Fatalf("after reorder: %+v", g)
+	}
+	if g[1].Abbreviation != "AL" || g[1].Color != "#123456" || g[1].Name["en"] != "alpha" {
+		t.Errorf("badge after recolour: %+v", g[1])
+	}
+	got := getBOM(t, api, admin, v)
+	if l := line(t, got, a.Other); l.Snapshot.ProductType.Abbreviation != "AL" || l.Snapshot.ProductType.Color != "#123456" {
+		t.Errorf("line badge: %+v", l.Snapshot.ProductType)
+	}
+
+	// A deleted system (gone from the catalog with its products): frozen
+	// name, no badge, last.
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM products WHERE product_type_id = $1`, b.TypeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM bus_lines WHERE product_type_id = $1`, b.TypeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM project_product_types WHERE product_type_id = $1`, b.TypeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM product_types WHERE id = $1`, b.TypeID); err != nil {
+		t.Fatal(err)
+	}
+	g = groups()
+	if len(g) != 2 || g[0].ID.String() != a.TypeID || g[1].ID.String() != b.TypeID || g[1].Name["en"] != "beta" || g[1].Abbreviation != "" || g[1].Color != "" {
+		t.Errorf("after delete: %+v", g)
+	}
 }
 
 // Catalog-change effects without a discount cap: each item's effect is the

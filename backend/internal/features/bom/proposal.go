@@ -126,9 +126,13 @@ func (s *Service) Snapshots(ctx context.Context, versionID uuid.UUID) (map[uuid.
 	if err != nil {
 		return nil, err
 	}
+	l, err := s.liveCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := make(map[uuid.UUID]VariantSnapshot, len(rows))
 	for _, r := range rows {
-		snap := snapshotOf(r)
+		snap := l.snapshotOf(r)
 		out[r.VariantID] = VariantSnapshot{
 			VariantID: r.VariantID, ProductName: r.ProductName, VariantName: r.VariantName,
 			ProductType: snap.ProductType, ImageFileID: r.ImageFileID,
