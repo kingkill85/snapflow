@@ -870,7 +870,7 @@ describe('CategoryEditorPage', () => {
     expect(await screen.findByRole('heading', { name: 'Dimmer actuator' })).toBeInTheDocument()
     expect(screen.getByText('You can view this category but not change it.')).toBeInTheDocument()
     expect(within(region('Basics')).getByLabelText('Key')).toBeDisabled()
-    // Categories have no colour (product types do).
+    // Categories have no colour (systems do).
     expect(within(region('Basics')).queryByLabelText('Colour')).not.toBeInTheDocument()
     // Everything is shown, nothing can be changed.
     const attributes = attributesRegion()

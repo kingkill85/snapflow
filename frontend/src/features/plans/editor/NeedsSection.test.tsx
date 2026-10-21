@@ -86,7 +86,7 @@ describe('zone needs section', () => {
     const first = within(section).getByRole('listitem', { name: '3 × Dimmable light · 60 W · LED · Ceiling' })
     expect(within(first).getByText('Over the table')).toBeInTheDocument()
     expect(within(first).getByRole('alert')).toHaveTextContent('Must be between 1 and 100.')
-    expect(within(section).getByText('The function type is inactive in the catalog.')).toBeInTheDocument()
+    expect(within(section).getByText('The function is inactive in the catalog.')).toBeInTheDocument()
 
     await user.click(within(section).getByRole('button', { name: 'Move 1 × Blind · Window up' }))
     expect(needsOf()).toEqual([
@@ -111,12 +111,12 @@ describe('zone needs section', () => {
 
     const add = within(section).getByRole('combobox', { name: 'Add need' })
     await user.click(add)
-    // Inactive function types are not offered.
+    // Inactive functions are not offered.
     expect(screen.queryByRole('option', { name: 'Old function' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('option', { name: 'Dimmable light' }))
     expect(needsOf()).toEqual([[functionTypes[0].id, 1]])
 
-    // The new need opens for editing; the load type list follows the function type.
+    // The new need opens for editing; the load type list follows the function.
     await user.clear(within(section).getByRole('spinbutton', { name: /Quantity/ }))
     await user.type(within(section).getByRole('spinbutton', { name: /Quantity/ }), '4')
     await user.type(within(section).getByRole('textbox', { name: 'Power per unit' }), '7,5')
@@ -145,7 +145,7 @@ describe('zone needs section', () => {
     ])
     expect(spy).toHaveBeenCalledTimes(1)
     expect(within(section).getByText('2 needs added from “Living room”.')).toBeInTheDocument()
-    expect(within(section).getByText('1 line was skipped: its function type or load type is inactive.')).toBeInTheDocument()
+    expect(within(section).getByText('1 line was skipped: its function or load type is inactive.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'undo' }))
     expect(needsOf()).toEqual([])
   })

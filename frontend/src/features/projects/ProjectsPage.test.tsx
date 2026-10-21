@@ -140,7 +140,7 @@ describe('ProjectsPage', () => {
 
     await user.click((await screen.findAllByRole('button', { name: 'New project' }))[0])
     const dialog = await screen.findByRole('dialog', { name: 'New project' })
-    // Every active product type is chosen; the inactive one is not offered.
+    // Every active system is chosen; the inactive one is not offered.
     await waitFor(() => expect(within(dialog).getByRole('checkbox', { name: /Zigbee/ })).toBeChecked())
     expect(within(dialog).getByRole('checkbox', { name: /KNX/ })).toBeChecked()
     expect(within(dialog).queryByRole('checkbox', { name: /Legacy/ })).not.toBeInTheDocument()
@@ -196,7 +196,7 @@ describe('ProjectsPage', () => {
     await user.type(within(dialog).getByLabelText('Email'), 'nope')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-    expect(await within(dialog).findByText('Choose at least one product type.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Choose at least one system.')).toBeInTheDocument()
     expect(within(dialog).getByText('Enter a valid email address.')).toBeInTheDocument()
     expect(posted).toBe(false)
   })

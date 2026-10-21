@@ -6,12 +6,12 @@
     "noZone": "No zone",
     "symbol": "Symbol on plan",
     "symbolHint": "Drawn as a load symbol on the plan",
-    "byFunctionType": "Totals by function type",
+    "byFunctionType": "Totals by function",
     "byLoadType": "Totals by load type",
     "noLoadType": "No load type",
     "total": "All plans",
     "columns": {
-      "functionType": "Function type",
+      "functionType": "Function",
       "loadType": "Load type",
       "quantity": "Units",
       "power": "Power"
@@ -21,7 +21,7 @@
     "quantity": "{{count}} × {{name}}",
     "count": "{{count}} ×",
     "power": "{{power}} W",
-    "unknown": "Unknown function type"
+    "unknown": "Unknown function"
   },
   "totals_one": "{{count}} unit",
   "totals_other": "{{count}} units",

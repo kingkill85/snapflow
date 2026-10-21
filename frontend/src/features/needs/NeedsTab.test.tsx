@@ -43,7 +43,7 @@ describe('NeedsTab', () => {
     expect(within(none).getByRole('listitem')).toHaveTextContent('2 × Blind · Terrace')
     expect(within(plan).getByText('2 units')).toBeInTheDocument()
 
-    expect(cells(screen.getByRole('table', { name: 'Totals by function type' }))).toEqual([
+    expect(cells(screen.getByRole('table', { name: 'Totals by function' }))).toEqual([
       ['Blind', '3', ''],
       ['Dimmable light', '3', '22.5 W'],
     ])

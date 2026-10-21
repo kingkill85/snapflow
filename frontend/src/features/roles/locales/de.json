@@ -6,7 +6,7 @@
   "denied": "Nicht erlaubt",
   "permissions": {
     "catalog": {
-      "read": { "label": "Katalog ansehen", "description": "Produkte, Produkttypen und Funktionstypen durchsuchen." },
+      "read": { "label": "Katalog ansehen", "description": "Produkte, Systeme und Funktionen durchsuchen." },
       "write": { "label": "Katalog bearbeiten", "description": "Katalogdaten anlegen, ändern, importieren und löschen." }
     },
     "projects": {

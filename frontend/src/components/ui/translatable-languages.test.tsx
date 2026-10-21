@@ -8,7 +8,7 @@ import { server } from '@/test/server'
 // A test-only content-locale list with a third language (the UI languages
 // stay as they are): every translatable form derives its tabs, values, checks
 // and API body from `contentLocales`, so adding a language needs no form
-// changes (D109). This renders a real form (the function type dialog) with
+// changes (D109). This renders a real form (the function dialog) with
 // French added and nothing else changed.
 vi.mock('@/i18n/content-locales', () => ({ contentLocales: ['en', 'de', 'fr'] }))
 

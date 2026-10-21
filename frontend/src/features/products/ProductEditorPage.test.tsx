@@ -97,9 +97,9 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument()
     expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
     // Only active types and categories are offered for a new product; types with their badge.
-    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual(['Choose a product type', 'ZBZigbee', 'KNX'])
+    expect(await optionTexts(u, screen.getByLabelText('System'))).toEqual(['Choose a system', 'ZBZigbee', 'KNX'])
     expect(await optionTexts(u, screen.getByLabelText('Category'))).toEqual(['Choose a category', 'Dimmer actuators', 'Gateways'])
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Zigbee')
+    await chooseOption(u, screen.getByLabelText('System'), 'Zigbee')
     // The attributes come from the category.
     expect(attributes()).toHaveTextContent('Choose a category to fill in its attributes.')
     await chooseOption(u, screen.getByLabelText('Category'), 'Dimmer actuators')
@@ -360,8 +360,8 @@ describe('ProductEditorPage', () => {
 
     await u.clear(inAttributes('Power'))
     await u.type(inAttributes('Power'), '250')
-    // Another product type changes nothing about the attributes.
-    await chooseOption(u, screen.getByLabelText('Product type'), 'KNX')
+    // Another system changes nothing about the attributes.
+    await chooseOption(u, screen.getByLabelText('System'), 'KNX')
     expect(inAttributes('Power')).toHaveValue('250')
     expect(screen.queryByText(/You changed the category/)).not.toBeInTheDocument()
     await chooseOption(u, screen.getByLabelText('Category'), 'Gateways')
@@ -590,8 +590,8 @@ describe('ProductEditorPage', () => {
     const u = userEvent.setup()
     await openEditor(() => ({ ...dimmer, productTypeId: legacyType.id, categoryId: inactiveCategory.id, attributes: {} }))
 
-    expect(await optionTexts(u, screen.getByLabelText('Product type'))).toEqual(['ZBZigbee', 'KNX', 'Legacy (inactive)'])
-    expect(screen.getByLabelText('Product type')).toHaveTextContent('Legacy (inactive)')
+    expect(await optionTexts(u, screen.getByLabelText('System'))).toEqual(['ZBZigbee', 'KNX', 'Legacy (inactive)'])
+    expect(screen.getByLabelText('System')).toHaveTextContent('Legacy (inactive)')
     expect(await optionTexts(u, screen.getByLabelText('Category'))).toEqual(['Dimmer actuators', 'Gateways', 'Retired (inactive)'])
     expect(screen.getByLabelText('Category')).toHaveTextContent('Retired (inactive)')
     // The inactive category has no attributes.
@@ -612,7 +612,7 @@ describe('ProductEditorPage', () => {
     await openEditor(undefined, () => respond())
 
     await u.click(screen.getByRole('button', { name: 'Update' }))
-    await waitFor(() => expect(screen.getByLabelText('Product type')).toHaveAccessibleDescription('This product type is inactive. Choose an active product type.'))
+    await waitFor(() => expect(screen.getByLabelText('System')).toHaveAccessibleDescription('This system is inactive. Choose an active system.'))
     expect(screen.getByLabelText('Category')).toHaveAccessibleDescription('The selected category no longer exists.')
     expect(screen.getByLabelText('Model number')).toHaveAccessibleDescription(
       'Control characters (such as tabs, line breaks or invisible characters) are not allowed.',

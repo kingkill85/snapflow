@@ -130,7 +130,7 @@ describe('PlanEditorPage', () => {
     open()
 
     const palette = await screen.findByRole('tabpanel', { name: 'Products' })
-    // Only the project's product types, by category.
+    // Only the project's systems, by category.
     expect(within(palette).getByRole('region', { name: 'Switches' })).toBeInTheDocument()
     expect(within(palette).queryByText('KNX switch')).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'true'))
@@ -326,8 +326,8 @@ describe('PlanEditorPage', () => {
     expect(screen.getByRole('button', { name: 'Place need' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText('Click on the plan to place the need symbol; Esc cancels.')).toBeInTheDocument()
-    // The first active function type is preselected.
-    const select = await screen.findByRole('combobox', { name: 'Function type of the next symbol' })
+    // The first active function is preselected.
+    const select = await screen.findByRole('combobox', { name: 'Function of the next symbol' })
     await waitFor(() => expect(select).toHaveTextContent('Dimmable light'))
     await chooseOption(user, select, 'Blind')
     await user.click(screen.getByRole('button', { name: 'place here' }))
@@ -342,7 +342,7 @@ describe('PlanEditorPage', () => {
 
     // The next time the last used one is chosen.
     await user.click(screen.getByRole('button', { name: 'Place need' }))
-    expect(screen.getByRole('combobox', { name: 'Function type of the next symbol' })).toHaveTextContent('Blind')
+    expect(screen.getByRole('combobox', { name: 'Function of the next symbol' })).toHaveTextContent('Blind')
     await user.keyboard('{Escape}')
 
     await user.click(screen.getByRole('tab', { name: 'Layers' }))
@@ -354,7 +354,7 @@ describe('PlanEditorPage', () => {
     serve({ lockHeld: true })
     open()
     await waitFor(() => expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-editable', 'false'))
-    expect(screen.queryByRole('combobox', { name: 'Function type of the next symbol' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Function of the next symbol' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Esc cancels/)).not.toBeInTheDocument()
   })
 
@@ -370,7 +370,7 @@ describe('PlanEditorPage', () => {
     await user.keyboard('{Control>}d{/Control}')
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-count', '2')
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '3')
-    expect(screen.getByText('1 need symbol was not copied: its function type or load type is inactive.')).toBeInTheDocument()
+    expect(screen.getByText('1 need symbol was not copied: its function or load type is inactive.')).toBeInTheDocument()
 
     // One undo step takes back the placement and the symbol.
     await user.click(screen.getByRole('button', { name: 'Undo' }))
@@ -381,7 +381,7 @@ describe('PlanEditorPage', () => {
     // Copy and paste works the same way.
     await user.keyboard('{Control>}a{/Control}{Control>}c{/Control}{Control>}v{/Control}')
     expect(screen.getByTestId('plan-canvas')).toHaveAttribute('data-needs', '3')
-    expect(screen.getByText('1 need symbol was not copied: its function type or load type is inactive.')).toBeInTheDocument()
+    expect(screen.getByText('1 need symbol was not copied: its function or load type is inactive.')).toBeInTheDocument()
     await waitFor(() => expect(saved.length).toBeGreaterThanOrEqual(1))
   })
 
@@ -522,5 +522,5 @@ const outputKind: OutputKind = {
   can: { update: true, delete: true },
 } as unknown as OutputKind
 
-/** A need of the fixtures' first function type. */
+/** A need of the fixtures' first function. */
 const need = (n: number) => ({ ...newNeed(functionTypes[0].id, null), id: pid(1300 + n) })

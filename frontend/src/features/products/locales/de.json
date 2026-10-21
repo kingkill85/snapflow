@@ -10,8 +10,8 @@
   "showInactive": "Inaktive anzeigen",
   "search": "Suche",
   "searchHint": "Modellnummer, Name oder SKU",
-  "typeFilter": "Produkttyp",
-  "allTypes": "Alle Produkttypen",
+  "typeFilter": "System",
+  "allTypes": "Alle Systeme",
   "categoryFilter": "Kategorie",
   "allCategories": "Alle Kategorien",
   "deleteTitle": "Produkt löschen",
@@ -20,14 +20,14 @@
     "image": "Bild",
     "modelNumber": "Modellnummer",
     "name": "Name",
-    "typeCategory": "Produkttyp / Kategorie",
+    "typeCategory": "System / Kategorie",
     "variants": "Varianten",
     "price": "Preis",
     "status": "Status"
   },
   "problems_one": "{{count}} Attributwert muss geprüft werden",
   "problems_other": "{{count}} Attributwerte müssen geprüft werden",
-  "unavailableHint": "Aktiv, aber sein Produkttyp oder seine Kategorie ist inaktiv.",
+  "unavailableHint": "Aktiv, aber sein System oder seine Kategorie ist inaktiv.",
   "noPrice": "–",
   "section": {
     "basics": "Grunddaten",
@@ -37,9 +37,9 @@
     "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör."
   },
   "field": {
-    "productType": "Produkttyp",
+    "productType": "System",
     "productTypeHint": "Das System oder die Produktlinie, z. B. Zigbee",
-    "chooseType": "Produkttyp auswählen",
+    "chooseType": "System auswählen",
     "inactiveType": "{{name}} (inaktiv)",
     "category": "Kategorie",
     "categoryHint": "Die Geräteart; legt die Attribute fest",
@@ -103,7 +103,7 @@
       "active": "Aktiv",
       "activeHint": "Inaktive Varianten können nicht zu Projekten hinzugefügt werden."
     },
-    "productInactive": "Diese Variante ist nicht verfügbar, weil ihr Produkt, Produkttyp oder ihre Kategorie inaktiv ist.",
+    "productInactive": "Diese Variante ist nicht verfügbar, weil ihr Produkt, System oder ihre Kategorie inaktiv ist.",
     "notFound": {
       "title": "Variante nicht gefunden",
       "message": "Diese Variante gibt es nicht (mehr)."
@@ -126,7 +126,7 @@
     "save": "Zubehör speichern",
     "saved": "Zubehör gespeichert.",
     "unsaved": "Das Zubehör hat ungespeicherte Änderungen.",
-    "typeFilter": "Produkttyp",
+    "typeFilter": "System",
     "categoryFilter": "Kategorie",
     "sku": "SKU {{sku}}",
     "shown_one": "{{count}} Variante angezeigt",

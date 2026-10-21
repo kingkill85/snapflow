@@ -133,7 +133,7 @@ describe('NewImportPage', () => {
 
     await user.upload(await screen.findByLabelText('File to import'), xlsx())
     expect(screen.getByText('supplier.xlsx')).toBeInTheDocument()
-    await user.click(screen.getByRole('combobox', { name: 'Profile' }))
+    await user.click(screen.getByRole('combobox', { name: 'Saved mapping' }))
     await user.click(await screen.findByRole('option', { name: 'Supplier A' }))
     await user.click(screen.getByRole('button', { name: 'Upload and preview' }))
 

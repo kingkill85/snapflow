@@ -95,7 +95,7 @@ describe('LayersPanel', () => {
     await user.click(screen.getByRole('switch', { name: 'Zones' }))
     expect(lastLayers(onLayers).zonesHidden).toBe(true)
 
-    const types = screen.getByRole('group', { name: 'Product types' })
+    const types = screen.getByRole('group', { name: 'Systems' })
     expect(within(types).getAllByRole('switch')).toHaveLength(2)
     await user.click(within(types).getByRole('switch', { name: 'KNX' }))
     expect([...lastLayers(onLayers).hiddenProductTypes]).toEqual([catalog[3].productTypeId])

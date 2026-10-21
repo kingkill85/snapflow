@@ -78,7 +78,7 @@
     "line_stale": "Jemand anderes hat diese Position inzwischen geändert. Der aktuelle Stand ist jetzt geladen; erneutes Speichern überschreibt ihn.",
     "nothing_selected": "Wählen Sie mindestens einen Eintrag zum Aktualisieren aus.",
     "order_mismatch": "Die Positionen wurden inzwischen geändert. Die aktuelle Reihenfolge ist jetzt geladen; versuchen Sie es erneut.",
-    "product_type_not_in_project": "Der Produkttyp dieses Produkts gehört nicht zum Projekt.",
+    "product_type_not_in_project": "Das System dieses Produkts gehört nicht zum Projekt.",
     "quantity_range": "Geben Sie eine ganze Zahl von {{min}} bis {{max}} ein.",
     "too_many_lines": "Eine Version kann höchstens {{max}} manuelle Positionen haben.",
     "unit_price_invalid": "Geben Sie einen Betrag ab 0 mit höchstens 2 Nachkommastellen ein.",
@@ -122,14 +122,14 @@
   "catalog_field": {
     "in_use": "Kategorien verknüpfen das Feld „{{key}}“: Schlüssel und Typ können nicht geändert werden, und es kann nicht gelöscht werden.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
-    "key_referenced": "Importprofile verwenden den Schlüssel „{{key}}“: Er kann sich nicht ändern.",
+    "key_referenced": "Gespeicherte Import-Zuordnungen verwenden den Schlüssel „{{key}}“: Er kann sich nicht ändern.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
     "meaning_options": "Für diese Bedeutung müssen die Auswahlwerte genau diese sein: {{expected}}.",
     "meaning_type": "Diese Bedeutung braucht einen anderen Werttyp ({{expected}}).",
     "not_found": "Dieses Feld existiert nicht mehr.",
     "order_mismatch": "Die Felder wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
     "param_not_allowed": "Diese Bedeutung hat keine solche Einstellung.",
-    "product_type_duplicate": "Dieser Produkttyp ist doppelt aufgeführt.",
+    "product_type_duplicate": "Dieses System ist doppelt aufgeführt.",
     "stale": "Jemand anderes hat dieses Feld inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "category": {
@@ -153,13 +153,13 @@
     "type": "Nur JPEG-, PNG- und WebP-Bilder werden akzeptiert."
   },
   "function_type": {
-    "in_use": "Dieser Funktionstyp wird noch von Ausgangsarten, Bedarfen oder Raumvorlagen verwendet.",
+    "in_use": "Diese Funktion wird noch von Kanalarten, Bedarfen oder Raumvorlagen verwendet.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
     "knx_object_duplicate": "Der Objektschlüssel \"{{key}}\" ist doppelt vergeben.",
     "dpst_format": "Datenpunkt-Subtyp wie DPST-1-1 eingeben.",
-    "not_found": "Dieser Funktionstyp existiert nicht mehr."
+    "not_found": "Diese Funktion existiert nicht mehr."
   },
   "import": {
     "addon_ambiguous": "Das Zubehör \"{{ref}}\" passt zu mehr als einer Variante; die erste wird verwendet.",
@@ -179,13 +179,13 @@
     "has_errors": "Zeilen enthalten Fehler ({{count}}). Korrigieren Sie die Datei oder schalten Sie „Alles oder nichts“ aus, um sie zu überspringen.",
     "image_invalid": "Dieses Bild kann nicht verwendet werden (nur JPEG, PNG und WebP bis 10 MB und 25 Megapixel).",
     "images_too_large": "Die Bilder des Blatts sind zusammen zu groß (höchstens {{maxMb}} MB).",
-    "mapping_required": "Wählen Sie ein Profil oder eine Zuordnung.",
+    "mapping_required": "Wählen Sie eine gespeicherte Zuordnung oder ordnen Sie die Spalten zu.",
     "mounting_unknown": "„{{value}}“ ist keine Montageart (Grundriss, Verteiler oder beides).",
     "no_rows": "Die Datei hat unter der Kopfzeile keine Datenzeilen.",
     "not_found": "Dieser Import existiert nicht mehr.",
     "price_rounded": "Der Preis {{value}} hat mehr als zwei Nachkommastellen und wird auf {{rounded}} gerundet.",
     "product_field_conflict": "Dieses Produktfeld weicht von der ersten Zeile des Produkts ab ({{field}}); die erste Zeile gilt.",
-    "product_type_unknown": "Es gibt keinen Produkttyp \"{{value}}\". Legen Sie ihn zuerst unter Produkttypen an; der Import legt keine Produkttypen an.",
+    "product_type_unknown": "Es gibt kein System \"{{value}}\". Legen Sie es zuerst unter Systeme an; der Import legt keine Systeme an.",
     "sheet_not_found": "Die Datei hat kein Blatt \"{{sheet}}\".",
     "stale": "Der Katalog wurde seit der Vorschau geändert. Erstellen Sie die Vorschau erneut.",
     "state": "Das ist im aktuellen Zustand des Imports nicht möglich. Laden Sie ihn neu.",
@@ -203,18 +203,18 @@
     "constant_not_allowed": "Dieses Ziel kann keinen festen Wert haben.",
     "data_start_row": "Die Daten müssen unter der Kopfzeile beginnen.",
     "model_number_required": "Ordnen Sie die Modellnummer zu.",
-    "name_taken": "Der Profilname \"{{name}}\" ist bereits vergeben.",
-    "not_found": "Dieses Importprofil existiert nicht mehr.",
-    "product_type_conflict": "Wählen Sie einen festen Produkttyp oder eine Produkttyp-Spalte, nicht beides.",
-    "product_type_required": "Ordnen Sie den Produkttyp zu oder wählen Sie einen festen.",
+    "name_taken": "Eine gespeicherte Zuordnung namens \"{{name}}\" gibt es bereits.",
+    "not_found": "Diese gespeicherte Zuordnung existiert nicht mehr.",
+    "product_type_conflict": "Wählen Sie ein festes System oder eine System-Spalte, nicht beides.",
+    "product_type_required": "Ordnen Sie das System zu oder wählen Sie ein festes.",
     "source_conflict": "Wählen Sie eine Spalte oder einen festen Wert, nicht beides.",
     "source_required": "Wählen Sie eine Spalte oder einen festen Wert.",
-    "stale": "Jemand anderes hat dieses Profil inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "stale": "Jemand anderes hat diese gespeicherte Zuordnung inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor.",
     "target_duplicate": "Dieses Ziel ist doppelt zugeordnet.",
     "target_unknown": "Dieses Ziel gibt es nicht."
   },
   "load_type": {
-    "in_use": "Diese Lastart wird noch von Funktionstypen, Katalogfeldern, Bedarfen oder Raumvorlagen verwendet.",
+    "in_use": "Diese Lastart wird noch von Funktionen, Katalogfeldern, Bedarfen oder Raumvorlagen verwendet.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
     "not_found": "Diese Lastart existiert nicht mehr.",
@@ -222,9 +222,9 @@
     "stale": "Jemand anderes hat diese Lastart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "need": {
-    "function_type_inactive": "Dieser Funktionstyp ist nicht mehr aktiv. Wählen Sie einen anderen.",
+    "function_type_inactive": "Diese Funktion ist nicht mehr aktiv. Wählen Sie eine andere.",
     "load_type_inactive": "Diese Lastart ist nicht mehr aktiv. Wählen Sie eine andere.",
-    "load_type_not_allowed": "Diese Lastart passt nicht zum Funktionstyp.",
+    "load_type_not_allowed": "Diese Lastart passt nicht zur Funktion.",
     "position_partial": "Geben Sie beide Koordinaten der Position an oder keine.",
     "power_invalid": "Geben Sie eine Leistung von 0 bis {{max}} W mit höchstens 2 Nachkommastellen ein.",
     "zone_not_found": "Diese Zone existiert nicht mehr."
@@ -241,16 +241,16 @@
     "changed": "Ein Plan oder eine Buslinie wurde inzwischen geändert. Neu laden und erneut versuchen."
   },
   "output_kind": {
-    "alternative_cycle": "Diese Ausgangsart hat diese bereits als Alternative.",
-    "alternative_duplicate": "Diese Ausgangsart ist doppelt als Alternative aufgeführt.",
-    "alternative_self": "Eine Ausgangsart kann nicht ihre eigene Alternative sein.",
-    "function_type_duplicate": "Dieser Funktionstyp ist doppelt aufgeführt.",
-    "in_use": "Diese Ausgangsart wird noch von Katalogfeldern oder als Alternative einer anderen Ausgangsart verwendet.",
+    "alternative_cycle": "Diese Kanalart hat diese bereits als Alternative.",
+    "alternative_duplicate": "Diese Kanalart ist doppelt als Alternative aufgeführt.",
+    "alternative_self": "Eine Kanalart kann nicht ihre eigene Alternative sein.",
+    "function_type_duplicate": "Diese Funktion ist doppelt aufgeführt.",
+    "in_use": "Diese Kanalart wird noch von Katalogfeldern oder als Alternative einer anderen Kanalart verwendet.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
-    "not_found": "Diese Ausgangsart existiert nicht mehr.",
-    "order_mismatch": "Die Ausgangsarten wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
-    "stale": "Jemand anderes hat diese Ausgangsart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
+    "not_found": "Diese Kanalart existiert nicht mehr.",
+    "order_mismatch": "Die Kanalarten wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat diese Kanalart inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."
   },
   "plan": {
     "not_found": "Dieser Plan existiert nicht mehr.",
@@ -284,17 +284,17 @@
     "model_number_taken": "Die Modellnummer \"{{modelNumber}}\" ist bereits vergeben.",
     "not_found": "Dieses Produkt existiert nicht mehr.",
     "stale": "Jemand anderes hat dieses Produkt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
-    "type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
-    "type_not_found": "Der gewählte Produkttyp existiert nicht mehr."
+    "type_inactive": "Dieses System ist inaktiv. Wählen Sie ein aktives System.",
+    "type_not_found": "Das gewählte System existiert nicht mehr."
   },
   "product_type": {
     "color_format": "Geben Sie eine Farbe als #rrggbb ein, z. B. #1f6feb.",
-    "in_use": "Dieser Produkttyp wird noch von Produkten oder Projekten verwendet. Deaktivieren Sie ihn stattdessen.",
+    "in_use": "Dieses System wird noch von Produkten oder Projekten verwendet. Deaktivieren Sie es stattdessen.",
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
-    "not_found": "Dieser Produkttyp existiert nicht mehr.",
-    "order_mismatch": "Die Produkttypen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
-    "stale": "Jemand anderes hat diesen Produkttyp inzwischen geändert. Laden Sie ihn neu und nehmen Sie Ihre Änderungen erneut vor.",
+    "not_found": "Dieses System existiert nicht mehr.",
+    "order_mismatch": "Die Systeme wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    "stale": "Jemand anderes hat dieses System inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
     "addressing_topology": "Diese Adressierung passt nicht zur Topologie: KNX und HDL brauchen einen Bus, EUI-64 Funk."
   },
   "project": {
@@ -304,9 +304,9 @@
     "exchange_rate_implausible": "Dieser Kurs weicht stark vom heutigen Online-Kurs von {{currency}} ab (1 USD = {{online}} {{currency}}): War er für die vorige Währung gedacht? Prüfen Sie ihn und speichern Sie erneut, um ihn zu behalten.",
     "exchange_rate_usd": "USD-Projekte haben keinen Wechselkurs: Katalogpreise sind in USD.",
     "not_found": "Dieses Projekt existiert nicht mehr.",
-    "product_type_inactive": "Dieser Produkttyp ist inaktiv. Wählen Sie einen aktiven Produkttyp.",
-    "product_type_not_found": "Der gewählte Produkttyp existiert nicht mehr.",
-    "product_types_required": "Wählen Sie mindestens einen Produkttyp.",
+    "product_type_inactive": "Dieses System ist inaktiv. Wählen Sie ein aktives System.",
+    "product_type_not_found": "Das gewählte System existiert nicht mehr.",
+    "product_types_required": "Wählen Sie mindestens ein System.",
     "read_only": "Dieses Projekt ist abgeschlossen oder storniert und kann nicht geändert werden. Öffnen Sie es zuerst wieder.",
     "stale": "Jemand anderes hat dieses Projekt inzwischen geändert. Laden Sie es neu und nehmen Sie Ihre Änderungen erneut vor.",
     "tenant_forbidden": "Sie können keine Projekte in einem anderen Mandanten anlegen.",
@@ -322,8 +322,8 @@
     "empty": "Die Stückliste dieser Version ist leer; es gibt noch nichts anzubieten.",
     "exporter_unknown": "Dieses Dokumentformat ist nicht verfügbar ({{exporters}}).",
     "not_found": "Dieses Angebot existiert nicht mehr.",
-    "product_type_not_in_bom": "Diese Version hat keine Positionen dieses Produkttyps.",
-    "product_types_required": "Wählen Sie mindestens einen Produkttyp.",
+    "product_type_not_in_bom": "Diese Version hat keine Positionen dieses Systems.",
+    "product_types_required": "Wählen Sie mindestens ein System.",
     "rate_missing": "Für dieses Projekt gibt es noch keinen Wechselkurs für {{currency}}. Rufen Sie ihn zuerst im Tab Stückliste oder Preise ab oder geben Sie ihn ein."
   },
   "request": {
@@ -337,7 +337,7 @@
   "room_template": {
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel „{{key}}“ ist bereits vergeben.",
-    "line_reference": "Ein Funktionstyp oder eine Lastart einer Zeile existiert nicht mehr. Laden Sie neu und versuchen Sie es erneut.",
+    "line_reference": "Eine Funktion oder Lastart einer Zeile existiert nicht mehr. Laden Sie neu und versuchen Sie es erneut.",
     "not_found": "Diese Raumvorlage existiert nicht mehr.",
     "order_mismatch": "Die Raumvorlagen wurden inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
     "stale": "Jemand anderes hat diese Raumvorlage inzwischen geändert. Laden Sie sie neu und nehmen Sie Ihre Änderungen erneut vor."

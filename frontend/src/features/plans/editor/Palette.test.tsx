@@ -53,6 +53,6 @@ describe('Palette', () => {
     expect(screen.getByRole('button', { name: /Wall switch/ })).toBeDisabled()
     unmount()
     renderWithProviders(<Palette products={[]} armed={null} onArm={() => undefined} editable />)
-    expect(screen.getByText("The project's product types have no available products.")).toBeInTheDocument()
+    expect(screen.getByText("The project's systems have no available products.")).toBeInTheDocument()
   })
 })

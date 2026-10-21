@@ -102,7 +102,7 @@ describe('LoadTypesPage', () => {
     await u.click(await screen.findByRole('button', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete load type' })
     await u.click(within(dialog).getByRole('button', { name: 'Delete' }))
-    expect(await within(dialog).findByText('This load type is still used by function types, catalog fields, needs or room templates.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('This load type is still used by functions, catalog fields, needs or room templates.')).toBeInTheDocument()
   })
 
   it('moves a load type down, sending all ids', async () => {
