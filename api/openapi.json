@@ -7028,10 +7028,19 @@
               "product_channel_without_limit"
             ],
             "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "type": "string"
           }
         },
         "required": [
-          "code"
+          "code",
+          "severity"
         ],
         "type": "object"
       },

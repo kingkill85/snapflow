@@ -231,7 +231,7 @@ test('a readiness card shows a missing width, fixed on the product the card goes
   const actuator = await api.createProduct({ ...ids, modelNumber: `ACT-${tag}`, name: { en: `Actuator ${tag}` } })
 
   await page.goto('/catalog/product-types')
-  await expect(page.getByText('What SnapFlow still needs before this system works in a project.')).toBeVisible()
+  await expect(page.getByText('What SnapFlow still needs before a system works in a project.')).toBeVisible()
   const card = page.getByRole('listitem', { name: systemName })
   await expect(card).toContainText('Products on the board without a width (TE)')
   await card.getByRole('link', { name: `ACT-${tag}` }).click()

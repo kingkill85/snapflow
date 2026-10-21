@@ -67,9 +67,32 @@ const (
 // MissingCodes are the product-level codes in display order.
 var MissingCodes = []MissingCode{MissingBoardWidth, MissingChannels, MissingBusCurrent, MissingChannelLimit}
 
+// Severity is how much a readiness item matters (D446).
+type Severity string
+
+const (
+	SeverityError   Severity = "error"
+	SeverityWarning Severity = "warning"
+	SeverityInfo    Severity = "info"
+)
+
+// MissingSeverity is the severity of each product-level code; the readiness
+// check uses the same table.
+var MissingSeverity = map[MissingCode]Severity{
+	MissingBoardWidth:   SeverityError,
+	MissingChannels:     SeverityWarning,
+	MissingBusCurrent:   SeverityWarning,
+	MissingChannelLimit: SeverityInfo,
+}
+
 // Missing is one thing the checks still need of a product.
 type Missing struct {
-	Code MissingCode `json:"code" enum:"product_board_without_width,product_channels_missing,product_bus_current_missing,product_channel_without_limit"`
+	Code     MissingCode `json:"code" enum:"product_board_without_width,product_channels_missing,product_bus_current_missing,product_channel_without_limit"`
+	Severity Severity    `json:"severity" enum:"error,warning,info"`
+}
+
+func missingItem(code MissingCode) Missing {
+	return Missing{Code: code, Severity: MissingSeverity[code]}
 }
 
 // HasMissing reports whether c lists the code.
@@ -87,7 +110,7 @@ func MergeMissing(product Capabilities, variants []Capabilities) []Missing {
 	var out []Missing
 	for _, code := range MissingCodes {
 		if slices.ContainsFunc(variants, func(v Capabilities) bool { return v.HasMissing(code) }) {
-			out = append(out, Missing{Code: code})
+			out = append(out, missingItem(code))
 		}
 	}
 	return out
@@ -373,7 +396,7 @@ func Compute(reg Registry, in Input) Capabilities {
 func missing(reg Registry, in Input, c Capabilities, channelFields map[uuid.UUID]bool) []Missing {
 	enclosure := c.EnclosureRows != nil
 	var out []Missing
-	add := func(code MissingCode) { out = append(out, Missing{Code: code}) }
+	add := func(code MissingCode) { out = append(out, missingItem(code)) }
 	if (c.Mounting == string(MountingBoard) || c.Mounting == string(MountingBoth)) && c.RailWidthTE == nil && !enclosure {
 		add(MissingBoardWidth)
 	}

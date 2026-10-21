@@ -38,7 +38,7 @@ describe('ReadinessSection', () => {
   it('shows a card per system and a General card, items grouped by severity with links', async () => {
     server.use(http.get('/api/catalog/readiness', () => HttpResponse.json(readiness)))
     renderWithProviders(<ReadinessSection />)
-    expect(screen.getByText('What SnapFlow still needs before this system works in a project.')).toBeInTheDocument()
+    expect(screen.getByText('What SnapFlow still needs before a system works in a project.')).toBeInTheDocument()
     const knx = await screen.findByRole('listitem', { name: 'KNX' })
     expect(within(knx).getByText('Bus')).toBeInTheDocument()
     // Errors, then warnings, then notes.
@@ -49,7 +49,8 @@ describe('ReadinessSection', () => {
     expect(within(width).getAllByRole('link')).toHaveLength(20)
     expect(within(width).getByRole('link', { name: 'A-1' })).toHaveAttribute('href', `/catalog/products/${product(1).id}`)
     expect(width).toHaveTextContent('and 2 more')
-    expect(within(knx).getByText('No power supply: no product supplies bus current')).toBeInTheDocument()
+    // A count of 1 is not shown.
+    expect(knx.querySelector('[data-code="system_no_power_supply"]')).toHaveTextContent(/^No power supply: no product supplies bus current$/)
 
     expect(within(screen.getByRole('listitem', { name: 'Zigbee' })).getByText('Ready: nothing missing')).toBeInTheDocument()
 

@@ -220,6 +220,12 @@ func TestReadiness(t *testing.T) {
 	if got := missing(a1); len(got) != 3 || got[0] != "product_board_without_width" {
 		t.Errorf("A-1 missing %v", got)
 	}
+	// Each line carries the severity the readiness card shows.
+	for _, m := range a1.Capabilities.Missing {
+		if m.Severity != capabilities.MissingSeverity[m.Code] || (m.Code == capabilities.MissingBoardWidth && m.Severity != readiness.SeverityError) {
+			t.Errorf("A-1 %s severity %s", m.Code, m.Severity)
+		}
+	}
 	if got := missing(a2); len(got) != 1 || got[0] != "product_channels_missing" {
 		t.Errorf("A-2 missing %v", got)
 	}

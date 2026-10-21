@@ -5,7 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MissingCode } from './missingCode';
+import type { MissingSeverity } from './missingSeverity';
 
 export interface Missing {
   code: MissingCode;
+  severity: MissingSeverity;
 }

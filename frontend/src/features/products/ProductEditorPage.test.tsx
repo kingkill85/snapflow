@@ -223,13 +223,15 @@ describe('ProductEditorPage', () => {
   })
 
   it('lists what is still missing in plain words, and nothing when complete (D447)', async () => {
-    await openEditor(() => ({ ...dimmer, capabilities: { ...dimmer.capabilities, missing: [{ code: 'product_board_without_width' }, { code: 'product_channel_without_limit' }] } }))
+    await openEditor(() => ({ ...dimmer, capabilities: { ...dimmer.capabilities, missing: [{ code: 'product_board_without_width', severity: 'error' }, { code: 'product_channel_without_limit', severity: 'info' }] } }))
     const missing = await screen.findByTestId('still-missing')
     expect(within(missing).getByRole('heading', { name: 'Still missing' })).toBeInTheDocument()
     expect(within(missing).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Width on the rail (TE): the board cannot place it without one',
       'Load limit per channel (W or A): loads on its channels are not checked',
     ])
+    // Icons by severity, like the readiness card.
+    expect(within(missing).getAllByRole('listitem').map((li) => li.dataset.severity)).toEqual(['error', 'info'])
   })
 
   it('shows no missing lines for a complete product', async () => {

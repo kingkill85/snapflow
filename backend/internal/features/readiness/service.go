@@ -22,12 +22,13 @@ import (
 // MaxRefs is the most refs an item lists; Count says how many there are.
 const MaxRefs = 20
 
-type Severity string
+// Severity is capabilities.Severity: one table for both (D446).
+type Severity = capabilities.Severity
 
 const (
-	SeverityError   Severity = "error"
-	SeverityWarning Severity = "warning"
-	SeverityInfo    Severity = "info"
+	SeverityError   = capabilities.SeverityError
+	SeverityWarning = capabilities.SeverityWarning
+	SeverityInfo    = capabilities.SeverityInfo
 )
 
 // Codes (D446). Product-level codes are capabilities.MissingCode values.
@@ -87,14 +88,6 @@ type Service struct {
 
 func NewService(p *products.Service, c *categories.Service, t *producttypes.Service, f *functiontypes.Service, caps *capabilities.Service) *Service {
 	return &Service{products: p, cats: c, types: t, functions: f, caps: caps}
-}
-
-// productSeverity is the severity of each product-level code.
-var productSeverity = map[capabilities.MissingCode]Severity{
-	capabilities.MissingBoardWidth:   SeverityError,
-	capabilities.MissingChannels:     SeverityWarning,
-	capabilities.MissingBusCurrent:   SeverityWarning,
-	capabilities.MissingChannelLimit: SeverityInfo,
 }
 
 // Readiness computes the readiness of the catalog: one pass over the
@@ -241,7 +234,7 @@ func systemItems(t producttypes.ProductType, prods []products.ReadinessProduct) 
 		ref := &ReadinessRef{Kind: "product", ID: p.ID, Label: i18n.Text{"en": p.ModelNumber}}
 		for _, code := range capabilities.MissingCodes {
 			if p.Capabilities.HasMissing(code) {
-				l.add(string(code), productSeverity[code], ref)
+				l.add(string(code), capabilities.MissingSeverity[code], ref)
 			}
 		}
 		powerSupply = powerSupply || anyCaps(p, func(c capabilities.Capabilities) bool {

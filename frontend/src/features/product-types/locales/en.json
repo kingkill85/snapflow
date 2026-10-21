@@ -53,7 +53,7 @@
   },
   "readiness": {
     "title": "Readiness",
-    "description": "What SnapFlow still needs before this system works in a project.",
+    "description": "What SnapFlow still needs before a system works in a project.",
     "general": "General",
     "generalHint": "Functions, channel kinds and categories of the whole catalog",
     "ready": "Ready: nothing missing",

@@ -107,7 +107,8 @@ function ReadinessItems({ items }: { items: ReadinessItem[] }) {
                     <span className="mt-0.5">{icons[sev]}</span>
                     <span className="min-w-0">
                       {text(it.code)}
-                      {it.refs.length > 0 || it.count > 1 ? <span className="text-muted"> ({it.count})</span> : null}
+                      {/* A count of 1 adds nothing. */}
+                      {it.count > 1 ? <span className="text-muted"> ({it.count})</span> : null}
                     </span>
                   </p>
                   {it.refs.length > 0 && (

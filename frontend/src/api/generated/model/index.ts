@@ -298,6 +298,7 @@ export * from './meaningList';
 export * from './meaningSpec';
 export * from './missing';
 export * from './missingCode';
+export * from './missingSeverity';
 export * from './needInfo';
 export * from './needRef';
 export * from './needRefName';

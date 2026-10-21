@@ -35,7 +35,7 @@
       "function_not_served": "Funktionen, die keine Kanalart bedient: ihre Bedarfe lassen sich nicht anschließen",
       "function_no_load_types": "Funktionen ohne Lastarten: jede Last wird akzeptiert",
       "function_no_knx_objects": "Funktionen ohne KNX-Objekte: keine Gruppenadressen für sie",
-      "channel_kind_unused": "Kanalarten, die kein Feld zählt: kein Produkt liefert sie",
+      "channel_kind_unused": "Kanalarten ohne Kanalfeld: kein Produkt kann sie liefern",
       "categories_without_mounting_board": "Kategorien mit Montage im Grundriss, deren Produkte eine Breite haben: sie kommen nie in den Verteiler",
       "topology_none": "Keine Topologie: keine Bus- oder Funkprüfungen für dieses System",
       "product_bus_current_missing": "Produkte ohne Busstrom, und das System hat keinen Standardwert",
