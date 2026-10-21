@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 
 import { expect, test, unique, uniqueKey } from '../fixtures'
+import { catalog, complete, villa } from '../villa-seed'
 
 // Step 3b: zone needs, room templates and load symbols, clicked through.
 
@@ -134,4 +135,55 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   // "Open in editor" selects the zone.
   await rooms.getByRole('listitem', { name: 'Kitchen' }).getByRole('link', { name: 'Open Kitchen in the editor' }).click()
   await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Kitchen')
+})
+
+test('needs: room overview connects one room automatically, a completed project shows no template action', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1400, height: 900 })
+  const cat = await catalog(api, 'en')
+  const v = await villa(api, cat, 'en', 'Room overview villa')
+  type Rooms = { plans: { planId: string; rooms: { zoneId: string | null; name: string; units: number; connectedUnits: number; status: string }[] }[] }
+  const room = async (name: string) => {
+    const res = await api.ctx.get(`/api/versions/${v.version}/rooms`)
+    expect(res.ok()).toBe(true)
+    return ((await res.json()) as Rooms).plans.flatMap((p) => p.rooms).find((r) => r.name === name)!
+  }
+  const drawing = cat.names.drawing.en
+  const before = await room(drawing)
+  expect(before).toMatchObject({ units: 13, connectedUnits: 0, status: 'missing' })
+
+  await page.goto(`/projects/${v.project.id}?tab=needs`)
+  const ground = page.getByRole('list', { name: 'Ground floor' })
+  const row = ground.getByRole('listitem', { name: drawing })
+  await expect(row).toContainText('0 of 13 connected')
+  await expect(row).toContainText('None connected')
+
+  // "Connect automatically" opens the auto-connect dialog with this zone ticked, runs it, the row updates.
+  await row.getByRole('button', { name: `Connect ${drawing} automatically` }).click()
+  const dialog = page.getByRole('dialog', { name: 'Auto-connect' })
+  await expect(dialog.getByRole('combobox', { name: 'Needs' })).toContainText('Needs of selected zones')
+  await expect(dialog.getByRole('checkbox', { name: new RegExp(`^${drawing} `) })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Preview' }).click()
+  await dialog.getByRole('button', { name: 'Apply' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('status').filter({ hasText: /^\d+ connections? made\.$/ })).toBeVisible()
+  const after = await room(drawing)
+  expect(after.connectedUnits).toBeGreaterThan(0)
+  const status = after.status === 'covered' ? 'All connected' : 'Some missing'
+  await expect(row).toContainText(`${after.connectedUnits} of 13 connected`)
+  await expect(row).toContainText(status)
+  // Only that zone was connected: the dining room is untouched.
+  expect(await room(cat.names.dining.en)).toMatchObject({ connectedUnits: 0 })
+
+  // "Open in editor" selects the zone.
+  await row.getByRole('link', { name: `Open ${drawing} in the editor` }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(drawing)
+
+  // A completed project is read-only: no template or connect action, opening the editor stays.
+  await complete(api, v.project.id, v.project.name)
+  await page.goto(`/projects/${v.project.id}?tab=needs`)
+  const readRow = page.getByRole('list', { name: 'Ground floor' }).getByRole('listitem', { name: cat.names.dining.en })
+  await expect(readRow).toContainText('None connected')
+  await expect(readRow.getByRole('link', { name: /^Apply a room template/ })).toHaveCount(0)
+  await expect(readRow.getByRole('button', { name: /automatically$/ })).toHaveCount(0)
+  await expect(readRow.getByRole('link', { name: `Open ${cat.names.dining.en} in the editor` })).toBeVisible()
 })

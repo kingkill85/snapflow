@@ -359,6 +359,26 @@ for (const lang of ['en', 'de'] as const) {
     const cat = await catalog(api, lang)
     const v = await villa(api, cat, lang, 'Villa Gulberg, Lahore')
     await autoConnect(api, v.version)
+    // A basement after the auto-connect: a room with needs and none connected, a room without needs, needs outside
+    // every zone; and a garage floorplan without zones.
+    const basement = await api.createPlan(v.version, lang === 'en' ? 'Basement' : 'Untergeschoss', planImage())
+    const cellar = crypto.randomUUID()
+    const store = crypto.randomUUID()
+    const [first, second] = cat.templates.drawing
+    await api.savePlanContent(basement.id, {
+      zones: [
+        { id: cellar, name: lang === 'en' ? 'Wine cellar and tasting room' : 'Weinkeller und Verkostungsraum', color: '#22c55e', opacity: 0.25, points: rect(40, 40, 580, 380) },
+        // The fixture's zone type has no short name; the API takes it.
+        { id: store, name: lang === 'en' ? 'Storage' : 'Abstellraum', shortName: lang === 'en' ? 'ST' : 'AR', color: '#3b82f6', opacity: 0.25, points: rect(620, 40, 1160, 380) } as { id: string; name: string; color: string; opacity: number; points: number[][] },
+      ],
+      placements: [],
+      needs: [
+        { id: crypto.randomUUID(), zoneId: cellar, ...first },
+        { id: crypto.randomUUID(), zoneId: cellar, ...second },
+        { id: crypto.randomUUID(), zoneId: null, ...first, x: 300, y: 600 },
+      ],
+    })
+    await api.createPlan(v.version, lang === 'en' ? 'Garage' : 'Garage', planImage())
     await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
     for (const viewport of viewports) {
       await page.setViewportSize(viewport.size)
@@ -370,6 +390,15 @@ for (const lang of ['en', 'de'] as const) {
         await page.waitForLoadState('networkidle')
         await expectNoHorizontalOverflow(page)
         await page.screenshot({ path: `e2e/screenshots/needs-rooms-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: true })
+        // Each state on its own, to look at chips, badges and actions closely.
+        const shot = (name: string) => `e2e/screenshots/needs-room-${name}-${viewport.name}-${colorScheme}-${lang}.png`
+        const row = (plan: string, zone: string) => page.getByRole('list', { name: plan, exact: true }).getByRole('listitem', { name: zone, exact: true })
+        const ground = lang === 'en' ? 'Ground floor' : 'Erdgeschoss'
+        await page.locator(`dl[aria-label="${lang === 'en' ? 'Totals' : 'Summen'}"]`).locator('..').screenshot({ path: shot('totals') })
+        await row(ground, cat.names.drawing[lang]).screenshot({ path: shot('covered') })
+        await row(ground, cat.names.kitchen[lang]).screenshot({ path: shot('partial') })
+        await page.getByRole('region', { name: lang === 'en' ? 'Basement' : 'Untergeschoss' }).screenshot({ path: shot('missing-empty-outside') })
+        await page.getByRole('region', { name: 'Garage' }).screenshot({ path: shot('no-zones') })
       }
     }
   })
