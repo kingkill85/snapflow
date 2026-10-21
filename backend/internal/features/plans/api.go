@@ -32,7 +32,6 @@ type versionParam struct {
 	VersionID uuid.UUID `path:"versionId" format:"uuid"`
 }
 
-
 type planOutput struct {
 	Body Plan
 }
