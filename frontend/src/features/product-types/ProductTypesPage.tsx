@@ -32,6 +32,7 @@ import {
 import { useLocalized } from '@/i18n/localized'
 
 import { ProductTypeFormDialog } from './ProductTypeFormDialog'
+import { ReadinessSection } from './ReadinessSection'
 
 /** Tries of a move whose save meets a list changed meanwhile (see move). */
 const moveAttempts = 3
@@ -166,6 +167,7 @@ export function ProductTypesPage() {
 
   return (
     <Page width="wide" title={t('title')} description={t('description')} actions={createButton}>
+      <ReadinessSection />
       <CheckboxField label={t('showInactive')} checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
       <ErrorMessage error={moveError} />
       {list.isPending ? (

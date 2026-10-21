@@ -33,7 +33,7 @@ import {
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
-import { useFixedOptionLabel, useMeaningLabel } from '@/catalog/meaning-labels'
+import { useDescribeMeaning, useFixedOptionLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 import {
@@ -50,7 +50,10 @@ type Props = {
   onOpenChange: (open: boolean) => void
   /** null = create mode, object = edit mode. */
   item: CatalogField | null
-  onSaved: () => Promise<unknown>
+  /** Create mode: values to start from (e.g. a category attribute's key, label, type and unit, D445). Keep it stable while open. */
+  prefill?: Partial<CatalogFieldFormValues>
+  /** Gets the saved field. */
+  onSaved: (field: CatalogField) => Promise<unknown>
 }
 
 /**
@@ -59,12 +62,12 @@ type Props = {
  * checks (with its output kind / load type and the product types it is
  * limited to), or "just information".
  */
-export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Props) {
+export function CatalogFieldFormDialog({ open, onOpenChange, item, prefill, onSaved }: Props) {
   const { t } = useTranslation('capabilities')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
   const localized = useLocalized()
-  const meaningLabel = useMeaningLabel()
+  const describeMeaning = useDescribeMeaning()
   const fixedText = useFixedOptionLabel().text
   const queryClient = useQueryClient()
   const create = useCreateCatalogField()
@@ -76,7 +79,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
   const productTypes = useListProductTypes({ includeInactive: true }, { query: { enabled: open } })
   const form = useForm<CatalogFieldFormValues>({
     resolver: zodResolver(catalogFieldSchema),
-    defaultValues: toCatalogFieldFormValues(item),
+    defaultValues: { ...toCatalogFieldFormValues(item), ...prefill },
   })
   const { errors } = form.formState
   const { reset } = form
@@ -85,10 +88,10 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
 
   useEffect(() => {
     if (!open) return
-    reset(toCatalogFieldFormValues(item))
+    reset({ ...toCatalogFieldFormValues(item), ...(item ? {} : prefill) })
     resetCreate()
     resetUpdate()
-  }, [open, item, reset, resetCreate, resetUpdate])
+  }, [open, item, prefill, reset, resetCreate, resetUpdate])
 
   const [type, meaning] = useWatch({
     control: form.control,
@@ -117,13 +120,14 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
 
   const submit = form.handleSubmit(async (values) => {
     const data = toCatalogFieldInput(values, spec)
+    let saved: CatalogField
     try {
       if (item)
-        await update.mutateAsync({
+        saved = await update.mutateAsync({
           id: item.id,
           data: { ...data, expectedUpdatedAt: item.updatedAt },
         })
-      else await create.mutateAsync({ data })
+      else saved = await create.mutateAsync({ data })
     } catch (error) {
       setApiFieldErrors(error, form.setError, catalogFieldApiFields)
       if (error instanceof ApiError && error.code === 'catalog_field.key_taken') {
@@ -134,7 +138,7 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
       }
       return
     }
-    await onSaved()
+    await onSaved(saved)
     onOpenChange(false)
   })
 
@@ -142,19 +146,18 @@ export function CatalogFieldFormDialog({ open, onOpenChange, item, onSaved }: Pr
     value: v,
     label: t(`type.${v}`),
   }))
-  const meaningOptions = [
-    { value: '', label: meaningLabel() },
-    ...Object.values(CatalogFieldInputMeaning).map((m) => ({
-      value: m,
-      label: meaningLabel(m),
-    })),
-  ]
+  const meaningOption = (m: string) => {
+    const d = describeMeaning(m)
+    return { value: m, label: d.title, description: d.description }
+  }
+  const meaningOptions = [meaningOption(''), ...Object.values(CatalogFieldInputMeaning).map(meaningOption)]
+  const chosen = describeMeaning(meaning)
   const meaningHint =
     spec && !spec.types.includes(type)
       ? t('fields.meaningTypes', {
           types: spec.types.map((v) => t(`type.${v}` as 'type.text')).join(', '),
         })
-      : t('fields.meaningHint')
+      : `${chosen.description}. ${t('meaningExample', { example: chosen.example })}`
 
   return (
     <FormDialog

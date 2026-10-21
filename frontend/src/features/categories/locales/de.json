@@ -96,6 +96,7 @@
     "hint": "Die Verknüpfung übernimmt Typ, Einheit und Optionen des Felds sowie seine Bedeutung.",
     "meaning": "Bedeutung",
     "locked": "Vom verknüpften Katalogfeld vorgegeben.",
-    "summary": "Feld {{key}}"
+    "summary": "Feld {{key}}",
+    "create": "Neues Feld anlegen…"
   }
 }

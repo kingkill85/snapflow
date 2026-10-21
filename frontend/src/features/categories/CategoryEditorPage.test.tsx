@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import { getGetCategoryQueryKey } from '@/api/generated/categories/categories'
-import type { CatalogField, Category, CategoryUpdate } from '@/api/generated/model'
+import type { CatalogField, CatalogFieldInput, Category, CategoryUpdate } from '@/api/generated/model'
 import { routes as appRoutes } from '@/app/routes'
 import { adminMe, userMe } from '@/test/fixtures'
 import { renderRoutes } from '@/test/render'
@@ -232,6 +232,51 @@ describe('CategoryEditorPage', () => {
       scope: 'product',
       fieldKey: 'bus_current_ma',
     })
+  })
+
+  it('creates a catalog field from an attribute row, prefilled from it, and links the row to it (D445)', async () => {
+    const u = userEvent.setup()
+    const created = catalogField({ id: '6f1c2b8e-0000-4000-8000-0000000000f9', key: 'dimmer_count', label: { en: 'Dimmer channels' }, type: 'integer', unit: 'ch', meaning: undefined })
+    const posts: CatalogFieldInput[] = []
+    let fields = catalogFields
+    const { puts } = await openEditor()
+    server.use(
+      http.get('/api/catalog-fields', () => HttpResponse.json({ items: fields })),
+      http.get('/api/catalog-field-meanings', () => HttpResponse.json({ items: [] })),
+      http.get('/api/output-kinds', () => HttpResponse.json({ items: [] })),
+      http.get('/api/load-types', () => HttpResponse.json({ items: [] })),
+      http.get('/api/product-types', () => HttpResponse.json({ items: [] })),
+      http.post('/api/catalog-fields', async ({ request }) => {
+        posts.push((await request.json()) as CatalogFieldInput)
+        fields = [...catalogFields, created]
+        return HttpResponse.json(created, { status: 201 })
+      }),
+    )
+    const attributes = attributesRegion()
+    const adds = within(attributes).getAllByRole('button', { name: 'Add attribute' })
+    await u.click(adds[adds.length - 1])
+    const row = group('Attribute 4', attributes)
+    await u.type(own(row, 'Key'), 'dimmer_count')
+    await u.type(await translation(u, row, 'Label', 'en'), 'Dimmer channels')
+    await chooseOption(u, within(row).getByLabelText('Type'), 'Whole number')
+    await u.type(within(row).getByLabelText('Unit'), 'ch')
+    await chooseOption(u, within(row).getByLabelText('Catalog field'), 'Create a new field…')
+
+    const dialog = await screen.findByRole('dialog', { name: 'New field' })
+    expect(within(dialog).getByLabelText('Key')).toHaveValue('dimmer_count')
+    expect(within(dialog).getByLabelText('Unit')).toHaveValue('ch')
+    expect(within(dialog).getByLabelText('Value type')).toHaveTextContent('Whole number')
+    // The meaning in plain words, with an example.
+    expect(within(dialog).getByText(/Shown on the product and exported, never checked/)).toBeInTheDocument()
+    await u.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(posts).toEqual([expect.objectContaining({ key: 'dimmer_count', label: { en: 'Dimmer channels' }, type: 'integer', unit: 'ch' })])
+    await waitFor(() => expect(within(row).getAllByRole('combobox').map((c) => (c as HTMLInputElement).value)).toContain('Dimmer channels (dimmer_count)'))
+    expect(within(row).getByTestId('linked-meaning')).toHaveTextContent('Just information')
+
+    await u.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].attributes[3]).toMatchObject({ key: 'dimmer_count', type: 'integer', unit: 'ch', fieldKey: 'dimmer_count' })
   })
 
   it('unlinking a catalog field keeps the values the field gave and unlocks them (D295)', async () => {

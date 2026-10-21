@@ -2300,6 +2300,13 @@
             "format": "double",
             "type": "number"
           },
+          "missing": {
+            "description": "What the checks still need of the product (readiness codes); left out when nothing is missing",
+            "items": {
+              "$ref": "#/components/schemas/Missing"
+            },
+            "type": "array"
+          },
           "moduleTotalA": {
             "description": "Limit for the whole module (A)",
             "format": "double",
@@ -7010,6 +7017,33 @@
         ],
         "type": "object"
       },
+      "Missing": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "product_board_without_width",
+              "product_channels_missing",
+              "product_bus_current_missing",
+              "product_channel_without_limit"
+            ],
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity"
+        ],
+        "type": "object"
+      },
       "NeedInfo": {
         "additionalProperties": false,
         "properties": {
@@ -10494,6 +10528,166 @@
         ],
         "type": "object"
       },
+      "Readiness": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Readiness.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "global": {
+            "description": "Items that concern the whole catalog",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessItem"
+            },
+            "type": "array"
+          },
+          "systems": {
+            "description": "One entry per active system (product type), in catalog order",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessSystem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "systems",
+          "global"
+        ],
+        "type": "object"
+      },
+      "ReadinessItem": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "functions_none",
+              "function_not_served",
+              "function_no_load_types",
+              "function_no_knx_objects",
+              "channel_kind_unused",
+              "categories_without_mounting_board",
+              "topology_none",
+              "product_bus_current_missing",
+              "system_no_power_supply",
+              "system_no_gateway",
+              "product_board_without_width",
+              "product_channels_missing",
+              "product_channel_without_limit",
+              "system_no_enclosure"
+            ],
+            "type": "string"
+          },
+          "count": {
+            "description": "How many entries the item concerns (refs lists at most 20)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "refs": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessRef"
+            },
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "count",
+          "refs"
+        ],
+        "type": "object"
+      },
+      "ReadinessRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "product",
+              "category",
+              "function",
+              "system",
+              "channel_kind"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Model number of a product, else the entry's name",
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "label"
+        ],
+        "type": "object"
+      },
+      "ReadinessSystem": {
+        "additionalProperties": false,
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "items": {
+            "description": "Empty = ready: nothing missing",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessItem"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "productTypeId": {
+            "type": "string"
+          },
+          "topology": {
+            "enum": [
+              "bus",
+              "wireless",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "productTypeId",
+          "key",
+          "name",
+          "topology",
+          "items"
+        ],
+        "type": "object"
+      },
       "Refs": {
         "additionalProperties": false,
         "properties": {
@@ -12583,6 +12777,38 @@
         "summary": "Update a catalog field",
         "tags": [
           "catalog-fields"
+        ]
+      }
+    },
+    "/api/catalog/readiness": {
+      "get": {
+        "description": "What SnapFlow still needs before each active system works in a project, and what concerns the whole catalog. Computed on request; inactive products, categories and systems are skipped.",
+        "operationId": "getCatalogReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Catalog readiness",
+        "tags": [
+          "catalog-readiness"
         ]
       }
     },

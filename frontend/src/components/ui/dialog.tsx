@@ -61,6 +61,9 @@ export function FormDialog({ open, onOpenChange, title, submitLabel, submitting,
   const { t } = useTranslation()
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
+    // React bubbles events through portals: a dialog opened inside another
+    // form (e.g. a field created from a category attribute) must not submit it.
+    e.stopPropagation()
     if (submitDisabled) return
     onSubmit()
   }

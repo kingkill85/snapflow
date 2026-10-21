@@ -28,5 +28,34 @@
   "price": {
     "range": "{{min}} – {{max}}"
   },
-  "storedValue": "Gespeicherter Wert: {{value}}"
+  "storedValue": "Gespeicherter Wert: {{value}}",
+  "readiness": {
+    "code": {
+      "functions_none": "Keine aktive Funktion: Räume können nichts anfordern",
+      "function_not_served": "Funktionen, die keine Kanalart bedient: ihre Bedarfe lassen sich nicht anschließen",
+      "function_no_load_types": "Funktionen ohne Lastarten: jede Last wird akzeptiert",
+      "function_no_knx_objects": "Funktionen ohne KNX-Objekte: keine Gruppenadressen für sie",
+      "channel_kind_unused": "Kanalarten ohne Kanalfeld: kein Produkt kann sie liefern",
+      "categories_without_mounting_board": "Kategorien mit Montage im Grundriss, deren Produkte eine Breite haben: sie kommen nie in den Verteiler",
+      "topology_none": "Keine Topologie: keine Bus- oder Funkprüfungen für dieses System",
+      "product_bus_current_missing": "Produkte ohne Busstrom, und das System hat keinen Standardwert",
+      "system_no_power_supply": "Kein Netzteil: kein Produkt liefert Busstrom",
+      "system_no_gateway": "Kein Gateway: kein Produkt liefert Funkplätze",
+      "product_board_without_width": "Produkte im Verteiler ohne Breite (TE)",
+      "product_channels_missing": "Produkte ohne Anzahl Kanäle",
+      "product_channel_without_limit": "Produkte mit Kanälen, aber ohne Lastgrenze (W oder A)",
+      "system_no_enclosure": "Kein Verteilergehäuse: kein Produkt hat Verteilerreihen"
+    },
+    "missing": {
+      "product_board_without_width": "Breite auf der Hutschiene (TE): ohne sie kann der Verteiler das Produkt nicht platzieren",
+      "product_channels_missing": "Anzahl Kanäle: die Kategorie hat das Feld, der Wert ist leer",
+      "product_bus_current_missing": "Busstrom, den das Gerät zieht (mA): die Prüfung der Linienversorgung lässt es aus",
+      "product_channel_without_limit": "Lastgrenze je Kanal (W oder A): Lasten an seinen Kanälen werden nicht geprüft"
+    },
+    "severity": {
+      "error": "Fehler",
+      "warning": "Warnung",
+      "info": "Hinweis"
+    }
+  }
 }

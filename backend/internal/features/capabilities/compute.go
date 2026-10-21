@@ -43,6 +43,77 @@ type Capabilities struct {
 	WirelessPlacesUsedDefault bool     `json:"wirelessPlacesUsedDefault" doc:"wirelessPlacesUsed is the product type's default (the product has no value)"`
 	ZigbeeRouter              *bool    `json:"zigbeeRouter,omitempty"`
 	MotorType                 string   `json:"motorType,omitempty" enum:"ac,dc" doc:"Motors the blind outputs drive (D310)"`
+	// Missing lists what the checks still need of the product (D447);
+	// left out when nothing is missing.
+	Missing []Missing `json:"missing,omitempty" doc:"What the checks still need of the product (readiness codes); left out when nothing is missing"`
+}
+
+// MissingCode is a product-level readiness code (D446, D447).
+type MissingCode string
+
+const (
+	// MissingBusCurrent: a device of a bus system without a default bus
+	// current has no bus current value.
+	MissingBusCurrent MissingCode = "product_bus_current_missing"
+	// MissingBoardWidth: mounted on the board, but no rail width.
+	MissingBoardWidth MissingCode = "product_board_without_width"
+	// MissingChannels: the category has a channels field, the value is
+	// empty.
+	MissingChannels MissingCode = "product_channels_missing"
+	// MissingChannelLimit: channels, but no W or A limit for them.
+	MissingChannelLimit MissingCode = "product_channel_without_limit"
+)
+
+// MissingCodes are the product-level codes in display order.
+var MissingCodes = []MissingCode{MissingBoardWidth, MissingChannels, MissingBusCurrent, MissingChannelLimit}
+
+// Severity is how much a readiness item matters (D446).
+type Severity string
+
+const (
+	SeverityError   Severity = "error"
+	SeverityWarning Severity = "warning"
+	SeverityInfo    Severity = "info"
+)
+
+// MissingSeverity is the severity of each product-level code; the readiness
+// check uses the same table.
+var MissingSeverity = map[MissingCode]Severity{
+	MissingBoardWidth:   SeverityError,
+	MissingChannels:     SeverityWarning,
+	MissingBusCurrent:   SeverityWarning,
+	MissingChannelLimit: SeverityInfo,
+}
+
+// Missing is one thing the checks still need of a product.
+type Missing struct {
+	Code     MissingCode `json:"code" enum:"product_board_without_width,product_channels_missing,product_bus_current_missing,product_channel_without_limit"`
+	Severity Severity    `json:"severity" enum:"error,warning,info"`
+}
+
+func missingItem(code MissingCode) Missing {
+	return Missing{Code: code, Severity: MissingSeverity[code]}
+}
+
+// HasMissing reports whether c lists the code.
+func (c Capabilities) HasMissing(code MissingCode) bool {
+	return slices.ContainsFunc(c.Missing, func(m Missing) bool { return m.Code == code })
+}
+
+// MergeMissing is the missing list of a product with variants: a code
+// counts when any active variant lacks it (variants carry
+// the product's values too). Without variants the product's own list.
+func MergeMissing(product Capabilities, variants []Capabilities) []Missing {
+	if len(variants) == 0 {
+		return product.Missing
+	}
+	var out []Missing
+	for _, code := range MissingCodes {
+		if slices.ContainsFunc(variants, func(v Capabilities) bool { return v.HasMissing(code) }) {
+			out = append(out, missingItem(code))
+		}
+	}
+	return out
 }
 
 // ChannelCapability is the channels of one output kind a product supplies.
@@ -168,6 +239,9 @@ func Compute(reg Registry, in Input) Capabilities {
 		alternativeAllowedSet bool
 	}
 	channels := map[uuid.UUID]*channelData{}
+	// Kinds whose channels_supplied field the category has; true once the
+	// product gives a value (0 counts as given).
+	channelFields := map[uuid.UUID]bool{}
 	ch := func(id uuid.UUID) *channelData {
 		c := channels[id]
 		if c == nil {
@@ -192,6 +266,11 @@ func Compute(reg Registry, in Input) Capabilities {
 		}
 		if len(f.ProductTypeIDs) > 0 && !slices.Contains(f.ProductTypeIDs, in.ProductTypeID) {
 			continue
+		}
+		if f.Meaning == MeaningChannelsSupplied {
+			if _, seen := channelFields[deref0(f.OutputKindID)]; !seen {
+				channelFields[deref0(f.OutputKindID)] = false
+			}
 		}
 		raw, ok := in.Values[a.Key]
 		if !ok || raw == nil {
@@ -236,6 +315,7 @@ func Compute(reg Registry, in Input) Capabilities {
 		}
 		switch f.Meaning {
 		case MeaningChannelsSupplied:
+			channelFields[deref0(f.OutputKindID)] = true
 			setOnce(&ch(deref0(f.OutputKindID)).count, n)
 		case MeaningChannelLimitW:
 			ch(deref0(f.OutputKindID)).limitW.add(f.LoadTypeID, n)
@@ -304,6 +384,52 @@ func Compute(reg Registry, in Input) Capabilities {
 			}
 		}
 		out.Channels = append(out.Channels, cc)
+	}
+	out.Missing = missing(reg, in, out, channelFields)
+	return out
+}
+
+// missing derives the product-level readiness codes (D446) in
+// MissingCodes order; nil when nothing is missing. Enclosures and bus power
+// supplies are not bus devices and need no width or bus current of their
+// own.
+func missing(reg Registry, in Input, c Capabilities, channelFields map[uuid.UUID]bool) []Missing {
+	enclosure := c.EnclosureRows != nil
+	var out []Missing
+	add := func(code MissingCode) { out = append(out, missingItem(code)) }
+	if (c.Mounting == string(MountingBoard) || c.Mounting == string(MountingBoth)) && c.RailWidthTE == nil && !enclosure {
+		add(MissingBoardWidth)
+	}
+	// Channels: the category has channels fields of active kinds and the
+	// product gives none of them a value (a device has channels of one or
+	// two kinds, not of every kind its category lists). Power supplies,
+	// gateways and enclosures have no channels.
+	infrastructure := c.BusCurrentSuppliedMa != nil || c.WirelessPlacesSupplied != nil || enclosure
+	hasField, given := false, false
+	for _, k := range reg.OutputKinds {
+		if v, ok := channelFields[k.ID]; ok {
+			hasField, given = true, given || v
+		}
+	}
+	if hasField && !given && !infrastructure {
+		add(MissingChannels)
+	}
+	if in.ProductType.Topology == TopologyBus && c.BusCurrentUsedMa == nil && c.BusCurrentSuppliedMa == nil && !enclosure {
+		add(MissingBusCurrent)
+	}
+	// Limits: only for kinds the catalog has a W or A limit field for
+	// (inputs have none).
+	limitFields := map[uuid.UUID]bool{}
+	for _, f := range reg.Fields {
+		if (f.Meaning == MeaningChannelLimitW || f.Meaning == MeaningChannelLimitA) && f.OutputKindID != nil {
+			limitFields[*f.OutputKindID] = true
+		}
+	}
+	for _, cc := range c.Channels {
+		if limitFields[cc.OutputKindID] && len(cc.LimitsW) == 0 && len(cc.LimitsA) == 0 {
+			add(MissingChannelLimit)
+			break
+		}
 	}
 	return out
 }

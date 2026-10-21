@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { ProductType, ProductTypeInput, ProductTypeUpdate } from '@/api/generated/model'
 import { getSearchVariantsQueryKey } from '@/api/generated/products/products'
@@ -61,6 +61,9 @@ const row = (name: string) => screen.getByText(name).closest('tr')!
 const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[1].textContent)
 
 describe('ProductTypesPage', () => {
+  // The Readiness section above the table (ReadinessSection.test.tsx covers it).
+  beforeEach(() => server.use(http.get('/api/catalog/readiness', () => HttpResponse.json({ systems: [], global: [] }))))
+
   it('lists active product types with their badge and shows inactive ones on request', async () => {
     const requested: string[] = []
     server.use(listHandler(() => [alpha, beta, gamma], requested))

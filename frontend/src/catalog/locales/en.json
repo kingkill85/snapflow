@@ -28,5 +28,34 @@
   "price": {
     "range": "{{min}} – {{max}}"
   },
-  "storedValue": "Stored value: {{value}}"
+  "storedValue": "Stored value: {{value}}",
+  "readiness": {
+    "code": {
+      "functions_none": "No active function: rooms cannot ask for anything",
+      "function_not_served": "Functions no channel kind serves: their needs cannot be connected",
+      "function_no_load_types": "Functions without load types: any load is accepted",
+      "function_no_knx_objects": "Functions without KNX objects: no group addresses for them",
+      "channel_kind_unused": "Channel kinds without a channels field: no product can supply them",
+      "categories_without_mounting_board": "Categories mounted on the floorplan whose products have a width: they never reach the board",
+      "topology_none": "No topology: no bus or wireless checks for this system",
+      "product_bus_current_missing": "Products without bus current, and the system has no default",
+      "system_no_power_supply": "No power supply: no product supplies bus current",
+      "system_no_gateway": "No gateway: no product supplies wireless places",
+      "product_board_without_width": "Products on the board without a width (TE)",
+      "product_channels_missing": "Products without their number of channels",
+      "product_channel_without_limit": "Products with channels but no load limit (W or A)",
+      "system_no_enclosure": "No enclosure: no product has enclosure rows"
+    },
+    "missing": {
+      "product_board_without_width": "Width on the rail (TE): the board cannot place it without one",
+      "product_channels_missing": "Number of channels: the category has the field, the value is empty",
+      "product_bus_current_missing": "Bus current the device draws (mA): the line's power supply check skips it",
+      "product_channel_without_limit": "Load limit per channel (W or A): loads on its channels are not checked"
+    },
+    "severity": {
+      "error": "Error",
+      "warning": "Warning",
+      "info": "Note"
+    }
+  }
 }

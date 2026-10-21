@@ -1,10 +1,20 @@
+import { CircleX, Info, TriangleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { Product } from '@/api/generated/model'
+import type { MissingSeverity, Product } from '@/api/generated/model'
+import { useMissingText } from '@/catalog/readiness'
 import { Section } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
 
 import { useDescribeCapabilities } from './describe-capabilities'
+
+/** The icon of a missing line, coloured like its readiness item (D446). */
+const severityIcons: Record<MissingSeverity, ReactNode> = {
+  error: <CircleX aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger" />,
+  warning: <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />,
+  info: <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />,
+}
 
 /**
  * "What SnapFlow knows about this product": the capabilities the backend
@@ -15,6 +25,8 @@ export function CapabilitiesSection({ product }: { product: Product }) {
   const { t } = useTranslation('products')
   const localized = useLocalized()
   const describe = useDescribeCapabilities()
+  const missingText = useMissingText()
+  const missing = product.capabilities.missing ?? []
   const rows = [
     { key: 'product', title: t('capabilities.product'), text: describe(product.capabilities) },
     ...product.variants.map((v) => ({ key: v.id, title: localized(v.name), text: describe(v.capabilities) })),
@@ -29,6 +41,20 @@ export function CapabilitiesSection({ product }: { product: Product }) {
           </div>
         ))}
       </dl>
+      {/* What the checks still need (D447): the product's and its active variants' gaps. */}
+      {missing.length > 0 && (
+        <div className="space-y-1.5" data-testid="still-missing">
+          <h3 className="text-sm font-medium">{t('capabilities.missing')}</h3>
+          <ul className="space-y-1">
+            {missing.map((m) => (
+              <li key={m.code} className="flex items-start gap-2 text-sm" data-severity={m.severity}>
+                {severityIcons[m.severity]}
+                <span>{missingText(m.code)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Section>
   )
 }

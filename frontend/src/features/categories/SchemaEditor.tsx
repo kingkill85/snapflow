@@ -3,7 +3,9 @@ import { type ReactNode, useId, useState } from 'react'
 import { type FieldPath, useFieldArray, type UseFormReturn, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
-import { useListCatalogFields } from '@/api/generated/catalog-fields/catalog-fields'
+import { useQueryClient } from '@tanstack/react-query'
+
+import { getListCatalogFieldsQueryKey, useListCatalogFields } from '@/api/generated/catalog-fields/catalog-fields'
 import { AttributeDefinitionItemType, AttributeDefinitionScope, AttributeDefinitionType, type CatalogField } from '@/api/generated/model'
 import {
   Button,
@@ -19,7 +21,8 @@ import {
   useFieldError,
   useRepeaterFocus,
 } from '@/components/ui'
-import { useMeaningLabel } from '@/catalog/meaning-labels'
+import { useDescribeMeaning } from '@/catalog/meaning-labels'
+import { CatalogFieldFormDialog, type CatalogFieldFormValues } from '@/features/capabilities'
 import { useLocalized } from '@/i18n/localized'
 
 import {
@@ -35,6 +38,9 @@ import {
 } from './form'
 
 type Form = UseFormReturn<FormValues>
+
+/** The "Catalog field" choice that creates a field instead of linking one. */
+const createField = '\u0000create'
 
 type ErrorTree = { message?: string; root?: { message?: string } } | undefined
 
@@ -183,8 +189,11 @@ type AttributeRowProps = {
 function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expanded, onExpandedChange, controls }: AttributeRowProps) {
   const { t } = useTranslation('categories')
   const localized = useLocalized()
-  const meaningLabel = useMeaningLabel()
+  const describeMeaning = useDescribeMeaning()
+  const queryClient = useQueryClient()
   const errorAt = useErrorAt(form)
+  // "Create a new field…": the Fields page's dialog, prefilled from the row (D445).
+  const [newField, setNewField] = useState<Partial<CatalogFieldFormValues> | null>(null)
   const path = `${name}.${index}` as const
   const [key, label, type, itemType, unit, required, scope, fieldKey] = useWatch({
     control: form.control,
@@ -211,11 +220,28 @@ function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expa
     ...catalogFields.map((f) => ({ value: f.key, label: `${localized(f.label)} (${f.key})` })),
     // A link to a field that is not listed (e.g. deleted since) stays visible.
     ...(fieldKey && !linked ? [{ value: fieldKey, label: fieldKey }] : []),
+    ...(readOnly ? [] : [{ value: createField, label: t('link.create') }]),
   ]
   const onLink = (value: string) => {
+    if (value === createField) {
+      const a = form.getValues(path)
+      setNewField({
+        key: a.key.trim(),
+        label: a.label,
+        type: a.type === 'list' ? 'text' : a.type,
+        unit: a.unit.trim(),
+        options: a.type === 'enum' ? a.options : [],
+      })
+      return
+    }
     const field = catalogFields.find((f) => f.key === value)
     form.setValue(path, linkField(form.getValues(path), field), { shouldDirty: true })
   }
+  const onFieldCreated = async (field: CatalogField) => {
+    form.setValue(path, linkField(form.getValues(path), field), { shouldDirty: true })
+    await queryClient.invalidateQueries({ queryKey: getListCatalogFieldsQueryKey() })
+  }
+  const meaning = describeMeaning(linked?.meaning)
 
   // Labels for min/max say what they limit for the chosen type.
   const boundsLabel = type === 'text' ? 'length' : type === 'list' ? 'items' : 'value'
@@ -273,10 +299,15 @@ function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expa
         {locked && (
           <div className="space-y-1.5 sm:col-span-2" data-testid="linked-meaning">
             <p className="text-sm font-medium">{t('link.meaning')}</p>
-            <p className="text-sm text-muted">{meaningLabel(linked?.meaning)}</p>
+            <p className="text-sm">{meaning.title}</p>
+            <p className="text-xs text-muted">{meaning.description}</p>
           </div>
         )}
       </div>
+      {/* Mounted only while open: a category has many rows. */}
+      {newField && (
+        <CatalogFieldFormDialog open onOpenChange={(open) => !open && setNewField(null)} item={null} prefill={newField} onSaved={onFieldCreated} />
+      )}
       <div className="grid items-start gap-4 sm:grid-cols-3">
         <FormSelectField
           control={form.control}

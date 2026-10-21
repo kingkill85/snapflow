@@ -201,3 +201,49 @@ test('the list in German', async ({ page, api }) => {
   await expect(dialog.getByText('Vorschau des Abzeichens')).toBeVisible()
   await dialog.getByRole('button', { name: 'Abbrechen' }).click()
 })
+
+// D446, D447: a system's readiness card names a board product without a
+// width; the product page says what is missing; filling the width there
+// turns the card green.
+test('a readiness card shows a missing width, fixed on the product the card goes green', async ({ page, api }) => {
+  const tag = uniqueKey('').replace(/^_+/, '').slice(-6)
+  const post = async <T,>(path: string, data: unknown): Promise<T> => {
+    const res = await api.ctx.post(path, { data })
+    expect(res.ok(), `${path}: ${res.status()} ${await res.text()}`).toBe(true)
+    return (await res.json()) as T
+  }
+  const systemName = `Bus ${tag}`
+  const system = await post<{ id: string }>('/api/product-types', {
+    key: `bus_${tag}`, name: { en: systemName }, isActive: true, topology: 'bus', defaultBusCurrentMa: 10,
+  })
+  const fields = { width: `width_${tag}`, supply: `supply_${tag}`, rows: `rows_${tag}` }
+  await post('/api/catalog-fields', { key: fields.width, label: { en: 'Width' }, type: 'number', unit: 'TE', meaning: 'rail_width_te' })
+  await post('/api/catalog-fields', { key: fields.supply, label: { en: 'Supply' }, type: 'number', meaning: 'bus_current_supplied_ma' })
+  await post('/api/catalog-fields', { key: fields.rows, label: { en: 'Rows' }, type: 'integer', meaning: 'enclosure_rows' })
+  const attr = (key: string, type: string, fieldKey: string) => ({ key, label: { en: key[0].toUpperCase() + key.slice(1) }, type, fieldKey })
+  const category = await post<{ id: string }>('/api/categories', {
+    key: `board_${tag}`, name: { en: `Board ${tag}` }, isActive: true, mounting: 'board', instanceAttributes: [],
+    attributes: [attr('width', 'number', fields.width), attr('supply', 'number', fields.supply), attr('rows', 'integer', fields.rows)],
+  })
+  const ids = { productTypeId: system.id, categoryId: category.id }
+  await api.createProduct({ ...ids, modelNumber: `PS-${tag}`, attributes: { supply: 640, width: 4 } })
+  await api.createProduct({ ...ids, modelNumber: `ENC-${tag}`, attributes: { rows: 3 } })
+  const actuator = await api.createProduct({ ...ids, modelNumber: `ACT-${tag}`, name: { en: `Actuator ${tag}` } })
+
+  await page.goto('/catalog/product-types')
+  await expect(page.getByText('What SnapFlow still needs before a system works in a project.')).toBeVisible()
+  const card = page.getByRole('listitem', { name: systemName })
+  await expect(card).toContainText('Products on the board without a width (TE)')
+  await card.getByRole('link', { name: `ACT-${tag}` }).click()
+
+  await expect(page.getByRole('heading', { name: 'Edit product' })).toBeVisible()
+  await expect(page.getByTestId('still-missing')).toContainText('Width on the rail (TE): the board cannot place it without one')
+  await page.getByRole('textbox', { name: /^Width/ }).fill('2')
+  await page.getByRole('button', { name: 'Update' }).click()
+  await expect(page.getByText('Saved.')).toBeVisible()
+  await expect(page.getByTestId('still-missing')).toHaveCount(0)
+  expect((await api.product(actuator.id)).attributes).toMatchObject({ width: 2 })
+
+  await page.goto('/catalog/product-types')
+  await expect(page.getByRole('listitem', { name: systemName })).toContainText('Ready: nothing missing')
+})

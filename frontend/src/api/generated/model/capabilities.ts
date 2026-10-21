@@ -8,6 +8,7 @@ import type { CapabilitiesMotorType } from './capabilitiesMotorType';
 import type { CapabilitiesMounting } from './capabilitiesMounting';
 import type { ChannelCapability } from './channelCapability';
 import type { Limit } from './limit';
+import type { Missing } from './missing';
 
 export interface Capabilities {
   busCurrentSuppliedMa?: number;
@@ -18,6 +19,8 @@ export interface Capabilities {
   channels: ChannelCapability[];
   enclosureRows?: number;
   enclosureTePerRow?: number;
+  /** What the checks still need of the product (readiness codes); left out when nothing is missing */
+  missing?: Missing[];
   /** Limit for the whole module (A) */
   moduleTotalA?: number;
   /** Limits for the whole module (W): one without a load type applies to any load */
