@@ -18913,7 +18913,7 @@
     },
     "/api/versions/{versionId}/checks": {
       "get": {
-        "description": "Zone coverage, board channels and TE, bus lines, gateways and the findings; computed on demand.",
+        "description": "Zone coverage, board channels and TE, bus lines, gateways and the findings (with every plan's content warnings, D453); computed on demand.",
         "operationId": "getChecks",
         "parameters": [
           {
@@ -18921,6 +18921,17 @@
             "name": "versionId",
             "required": true,
             "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the findings that refer to this plan (as need plan, target plan or item plan), counted alike",
+            "explode": false,
+            "in": "query",
+            "name": "planId",
+            "schema": {
+              "description": "Only the findings that refer to this plan (as need plan, target plan or item plan), counted alike",
               "format": "uuid",
               "type": "string"
             }

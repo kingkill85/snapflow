@@ -361,6 +361,57 @@ func TestWarnings(t *testing.T) {
 	if !found {
 		t.Errorf("no variant_deleted warning")
 	}
+
+	// The checks report the content warnings as findings with the severity
+	// of the plans' table and refs to plan and item (D453); ?planId= keeps
+	// those of one plan.
+	type finding struct {
+		Severity string `json:"severity"`
+		Code     string `json:"code"`
+		Refs     struct {
+			TargetPlanID *uuid.UUID `json:"targetPlanId"`
+			ItemID       *uuid.UUID `json:"itemId"`
+		} `json:"refs"`
+	}
+	type checks struct {
+		Findings []finding `json:"findings"`
+		Counts   struct {
+			Errors int `json:"errors"`
+		} `json:"counts"`
+	}
+	all := decode[checks](t, api.Get("/api/versions/"+version.String()+"/checks", user.Cookie))
+	want := map[string]bool{"variant_deleted": false, "variant_inactive": false, "required_addon_unavailable": false}
+	for _, f := range all.Findings {
+		if _, ok := want[f.Code]; !ok {
+			continue
+		}
+		item := main
+		if f.Code == "variant_deleted" {
+			item = foreign
+		}
+		if f.Refs.TargetPlanID == nil || *f.Refs.TargetPlanID != pl.ID || f.Refs.ItemID == nil || *f.Refs.ItemID != item {
+			t.Errorf("refs of %s: %+v", f.Code, f.Refs)
+		}
+		if f.Severity != string(plans.WarningSeverity[f.Code]) {
+			t.Errorf("severity of %s: %s", f.Code, f.Severity)
+		}
+		want[f.Code] = true
+	}
+	for code, ok := range want {
+		if !ok {
+			t.Errorf("checks lack %s: %+v", code, all.Findings)
+		}
+	}
+	if all.Counts.Errors < 2 {
+		t.Errorf("errors counted: %d", all.Counts.Errors)
+	}
+	second := createPlan(t, api, user.Cookie, version, "Upstairs", 1000, 1000)
+	if got := decode[checks](t, api.Get("/api/versions/"+version.String()+"/checks?planId="+second.ID.String(), user.Cookie)); len(got.Findings) != 0 || got.Counts.Errors != 0 {
+		t.Errorf("other plan: %+v", got)
+	}
+	if got := decode[checks](t, api.Get("/api/versions/"+version.String()+"/checks?planId="+pl.ID.String(), user.Cookie)); len(got.Findings) != len(all.Findings) {
+		t.Errorf("own plan: %d of %d", len(got.Findings), len(all.Findings))
+	}
 }
 
 func TestLockLifecycle(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/features/networks"
+	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
 )
 
@@ -77,8 +78,10 @@ func itemFinding(st *state, sev Severity, code string, planID, itemID uuid.UUID,
 	return Finding{Severity: sev, Code: code, Refs: Refs{TargetPlanID: &planID, ItemID: &itemID}, Params: params}
 }
 
-// Checks evaluates a version.
-func (s *Service) Checks(ctx context.Context, versionID uuid.UUID) (Checks, error) {
+// Checks evaluates a version. With planID only the findings that refer to
+// that plan (as need plan, target plan or item plan) are returned, counted
+// alike; the zones, boards, lines and gateways stay those of the version.
+func (s *Service) Checks(ctx context.Context, versionID uuid.UUID, planID *uuid.UUID) (Checks, error) {
 	actor, err := auth.Require(ctx, auth.PermProjectsRead)
 	if err != nil {
 		return Checks{}, err
@@ -99,19 +102,94 @@ func (s *Service) Checks(ctx context.Context, versionID uuid.UUID) (Checks, erro
 	if err != nil {
 		return Checks{}, err
 	}
+	content, err := s.plans.ContentFindings(ctx, versionID)
+	if err != nil {
+		return Checks{}, err
+	}
 	out := evaluateChecks(sn, members, lines)
 	addAddressFindings(&out, sn.st, issues)
+	addFindings(&out, contentFindings(sn.st, content))
+	if planID != nil {
+		filterPlan(&out, *planID)
+	}
 	return out, nil
+}
+
+// contentFindings are the plans' content warnings as findings (D453): the
+// severity from the plans feature's table, an item named by its label and
+// product, a need by its label and function type.
+func contentFindings(st *state, list []plans.ContentFinding) []Finding {
+	out := make([]Finding, 0, len(list))
+	for _, c := range list {
+		pl := c.PlanID
+		var f Finding
+		switch {
+		case c.ItemID != nil:
+			f = itemFinding(st, Severity(c.Severity), c.Code, pl, *c.ItemID, map[string]any{})
+		case c.NeedID != nil:
+			id := *c.NeedID
+			params := map[string]any{}
+			if n := st.needs[NeedKey{pl, id}]; n != nil {
+				params["label"] = n.Label
+				params["functionTypeKey"] = st.cat.FunctionKey[n.FunctionTypeID]
+			}
+			f = Finding{Severity: Severity(c.Severity), Code: c.Code, Refs: Refs{PlanID: &pl, NeedID: &id}, Params: params}
+		default:
+			f = Finding{Severity: Severity(c.Severity), Code: c.Code, Refs: Refs{TargetPlanID: &pl}, Params: map[string]any{}}
+		}
+		if c.AddonVariantID != nil {
+			f.Params["addonVariantId"] = c.AddonVariantID.String()
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// addFindings adds findings to the checks, sorted by severity (stable) and
+// counted.
+func addFindings(out *Checks, more []Finding) {
+	if len(more) == 0 {
+		return
+	}
+	out.Findings = append(out.Findings, more...)
+	sortAndCount(out)
+}
+
+// sortAndCount orders the findings errors, then warnings, then infos
+// (otherwise in the order found) and counts them.
+func sortAndCount(out *Checks) {
+	rank := map[Severity]int{SeverityError: 0, SeverityWarning: 1, SeverityInfo: 2}
+	slices.SortStableFunc(out.Findings, func(a, b Finding) int { return rank[a.Severity] - rank[b.Severity] })
+	out.Counts.Errors, out.Counts.Warnings, out.Counts.Infos = 0, 0, 0
+	for _, f := range out.Findings {
+		switch f.Severity {
+		case SeverityError:
+			out.Counts.Errors++
+		case SeverityWarning:
+			out.Counts.Warnings++
+		default:
+			out.Counts.Infos++
+		}
+	}
+}
+
+// filterPlan keeps the findings that refer to a plan.
+func filterPlan(out *Checks, planID uuid.UUID) {
+	kept := []Finding{}
+	for _, f := range out.Findings {
+		if (f.Refs.PlanID != nil && *f.Refs.PlanID == planID) || (f.Refs.TargetPlanID != nil && *f.Refs.TargetPlanID == planID) {
+			kept = append(kept, f)
+		}
+	}
+	out.Findings = kept
+	sortAndCount(out)
 }
 
 // addAddressFindings adds the address rules' findings (3e, D419) to the
 // checks: duplicates are errors, addresses outside their line and malformed
 // line addresses warnings, devices without address one info per line.
 func addAddressFindings(out *Checks, st *state, issues []networks.AddressIssue) {
-	if len(issues) == 0 {
-		return
-	}
-	findings := out.Findings
+	var more []Finding
 	for _, is := range issues {
 		sev := Severity(is.Severity)
 		var f Finding
@@ -121,19 +199,9 @@ func addAddressFindings(out *Checks, st *state, issues []networks.AddressIssue) 
 			f = Finding{Severity: sev, Code: is.Code, Params: is.Params}
 		}
 		f.Refs.BusLineID = is.BusLineID
-		findings = append(findings, f)
-		switch sev {
-		case SeverityError:
-			out.Counts.Errors++
-		case SeverityWarning:
-			out.Counts.Warnings++
-		default:
-			out.Counts.Infos++
-		}
+		more = append(more, f)
 	}
-	rank := map[Severity]int{SeverityError: 0, SeverityWarning: 1, SeverityInfo: 2}
-	slices.SortStableFunc(findings, func(a, b Finding) int { return rank[a.Severity] - rank[b.Severity] })
-	out.Findings = findings
+	addFindings(out, more)
 }
 
 // evaluateChecks is the pure part of Checks.

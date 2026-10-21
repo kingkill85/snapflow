@@ -1,6 +1,10 @@
 package installation
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/kingkill85/snapflow/backend/internal/features/plans"
+)
 
 // Every text exists in every language, and the finding texts cover the
 // codes the checks report (frontend list, D393/D419).
@@ -22,6 +26,9 @@ func TestMessages(t *testing.T) {
 		"bus_line_devices_reserve", "bus_current_unknown", "bus_device_unassigned", "wireless_no_gateway", "gateway_places_reserve",
 		"gateway_places_exceeded", "gateway_no_router", "network_assignment_dangling", "address_duplicate", "address_outside_line",
 		"bus_line_address_invalid", "bus_line_address_duplicate", "address_device_zero"}
+	for code := range plans.WarningSeverity {
+		codes = append(codes, code) // the plans' content warnings (D453)
+	}
 	for _, c := range codes {
 		if _, ok := messages["en"]["f-"+c]; !ok {
 			t.Errorf("no text for %s", c)
