@@ -215,6 +215,56 @@ func (q *Queries) DeleteOutputKindFunctionTypes(ctx context.Context, outputKindI
 	return err
 }
 
+const deleteServingKinds = `-- name: DeleteServingKinds :many
+DELETE FROM output_kind_function_types WHERE function_type_id = $1 RETURNING output_kind_id
+`
+
+// Removes the links of a function type; returns the kinds that served it.
+func (q *Queries) DeleteServingKinds(ctx context.Context, functionTypeID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, deleteServingKinds, functionTypeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var output_kind_id uuid.UUID
+		if err := rows.Scan(&output_kind_id); err != nil {
+			return nil, err
+		}
+		items = append(items, output_kind_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const existingOutputKindIDs = `-- name: ExistingOutputKindIDs :many
+SELECT id FROM output_kinds WHERE id = ANY($1::uuid[]) FOR KEY SHARE
+`
+
+// FOR KEY SHARE: a concurrent delete of one of them waits for the caller's transaction.
+func (q *Queries) ExistingOutputKindIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, existingOutputKindIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCatalogField = `-- name: GetCatalogField :one
 SELECT id, key, label, value_type, unit, options, etim_feature, meaning, output_kind_id, load_type_id, sort_order, created_at, updated_at FROM catalog_fields WHERE id = $1
 `
@@ -321,6 +371,21 @@ type InsertOutputKindFunctionTypesParams struct {
 
 func (q *Queries) InsertOutputKindFunctionTypes(ctx context.Context, arg InsertOutputKindFunctionTypesParams) error {
 	_, err := q.db.Exec(ctx, insertOutputKindFunctionTypes, arg.OutputKindID, arg.FunctionTypeIds)
+	return err
+}
+
+const insertServingKinds = `-- name: InsertServingKinds :exec
+INSERT INTO output_kind_function_types (output_kind_id, function_type_id)
+SELECT unnest($1::uuid[]), $2::uuid
+`
+
+type InsertServingKindsParams struct {
+	OutputKindIds  []uuid.UUID
+	FunctionTypeID uuid.UUID
+}
+
+func (q *Queries) InsertServingKinds(ctx context.Context, arg InsertServingKindsParams) error {
+	_, err := q.db.Exec(ctx, insertServingKinds, arg.OutputKindIds, arg.FunctionTypeID)
 	return err
 }
 
@@ -499,6 +564,38 @@ func (q *Queries) ListOutputKinds(ctx context.Context, includeInactive bool) ([]
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listServingKinds = `-- name: ListServingKinds :many
+SELECT l.function_type_id, l.output_kind_id FROM output_kind_function_types l
+JOIN output_kinds k ON k.id = l.output_kind_id
+ORDER BY l.function_type_id, k.sort_order, k.key
+`
+
+type ListServingKindsRow struct {
+	FunctionTypeID uuid.UUID
+	OutputKindID   uuid.UUID
+}
+
+// The output kinds serving each function type, in the kinds' order.
+func (q *Queries) ListServingKinds(ctx context.Context) ([]ListServingKindsRow, error) {
+	rows, err := q.db.Query(ctx, listServingKinds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListServingKindsRow{}
+	for rows.Next() {
+		var i ListServingKindsRow
+		if err := rows.Scan(&i.FunctionTypeID, &i.OutputKindID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -712,6 +809,16 @@ func (q *Queries) ShareCatalogFields(ctx context.Context, keys []string) ([]Cata
 		return nil, err
 	}
 	return items, nil
+}
+
+const touchOutputKinds = `-- name: TouchOutputKinds :exec
+UPDATE output_kinds SET updated_at = now() WHERE id = ANY($1::uuid[])
+`
+
+// Bumps updated_at so open editors of these kinds see they are stale (D56).
+func (q *Queries) TouchOutputKinds(ctx context.Context, ids []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchOutputKinds, ids)
+	return err
 }
 
 const updateCatalogField = `-- name: UpdateCatalogField :one

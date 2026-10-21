@@ -10,6 +10,12 @@
     "key": "Key",
     "name": "Name",
     "keyHint": "e.g. dimmer, switching, blind",
+    "servedBy": "Served by channel kinds",
+    "servedByHint": "The kinds of channel a need of this function can be connected to.",
+    "servedByNone": "No channel kind serves this function yet: needs of it cannot be connected.",
+    "details": "Details",
+    "detailsHint": "Allowed load types and KNX objects.",
+    "detailsHintNoKnx": "Allowed load types.",
     "loadTypes": "Allowed load types",
     "loadTypesHint": "The load types a need of this function may have. None ticked = any.",
     "allowsCircuit": "Several needs may share one channel",
@@ -24,6 +30,9 @@
     "addKnxObject": "Add object",
     "status": "Status",
     "active": "Active",
-    "activeHint": "Inactive functions stay on existing needs but cannot be chosen for new needs or room templates."
+    "activeHint": "Inactive functions stay on existing needs but cannot be chosen for new needs or room templates.",
+    "servedByColumn": "Served by",
+    "notServed": "Not served: needs of this function cannot be connected",
+    "notServedBadge": "Not served"
   }
 }

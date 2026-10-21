@@ -31,4 +31,9 @@ export interface FunctionTypeInput {
   loadTypeIds?: string[];
   /** Display name per locale; "en" is required */
   name: FunctionTypeInputName;
+  /**
+     * The output kinds serving this function (existing ones, each once); on update, left out keeps the stored links, empty clears them (D444)
+     * @maxItems 200
+     */
+  outputKindIds?: string[];
 }

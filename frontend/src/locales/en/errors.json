@@ -157,6 +157,7 @@
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "load_type_duplicate": "This load type is listed twice.",
+    "output_kind_duplicate": "This channel kind is listed twice.",
     "knx_object_duplicate": "The object key \"{{key}}\" is used twice.",
     "dpst_format": "Enter the datapoint subtype like DPST-1-1.",
     "not_found": "This function no longer exists."

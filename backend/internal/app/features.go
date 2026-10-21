@@ -50,6 +50,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	productTypes := producttypes.NewService(deps.DB)
 	producttypes.Register(api, productTypes)
 	capSvc := capabilities.NewService(deps.DB)
+	functionTypeSvc.SetServedBy(capSvc.ServedByHook())
 	capabilities.Register(api, capSvc)
 	roomtemplates.Register(api, roomtemplates.NewService(deps.DB, functionTypeSvc, capSvc))
 	cats := categories.NewService(deps.DB, capSvc)

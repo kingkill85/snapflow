@@ -4252,6 +4252,13 @@
             "description": "Display name per locale",
             "type": "object"
           },
+          "outputKindIds": {
+            "description": "The output (channel) kinds that serve this function, in their order; empty = needs of it cannot be connected",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
@@ -4265,6 +4272,7 @@
           "loadTypeIds",
           "isActive",
           "knxObjects",
+          "outputKindIds",
           "createdAt",
           "updatedAt"
         ],
@@ -4320,6 +4328,14 @@
             },
             "description": "Display name per locale; \"en\" is required",
             "type": "object"
+          },
+          "outputKindIds": {
+            "description": "The output kinds serving this function (existing ones, each once); on update, left out keeps the stored links, empty clears them (D444)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
           }
         },
         "required": [

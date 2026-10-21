@@ -24,6 +24,8 @@ describe('a third language', () => {
     let posted: unknown
     server.use(
       http.get('/api/load-types', () => HttpResponse.json({ items: [] })),
+      http.get('/api/output-kinds', () => HttpResponse.json({ items: [] })),
+      http.get('/api/product-types', () => HttpResponse.json({ items: [] })),
       http.post('/api/function-types', async ({ request }) => {
         posted = await request.json()
         return HttpResponse.json({}, { status: 201 })
@@ -43,6 +45,6 @@ describe('a third language', () => {
     await user.type(within(dialog).getByLabelText('Name'), 'Variateur')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer', fr: 'Variateur' }, allowsCircuit: false, loadTypeIds: [], isActive: true, knxObjects: [] }))
+    await waitFor(() => expect(posted).toEqual({ key: 'dimmer', name: { en: 'Dimmer', fr: 'Variateur' }, allowsCircuit: false, loadTypeIds: [], outputKindIds: [], isActive: true }))
   })
 })

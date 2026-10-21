@@ -24,6 +24,7 @@ const functionType = (over: Partial<FunctionType>): FunctionType => ({
   allowsCircuit: true,
   knxObjects: [],
   loadTypeIds: [],
+  outputKindIds: [],
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',

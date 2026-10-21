@@ -153,3 +153,25 @@ DELETE FROM catalog_field_product_types WHERE catalog_field_id = $1;
 -- name: InsertCatalogFieldProductTypes :exec
 INSERT INTO catalog_field_product_types (catalog_field_id, product_type_id)
 SELECT sqlc.arg(catalog_field_id)::uuid, unnest(sqlc.arg(product_type_ids)::uuid[]);
+
+-- name: ListServingKinds :many
+-- The output kinds serving each function type, in the kinds' order.
+SELECT l.function_type_id, l.output_kind_id FROM output_kind_function_types l
+JOIN output_kinds k ON k.id = l.output_kind_id
+ORDER BY l.function_type_id, k.sort_order, k.key;
+
+-- name: ExistingOutputKindIDs :many
+-- FOR KEY SHARE: a concurrent delete of one of them waits for the caller's transaction.
+SELECT id FROM output_kinds WHERE id = ANY(sqlc.arg(ids)::uuid[]) FOR KEY SHARE;
+
+-- name: DeleteServingKinds :many
+-- Removes the links of a function type; returns the kinds that served it.
+DELETE FROM output_kind_function_types WHERE function_type_id = $1 RETURNING output_kind_id;
+
+-- name: InsertServingKinds :exec
+INSERT INTO output_kind_function_types (output_kind_id, function_type_id)
+SELECT unnest(sqlc.arg(output_kind_ids)::uuid[]), sqlc.arg(function_type_id)::uuid;
+
+-- name: TouchOutputKinds :exec
+-- Bumps updated_at so open editors of these kinds see they are stale (D56).
+UPDATE output_kinds SET updated_at = now() WHERE id = ANY(sqlc.arg(ids)::uuid[]);

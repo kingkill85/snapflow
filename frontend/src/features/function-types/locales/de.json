@@ -10,6 +10,12 @@
     "key": "Schlüssel",
     "name": "Name",
     "keyHint": "z. B. dimmer, switching, blind",
+    "servedBy": "Bedient von Kanalarten",
+    "servedByHint": "Die Kanalarten, an die ein Bedarf dieser Funktion angeschlossen werden kann.",
+    "servedByNone": "Noch keine Kanalart bedient diese Funktion: Bedarfe davon können nicht angeschlossen werden.",
+    "details": "Details",
+    "detailsHint": "Erlaubte Lastarten und KNX-Objekte.",
+    "detailsHintNoKnx": "Erlaubte Lastarten.",
     "loadTypes": "Erlaubte Lastarten",
     "loadTypesHint": "Die Lastarten, die ein Bedarf dieser Funktion haben darf. Keine angehakt = alle.",
     "allowsCircuit": "Mehrere Bedarfe dürfen sich einen Kanal teilen",
@@ -24,6 +30,9 @@
     "addKnxObject": "Objekt hinzufügen",
     "status": "Status",
     "active": "Aktiv",
-    "activeHint": "Inaktive Funktionen bleiben an bestehenden Bedarfen, können aber für neue Bedarfe und Raumvorlagen nicht gewählt werden."
+    "activeHint": "Inaktive Funktionen bleiben an bestehenden Bedarfen, können aber für neue Bedarfe und Raumvorlagen nicht gewählt werden.",
+    "servedByColumn": "Bedient von",
+    "notServed": "Nicht bedient: Bedarfe dieser Funktion können nicht angeschlossen werden",
+    "notServedBadge": "Nicht bedient"
   }
 }

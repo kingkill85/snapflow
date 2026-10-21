@@ -34,6 +34,7 @@ type FunctionType struct {
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds" doc:"The load types a need of this function may have; empty = any"`
 	IsActive      bool        `json:"isActive" doc:"Inactive: kept on existing needs (with a warning), not chosen for new ones"`
 	KNXObjects    []KNXObject `json:"knxObjects" doc:"The KNX communication objects of a need of this function (one group address each)"`
+	OutputKindIDs []uuid.UUID `json:"outputKindIds" doc:"The output (channel) kinds that serve this function, in their order; empty = needs of it cannot be connected"`
 	CreatedAt     time.Time   `json:"createdAt"`
 	UpdatedAt     time.Time   `json:"updatedAt"`
 }
@@ -45,6 +46,17 @@ type FunctionTypeInput struct {
 	LoadTypeIDs   []uuid.UUID `json:"loadTypeIds,omitempty" maxItems:"200" doc:"Allowed load types (existing ones, each once); empty = any; on update, left out keeps the stored ones (D294)"`
 	IsActive      *bool       `json:"isActive,omitempty" doc:"Default true; on update, left out keeps the stored value (D294)"`
 	KNXObjects    []KNXObject `json:"knxObjects,omitempty" maxItems:"32" doc:"KNX communication objects (keys unique); on update, left out keeps the stored ones (D294)"`
+	OutputKindIDs []uuid.UUID `json:"outputKindIds,omitempty" maxItems:"200" doc:"The output kinds serving this function (existing ones, each once); on update, left out keeps the stored links, empty clears them (D444)"`
+}
+
+// ServedBy reads and replaces which output kinds serve a function type.
+// The capabilities feature owns those links and registers an
+// implementation at wiring time (SetServedBy); functiontypes does not read
+// its tables (D444, like plans.ContentHook, D243). tx nil: outside a
+// transaction.
+type ServedBy interface {
+	ListServedBy(ctx context.Context, tx pgx.Tx) (map[uuid.UUID][]uuid.UUID, error)
+	SetServedBy(ctx context.Context, tx pgx.Tx, functionTypeID uuid.UUID, outputKindIDs []uuid.UUID) error
 }
 
 // KNXObject is a KNX communication object of a function: a group address
@@ -69,16 +81,40 @@ type DB interface {
 }
 
 type Service struct {
-	db DB
-	q  *store.Queries
+	db       DB
+	q        *store.Queries
+	servedBy ServedBy
 }
+
+// SetServedBy registers the owner of the output kind links (capabilities).
+func (s *Service) SetServedBy(h ServedBy) { s.servedBy = h }
 
 func NewService(db DB) *Service {
 	return &Service{db: db, q: store.New(db)}
 }
 
-func (s *Service) inTx(ctx context.Context, fn func(q *store.Queries) error) error {
-	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error { return fn(s.q.WithTx(tx)) })
+func (s *Service) inTx(ctx context.Context, fn func(tx pgx.Tx, q *store.Queries) error) error {
+	return database.InTx(ctx, s.db, pgx.TxOptions{}, func(tx pgx.Tx) error { return fn(tx, s.q.WithTx(tx)) })
+}
+
+// served returns the output kinds serving each function type (empty
+// without a registered hook).
+func (s *Service) served(ctx context.Context, tx pgx.Tx) (map[uuid.UUID][]uuid.UUID, error) {
+	if s.servedBy == nil {
+		return map[uuid.UUID][]uuid.UUID{}, nil
+	}
+	return s.servedBy.ListServedBy(ctx, tx)
+}
+
+// setServed replaces the serving output kinds; nil keeps them.
+func (s *Service) setServed(ctx context.Context, tx pgx.Tx, id uuid.UUID, kindIDs []uuid.UUID) error {
+	if kindIDs == nil {
+		return nil
+	}
+	if s.servedBy == nil {
+		return errors.New("functiontypes: outputKindIds given but no ServedBy hook is registered")
+	}
+	return s.servedBy.SetServedBy(ctx, tx, id, kindIDs)
 }
 
 // loadTypes returns the allowed load types of every function type.
@@ -106,9 +142,13 @@ func (s *Service) List(ctx context.Context) ([]FunctionType, error) {
 	if err != nil {
 		return nil, err
 	}
+	served, err := s.served(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]FunctionType, len(rows))
 	for i, r := range rows {
-		out[i] = fromRow(r, loads[r.ID])
+		out[i] = fromRow(r, loads[r.ID], served[r.ID])
 	}
 	return out, nil
 }
@@ -125,7 +165,11 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (FunctionType, error) {
 	if err != nil {
 		return FunctionType{}, err
 	}
-	return fromRow(row, loads[row.ID]), nil
+	served, err := s.served(ctx, nil)
+	if err != nil {
+		return FunctionType{}, err
+	}
+	return fromRow(row, loads[row.ID], served[row.ID]), nil
 }
 
 func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionType, error) {
@@ -146,19 +190,28 @@ func (s *Service) Create(ctx context.Context, in FunctionTypeInput) (FunctionTyp
 		objects = []byte("[]")
 	}
 	var row store.FunctionType
-	err = s.inTx(ctx, func(q *store.Queries) error {
+	var served []uuid.UUID
+	err = s.inTx(ctx, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
 		row, err = q.CreateFunctionType(ctx, store.CreateFunctionTypeParams{Key: in.Key, Name: in.Name,
 			AllowsCircuit: in.AllowsCircuit != nil && *in.AllowsCircuit, IsActive: in.IsActive == nil || *in.IsActive, KnxObjects: objects})
 		if err != nil {
 			return err
 		}
-		return setLoadTypes(ctx, q, row.ID, in.LoadTypeIDs)
+		if err := setLoadTypes(ctx, q, row.ID, in.LoadTypeIDs); err != nil {
+			return err
+		}
+		if err := s.setServed(ctx, tx, row.ID, in.OutputKindIDs); err != nil {
+			return err
+		}
+		all, err := s.served(ctx, tx)
+		served = all[row.ID]
+		return err
 	})
 	if err != nil {
 		return FunctionType{}, mapErr(err, in.Key)
 	}
-	return fromRow(row, in.LoadTypeIDs), nil
+	return fromRow(row, in.LoadTypeIDs, served), nil
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput) (FunctionType, error) {
@@ -176,7 +229,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 		return FunctionType{}, err
 	}
 	var row store.FunctionType
-	err = s.inTx(ctx, func(q *store.Queries) error {
+	var served []uuid.UUID
+	err = s.inTx(ctx, func(tx pgx.Tx, q *store.Queries) error {
 		var err error
 		// Left-out flags keep the stored values (D294).
 		allowsCircuit, isActive := in.AllowsCircuit, in.IsActive
@@ -194,13 +248,23 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 		}
 		row, err = q.UpdateFunctionType(ctx, store.UpdateFunctionTypeParams{ID: id, Key: in.Key, Name: in.Name,
 			AllowsCircuit: *allowsCircuit, IsActive: *isActive, KnxObjects: objects})
-		if err != nil || in.LoadTypeIDs == nil {
+		if err != nil {
 			return err
 		}
-		if err := q.DeleteFunctionTypeLoadTypes(ctx, id); err != nil {
+		if in.LoadTypeIDs != nil {
+			if err := q.DeleteFunctionTypeLoadTypes(ctx, id); err != nil {
+				return err
+			}
+			if err := setLoadTypes(ctx, q, id, in.LoadTypeIDs); err != nil {
+				return err
+			}
+		}
+		if err := s.setServed(ctx, tx, id, in.OutputKindIDs); err != nil {
 			return err
 		}
-		return setLoadTypes(ctx, q, id, in.LoadTypeIDs)
+		all, err := s.served(ctx, tx)
+		served = all[id]
+		return err
 	})
 	if err != nil {
 		return FunctionType{}, mapErr(err, in.Key)
@@ -210,9 +274,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in FunctionTypeInput
 		if err != nil {
 			return FunctionType{}, err
 		}
-		return fromRow(row, loads[id]), nil
+		return fromRow(row, loads[id], served), nil
 	}
-	return fromRow(row, in.LoadTypeIDs), nil
+	return fromRow(row, in.LoadTypeIDs, served), nil
 }
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
@@ -244,6 +308,13 @@ func validate(in FunctionTypeInput) error {
 			errs = append(errs, apperr.Field(fmt.Sprintf("body.loadTypeIds[%d]", i), "function_type.load_type_duplicate", "listed twice"))
 		}
 		seen[id] = true
+	}
+	seenKinds := map[uuid.UUID]bool{}
+	for i, id := range in.OutputKindIDs {
+		if seenKinds[id] {
+			errs = append(errs, apperr.Field(fmt.Sprintf("body.outputKindIds[%d]", i), "function_type.output_kind_duplicate", "listed twice"))
+		}
+		seenKinds[id] = true
 	}
 	if len(in.KNXObjects) > MaxKNXObjects {
 		errs = append(errs, apperr.Field("body.knxObjects", "validation.too_many", "too many objects").With("max", MaxKNXObjects))
@@ -333,10 +404,13 @@ func setLoadTypes(ctx context.Context, q *store.Queries, id uuid.UUID, loadTypeI
 	return err
 }
 
-func fromRow(r store.FunctionType, loadTypes []uuid.UUID) FunctionType {
+func fromRow(r store.FunctionType, loadTypes, served []uuid.UUID) FunctionType {
 	if loadTypes == nil {
 		loadTypes = []uuid.UUID{}
 	}
+	if served == nil {
+		served = []uuid.UUID{}
+	}
 	return FunctionType{ID: r.ID, Key: r.Key, Name: r.Name, AllowsCircuit: r.AllowsCircuit, LoadTypeIDs: loadTypes,
-		IsActive: r.IsActive, KNXObjects: objectsOf(r.KnxObjects), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+		IsActive: r.IsActive, KNXObjects: objectsOf(r.KnxObjects), OutputKindIDs: served, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }

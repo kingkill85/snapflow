@@ -157,6 +157,7 @@
     "key_format": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
     "key_taken": "Der Schlüssel \"{{key}}\" ist bereits vergeben.",
     "load_type_duplicate": "Diese Lastart ist doppelt aufgeführt.",
+    "output_kind_duplicate": "Diese Kanalart ist doppelt aufgeführt.",
     "knx_object_duplicate": "Der Objektschlüssel \"{{key}}\" ist doppelt vergeben.",
     "dpst_format": "Datenpunkt-Subtyp wie DPST-1-1 eingeben.",
     "not_found": "Diese Funktion existiert nicht mehr."

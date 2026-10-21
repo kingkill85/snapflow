@@ -29,6 +29,13 @@ export type ProductTypeInput = {
   abbreviation?: string
   color?: string
   isActive: boolean
+  topology?: 'bus' | 'wireless' | 'none'
+  addressing?: 'knx_individual' | 'hdl' | 'eui64' | 'none'
+  defaultBusCurrentMa?: number
+  busDevicesMax?: number
+  defaultWirelessPlacesUsed?: number
+  reservePercent?: number
+  nominalVoltage?: number
 }
 export type ProductType = ProductTypeInput & { id: string; sortOrder: number; updatedAt: string }
 /** A category: the kind of device, with the attribute schemas. */
@@ -175,6 +182,15 @@ export class Api {
 
   async createFunctionType(key: string, en: string): Promise<{ id: string }> {
     return this.json(await this.ctx.post('/api/function-types', { data: { key, name: { en } } }))
+  }
+
+  async functionType(id: string): Promise<{ id: string; outputKindIds: string[]; knxObjects: unknown[] }> {
+    return this.json(await this.ctx.get(`/api/function-types/${id}`))
+  }
+
+  /** An active output (channel) kind, after the others. */
+  async createOutputKind(key: string, en: string): Promise<{ id: string; key: string; updatedAt: string }> {
+    return this.json(await this.ctx.post('/api/output-kinds', { data: { key, name: { en }, isActive: true } }))
   }
 
   /** Creates a product type; unset fields get defaults (active, no badge). */

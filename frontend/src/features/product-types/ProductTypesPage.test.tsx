@@ -69,7 +69,7 @@ describe('ProductTypesPage', () => {
 
     await screen.findByText('Zigbee')
     const zigbee = row('Zigbee')
-    expect(within(zigbee).getAllByRole('cell').map((c) => c.textContent)).toEqual(['1', 'ZBZigbee', 'zigbee', 'Active', expect.any(String)])
+    expect(within(zigbee).getAllByRole('cell').map((c) => c.textContent)).toEqual(['1', 'ZBZigbee', 'zigbee', 'Bus', '–', 'Active', expect.any(String)])
     // The abbreviation on the badge colour, its text black or white for contrast.
     expect(within(zigbee).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb', color: '#ffffff' })
     expect(screen.queryByText('KNX')).not.toBeInTheDocument()
@@ -410,5 +410,57 @@ describe('ProductTypesPage', () => {
     await u.click(within(dialog).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(screen.queryByText('HDL Buspro')).not.toBeInTheDocument())
     expect(screen.getByText('Zigbee')).toBeInTheDocument()
+  })
+
+  it('shows only the settings of the chosen topology and clears the others when switching', async () => {
+    let posted: ProductTypeInput | undefined
+    const knx = productType({ id: '6f1c2b8e-0000-4000-8000-000000000004', key: 'knx_bus', name: { en: 'KNX bus' }, topology: 'bus', addressing: 'knx_individual', defaultBusCurrentMa: 10, busDevicesMax: 64 })
+    server.use(
+      listHandler(() => [knx]),
+      http.put('/api/product-types/:id', async ({ request }) => {
+        posted = (await request.json()) as ProductTypeInput
+        return HttpResponse.json(knx)
+      }),
+    )
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+
+    await screen.findByText('KNX bus')
+    expect(within(row('KNX bus')).getByText('KNX individual address')).toBeInTheDocument()
+    await u.click(within(row('KNX bus')).getByRole('button', { name: 'Edit' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit system' })
+    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('10')
+    // Voltage and reserve at their defaults: Advanced is collapsed.
+    const advanced = within(dialog).getByRole('button', { name: /Advanced/ })
+    expect(advanced).toHaveAttribute('aria-expanded', 'false')
+    expect(within(dialog).getByLabelText(/^Reserve/)).not.toBeVisible()
+
+    await chooseOption(u, within(dialog).getByLabelText('Topology'), 'None')
+    expect(within(dialog).queryByLabelText('Addressing')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Default bus current')).not.toBeInTheDocument()
+    // Back to bus: the cleared values stay cleared.
+    await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Bus')
+    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('')
+    await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Wireless')
+    await u.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(posted).toBeDefined())
+    expect(posted).toMatchObject({ topology: 'wireless', addressing: 'none', defaultBusCurrentMa: 0, busDevicesMax: 0, defaultWirelessPlacesUsed: 0, nominalVoltage: 230, reservePercent: 20 })
+  })
+
+  it('opens Advanced when voltage or reserve differ from their defaults, for every topology', async () => {
+    server.use(listHandler(() => [productType({ topology: 'none', nominalVoltage: 110 })]))
+    const u = userEvent.setup()
+    renderWithProviders(<ProductTypesPage />, { me: adminMe })
+
+    await screen.findByText('Zigbee')
+    await u.click(within(row('Zigbee')).getByRole('button', { name: 'Edit' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit system' })
+    expect(within(dialog).getByRole('button', { name: /Advanced/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(dialog).getByLabelText(/^Switched voltage/)).toBeVisible()
+    expect(within(dialog).getByLabelText(/^Switched voltage/)).toHaveValue('110')
+    // Active stays the last field.
+    const switches = within(dialog).getAllByRole('switch')
+    expect(switches[switches.length - 1]).toBe(within(dialog).getByRole('switch', { name: /^Active/ }))
   })
 })

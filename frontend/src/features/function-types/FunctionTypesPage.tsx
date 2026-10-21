@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -9,6 +9,7 @@ import {
   useListFunctionTypes,
 } from '@/api/generated/function-types/function-types'
 import type { FunctionType } from '@/api/generated/model'
+import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { useCan } from '@/app/session'
 import { Badge, Button, ConfirmDialog, DataTable, EmptyState, ErrorMessage, Loading, Page, RowAction } from '@/components/ui'
 import { useLocalized } from '@/i18n/localized'
@@ -23,6 +24,11 @@ export function FunctionTypesPage() {
   const queryClient = useQueryClient()
   const list = useListFunctionTypes()
   const remove = useDeleteFunctionType()
+  const kinds = useListOutputKinds({ includeInactive: true })
+  const kindName = (id: string) => {
+    const k = kinds.data?.items.find((x) => x.id === id)
+    return k ? localized(k.name) : ''
+  }
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<FunctionType | null>(null)
@@ -77,6 +83,20 @@ export function FunctionTypesPage() {
           columns={[
             { header: t('field.key'), cell: (ft) => <code className="text-xs">{ft.key}</code> },
             { header: t('field.name'), cell: (ft) => localized(ft.name), mobile: 'title' },
+            {
+              header: t('field.servedByColumn'),
+              cell: (ft) =>
+                ft.outputKindIds.length > 0 ? (
+                  ft.outputKindIds.map(kindName).filter(Boolean).join(', ')
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    –
+                    <Badge variant="warning" title={t('field.notServed')}>
+                      <TriangleAlert aria-hidden="true" /> {t('field.notServedBadge')}
+                    </Badge>
+                  </span>
+                ),
+            },
             {
               header: t('field.status'),
               cell: (ft) => (
