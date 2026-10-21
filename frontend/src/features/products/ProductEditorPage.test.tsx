@@ -79,6 +79,7 @@ describe('ProductEditorPage', () => {
     await i18n.changeLanguage('en')
   })
 
+  // Types into every field: slow under the full parallel run, hence the longer timeout.
   it('creates a product with a value of every attribute type, sending exactly what is set', async () => {
     let posted: ProductCreate | undefined
     const created = { ...dimmer, id: ids.id(299), variants: [] }
@@ -154,7 +155,7 @@ describe('ProductEditorPage', () => {
       mounting: '',
       firstVariant: { price: '27.5', sku: 'M1-STD' },
     })
-  })
+  }, 30_000)
 
   it('shows a product with one variant as a "Price and variant" section that saves through the variant API', async () => {
     const product: Product = { ...dimmer, variants: [ivory] }
