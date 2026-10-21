@@ -52,22 +52,22 @@ type Readiness struct {
 
 // ReadinessSystem is the readiness of one active product type.
 type ReadinessSystem struct {
-	ProductTypeID uuid.UUID `json:"productTypeId"`
-	Key           string    `json:"key"`
-	Name          i18n.Text `json:"name"`
-	Abbreviation  string    `json:"abbreviation,omitempty"`
-	Color         string    `json:"color,omitempty"`
-	Topology      string    `json:"topology" enum:"bus,wireless,none"`
-	Items         []ReadinessItem    `json:"items" doc:"Empty = ready: nothing missing"`
+	ProductTypeID uuid.UUID       `json:"productTypeId"`
+	Key           string          `json:"key"`
+	Name          i18n.Text       `json:"name"`
+	Abbreviation  string          `json:"abbreviation,omitempty"`
+	Color         string          `json:"color,omitempty"`
+	Topology      string          `json:"topology" enum:"bus,wireless,none"`
+	Items         []ReadinessItem `json:"items" doc:"Empty = ready: nothing missing"`
 }
 
 // ReadinessItem is one thing still missing; Refs name at most MaxRefs of the Count
 // entries it concerns.
 type ReadinessItem struct {
-	Code     string   `json:"code" enum:"functions_none,function_not_served,function_no_load_types,function_no_knx_objects,channel_kind_unused,categories_without_mounting_board,topology_none,product_bus_current_missing,system_no_power_supply,system_no_gateway,product_board_without_width,product_channels_missing,product_channel_without_limit,system_no_enclosure"`
-	Severity Severity `json:"severity" enum:"error,warning,info"`
-	Count    int      `json:"count" doc:"How many entries the item concerns (refs lists at most 20)"`
-	Refs     []ReadinessRef    `json:"refs"`
+	Code     string         `json:"code" enum:"functions_none,function_not_served,function_no_load_types,function_no_knx_objects,channel_kind_unused,categories_without_mounting_board,topology_none,product_bus_current_missing,system_no_power_supply,system_no_gateway,product_board_without_width,product_channels_missing,product_channel_without_limit,system_no_enclosure"`
+	Severity Severity       `json:"severity" enum:"error,warning,info"`
+	Count    int            `json:"count" doc:"How many entries the item concerns (refs lists at most 20)"`
+	Refs     []ReadinessRef `json:"refs"`
 }
 
 // ReadinessRef names a catalog entry an item concerns.

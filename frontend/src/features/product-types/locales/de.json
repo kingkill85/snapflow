@@ -50,5 +50,13 @@
     "none": "Keine",
     "bus": "Bus",
     "wireless": "Funk"
+  },
+  "readiness": {
+    "title": "Bereitschaft",
+    "description": "Was SnapFlow noch braucht, bevor dieses System in einem Projekt funktioniert.",
+    "general": "Allgemein",
+    "generalHint": "Funktionen, Kanalarten und Kategorien des ganzen Katalogs",
+    "ready": "Bereit: nichts fehlt",
+    "more": "und {{count}} weitere"
   }
 }

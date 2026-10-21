@@ -94,6 +94,8 @@ test('an import asks what new capability columns mean; the product then shows it
   // Width: rail width in TE.
   const width = column(columns.width)
   await chooseOption(width.getByRole('combobox', { name: 'Meaning for the checks' }), 'Width on the rail (TE)')
+  // The meaning in plain words, with an example (D445).
+  await expect(width).toContainText("In TE (17.5 mm); used for the board's capacity. Example: 4 TE")
   await width.getByRole('textbox', { name: /Unit/ }).fill('TE')
   // Notes: just information.
   await chooseOption(column(columns.notes).getByRole('combobox', { name: 'This column is' }), 'Just information')

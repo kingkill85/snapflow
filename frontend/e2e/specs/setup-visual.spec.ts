@@ -322,3 +322,53 @@ test('every state of the Systems and Functions editors and their lists', { tag: 
     }
   }
 })
+
+// Step 4a-3 (D446, D447): the Readiness section of the Systems page (a
+// system with gaps, the General card) and the product page's "Still missing"
+// lines in every layout; screenshots in e2e/screenshots/setup-readiness-*.png
+// and setup-product-missing-*.png.
+test('the Readiness section and the product missing lines fit the screen', { tag: '@visual' }, async ({ page, api }) => {
+  test.setTimeout(300_000)
+  const tag = uniqueKey('').replace(/^_+/, '').slice(-6)
+  const post = async <T,>(path: string, data: unknown): Promise<T> => {
+    const res = await api.ctx.post(path, { data })
+    expect(res.ok(), `${path}: ${res.status()} ${await res.text()}`).toBe(true)
+    return (await res.json()) as T
+  }
+  const system = await post<{ id: string }>('/api/product-types', {
+    key: `ready_${tag}`, name: { en: `KNX ${tag}`, de: `KNX ${tag}` }, abbreviation: 'KNX', color: '#2f855a', isActive: true, topology: 'bus',
+  })
+  const width = `ready_width_${tag}`
+  await post('/api/catalog-fields', { key: width, label: { en: 'Width' }, type: 'number', unit: 'TE', meaning: 'rail_width_te' })
+  const category = await post<{ id: string }>('/api/categories', {
+    key: `ready_${tag}`, name: { en: `Actuators ${tag}` }, isActive: true, mounting: 'board', instanceAttributes: [],
+    attributes: [{ key: 'width', label: { en: 'Width' }, type: 'number', fieldKey: width }],
+  })
+  const product = await api.createProduct({ productTypeId: system.id, categoryId: category.id, modelNumber: `RDY-${tag}` })
+  // Its card first.
+  await api.moveProductTypesToTop([system.id])
+
+  for (const lang of ['en', 'de'] as const) {
+    await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport.size)
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme })
+        await page.goto('/catalog/product-types')
+        const card = page.getByRole('listitem', { name: `KNX ${tag}` })
+        await expect(card.getByRole('link', { name: `RDY-${tag}` }).first()).toBeVisible()
+        await settle(page)
+        await expectNoHorizontalOverflow(page)
+        await card.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: `e2e/screenshots/setup-readiness-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: false, animations: 'disabled' })
+        await page.goto(`/catalog/products/${product.id}`)
+        const missing = page.getByTestId('still-missing')
+        await expect(missing).toBeVisible()
+        await settle(page)
+        await expectNoHorizontalOverflow(page)
+        await missing.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: `e2e/screenshots/setup-product-missing-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: false, animations: 'disabled' })
+      }
+    }
+  }
+})

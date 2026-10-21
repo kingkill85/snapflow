@@ -222,6 +222,22 @@ describe('ProductEditorPage', () => {
     expect(puts[0].mounting).toBe('')
   })
 
+  it('lists what is still missing in plain words, and nothing when complete (D447)', async () => {
+    await openEditor(() => ({ ...dimmer, capabilities: { ...dimmer.capabilities, missing: [{ code: 'product_board_without_width' }, { code: 'product_channel_without_limit' }] } }))
+    const missing = await screen.findByTestId('still-missing')
+    expect(within(missing).getByRole('heading', { name: 'Still missing' })).toBeInTheDocument()
+    expect(within(missing).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Width on the DIN rail (TE): the board cannot place it without one',
+      'Load limit per channel (W or A): loads on its channels are not checked',
+    ])
+  })
+
+  it('shows no missing lines for a complete product', async () => {
+    await openEditor()
+    await screen.findByTestId('capabilities')
+    expect(screen.queryByTestId('still-missing')).not.toBeInTheDocument()
+  })
+
   it('edits lists and clears values, leaving out what is not set', async () => {
     const u = userEvent.setup()
     const { puts } = await openEditor()

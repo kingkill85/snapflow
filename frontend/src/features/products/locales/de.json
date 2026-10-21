@@ -172,6 +172,7 @@
     "limitsA": "max. {{limits}} pro Kanal",
     "minLoads": "min. {{limits}} pro Kanal",
     "moduleTotalsW": "max. {{limits}} für das ganze Modul",
-    "systemDefault": "{{text}} (Systemvorgabe)"
+    "systemDefault": "{{text}} (Systemvorgabe)",
+    "missing": "Fehlt noch"
   }
 }
