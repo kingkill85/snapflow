@@ -170,6 +170,9 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const [params, setParams] = useSearchParams()
   const selectParam = params.get('select')
   const focusParam = params.get('focus')
+  // The pending focus attempt stops when the editor closes (not when the params are dropped below).
+  const stopFocus = useRef<(() => void) | null>(null)
+  useEffect(() => () => stopFocus.current?.(), [])
   useEffect(() => {
     if (!selectParam) return
     const d = docRef.current
@@ -178,7 +181,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       dispatchEditor({ type: 'select', ids: [selectionFor(selectParam, d)] })
       setTab('inspector')
       // &focus=template (the Needs tab's "Apply a room template"): focus the zone's template picker once it is shown.
-      if (focusParam === 'template') focusWhenShown(templatePickerId)
+      if (focusParam === 'template') stopFocus.current = focusWhenShown(templatePickerId)
     }
     setParams(
       (p) => {

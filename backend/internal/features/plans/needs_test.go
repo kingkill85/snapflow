@@ -250,7 +250,9 @@ func TestNeeds(t *testing.T) {
 	wantCode(t, saveNeeds(api, user.Cookie, content, []any{}, []any{}), http.StatusConflict, "plan.lock_required")
 }
 
-func TestNeedsSummaryAndCopy(t *testing.T) {
+// TestNeedsCopy: a version copy copies the needs (the version's needs
+// overview is the wiring feature's room overview, D455).
+func TestNeedsCopy(t *testing.T) {
 	var copiedPlans map[uuid.UUID]uuid.UUID
 	api := apptest.NewWithPlanCopier(t, func(_ context.Context, _ pgx.Tx, planIDs map[uuid.UUID]uuid.UUID, _, _ projects.VersionRef) error {
 		copiedPlans = planIDs
@@ -274,38 +276,9 @@ func TestNeedsSummaryAndCopy(t *testing.T) {
 	zz["name"] = "Kitchen"
 	wantCode(t, saveNeeds(api, user.Cookie, getContent(t, api, user.Cookie, pl.ID), []any{zz}, []any{n1, n2, n3}), http.StatusOK, "")
 
-	resp := api.Get("/api/versions/"+source.String()+"/needs", user.Cookie)
-	wantCode(t, resp, http.StatusOK, "")
-	sum := decode[plans.VersionNeeds](t, resp)
-	if len(sum.Plans) != 1 || len(sum.Plans[0].Zones) != 2 {
-		t.Fatalf("summary: %+v", sum)
-	}
-	kitchen, none := sum.Plans[0].Zones[0], sum.Plans[0].Zones[1]
-	if kitchen.Name != "Kitchen" || kitchen.ZoneID == nil || len(kitchen.Needs) != 2 || kitchen.Totals.Quantity != 7 || kitchen.Totals.PowerW != "99.99" ||
-		none.ZoneID != nil || len(none.Needs) != 1 || !none.Needs[0].Symbol {
-		t.Errorf("zones: %+v", sum.Plans[0].Zones)
-	}
-	if kitchen.Needs[0].FunctionType.Key != "n_blind" || kitchen.Needs[0].LoadType == nil || kitchen.Needs[0].LoadType.Key != "n_motor" {
-		t.Errorf("need refs: %+v", kitchen.Needs[0])
-	}
-	// Exact decimal sums (D341): 3 × 33.33 + 0.10.
-	if none.Needs[0].PowerW == nil || *none.Needs[0].PowerW != "0.10" || none.Totals.PowerW != "0.10" {
-		t.Errorf("no zone: %+v", none)
-	}
-	if sum.Totals.Quantity != 8 || sum.Totals.PowerW != "100.09" || sum.LoadTypes[2].Totals.PowerW != "0.00" || len(sum.FunctionTypes) != 2 ||
-		sum.FunctionTypes[0].FunctionType.Key != "n_blind" || sum.FunctionTypes[1].Totals.Quantity != 5 {
-		t.Errorf("totals: %+v %+v", sum.Totals, sum.FunctionTypes)
-	}
-	if len(sum.LoadTypes) != 3 || sum.LoadTypes[2].LoadType != nil || sum.LoadTypes[2].Totals.Quantity != 4 {
-		t.Errorf("load type totals: %+v", sum.LoadTypes)
-	}
-	// Another tenant does not see the version.
-	other := api.NewUser(api.NewTenant("Other"), auth.RoleUser)
-	wantCode(t, api.Get("/api/versions/"+source.String()+"/needs", other.Cookie), http.StatusNotFound, "")
-
 	// Version copy copies the needs with their ids and zones (D339) and
 	// hands the plan id map to the plan copiers.
-	resp = api.Post("/api/projects/"+p.ID.String()+"/versions", user.Cookie, map[string]any{"name": "V2", "sourceVersionId": source})
+	resp := api.Post("/api/projects/"+p.ID.String()+"/versions", user.Cookie, map[string]any{"name": "V2", "sourceVersionId": source})
 	wantCode(t, resp, http.StatusCreated, "")
 	target := decode[struct{ ID uuid.UUID }](t, resp).ID
 	copied := decode[[]plans.Plan](t, api.Get("/api/versions/"+target.String()+"/plans", user.Cookie))

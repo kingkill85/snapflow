@@ -113,7 +113,8 @@ FROM jsonb_to_recordset(sqlc.arg(rows)::jsonb)
     AS r (id uuid, function_type_id uuid, quantity integer, power_w numeric, load_type_id uuid, label text,
           note text, x double precision, y double precision, zone_id uuid, position integer);
 
--- VersionNeeds returns the needs of a version's plans (the needs summary).
+-- VersionNeeds returns the needs of a version's plans (WiringData: the
+-- wiring feature's checks and room overview).
 -- name: VersionNeeds :many
 SELECT n.plan_id, n.id, n.function_type_id, n.quantity, n.power_w, n.load_type_id, n.label, n.note,
     (n.x IS NOT NULL)::boolean AS symbol, n.zone_id

@@ -1312,7 +1312,8 @@ type VersionNeedsRow struct {
 	ZoneID         *uuid.UUID
 }
 
-// VersionNeeds returns the needs of a version's plans (the needs summary).
+// VersionNeeds returns the needs of a version's plans (WiringData: the
+// wiring feature's checks and room overview).
 func (q *Queries) VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error) {
 	rows, err := q.db.Query(ctx, versionNeeds, versionID)
 	if err != nil {

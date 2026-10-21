@@ -217,108 +217,36 @@ func evaluateChecks(sn *snapshot, members []networks.Member, lines []networks.Bu
 
 	// Connection validity (dangling, overloads, circuits, limits); zones
 	// count only connections without errors (D412).
-	broken := map[uuid.UUID]bool{}
-	for _, p := range st.evaluate() {
+	problems := st.evaluate()
+	for _, p := range problems {
 		findings = append(findings, findingOf(st, p))
-		if p.Severity == SeverityError {
-			for _, id := range p.Conns {
-				broken[id] = true
-			}
-		}
 	}
 
-	// Zones and unconnected needs.
-	for _, p := range sn.data.Plans {
-		if p.Kind != "floorplan" {
-			continue
-		}
-		type acc struct{ units, connected int64 }
-		byZone := map[uuid.UUID]*acc{}
-		var none *acc
-		zoneExists := map[uuid.UUID]bool{}
-		for _, z := range p.Zones {
-			zoneExists[z.ID] = true
-		}
-		for _, n := range p.Needs {
-			k := NeedKey{p.ID, n.ID}
-			// connected: every connection (need_unconnected); good: only
-			// those without errors (zone coverage, D412).
-			connected, good := int64(0), int64(0)
-			for _, c := range st.byNeed[k] {
-				connected += int64(c.Units)
-				if !broken[c.ID] {
-					good += int64(c.Units)
-				}
-			}
-			connected = min(connected, int64(n.Quantity))
-			good = min(good, int64(n.Quantity))
-			a := none
-			if n.ZoneID != nil {
-				a = byZone[*n.ZoneID]
-				if a == nil {
-					a = &acc{}
-					byZone[*n.ZoneID] = a
-				}
-			} else {
-				if none == nil {
-					none = &acc{}
-				}
-				a = none
-			}
-			a.units += int64(n.Quantity)
-			a.connected += good
+	// Zones and unconnected needs (one coverage rule with the room
+	// overview, D455).
+	for _, pc := range zoneCoverage(sn, brokenConnections(problems)) {
+		for _, nc := range pc.Needs {
+			n := nc.Need
 			out.Counts.Units += int64(n.Quantity)
-			out.Counts.ConnectedUnits += good
-			if missing := int64(n.Quantity) - connected; missing > 0 {
-				pl, id := p.ID, n.ID
+			out.Counts.ConnectedUnits += nc.Good
+			if missing := int64(n.Quantity) - nc.Connected; missing > 0 {
+				pl, id := pc.PlanID, n.ID
 				// A need of a zone that no longer exists links to the plan.
-				var zone *uuid.UUID
-				if n.ZoneID != nil && zoneExists[*n.ZoneID] {
-					zone = n.ZoneID
-				}
-				f := Finding{Severity: SeverityWarning, Code: CodeNeedUnconnected, Refs: Refs{PlanID: &pl, NeedID: &id, ZoneID: zone},
+				f := Finding{Severity: SeverityWarning, Code: CodeNeedUnconnected, Refs: Refs{PlanID: &pl, NeedID: &id, ZoneID: nc.ZoneID},
 					Params: map[string]any{"missing": missing, "quantity": n.Quantity, "functionTypeKey": st.cat.FunctionKey[n.FunctionTypeID], "label": n.Label}}
 				findings = append(findings, f)
 			}
 		}
-		zone := func(id *uuid.UUID, name string, a *acc) {
-			z := ZoneStatus{PlanID: p.ID, ZoneID: id, Name: name, Status: "none"}
-			if a != nil && a.units > 0 {
-				z.Units, z.ConnectedUnits = a.units, a.connected
+		for _, r := range pc.Rooms {
+			z := ZoneStatus{PlanID: pc.PlanID, ZoneID: r.ZoneID, Name: r.Name, Status: r.Status}
+			if r.Units > 0 {
+				z.Units, z.ConnectedUnits = r.Units, r.Good
 				out.Counts.ZonesWithNeeds++
-				switch {
-				case a.connected >= a.units:
-					z.Status = "covered"
+				if r.Status == "covered" {
 					out.Counts.ZonesCovered++
-				case a.connected > 0:
-					z.Status = "partial"
-				default:
-					z.Status = "missing"
 				}
 			}
 			out.Zones = append(out.Zones, z)
-		}
-		known := map[uuid.UUID]bool{}
-		for _, z := range p.Zones {
-			id := z.ID
-			known[id] = true
-			zone(&id, z.Name, byZone[id])
-		}
-		// Needs of a zone removed meanwhile count as outside every zone.
-		for _, n := range p.Needs {
-			if n.ZoneID != nil && !known[*n.ZoneID] {
-				if a := byZone[*n.ZoneID]; a != nil {
-					if none == nil {
-						none = &acc{}
-					}
-					none.units += a.units
-					none.connected += a.connected
-					delete(byZone, *n.ZoneID)
-				}
-			}
-		}
-		if none != nil {
-			zone(nil, "", none)
 		}
 	}
 
