@@ -25,7 +25,7 @@ describe('NeedsTab', () => {
     expect(await screen.findByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
     const totals = screen.getByRole('list', { name: 'By function' })
     expect(within(totals).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Blind: 3 of 3 connected', 'Dimmable light: 2 of 3 connected'])
-    expect(screen.getByText('5 of 6 connected')).toBeInTheDocument()
+    expect(screen.getByText('5 of 6', { exact: true })).toBeInTheDocument()
     expect(screen.getByText('22.5 W')).toBeInTheDocument()
   })
 

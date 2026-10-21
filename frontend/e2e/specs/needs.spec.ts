@@ -117,7 +117,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   const hallRow = rooms.getByRole('listitem', { name: 'Hall' })
   await expect(hallRow).toContainText('No needs yet')
   await expect(page.getByRole('list', { name: 'By function' })).toContainText(`${light}: 0 of 4 connected`)
-  await expect(page.getByText('0 of 5 connected')).toBeVisible()
+  await expect(page.getByText('0 of 5', { exact: true })).toBeVisible()
 
   // "Apply a room template" opens the editor on the zone with the template picker focused.
   await hallRow.getByRole('link', { name: 'Apply a room template to Hall' }).click()
@@ -129,9 +129,9 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
 
   await page.goto(`/projects/${project.id}?tab=needs`)
   await expect(rooms.getByRole('listitem', { name: 'Hall' })).toContainText('0 of 3 connected')
-  await expect(page.getByText('0 of 8 connected')).toBeVisible()
+  await expect(page.getByText('0 of 8', { exact: true })).toBeVisible()
 
   // "Open in editor" selects the zone.
   await rooms.getByRole('listitem', { name: 'Kitchen' }).getByRole('link', { name: 'Open Kitchen in the editor' }).click()
-  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name' })).toHaveValue('Kitchen')
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Kitchen')
 })

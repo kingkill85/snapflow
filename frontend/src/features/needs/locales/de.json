@@ -39,6 +39,7 @@
     "autoConnectFor": "{{name}} automatisch anschließen",
     "autoConnectAll": "Ganze Version automatisch anschließen",
     "applied_one": "{{count}} Verbindung angelegt.",
-    "applied_other": "{{count}} Verbindungen angelegt."
+    "applied_other": "{{count}} Verbindungen angelegt.",
+    "of": "{{connected}} von {{units}}"
   }
 }

@@ -105,14 +105,14 @@ function Totals({ totals, functionTypes }: { totals: RoomCounts; functionTypes: 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label={t('rooms.totals')}>
         {tile(t('rooms.totalNeeds'), String(totals.needs))}
         {tile(t('rooms.totalUnits'), String(totals.units))}
-        {tile(t('rooms.totalConnected'), t('rooms.connected', { connected: totals.connectedUnits, units: totals.units }))}
+        {tile(t('rooms.totalConnected'), t('rooms.of', { connected: totals.connectedUnits, units: totals.units }))}
         {tile(t('rooms.totalPower'), hasPower(totals.powerW) ? t('line.power', { power: watts(totals.powerW) }) : '–')}
       </dl>
       {functionTypes.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label={t('rooms.byFunction')}>
           {functionTypes.map((f) => (
             <li key={f.functionType.id}>
-              <Badge>
+              <Badge wrap>
                 {localize(f.functionType.name)}: {t('rooms.connected', { connected: f.counts.connectedUnits, units: f.counts.units })}
               </Badge>
             </li>
@@ -185,10 +185,10 @@ function RoomRow({ room, path, canUpdate, onAutoConnect }: { room: Room; path: s
       </div>
 
       {room.needs.length > 0 ? (
-        <ul className="flex flex-wrap gap-2" aria-label={t('rooms.needsOf', { name })}>
+        <ul className="flex min-w-0 flex-wrap gap-2" aria-label={t('rooms.needsOf', { name })}>
           {room.needs.map((n) => (
-            <li key={n.id}>
-              <Badge variant={n.connectedUnits >= n.quantity ? 'neutral' : 'warning'}>
+            <li key={n.id} className="min-w-0 max-w-full">
+              <Badge wrap variant={n.connectedUnits >= n.quantity ? 'neutral' : 'warning'}>
                 {needText({ quantity: n.quantity, functionTypeName: n.functionType.name, powerW: n.powerW, label: n.label })}
                 {n.connectedUnits < n.quantity && <span className="sr-only">{t('rooms.connected', { connected: n.connectedUnits, units: n.quantity })}</span>}
               </Badge>
