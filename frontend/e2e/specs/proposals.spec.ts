@@ -49,7 +49,9 @@ test('proposals: generate combined and per product type, download DOCX, delete',
   await page.goto(`/projects/${project.id}`)
   await page.getByRole('tab', { name: 'Documents' }).click()
   await expect(page).toHaveURL(/\?tab=documents/)
-  await expect(page.getByText('No proposals yet. Create one from the bill of materials of this version.')).toBeVisible()
+  // By audience (D450): proposals for the customer, installation documents for the installer.
+  await expect(page.getByRole('region', { name: 'For the customer' }).getByText('No proposals yet. Create one from the bill of materials of this version.')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'For the installer' })).toContainText('Manual, channel labels and programming data for the site.')
 
   // Combined: the preview shows the grand total, Create downloads the file.
   await page.getByRole('button', { name: 'Create proposal' }).click()

@@ -26,7 +26,8 @@ test('create, edit, versions (copy, empty, rename, delete) and delete a project'
   await expect(page.getByRole('heading', { level: 1 })).toContainText(name)
   await expect(page.getByText('Müller GmbH')).toBeVisible()
   await expect(page.getByLabel('Version', { exact: true })).toHaveText('V1')
-  await expect(page.getByText('No plans yet.')).toBeVisible()
+  await expect(page.getByText('Start with a floorplan (an image of the building) or a distribution board.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add plan' })).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Delete version' })).toBeDisabled()
 
   // Edit: rename and enter the exchange rate by hand; it comes back as stored.

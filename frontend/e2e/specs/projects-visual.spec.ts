@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { type Page } from '@playwright/test'
 
 import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
@@ -11,6 +14,7 @@ import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
 
 const viewports = [
   { name: 'phone', size: { width: 390, height: 844 } },
+  { name: 'tablet', size: { width: 768, height: 1024 } },
   { name: 'desktop', size: { width: 1280, height: 800 } },
 ]
 
@@ -28,6 +32,7 @@ const labels = {
     empty: 'Empty version',
     version: 'Version',
     showArchived: 'Show archived',
+    chooseSystems: 'Choose systems',
   },
   de: {
     newProject: 'Neues Projekt',
@@ -42,6 +47,7 @@ const labels = {
     empty: 'Leere Version',
     version: 'Version',
     showArchived: 'Archivierte anzeigen',
+    chooseSystems: 'Systeme wählen',
   },
 }
 
@@ -98,7 +104,14 @@ async function seed(api: Api) {
   await api.createProject({ tenantId: toArchive.id, name: `Partnerprojekt ${tag}` })
   const toDelete = await api.createTenant(unique('Partner without projects'))
 
-  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete }
+  // The empty planning states (D448): a project whose only system has no products, with an empty floorplan and board.
+  const palette = await create({ name: `Neubau Schulze ${tag}`, productTypeIds: [type.id] })
+  const paletteVersion = palette.versions![0].id
+  const image = { name: 'floorplan.png', mimeType: 'image/png', buffer: readFileSync(join(import.meta.dirname, '../assets/floorplan.png')) }
+  const floor = await api.createPlan(paletteVersion, 'Erdgeschoss', image)
+  const board = await json<{ id: string }>(await api.ctx.post(`/api/versions/${paletteVersion}/boards`, { data: { name: 'Hauptverteiler', rows: [{ capacityTe: 12 }] } }))
+
+  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board }
 }
 
 for (const lang of ['en', 'de'] as const) {
@@ -110,7 +123,35 @@ for (const lang of ['en', 'de'] as const) {
       const row = (p: Page, text: string) => p.getByRole('row').filter({ hasText: text })
       const dialogShot = { fullPage: false }
 
-      const steps: { name: string; path: string; fullPage?: boolean; act?: (p: Page) => Promise<void> }[] = [
+      const versionOf = (p: Project) => `/projects/${p.id}/versions/${p.versions![0].id}`
+      const floorEditor = `/projects/${s.palette.id}/versions/${s.paletteVersion}/plans/${s.floor.id}`
+      const boardEditor = `/projects/${s.palette.id}/versions/${s.paletteVersion}/boards/${s.board.id}`
+      // The API never returns a project without systems: the palette's "Choose systems" state through a changed response.
+      const withoutSystems = (p: Page) =>
+        p.route(`**/api/projects/${s.palette.id}`, async (route) => {
+          if (route.request().method() !== 'GET') return route.continue()
+          const res = await route.fetch()
+          await route.fulfill({ response: res, json: { ...(await res.json()), productTypeIds: [] } })
+        })
+      const steps: { name: string; path: string; fullPage?: boolean; wideOnly?: boolean; before?: (p: Page) => Promise<unknown>; act?: (p: Page) => Promise<void> }[] = [
+        { name: 'empty-networks', path: `${versionOf(s.palette)}?tab=networks` },
+        { name: 'empty-checks', path: `${versionOf(s.palette)}?tab=checks` },
+        { name: 'empty-bom', path: `${versionOf(s.single)}?tab=bom` },
+        { name: 'documents', path: `${versionOf(s.single)}?tab=documents` },
+        { name: 'palette-floorplan-nothing-fits', path: floorEditor, wideOnly: true, fullPage: false },
+        { name: 'palette-board-nothing-fits', path: boardEditor, wideOnly: true, fullPage: false },
+        { name: 'palette-no-systems', path: floorEditor, wideOnly: true, fullPage: false, before: withoutSystems },
+        {
+          name: 'palette-choose-systems',
+          path: boardEditor,
+          wideOnly: true,
+          fullPage: false,
+          before: withoutSystems,
+          act: async (p) => {
+            await p.getByRole('button', { name: l.chooseSystems }).click()
+            await expect(p.getByRole('dialog', { name: l.editProject })).toBeVisible()
+          },
+        },
         { name: 'list', path: `/projects?search=${s.tag}` },
         { name: 'list-all-statuses', path: `/projects?search=${s.tag}&status=all` },
         { name: 'list-empty-filtered', path: '/projects?search=nothing-matches-this' },
@@ -249,6 +290,8 @@ for (const lang of ['en', 'de'] as const) {
           await p.screenshot({ path: `e2e/screenshots/project-${name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage })
         }
         for (const step of steps) {
+          if (step.wideOnly && viewport.name === 'phone') continue
+          await step.before?.(page)
           await page.goto(step.path)
           await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
           await page.waitForLoadState('networkidle')
@@ -256,6 +299,7 @@ for (const lang of ['en', 'de'] as const) {
           if (step.act) await step.act(page)
           await shoot(page, step.name, step.fullPage ?? true)
           await page.keyboard.press('Escape')
+          await page.unrouteAll({ behavior: 'ignoreErrors' })
         }
         await other.goto('/projects')
         await expect(other.getByRole('heading', { level: 1 })).toBeVisible()
