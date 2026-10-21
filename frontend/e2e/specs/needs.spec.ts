@@ -40,7 +40,8 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   const plan = await api.createPlan(versionId, 'Ground floor', planImage())
   const living = { id: crypto.randomUUID(), name: 'Living', color: '#3b82f6', opacity: 0.25, points: rect(100, 100, 500, 500) }
   const kitchen = { id: crypto.randomUUID(), name: 'Kitchen', color: '#22c55e', opacity: 0.25, points: rect(600, 100, 1100, 500) }
-  await api.savePlanContent(plan.id, { zones: [living, kitchen], placements: [] })
+  const hall = { id: crypto.randomUUID(), name: 'Hall', color: '#f59e0b', opacity: 0.25, points: rect(100, 550, 500, 750) }
+  await api.savePlanContent(plan.id, { zones: [living, kitchen, hall], placements: [] })
 
   // A room template in the catalog.
   const templateName = unique('Living room')
@@ -104,13 +105,33 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   await expect(page.getByTestId(`zone-needs-${living.id}`)).toHaveText('4 needs')
   await expect(page.getByTestId(`zone-needs-${kitchen.id}`)).toHaveText('1 need')
 
-  // The version's needs overview lists them with totals.
+  // The Needs tab is a room overview (4b-4): every zone with chips, counts and status, totals at the top.
   await page.goto(`/projects/${project.id}?tab=needs`)
-  await expect(page.getByRole('heading', { name: 'Needs by room' })).toBeVisible()
-  const planRegion = page.getByRole('region', { name: 'Ground floor' })
-  await expect(planRegion.getByRole('list', { name: 'Living' })).toContainText(`3 × ${light} · 7.5 W · Ceiling`)
-  await expect(planRegion.getByRole('list', { name: 'Kitchen' })).toContainText('Symbol on plan')
-  await expect(page.getByText('All plans: 5 units · 22.5 W')).toBeVisible()
-  const byFunction = page.getByRole('table', { name: 'Totals by function' })
-  await expect(byFunction.getByRole('row', { name: new RegExp(light) })).toContainText('4')
+  await expect(page.getByRole('heading', { name: 'Rooms', exact: true })).toBeVisible()
+  const rooms = page.getByRole('list', { name: 'Ground floor' })
+  const livingRow = rooms.getByRole('listitem', { name: 'Living' })
+  await expect(livingRow.getByRole('list', { name: 'Needs of Living' })).toContainText(`3 × ${light} · 7.5 W · Ceiling`)
+  await expect(livingRow).toContainText('0 of 4 connected')
+  await expect(livingRow).toContainText('None connected')
+  await expect(rooms.getByRole('listitem', { name: 'Kitchen' })).toContainText(`1 × ${light}`)
+  const hallRow = rooms.getByRole('listitem', { name: 'Hall' })
+  await expect(hallRow).toContainText('No needs yet')
+  await expect(page.getByRole('list', { name: 'By function' })).toContainText(`${light}: 0 of 4 connected`)
+  await expect(page.getByText('0 of 5 connected')).toBeVisible()
+
+  // "Apply a room template" opens the editor on the zone with the template picker focused.
+  await hallRow.getByRole('link', { name: 'Apply a room template to Hall' }).click()
+  const picker = page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('combobox', { name: 'Apply template' })
+  await expect(picker).toBeFocused()
+  await picker.click()
+  await page.getByRole('option', { name: templateName }).click()
+  await saved(page)
+
+  await page.goto(`/projects/${project.id}?tab=needs`)
+  await expect(rooms.getByRole('listitem', { name: 'Hall' })).toContainText('0 of 3 connected')
+  await expect(page.getByText('0 of 8 connected')).toBeVisible()
+
+  // "Open in editor" selects the zone.
+  await rooms.getByRole('listitem', { name: 'Kitchen' }).getByRole('link', { name: 'Open Kitchen in the editor' }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name' })).toHaveValue('Kitchen')
 })

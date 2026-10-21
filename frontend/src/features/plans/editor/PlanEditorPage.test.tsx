@@ -460,6 +460,15 @@ describe('PlanEditorPage', () => {
     expect(screen.getByText('2 needs were removed with their zone (Undo brings them back).')).toBeInTheDocument()
   })
 
+  it('?select=<zone>&focus=template selects the zone and focuses its template picker (Needs tab, 4b-4)', async () => {
+    const z = { id: pid(950), name: 'Living', color: '#3b82f6', opacity: 0.25, points: [[0, 0], [100, 0], [100, 100], [0, 100]] }
+    serve({ content: content({ zones: [z] }) })
+    open(undefined, `?select=${z.id}&focus=template`)
+    const inspector = await screen.findByRole('tabpanel', { name: 'Inspector' })
+    const picker = await within(inspector).findByRole('combobox', { name: 'Apply template' })
+    await waitFor(() => expect(picker).toHaveFocus())
+  })
+
   describe('connections (3d)', () => {
     const z = { id: pid(950), name: 'Living', color: '#3b82f6', opacity: 0.25, points: [[0, 0], [100, 0], [100, 100], [0, 100]] }
     const board = pid(600)

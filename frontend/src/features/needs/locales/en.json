@@ -1,22 +1,4 @@
 {
-  "overview": {
-    "title": "Needs by room",
-    "description": "What each room needs, as planned in the floorplans. Needs are not products and never appear in the bill of materials.",
-    "empty": "No needs planned yet: open a plan and add needs to its zones.",
-    "noZone": "No zone",
-    "symbol": "Symbol on plan",
-    "symbolHint": "Drawn as a load symbol on the plan",
-    "byFunctionType": "Totals by function",
-    "byLoadType": "Totals by load type",
-    "noLoadType": "No load type",
-    "total": "All plans",
-    "columns": {
-      "functionType": "Function",
-      "loadType": "Load type",
-      "quantity": "Units",
-      "power": "Power"
-    }
-  },
   "line": {
     "quantity": "{{count}} × {{name}}",
     "count": "{{count}} ×",
@@ -26,5 +8,37 @@
   "totals_one": "{{count}} unit",
   "totals_other": "{{count}} units",
   "totalsPower_one": "{{count}} unit · {{power}} W",
-  "totalsPower_other": "{{count}} units · {{power}} W"
+  "totalsPower_other": "{{count}} units · {{power}} W",
+  "rooms": {
+    "title": "Rooms",
+    "description": "Every zone of the floorplans with its needs and how many of their units are connected. Needs are not products and never appear in the bill of materials.",
+    "empty": "No floorplans yet: add a floorplan on the Plans tab, draw its zones and add their needs.",
+    "noZones": "This floorplan has no zones yet.",
+    "outside": "Outside every zone",
+    "shortName": "Short name",
+    "connected": "{{connected}} of {{units}} connected",
+    "noNeeds": "No needs yet",
+    "needsOf": "Needs of {{name}}",
+    "totals": "Totals",
+    "totalNeeds": "Needs",
+    "totalUnits": "Units",
+    "totalConnected": "Connected",
+    "totalPower": "Power",
+    "byFunction": "By function",
+    "status": {
+      "covered": "All connected",
+      "partial": "Some missing",
+      "missing": "None connected",
+      "none": "No needs"
+    },
+    "openEditor": "Open in editor",
+    "openEditorFor": "Open {{name}} in the editor",
+    "applyTemplate": "Apply a room template",
+    "applyTemplateFor": "Apply a room template to {{name}}",
+    "autoConnect": "Connect automatically",
+    "autoConnectFor": "Connect {{name}} automatically",
+    "autoConnectAll": "Connect the whole version automatically",
+    "applied_one": "{{count}} connection made.",
+    "applied_other": "{{count}} connections made."
+  }
 }

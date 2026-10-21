@@ -6,7 +6,7 @@ import { useListFunctionTypes } from '@/api/generated/function-types/function-ty
 import { useListLoadTypes } from '@/api/generated/load-types/load-types'
 import type { Connection, Finding, ItemInfo, NeedInfo, Wiring } from '@/api/generated/model'
 import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
-import { getGetChecksQueryKey, getGetWiringQueryKey, getListConnectionsQueryKey, useGetWiring } from '@/api/generated/wiring/wiring'
+import { getGetChecksQueryKey, getGetRoomsQueryKey, getGetWiringQueryKey, getListConnectionsQueryKey, useGetWiring } from '@/api/generated/wiring/wiring'
 import { useLocalized } from '@/i18n/localized'
 
 import type { FindingNames } from './format'
@@ -15,7 +15,7 @@ export const itemKey = (planId: string, itemId: string) => `${planId}/${itemId}`
 export const needKey = (planId: string, needId: string) => `${planId}/${needId}`
 export const channelKey = (planId: string, itemId: string, kindId: string, no: number) => `${planId}/${itemId}/${kindId}/${no}`
 
-/** Reloads everything that shows connections (wiring view, checks, connection list) after a change. */
+/** Reloads everything that shows connections (wiring view, checks, connection list, room overview) after a change. */
 export function useRefreshWiring(versionId: string) {
   const queryClient = useQueryClient()
   return () =>
@@ -23,6 +23,7 @@ export function useRefreshWiring(versionId: string) {
       queryClient.invalidateQueries({ queryKey: getGetWiringQueryKey(versionId) }),
       queryClient.invalidateQueries({ queryKey: getGetChecksQueryKey(versionId) }),
       queryClient.invalidateQueries({ queryKey: getListConnectionsQueryKey(versionId) }),
+      queryClient.invalidateQueries({ queryKey: getGetRoomsQueryKey(versionId) }),
     ])
 }
 
