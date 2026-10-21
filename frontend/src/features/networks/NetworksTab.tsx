@@ -301,18 +301,6 @@ function BusSystemSection({
       }
     >
       <SystemHeader system={system.productType} />
-      {system.lines.length === 0 && system.unassigned.length > 0 && (
-        <EmptyState
-          title={t('bus.needsLine')}
-          action={
-            actions && (
-              <Button onClick={() => setDialog({ item: null })}>
-                <Plus aria-hidden /> {t('bus.createLine')}
-              </Button>
-            )
-          }
-        />
-      )}
       <ol aria-label={t('bus.lines', { system: name })} className="space-y-6">
         {system.lines.map((line, index) => (
           <li key={line.id}>
@@ -321,6 +309,7 @@ function BusSystemSection({
               lines={system.lines}
               first={index === 0}
               last={index === system.lines.length - 1}
+              lastWithDevices={system.lines.length === 1 && (line.members.length > 0 || system.unassigned.length > 0)}
               actions={actions}
               onAssign={assignLine ? () => assignLine(line.id) : null}
               assignBusy={assignBusy}
@@ -367,6 +356,8 @@ type LineBlockProps = {
   lines: BusLineNetwork[]
   first: boolean
   last: boolean
+  /** The system's only line while it has devices: the server refuses its delete (D451). */
+  lastWithDevices: boolean
   actions: Actions | null
   onAssign: (() => void) | null
   assignBusy: boolean
@@ -375,7 +366,7 @@ type LineBlockProps = {
 }
 
 /** One bus line: name, address, informational totals, controls and its members. */
-function LineBlock({ line, lines, first, last, actions, onAssign, assignBusy, onEdit, onDelete }: LineBlockProps) {
+function LineBlock({ line, lines, first, last, lastWithDevices, actions, onAssign, assignBusy, onEdit, onDelete }: LineBlockProps) {
   const { t } = useTranslation('networks')
   const { t: tCommon } = useTranslation()
   const pinned = line.members.some((m) => m.pinned)
@@ -419,8 +410,8 @@ function LineBlock({ line, lines, first, last, actions, onAssign, assignBusy, on
                   variant="danger-quiet"
                   label={tCommon('action.delete')}
                   aria-label={t('bus.deleteLine', { name: line.name })}
-                  title={pinned ? t('bus.deleteBlocked') : tCommon('action.delete')}
-                  disabled={pinned}
+                  title={lastWithDevices ? t('bus.deleteLast') : pinned ? t('bus.deleteBlocked') : tCommon('action.delete')}
+                  disabled={pinned || lastWithDevices}
                   onClick={onDelete}
                 />
               </>

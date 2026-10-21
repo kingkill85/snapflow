@@ -86,10 +86,22 @@ test('boards: enclosure, modules, totals, BOM, networks', async ({ page, api }) 
   await expect(bom.getByRole('row').filter({ hasText: c.psu.name }).getByRole('cell').nth(-3)).toHaveText('1')
   await expect(bom.getByRole('row').filter({ hasText: c.enclosure.name }).getByRole('cell').nth(-3)).toHaveText('1')
 
-  // Networks: a second KNX line, an actuator moved to it.
+  // Checks: the automatic line's power supply carries the two actuators (D451, D452).
+  await page.getByRole('tab', { name: 'Checks' }).click()
+  await expect(page.getByText('Bus line Line 1')).toBeVisible()
+  await expect(page.getByText('20 of 640 mA (reserve', { exact: false })).toBeVisible()
+  await expect(page.getByText(/^3 devices/)).toBeVisible()
+
+  // Networks: "Line 1" was created with the first save and holds every KNX module by default.
   await page.getByRole('tab', { name: 'Networks' }).click()
   await expect(page).toHaveURL(/\?tab=networks/)
   const knx = page.getByRole('region', { name: /KNX/ })
+  const first = knx.getByRole('table', { name: 'Line 1' })
+  await expect(first.getByRole('row').filter({ hasText: c.actuator.name })).toHaveCount(2)
+  await expect(first.getByRole('row').filter({ hasText: c.psu.name })).toHaveCount(1)
+  await expect(knx.getByRole('button', { name: 'Delete Line 1' })).toBeDisabled()
+
+  // A second KNX line, an actuator moved to it.
   await knx.getByRole('button', { name: 'Add line' }).click()
   const line = page.getByRole('dialog', { name: 'New line' })
   await line.getByLabel('Name').fill('KNX 2')

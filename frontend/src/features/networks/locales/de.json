@@ -52,8 +52,7 @@
     "deleteMessage": "Die Linie „{{name}}“ wird gelöscht. Geräte mit Standardzuordnung kommen auf die erste verbleibende Linie.",
     "unassigned": "Ohne Linie",
     "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie entsteht beim nächsten Speichern eines Plans, der sie enthält.",
-    "needsLine": "Diese Geräte brauchen eine Buslinie.",
-    "createLine": "Linie anlegen"
+    "deleteLast": "Die letzte Linie eines Systems mit Geräten bleibt: zuerst eine weitere Linie anlegen oder die Geräte von den Plänen entfernen."
   },
   "lineDialog": {
     "newTitle": "Neue Linie",

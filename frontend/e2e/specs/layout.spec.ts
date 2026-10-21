@@ -435,6 +435,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await page.goto('/profile')
           await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
           await page.goto(`/projects/${s.project.id}/versions/${s.versionId}?tab=networks`)
+          // The automatic first line (D451): named in the project's language (en), whatever the UI language.
+          await expect(page.getByRole('heading', { name: 'Line 1', exact: true })).toBeVisible()
           await expect(page.getByRole('row').filter({ hasText: s.dimmer.name })).toContainText('1.1.1')
           await expectNoHorizontalOverflow(page)
           await screenshot(page, testInfo, `networks-addresses-${viewport.name}-${colorScheme}-${lang}`, true)

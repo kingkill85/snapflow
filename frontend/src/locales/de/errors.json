@@ -89,6 +89,8 @@
     "not_found": "Diese Buslinie existiert nicht mehr.",
     "name_taken": "Dieses System hat bereits eine Linie namens „{{name}}“.",
     "in_use": "Dieser Linie sind Geräte zugeordnet ({{count}}). Verschieben Sie sie zuerst auf eine andere Linie.",
+    "last_with_devices_one": "Das ist die letzte Linie des Systems, und {{count}} Gerät ist auf den Plänen. Entfernen Sie es zuerst von den Plänen oder legen Sie eine weitere Linie an.",
+    "last_with_devices_other": "Das ist die letzte Linie des Systems, und {{count}} Geräte sind auf den Plänen. Entfernen Sie sie zuerst von den Plänen oder legen Sie eine weitere Linie an.",
     "order_mismatch": "Die Buslinien dieser Version haben sich geändert. Neu laden und erneut versuchen.",
     "not_bus_system": "Dieses System hat keine Bus-Topologie.",
     "product_type_not_found": "Dieses System existiert nicht mehr.",
