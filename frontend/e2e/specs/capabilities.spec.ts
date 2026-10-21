@@ -151,11 +151,18 @@ test('a category keeps its mounting and a product type its reserve when other fi
   await page.goto('/catalog/product-types')
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
   let dialog = page.getByRole('dialog', { name: 'Edit system' })
+  // Reserve sits under Advanced, collapsed while it is at its default (D443).
+  const advanced = () => dialog.getByRole('button', { name: /^Advanced/ })
+  await expect(advanced()).toHaveAttribute('aria-expanded', 'false')
+  await advanced().click()
   await dialog.getByLabel(/^Reserve/).fill('30')
   await dialog.getByRole('button', { name: 'Update' }).click()
   await expect(dialog).toBeHidden()
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
   dialog = page.getByRole('dialog', { name: 'Edit system' })
+  // Not the default any more: Advanced opens by itself.
+  await expect(advanced()).toHaveAttribute('aria-expanded', 'true')
+  await expect(dialog.getByLabel(/^Reserve/)).toBeVisible()
   await expect(dialog.getByLabel(/^Reserve/)).toHaveValue('30')
   await dialog.getByLabel('Abbreviation').fill('RS')
   await dialog.getByRole('button', { name: 'Update' }).click()
