@@ -12,6 +12,7 @@ import { NeedConnections } from './connections'
 import { isSymbol, type NeedPatch } from './document'
 import type { EditorAction } from './editor-state'
 import { functionTypeOptions, type NeedCatalog, useNeedText } from './need-catalog'
+import { templatePickerId } from './focus'
 import { allowedLoadTypes, applyTemplate, functionTypePatch, maxNeeds, needZoneId, newNeed } from './needs'
 import { ItemFindings } from './ItemFindings'
 
@@ -145,6 +146,7 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
           )}
           {catalog.templates.length > 0 ? (
             <SelectField
+              id={templatePickerId}
               label={t('needs.applyTemplate')}
               hint={t('needs.applyTemplateHint')}
               value=""

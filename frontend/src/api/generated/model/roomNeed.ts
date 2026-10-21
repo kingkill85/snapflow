@@ -4,22 +4,18 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { NeedRef } from './needRef';
-import type { NullableNeedRef } from './nullableNeedRef';
+import type { RoomFunctionType } from './roomFunctionType';
 
-export interface SummaryNeed {
-  functionType: NeedRef;
+export interface RoomNeed {
+  /** Units connected without errors, at most the quantity */
+  connectedUnits: number;
+  functionType: RoomFunctionType;
   id: string;
   label: string;
-  /** null for none */
-  loadType: NullableNeedRef | null;
-  note: string;
   /**
      * Power per unit in W, a decimal string with 2 decimals; null for unknown
      * @nullable
      */
   powerW: string | null;
   quantity: number;
-  /** Drawn as a load symbol on the plan */
-  symbol: boolean;
 }

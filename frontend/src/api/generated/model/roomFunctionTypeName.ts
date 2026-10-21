@@ -5,4 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type NeedRefName = {[key: string]: string};
+export type RoomFunctionTypeName = {[key: string]: string};

@@ -73,11 +73,3 @@ export function useNeedText() {
       .filter(Boolean)
       .join(' · ')
 }
-
-/** Totals in words: "7 units · 420 W" (the power only when it is not "0.00"). */
-export function useNeedTotalsText() {
-  const { t } = useTranslation('needs')
-  const watts = useFormatWatts()
-  return (totals: { quantity: number; powerW: string }) =>
-    hasPower(totals.powerW) ? t('totalsPower', { count: totals.quantity, power: watts(totals.powerW) }) : t('totals', { count: totals.quantity })
-}

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 
 import { expect, test, unique, uniqueKey } from '../fixtures'
+import { catalog, complete, villa } from '../villa-seed'
 
 // Step 3b: zone needs, room templates and load symbols, clicked through.
 
@@ -40,7 +41,8 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   const plan = await api.createPlan(versionId, 'Ground floor', planImage())
   const living = { id: crypto.randomUUID(), name: 'Living', color: '#3b82f6', opacity: 0.25, points: rect(100, 100, 500, 500) }
   const kitchen = { id: crypto.randomUUID(), name: 'Kitchen', color: '#22c55e', opacity: 0.25, points: rect(600, 100, 1100, 500) }
-  await api.savePlanContent(plan.id, { zones: [living, kitchen], placements: [] })
+  const hall = { id: crypto.randomUUID(), name: 'Hall', color: '#f59e0b', opacity: 0.25, points: rect(100, 550, 500, 750) }
+  await api.savePlanContent(plan.id, { zones: [living, kitchen, hall], placements: [] })
 
   // A room template in the catalog.
   const templateName = unique('Living room')
@@ -104,13 +106,84 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   await expect(page.getByTestId(`zone-needs-${living.id}`)).toHaveText('4 needs')
   await expect(page.getByTestId(`zone-needs-${kitchen.id}`)).toHaveText('1 need')
 
-  // The version's needs overview lists them with totals.
+  // The Needs tab is a room overview (4b-4): every zone with chips, counts and status, totals at the top.
   await page.goto(`/projects/${project.id}?tab=needs`)
-  await expect(page.getByRole('heading', { name: 'Needs by room' })).toBeVisible()
-  const planRegion = page.getByRole('region', { name: 'Ground floor' })
-  await expect(planRegion.getByRole('list', { name: 'Living' })).toContainText(`3 × ${light} · 7.5 W · Ceiling`)
-  await expect(planRegion.getByRole('list', { name: 'Kitchen' })).toContainText('Symbol on plan')
-  await expect(page.getByText('All plans: 5 units · 22.5 W')).toBeVisible()
-  const byFunction = page.getByRole('table', { name: 'Totals by function' })
-  await expect(byFunction.getByRole('row', { name: new RegExp(light) })).toContainText('4')
+  await expect(page.getByRole('heading', { name: 'Rooms', exact: true })).toBeVisible()
+  const rooms = page.getByRole('list', { name: 'Ground floor' })
+  const livingRow = rooms.getByRole('listitem', { name: 'Living' })
+  await expect(livingRow.getByRole('list', { name: 'Needs of Living' })).toContainText(`3 × ${light} · 7.5 W · Ceiling`)
+  await expect(livingRow).toContainText('0 of 4 connected')
+  await expect(livingRow).toContainText('None connected')
+  await expect(rooms.getByRole('listitem', { name: 'Kitchen' })).toContainText(`1 × ${light}`)
+  const hallRow = rooms.getByRole('listitem', { name: 'Hall' })
+  await expect(hallRow).toContainText('No needs yet')
+  await expect(page.getByRole('list', { name: 'By function' })).toContainText(`${light}: 0 of 4 connected`)
+  await expect(page.getByText('0 of 5', { exact: true })).toBeVisible()
+
+  // "Apply a room template" opens the editor on the zone with the template picker focused.
+  await hallRow.getByRole('link', { name: 'Apply a room template to Hall' }).click()
+  const picker = page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('combobox', { name: 'Apply template' })
+  await expect(picker).toBeFocused()
+  await picker.click()
+  await page.getByRole('option', { name: templateName }).click()
+  await saved(page)
+
+  await page.goto(`/projects/${project.id}?tab=needs`)
+  await expect(rooms.getByRole('listitem', { name: 'Hall' })).toContainText('0 of 3 connected')
+  await expect(page.getByText('0 of 8', { exact: true })).toBeVisible()
+
+  // "Open in editor" selects the zone.
+  await rooms.getByRole('listitem', { name: 'Kitchen' }).getByRole('link', { name: 'Open Kitchen in the editor' }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Kitchen')
+})
+
+test('needs: room overview connects one room automatically, a completed project shows no template action', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1400, height: 900 })
+  const cat = await catalog(api, 'en')
+  const v = await villa(api, cat, 'en', 'Room overview villa')
+  type Rooms = { plans: { planId: string; rooms: { zoneId: string | null; name: string; units: number; connectedUnits: number; status: string }[] }[] }
+  const room = async (name: string) => {
+    const res = await api.ctx.get(`/api/versions/${v.version}/rooms`)
+    expect(res.ok()).toBe(true)
+    return ((await res.json()) as Rooms).plans.flatMap((p) => p.rooms).find((r) => r.name === name)!
+  }
+  const drawing = cat.names.drawing.en
+  const before = await room(drawing)
+  expect(before).toMatchObject({ units: 13, connectedUnits: 0, status: 'missing' })
+
+  await page.goto(`/projects/${v.project.id}?tab=needs`)
+  const ground = page.getByRole('list', { name: 'Ground floor' })
+  const row = ground.getByRole('listitem', { name: drawing })
+  await expect(row).toContainText('0 of 13 connected')
+  await expect(row).toContainText('None connected')
+
+  // "Connect automatically" opens the auto-connect dialog with this zone ticked, runs it, the row updates.
+  await row.getByRole('button', { name: `Connect ${drawing} automatically` }).click()
+  const dialog = page.getByRole('dialog', { name: 'Auto-connect' })
+  await expect(dialog.getByRole('combobox', { name: 'Needs' })).toContainText('Needs of selected zones')
+  await expect(dialog.getByRole('checkbox', { name: new RegExp(`^${drawing} `) })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Preview' }).click()
+  await dialog.getByRole('button', { name: 'Apply' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('status').filter({ hasText: /^\d+ connections? made\.$/ })).toBeVisible()
+  const after = await room(drawing)
+  expect(after.connectedUnits).toBeGreaterThan(0)
+  const status = after.status === 'covered' ? 'All connected' : 'Some missing'
+  await expect(row).toContainText(`${after.connectedUnits} of 13 connected`)
+  await expect(row).toContainText(status)
+  // Only that zone was connected: the dining room is untouched.
+  expect(await room(cat.names.dining.en)).toMatchObject({ connectedUnits: 0 })
+
+  // "Open in editor" selects the zone.
+  await row.getByRole('link', { name: `Open ${drawing} in the editor` }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(drawing)
+
+  // A completed project is read-only: no template or connect action, opening the editor stays.
+  await complete(api, v.project.id, v.project.name)
+  await page.goto(`/projects/${v.project.id}?tab=needs`)
+  const readRow = page.getByRole('list', { name: 'Ground floor' }).getByRole('listitem', { name: cat.names.dining.en })
+  await expect(readRow).toContainText('None connected')
+  await expect(readRow.getByRole('link', { name: /^Apply a room template/ })).toHaveCount(0)
+  await expect(readRow.getByRole('button', { name: /automatically$/ })).toHaveCount(0)
+  await expect(readRow.getByRole('link', { name: `Open ${cat.names.dining.en} in the editor` })).toBeVisible()
 })

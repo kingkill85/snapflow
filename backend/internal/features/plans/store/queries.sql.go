@@ -1312,7 +1312,8 @@ type VersionNeedsRow struct {
 	ZoneID         *uuid.UUID
 }
 
-// VersionNeeds returns the needs of a version's plans (the needs summary).
+// VersionNeeds returns the needs of a version's plans (WiringData: the
+// wiring feature's checks and room overview).
 func (q *Queries) VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error) {
 	rows, err := q.db.Query(ctx, versionNeeds, versionID)
 	if err != nil {
@@ -1506,16 +1507,17 @@ func (q *Queries) WiringRows(ctx context.Context, versionID uuid.UUID) ([]Wiring
 }
 
 const wiringZones = `-- name: WiringZones :many
-SELECT z.plan_id, z.id, z.name
+SELECT z.plan_id, z.id, z.name, z.short_name
 FROM plan_zones z JOIN plans p ON p.id = z.plan_id
 WHERE p.version_id = $1
 ORDER BY z.plan_id, z.position
 `
 
 type WiringZonesRow struct {
-	PlanID uuid.UUID
-	ID     uuid.UUID
-	Name   string
+	PlanID    uuid.UUID
+	ID        uuid.UUID
+	Name      string
+	ShortName string
 }
 
 func (q *Queries) WiringZones(ctx context.Context, versionID uuid.UUID) ([]WiringZonesRow, error) {
@@ -1527,7 +1529,12 @@ func (q *Queries) WiringZones(ctx context.Context, versionID uuid.UUID) ([]Wirin
 	items := []WiringZonesRow{}
 	for rows.Next() {
 		var i WiringZonesRow
-		if err := rows.Scan(&i.PlanID, &i.ID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.PlanID,
+			&i.ID,
+			&i.Name,
+			&i.ShortName,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

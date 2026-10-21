@@ -470,7 +470,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           await page.goto('/profile')
           await page.evaluate((l) => window.localStorage.setItem('i18nextLng', l), lang)
           await page.goto(`/projects/${project.id}?tab=needs`)
-          await expect(page.getByRole('heading', { name: lang === 'en' ? 'Needs by room' : 'Bedarf nach Raum' })).toBeVisible()
+          await expect(page.getByRole('heading', { name: lang === 'en' ? 'Rooms' : 'Räume', exact: true })).toBeVisible()
           await expectNoHorizontalOverflow(page)
           await screenshot(page, testInfo, `needs-${viewport.name}-${colorScheme}-${lang}`, true)
         }

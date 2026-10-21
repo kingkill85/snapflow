@@ -4,10 +4,10 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { NeedRefName } from './needRefName';
+import type { RoomFunctionTypeName } from './roomFunctionTypeName';
 
-export interface NeedRef {
+export interface RoomFunctionType {
   id: string;
   key: string;
-  name: NeedRefName;
+  name: RoomFunctionTypeName;
 }

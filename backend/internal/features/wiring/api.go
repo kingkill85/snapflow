@@ -215,8 +215,24 @@ type candidatesInput struct {
 
 type candidatesOutput struct{ Body Candidates }
 
+type roomsOutput struct{ Body Rooms }
+
 // registerViews adds the wiring view and the connect candidates.
 func registerViews(api huma.API, svc *Service) {
+	huma.Register(api, huma.Operation{
+		OperationID: "getRooms",
+		Method:      http.MethodGet,
+		Path:        "/api/versions/{versionId}/rooms",
+		Summary:     "The room overview of a version",
+		Description: "Every zone of every floorplan with its needs and connected units, plus the needs outside every zone per plan (D455).",
+		Tags:        []string{tag},
+	}, func(ctx context.Context, in *versionParam) (*roomsOutput, error) {
+		out, err := svc.Rooms(ctx, in.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		return &roomsOutput{Body: out}, nil
+	})
 	huma.Register(api, huma.Operation{
 		OperationID: "getWiring",
 		Method:      http.MethodGet,

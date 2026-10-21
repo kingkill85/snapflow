@@ -41,6 +41,7 @@ import { useAutosave } from './use-autosave'
 import { usePlanLock } from './use-plan-lock'
 import { type CopyItems, useShortcuts } from './use-shortcuts'
 import { ZonesPanel } from './ZonesPanel'
+import { focusWhenShown, templatePickerId } from './focus'
 import { PlanWiringProvider } from './connections'
 import { usePlanWiring, zoneBadge } from './plan-wiring'
 import { isFloorplan, saveOnUnload, type Floorplan } from '../api'
@@ -165,9 +166,13 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   }, [t])
   const [tool, setTool] = useState<Tool>('select')
   const [tab, setTab] = useState<PanelTab>('products')
-  // ?select=<zone, placement or need id> (links from the Checks tab): select it once, then drop the param.
+  // ?select=<zone, placement or need id> (links from the Checks and Needs tabs): select it once, then drop the param.
   const [params, setParams] = useSearchParams()
   const selectParam = params.get('select')
+  const focusParam = params.get('focus')
+  // The pending focus attempt stops when the editor closes (not when the params are dropped below).
+  const stopFocus = useRef<(() => void) | null>(null)
+  useEffect(() => () => stopFocus.current?.(), [])
   useEffect(() => {
     if (!selectParam) return
     const d = docRef.current
@@ -175,16 +180,19 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     if (known) {
       dispatchEditor({ type: 'select', ids: [selectionFor(selectParam, d)] })
       setTab('inspector')
+      // &focus=template (the Needs tab's "Apply a room template"): focus the zone's template picker once it is shown.
+      if (focusParam === 'template') stopFocus.current = focusWhenShown(templatePickerId)
     }
     setParams(
       (p) => {
         const out = new URLSearchParams(p)
         out.delete('select')
+        out.delete('focus')
         return out
       },
       { replace: true },
     )
-  }, [selectParam, setParams])
+  }, [selectParam, focusParam, setParams])
   const [armed, setArmed] = useState<string | null>(null)
   // View state beside the document (not saved, not in the history).
   const [layers, setLayers] = useState<Layers>(allVisible)

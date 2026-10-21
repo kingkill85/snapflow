@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { type Page } from '@playwright/test'
 
 import { Api, expect, test, unique, uniqueKey } from '../fixtures'
+import { autoConnect, catalog, villa } from '../villa-seed'
 
 // Step 3b at phone, tablet and desktop width, light and dark, English and
 // German: zone needs in the inspector, room templates, load symbols on the
@@ -34,7 +35,7 @@ const labels = {
     placeFunction: 'Function of the next symbol',
     exportPng: 'Export PNG',
     plan: 'Ground floor',
-    zone: { living: 'Living room', kitchen: 'Kitchen', bedroom: 'Bedroom', hall: 'Hallway', bath: 'Bathroom' },
+    zone: { living: 'Living room', kitchen: 'Kitchen', bedroom: 'Bedroom', hall: 'Hallway', bath: 'Bathroom', storage: 'Storage' },
   },
   de: {
     zones: 'Zonen',
@@ -48,7 +49,7 @@ const labels = {
     placeFunction: 'Funktion des nächsten Symbols',
     exportPng: 'Als PNG exportieren',
     plan: 'Erdgeschoss',
-    zone: { living: 'Wohnzimmer', kitchen: 'Küche', bedroom: 'Schlafzimmer', hall: 'Flur', bath: 'Badezimmer' },
+    zone: { living: 'Wohnzimmer', kitchen: 'Küche', bedroom: 'Schlafzimmer', hall: 'Flur', bath: 'Badezimmer', storage: 'Abstellraum' },
   },
 }
 
@@ -133,6 +134,8 @@ async function seed(api: Api, lang: Lang) {
     { id: id(), name: l.zone.bedroom, color: '#be4bdb', opacity: 0.2, points: rect(12, 512, 400, 700) },
     { id: id(), name: l.zone.hall, color: '#868e96', opacity: 0.2, points: rect(412, 512, 594, 700) },
     { id: id(), name: l.zone.bath, color: '#12b886', opacity: 0.25, points: rect(606, 406, 1188, 700) },
+    // A zone without needs (the room overview's "No needs yet", 4b-4).
+    { id: id(), name: l.zone.storage, shortName: lang === 'de' ? 'AR' : 'ST', color: '#fab005', opacity: 0.2, points: rect(12, 712, 400, 790) },
   ]
   const [zLiving, zKitchen, zBedroom, zHall, zBath] = zones.map((z) => z.id)
   const need = (zoneId: string | null, functionTypeId: string, quantity: number, powerW: string | null, loadTypeId: string | null, label = '', extra: object = {}) => ({
@@ -344,6 +347,58 @@ for (const lang of ['en', 'de'] as const) {
           }
           await page.keyboard.press('Escape')
         }
+      }
+    }
+  })
+}
+
+// 4b-4: the room overview of an auto-connected villa (covered, partial and missing rooms, outside every zone).
+for (const lang of ['en', 'de'] as const) {
+  test(`room overview with connections fits the screen: ${lang}`, { tag: '@visual' }, async ({ page, api }) => {
+    test.setTimeout(600_000)
+    const cat = await catalog(api, lang)
+    const v = await villa(api, cat, lang, 'Villa Gulberg, Lahore')
+    await autoConnect(api, v.version)
+    // A basement after the auto-connect: a room with needs and none connected, a room without needs, needs outside
+    // every zone; and a garage floorplan without zones.
+    const basement = await api.createPlan(v.version, lang === 'en' ? 'Basement' : 'Untergeschoss', planImage())
+    const cellar = crypto.randomUUID()
+    const store = crypto.randomUUID()
+    const [first, second] = cat.templates.drawing
+    await api.savePlanContent(basement.id, {
+      zones: [
+        { id: cellar, name: lang === 'en' ? 'Wine cellar and tasting room' : 'Weinkeller und Verkostungsraum', color: '#22c55e', opacity: 0.25, points: rect(40, 40, 580, 380) },
+        // The fixture's zone type has no short name; the API takes it.
+        { id: store, name: lang === 'en' ? 'Storage' : 'Abstellraum', shortName: lang === 'en' ? 'ST' : 'AR', color: '#3b82f6', opacity: 0.25, points: rect(620, 40, 1160, 380) } as { id: string; name: string; color: string; opacity: number; points: number[][] },
+      ],
+      placements: [],
+      needs: [
+        { id: crypto.randomUUID(), zoneId: cellar, ...first },
+        { id: crypto.randomUUID(), zoneId: cellar, ...second },
+        { id: crypto.randomUUID(), zoneId: null, ...first, x: 300, y: 600 },
+      ],
+    })
+    await api.createPlan(v.version, lang === 'en' ? 'Garage' : 'Garage', planImage())
+    await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport.size)
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme })
+        await page.goto(`/projects/${v.project.id}?tab=needs`)
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+        await expect(page.getByRole('heading', { name: lang === 'de' ? 'Räume' : 'Rooms', exact: true })).toBeVisible()
+        await page.waitForLoadState('networkidle')
+        await expectNoHorizontalOverflow(page)
+        await page.screenshot({ path: `e2e/screenshots/needs-rooms-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: true })
+        // Each state on its own, to look at chips, badges and actions closely.
+        const shot = (name: string) => `e2e/screenshots/needs-room-${name}-${viewport.name}-${colorScheme}-${lang}.png`
+        const row = (plan: string, zone: string) => page.getByRole('list', { name: plan, exact: true }).getByRole('listitem', { name: zone, exact: true })
+        const ground = lang === 'en' ? 'Ground floor' : 'Erdgeschoss'
+        await page.locator(`dl[aria-label="${lang === 'en' ? 'Totals' : 'Summen'}"]`).locator('..').screenshot({ path: shot('totals') })
+        await row(ground, cat.names.drawing[lang]).screenshot({ path: shot('covered') })
+        await row(ground, cat.names.kitchen[lang]).screenshot({ path: shot('partial') })
+        await page.getByRole('region', { name: lang === 'en' ? 'Basement' : 'Untergeschoss' }).screenshot({ path: shot('missing-empty-outside') })
+        await page.getByRole('region', { name: 'Garage' }).screenshot({ path: shot('no-zones') })
       }
     }
   })

@@ -1,30 +1,41 @@
 {
-  "overview": {
-    "title": "Bedarf nach Raum",
-    "description": "Was jeder Raum braucht, wie in den Grundrissen geplant. Bedarf ist kein Produkt und erscheint nie in der Stückliste.",
-    "empty": "Noch kein Bedarf geplant: Öffnen Sie einen Plan und erfassen Sie den Bedarf seiner Zonen.",
-    "noZone": "Keine Zone",
-    "symbol": "Symbol im Plan",
-    "symbolHint": "Als Lastsymbol im Plan eingezeichnet",
-    "byFunctionType": "Summen nach Funktion",
-    "byLoadType": "Summen nach Lastart",
-    "noLoadType": "Keine Lastart",
-    "total": "Alle Pläne",
-    "columns": {
-      "functionType": "Funktion",
-      "loadType": "Lastart",
-      "quantity": "Stück",
-      "power": "Leistung"
-    }
-  },
   "line": {
     "quantity": "{{count}} × {{name}}",
     "count": "{{count}} ×",
     "power": "{{power}} W",
     "unknown": "Unbekannte Funktion"
   },
-  "totals_one": "{{count}} Stück",
-  "totals_other": "{{count}} Stück",
-  "totalsPower_one": "{{count}} Stück · {{power}} W",
-  "totalsPower_other": "{{count}} Stück · {{power}} W"
+  "rooms": {
+    "title": "Räume",
+    "description": "Jede Zone der Grundrisse mit ihrem Bedarf und wie viele seiner Einheiten angeschlossen sind. Bedarf ist kein Produkt und erscheint nie in der Stückliste.",
+    "empty": "Noch keine Grundrisse: Fügen Sie im Tab Pläne einen Grundriss hinzu, zeichnen Sie seine Zonen und erfassen Sie deren Bedarf.",
+    "noZones": "Dieser Grundriss hat noch keine Zonen.",
+    "outside": "Außerhalb aller Zonen",
+    "shortName": "Kurzname",
+    "connected": "{{connected}} von {{units}} angeschlossen",
+    "noNeeds": "Noch kein Bedarf",
+    "needsOf": "Bedarf von {{name}}",
+    "totals": "Summen",
+    "totalNeeds": "Bedarfe",
+    "totalUnits": "Einheiten",
+    "totalConnected": "Angeschlossen",
+    "totalPower": "Leistung",
+    "byFunction": "Nach Funktion",
+    "status": {
+      "covered": "Alles angeschlossen",
+      "partial": "Teilweise offen",
+      "missing": "Nichts angeschlossen",
+      "none": "Noch kein Bedarf"
+    },
+    "openEditor": "Im Editor öffnen",
+    "openEditorFor": "{{name}} im Editor öffnen",
+    "applyTemplate": "Raumvorlage anwenden",
+    "applyTemplateFor": "Raumvorlage auf {{name}} anwenden",
+    "autoConnect": "Automatisch anschließen",
+    "autoConnectFor": "{{name}} automatisch anschließen",
+    "autoConnectAll": "Ganze Version automatisch anschließen",
+    "applied_one": "{{count}} Verbindung angelegt.",
+    "applied_other": "{{count}} Verbindungen angelegt.",
+    "of": "{{connected}} von {{units}}"
+  }
 }

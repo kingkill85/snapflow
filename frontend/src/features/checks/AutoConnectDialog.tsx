@@ -18,6 +18,8 @@ type Props = {
   zones: ZoneStatus[]
   /** After apply: the batch to undo (null when nothing was connected) and how many connections were made. */
   onApplied: (batchId: string | null, count: number) => void
+  /** Opens on scope "selected zones" with these zones ticked (the room overview's "Connect automatically"). */
+  initialZoneIds?: string[]
 }
 
 type Step = { scope: AutoConnectScope; preview: AutoConnectPreview }
@@ -26,15 +28,15 @@ type Step = { scope: AutoConnectScope; preview: AutoConnectPreview }
  * Auto-connect (D391): choose the scope, preview what would be connected and what cannot (per need with the
  * reason), apply as one batch. A change since the preview (409 auto_connect.changed) previews again.
  */
-export function AutoConnectDialog({ versionId, wiring, open, onOpenChange, zones, onApplied }: Props) {
+export function AutoConnectDialog({ versionId, wiring, open, onOpenChange, zones, onApplied, initialZoneIds }: Props) {
   const { t } = useTranslation('checks')
   const { t: tCommon } = useTranslation()
   const reasonText = useReasonText()
   const refresh = useRefreshWiring(versionId)
   const preview = usePreviewAutoConnect()
   const apply = useApplyAutoConnect()
-  const [scope, setScope] = useState<'all' | 'zones'>('all')
-  const [zoneIds, setZoneIds] = useState<string[]>([])
+  const [scope, setScope] = useState<'all' | 'zones'>(initialZoneIds?.length ? 'zones' : 'all')
+  const [zoneIds, setZoneIds] = useState<string[]>(initialZoneIds ?? [])
   const [step, setStep] = useState<Step | null>(null)
   const [changed, setChanged] = useState(false)
 

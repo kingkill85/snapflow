@@ -240,7 +240,7 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
       panelClassName="overflow-visible px-0 pt-6"
       tabs={[
         { key: 'plans', label: t('tabs.plans'), content: <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} /> },
-        { key: 'needs', label: t('tabs.needs'), content: <NeedsTab key={version.id} versionId={version.id} /> },
+        { key: 'needs', label: t('tabs.needs'), content: <NeedsTab key={version.id} projectId={project.id} versionId={version.id} /> },
         { key: 'networks', label: t('tabs.networks'), content: <NetworksTab key={version.id} projectId={project.id} versionId={version.id} /> },
         { key: 'checks', label: t('tabs.checks'), content: <ChecksTab key={version.id} projectId={project.id} versionId={version.id} /> },
         {

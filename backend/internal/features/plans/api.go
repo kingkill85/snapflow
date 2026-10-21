@@ -32,10 +32,6 @@ type versionParam struct {
 	VersionID uuid.UUID `path:"versionId" format:"uuid"`
 }
 
-type versionNeedsOutput struct {
-	Body VersionNeeds
-}
-
 type planOutput struct {
 	Body Plan
 }
@@ -252,21 +248,6 @@ func Register(api huma.API, svc *Service) {
 			return nil, err
 		}
 		return &contentOutput{Body: c}, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "getVersionNeeds",
-		Method:      http.MethodGet,
-		Path:        "/api/versions/{versionId}/needs",
-		Summary:     "Get the needs of a version by plan and zone",
-		Description: "Every need of the version's plans, grouped by plan and zone, with totals per function type and load type.",
-		Tags:        []string{tag},
-	}, func(ctx context.Context, in *versionParam) (*versionNeedsOutput, error) {
-		out, err := svc.VersionNeeds(ctx, in.VersionID)
-		if err != nil {
-			return nil, err
-		}
-		return &versionNeedsOutput{Body: out}, nil
 	})
 
 	huma.Register(api, huma.Operation{
