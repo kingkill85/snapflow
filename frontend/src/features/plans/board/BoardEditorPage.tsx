@@ -536,7 +536,7 @@ function BoardCheck({ check, kindName }: { check: BoardStatus; kindName: (id: st
   const { t } = useTranslation('plans')
   const list = check.channels.map((c) => `${kindName(c.outputKindId)}${c.alternative ? ` (${t('board.channelAlternative')})` : ''} ${c.free}/${c.total}`).join(', ')
   return (
-    <span data-testid="board-check" className="flex items-center gap-2 text-sm text-muted">
+    <span data-testid="board-check" className="flex min-w-0 max-w-full items-center gap-2 text-sm text-muted">
       <StatusChip status={boardStatus(check)} />
       {list && <span className="hidden truncate lg:inline">{t('board.channelTotals', { list })}</span>}
     </span>
