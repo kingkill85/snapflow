@@ -1,10 +1,10 @@
 {
-  "title": "Function types",
-  "description": "The shared vocabulary of demand and supply: loads need a function type, module channels provide one.",
-  "empty": "No function types yet.",
-  "new": "New function type",
-  "edit": "Edit function type",
-  "deleteTitle": "Delete function type",
+  "title": "Functions",
+  "description": "What a room asks for (light, blind, socket). A function is served by channel kinds.",
+  "empty": "No functions yet.",
+  "new": "New function",
+  "edit": "Edit function",
+  "deleteTitle": "Delete function",
   "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
   "field": {
     "key": "Key",
@@ -24,6 +24,6 @@
     "addKnxObject": "Add object",
     "status": "Status",
     "active": "Active",
-    "activeHint": "Inactive function types stay on existing needs but cannot be chosen for new needs or room templates."
+    "activeHint": "Inactive functions stay on existing needs but cannot be chosen for new needs or room templates."
   }
 }

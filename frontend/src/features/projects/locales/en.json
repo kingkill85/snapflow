@@ -39,7 +39,7 @@
     "nameHint": "What the project is called, e.g. \"Villa Müller\"",
     "tenant": "Tenant",
     "status": "Status",
-    "productTypes": "Product types",
+    "productTypes": "Systems",
     "productTypesHint": "The systems the project uses",
     "inactiveType": "{{name}} (inactive)",
     "language": "Language",

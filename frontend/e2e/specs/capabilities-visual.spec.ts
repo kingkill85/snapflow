@@ -214,6 +214,18 @@ const t = {
   de: { edit: 'Bearbeiten', mode: 'Diese Spalte ist', existing: 'Ein vorhandenes Katalogfeld', info: 'Nur Information', meaning: 'Bedeutung für die Prüfungen', key: 'Feldschlüssel', save: 'Antworten speichern und Vorschau', change: 'Ändern, was Spalte', motor: 'Motortyp (AC/DC)', field: 'Katalogfeld' },
 }
 
+async function openSetup(page: Page, lang: Lang) {
+  const setup = lang === 'de' ? 'Einrichtung' : 'Setup'
+  const menu = page.getByRole('button', { name: lang === 'de' ? 'Menü' : 'Menu' })
+  if (await menu.isVisible()) {
+    await menu.click()
+    await expect(page.getByRole('dialog').getByRole('region', { name: setup }).getByRole('link')).toHaveCount(6)
+  } else {
+    await page.getByRole('banner').getByRole('button', { name: setup }).click()
+    await expect(page.getByRole('menuitem')).toHaveCount(6)
+  }
+}
+
 async function choose(page: Page, scope: ReturnType<Page['getByRole']>, label: string, option: string | RegExp) {
   await scope.getByRole('combobox', { name: label }).first().click()
   await page.getByRole('option', { name: option }).first().click()
@@ -229,6 +241,8 @@ test('the capability pages fit the screen in both themes and languages', { tag: 
     await expect(p.getByRole('dialog')).toBeVisible()
   }
   const steps: { name: string; path: string; act?: (page: Page, lang: Lang) => Promise<void>; full?: boolean }[] = [
+    // The header with its four sections (D442): the Setup menu, or the side sheet on phones.
+    { name: 'setup-menu', path: '/catalog/fields', act: (p, l) => openSetup(p, l), full: false },
     { name: 'fields', path: '/catalog/fields' },
     { name: 'field-editor', path: '/catalog/fields', act: (p, l) => editRow(s.f.ledW.key, l)(p), full: false },
     { name: 'field-motor', path: '/catalog/fields', act: (p, l) => editRow(s.f.motor.key, l)(p), full: false },

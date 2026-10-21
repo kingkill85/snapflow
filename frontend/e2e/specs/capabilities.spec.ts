@@ -19,7 +19,7 @@ async function uploadWithProfile(page: Page, file: string, profile: string) {
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Choose file' }).click()
   await (await chooser).setFiles(file)
-  await chooseOption(page.getByRole('combobox', { name: 'Profile' }), profile)
+  await chooseOption(page.getByRole('combobox', { name: 'Saved mapping' }), profile)
   await page.getByRole('button', { name: 'Upload and preview' }).click()
 }
 
@@ -84,11 +84,11 @@ test('an import asks what new capability columns mean; the product then shows it
   // Dimmer outputs: channels supplied of the new output kind.
   const dimmers = column(columns.dimmers)
   await chooseOption(dimmers.getByRole('combobox', { name: 'Meaning for the checks' }), 'Number of channels')
-  await chooseOption(dimmers.getByRole('combobox', { name: /Output kind/ }), kindName)
+  await chooseOption(dimmers.getByRole('combobox', { name: /Channel kind/ }), kindName)
   // LED limit: watts per channel for the output kind and load type.
   const led = column(columns.led)
   await chooseOption(led.getByRole('combobox', { name: 'Meaning for the checks' }), 'Max. load per channel (W)')
-  await chooseOption(led.getByRole('combobox', { name: /Output kind/ }), kindName)
+  await chooseOption(led.getByRole('combobox', { name: /Channel kind/ }), kindName)
   await chooseOption(led.getByRole('combobox', { name: /Load type/ }), loadName)
   await led.getByRole('textbox', { name: /Unit/ }).fill('W')
   // Width: rail width in TE.
@@ -150,12 +150,12 @@ test('a category keeps its mounting and a product type its reserve when other fi
   // Product type: reserve set, then only the abbreviation changed.
   await page.goto('/catalog/product-types')
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
-  let dialog = page.getByRole('dialog', { name: 'Edit product type' })
+  let dialog = page.getByRole('dialog', { name: 'Edit system' })
   await dialog.getByLabel(/^Reserve/).fill('30')
   await dialog.getByRole('button', { name: 'Update' }).click()
   await expect(dialog).toBeHidden()
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
-  dialog = page.getByRole('dialog', { name: 'Edit product type' })
+  dialog = page.getByRole('dialog', { name: 'Edit system' })
   await expect(dialog.getByLabel(/^Reserve/)).toHaveValue('30')
   await dialog.getByLabel('Abbreviation').fill('RS')
   await dialog.getByRole('button', { name: 'Update' }).click()
@@ -173,8 +173,8 @@ test('an output kind lists its alternatives; a product type takes its topology',
 
   // Output kind: two alternatives, one removed again.
   await page.goto('/catalog/output-kinds')
-  await page.getByRole('button', { name: 'New output kind' }).click()
-  const dialog = page.getByRole('dialog', { name: 'New output kind' })
+  await page.getByRole('button', { name: 'New channel kind' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New channel kind' })
   await dialog.getByLabel('Key').fill(`blind_${tag}`)
   await (await translation(dialog, 'Name', 'en')).fill(unique('Blind out'))
   await dialog.getByRole('button', { name: 'Add alternative' }).click()
@@ -200,7 +200,7 @@ test('an output kind lists its alternatives; a product type takes its topology',
   ])
   // Reopened, the list shows both.
   await row(page, `blind_${tag}`).getByRole('button', { name: 'Edit' }).click()
-  const edit = page.getByRole('dialog', { name: 'Edit output kind' })
+  const edit = page.getByRole('dialog', { name: 'Edit channel kind' })
   await expect(edit.getByRole('group', { name: /^Alternative \d$/ })).toHaveCount(2)
   const counts = await edit.getByLabel(/^Channels needed/).evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).value))
   expect(counts.sort()).toEqual(['2', '3'])
@@ -210,7 +210,7 @@ test('an output kind lists its alternatives; a product type takes its topology',
   const type = await api.createProductType({ name: { en: unique('Wireless system') } })
   await page.goto('/catalog/product-types')
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
-  const typeDialog = page.getByRole('dialog', { name: 'Edit product type' })
+  const typeDialog = page.getByRole('dialog', { name: 'Edit system' })
   await chooseOption(typeDialog.getByRole('combobox', { name: /^Topology/ }), 'Wireless')
   await expect(typeDialog.getByLabel(/^Default bus current/)).toHaveCount(0)
   await typeDialog.getByLabel(/^Default wireless places/).fill('2')

@@ -131,7 +131,7 @@ test('every import step fits the screen in both themes and languages', { tag: '@
       path: `/catalog/imports/${profiled.id}?view=mapping`,
       act: async (p) => {
         await p.getByLabel(/^(Create missing categories|Fehlende Kategorien anlegen)$/).check()
-        await expect(p.getByText(/(differs from the profile|weicht vom Profil)/)).toBeVisible()
+        await expect(p.getByText(/(differs from the saved mapping|weicht von der gespeicherten Zuordnung)/)).toBeVisible()
       },
     },
     { name: 'preview', path: `/catalog/imports/${previewed.id}` },

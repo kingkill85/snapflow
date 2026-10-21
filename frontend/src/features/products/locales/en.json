@@ -10,8 +10,8 @@
   "showInactive": "Show inactive",
   "search": "Search",
   "searchHint": "Model number, name or SKU",
-  "typeFilter": "Product type",
-  "allTypes": "All product types",
+  "typeFilter": "System",
+  "allTypes": "All systems",
   "categoryFilter": "Category",
   "allCategories": "All categories",
   "deleteTitle": "Delete product",
@@ -20,14 +20,14 @@
     "image": "Image",
     "modelNumber": "Model number",
     "name": "Name",
-    "typeCategory": "Product type / Category",
+    "typeCategory": "System / Category",
     "variants": "Variants",
     "price": "Price",
     "status": "Status"
   },
   "problems_one": "{{count}} attribute value needs attention",
   "problems_other": "{{count}} attribute values need attention",
-  "unavailableHint": "Active, but its product type or category is inactive.",
+  "unavailableHint": "Active, but its system or category is inactive.",
   "noPrice": "–",
   "section": {
     "basics": "Basics",
@@ -37,9 +37,9 @@
     "variantsHint": "The sellable versions of this product, each with its own price, image and add-ons."
   },
   "field": {
-    "productType": "Product type",
+    "productType": "System",
     "productTypeHint": "The system or product line, e.g. Zigbee",
-    "chooseType": "Choose a product type",
+    "chooseType": "Choose a system",
     "inactiveType": "{{name}} (inactive)",
     "category": "Category",
     "categoryHint": "The kind of device; defines the attributes",
@@ -103,7 +103,7 @@
       "active": "Active",
       "activeHint": "Inactive variants cannot be added to projects."
     },
-    "productInactive": "This variant is not available because its product, product type or category is inactive.",
+    "productInactive": "This variant is not available because its product, system or category is inactive.",
     "notFound": {
       "title": "Variant not found",
       "message": "This variant does not exist (anymore)."
@@ -126,7 +126,7 @@
     "save": "Save add-ons",
     "saved": "Add-ons saved.",
     "unsaved": "The add-ons have unsaved changes.",
-    "typeFilter": "Product type",
+    "typeFilter": "System",
     "categoryFilter": "Category",
     "sku": "SKU {{sku}}",
     "shown_one": "{{count}} variant shown",

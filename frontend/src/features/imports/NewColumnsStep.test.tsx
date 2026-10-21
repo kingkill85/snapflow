@@ -153,7 +153,7 @@ describe('NewColumnsStep', () => {
     await chooseOption(user, within(row).getByRole('combobox', { name: 'Meaning for the checks' }), 'Max. load per channel (W)')
     // The meaning's type and parameters follow.
     expect(within(row).getByRole('combobox', { name: /Value type/ })).toHaveTextContent('Number')
-    await chooseOption(user, within(row).getByRole('combobox', { name: /Output kind/ }), 'Dimmer output')
+    await chooseOption(user, within(row).getByRole('combobox', { name: /Channel kind/ }), 'Dimmer output')
     await chooseOption(user, within(row).getByRole('combobox', { name: /Load type/ }), 'LED')
     await user.type(within(row).getByRole('textbox', { name: /Unit/ }), 'W')
     await user.click(screen.getByRole('button', { name: 'Save answers and preview' }))

@@ -86,7 +86,7 @@ describe('ImportRunPage: mapping', () => {
     // Choosing the category column turns the category to "from a column".
     await chooseOption(user, targetSelect('Category'), 'Category (required)')
     expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('From a column')
-    await chooseOption(user, screen.getByRole('combobox', { name: 'Product type' }), 'Zigbee')
+    await chooseOption(user, screen.getByRole('combobox', { name: 'System' }), 'Zigbee')
 
     await user.click(screen.getByRole('button', { name: 'Add fixed value' }))
     const constant = screen.getByRole('group', { name: 'Fixed value 1' })
@@ -147,7 +147,7 @@ describe('ImportRunPage: mapping', () => {
 
     expect(await screen.findByText('The file has no column "Model Number".')).toBeInTheDocument()
     expect(targetSelect('Model Number')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByText('Map the product type or choose a fixed one.')).toBeInTheDocument()
+    expect(screen.getByText('Map the system or choose a fixed one.')).toBeInTheDocument()
     expect(screen.getByText('Map the category or choose a fixed one.')).toBeInTheDocument()
     expect(screen.getByText('The data must start below the header row.')).toBeInTheDocument()
     expect(screen.getByRole('alert', { name: '' })).toHaveTextContent('Please check the highlighted fields.')
@@ -185,38 +185,38 @@ describe('ImportRunPage: mapping', () => {
     renderRoutes(routes, { route: runRoute })
 
     await chooseOption(user, await screen.findByRole('combobox', { name: 'Imported as: Model Number' }), 'Model number (required)')
-    await user.click(screen.getByRole('button', { name: 'Save as new profile' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Save as profile' })
-    const name = within(dialog).getByLabelText('Profile name')
+    await user.click(screen.getByRole('button', { name: 'Save as new mapping' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Save mapping' })
+    const name = within(dialog).getByLabelText('Name of the mapping')
     expect(name).toHaveValue('supplier')
     await user.clear(name)
     await user.type(name, 'Mine')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-    expect(await screen.findByText('Profile "Mine" created.')).toBeInTheDocument()
+    expect(await screen.findByText('Saved mapping "Mine" created.')).toBeInTheDocument()
     // Saving the profile does not submit the mapping form around the dialog.
     expect(previews).toEqual([])
     expect(created?.mapping.fields).toEqual([{ target: 'product.modelNumber', column: 'Model Number', columnLetter: 'A' }])
-    expect(screen.getByRole('combobox', { name: 'Profile' })).toHaveTextContent('Mine')
+    expect(screen.getByRole('combobox', { name: 'Saved mapping' })).toHaveTextContent('Mine')
     // The form is the profile: nothing to update.
-    expect(screen.queryByText(/The mapping differs from the profile/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Update profile' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/The mapping differs from the saved mapping/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Update saved mapping' })).not.toBeInTheDocument()
 
     // A change: the hint offers to update the profile.
     await chooseOption(user, targetSelect('Name'), 'Product name (English)')
-    expect(screen.getByText('The mapping differs from the profile "Mine". The preview uses the mapping as shown here.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Update profile' }))
-    expect(await screen.findByText('Profile saved.')).toBeInTheDocument()
+    expect(screen.getByText('The mapping differs from the saved mapping "Mine". The preview uses the mapping as shown here.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Update saved mapping' }))
+    expect(await screen.findByText('Saved mapping updated.')).toBeInTheDocument()
     expect(screen.queryByText(/The mapping differs/)).not.toBeInTheDocument()
 
     // The next update finds the profile changed since: Reload loads it as it is now, replacing the form.
     await chooseOption(user, targetSelect('Price'), 'Price (USD)')
-    await user.click(screen.getByRole('button', { name: 'Update profile' }))
-    expect(await screen.findByText(/Someone else changed this profile/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Reload profile' }))
+    await user.click(screen.getByRole('button', { name: 'Update saved mapping' }))
+    expect(await screen.findByText(/Someone else changed this saved mapping/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reload saved mapping' }))
     await waitFor(() => expect(targetSelect('Price')).toHaveTextContent('Not imported'))
     expect(targetSelect('Name')).toHaveTextContent('Product name (English)')
-    expect(screen.queryByText(/Someone else changed this profile/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Someone else changed this saved mapping/)).not.toBeInTheDocument()
   })
 
   it('loads a saved profile into the form, its columns matched by header', async () => {
@@ -224,11 +224,11 @@ describe('ImportRunPage: mapping', () => {
     runHandlers(() => run())
     const user = userEvent.setup()
     renderRoutes(routes, { route: runRoute })
-    await chooseOption(user, await screen.findByRole('combobox', { name: 'Profile' }), 'Supplier A')
+    await chooseOption(user, await screen.findByRole('combobox', { name: 'Saved mapping' }), 'Supplier A')
     await waitFor(() => expect(targetSelect('Model Number')).toHaveTextContent('Model number (required)'))
     expect(targetSelect('Name')).toHaveTextContent('Product name (English)')
     expect(targetSelect('Category')).toHaveTextContent('Category (required)')
-    expect(screen.getByRole('combobox', { name: 'Product type' })).toHaveTextContent('Zigbee')
+    expect(screen.getByRole('combobox', { name: 'System' })).toHaveTextContent('Zigbee')
   })
 
   it('previews at once with the profile chosen with the upload, and shows a failing preview at the mapping', async () => {
@@ -244,7 +244,7 @@ describe('ImportRunPage: mapping', () => {
     const user = userEvent.setup()
     renderRoutes(routes, { route: '/catalog/imports/new' })
     await user.upload(await screen.findByLabelText('File to import'), new File(['x'], 'supplier.xlsx'))
-    await chooseOption(user, screen.getByRole('combobox', { name: 'Profile' }), 'Supplier A')
+    await chooseOption(user, screen.getByRole('combobox', { name: 'Saved mapping' }), 'Supplier A')
     await user.click(screen.getByRole('button', { name: 'Upload and preview' }))
 
     await waitFor(() => expect(bodies).toEqual([{ profileId: profile().id }]))
@@ -365,7 +365,7 @@ describe('ImportRunPage: preview', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit mapping' }))
     expect(router.state.location.search).toBe('?view=mapping')
     await waitFor(() => expect(targetSelect('Category')).toHaveTextContent('Category (required)'))
-    expect(screen.getByRole('combobox', { name: 'Product type' })).toHaveTextContent('Zigbee')
+    expect(screen.getByRole('combobox', { name: 'System' })).toHaveTextContent('Zigbee')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(await screen.findByRole('heading', { name: 'Preview' })).toBeInTheDocument()
   })

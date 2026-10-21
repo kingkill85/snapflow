@@ -4,6 +4,7 @@
   },
   "nav": {
     "catalog": "Katalog",
+    "setup": "Einrichtung",
     "projects": "Projekte",
     "admin": "Verwaltung",
     "main": "Hauptnavigation",

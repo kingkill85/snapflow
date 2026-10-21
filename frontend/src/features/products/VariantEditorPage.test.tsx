@@ -459,15 +459,15 @@ describe('VariantEditorPage', () => {
     expect(within(first).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb' })
 
     // The type filter offers the type names and starts again at the first page.
-    const typeFilter = within(addons).getByLabelText('Product type')
-    expect(await optionTexts(u, typeFilter)).toEqual(['All product types', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
+    const typeFilter = within(addons).getByLabelText('System')
+    expect(await optionTexts(u, typeFilter)).toEqual(['All systems', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
     await chooseOption(u, typeFilter, 'KNX')
     expect(await within(results).findByText('3 variants shown')).toBeInTheDocument()
     expect(searched[searched.length - 1]).toEqual({ productTypeId: knxType.id, limit: '20', offset: '0' })
     expect(within(results).queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
 
     // So does the category filter.
-    await chooseOption(u, typeFilter, 'All product types')
+    await chooseOption(u, typeFilter, 'All systems')
     const categoryFilter = within(addons).getByLabelText('Category')
     expect(await optionTexts(u, categoryFilter)).toEqual(['All categories', 'Dimmer actuators', 'Gateways', 'Retired (inactive)'])
     await chooseOption(u, categoryFilter, 'Gateways')

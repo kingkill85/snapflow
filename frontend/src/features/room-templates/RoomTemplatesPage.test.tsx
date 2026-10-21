@@ -96,9 +96,9 @@ describe('RoomTemplatesPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add line' }))
     const line = within(dialog).getByRole('group', { name: 'Line 1' })
 
-    // Inactive function types are not offered for a new line.
-    expect(await optionTexts(user, within(line).getByRole('combobox', { name: /function type/i }))).toEqual(['Dimmable light', 'Blind'])
-    await chooseOption(user, within(line).getByRole('combobox', { name: /function type/i }), 'Dimmable light')
+    // Inactive functions are not offered for a new line.
+    expect(await optionTexts(user, within(line).getByRole('combobox', { name: /function/i }))).toEqual(['Dimmable light', 'Blind'])
+    await chooseOption(user, within(line).getByRole('combobox', { name: /function/i }), 'Dimmable light')
     expect(await optionTexts(user, within(line).getByRole('combobox', { name: 'Load type' }))).toEqual(['None', 'LED', 'Halogen'])
     await chooseOption(user, within(line).getByRole('combobox', { name: 'Load type' }), 'LED')
     const quantity = within(line).getByLabelText(/quantity/i)
@@ -129,7 +129,7 @@ describe('RoomTemplatesPage', () => {
     const line = within(dialog).getByRole('group', { name: 'Line 1' })
     expect(within(line).getByLabelText(/power per unit/i)).toHaveValue('7.5')
     await waitFor(() => expect(within(line).getByRole('combobox', { name: 'Load type' })).toHaveTextContent('LED'))
-    await chooseOption(user, within(line).getByRole('combobox', { name: /function type/i }), 'Blind')
+    await chooseOption(user, within(line).getByRole('combobox', { name: /function/i }), 'Blind')
     expect(within(line).getByRole('combobox', { name: 'Load type' })).toHaveTextContent('None')
   })
 
@@ -151,11 +151,11 @@ describe('RoomTemplatesPage', () => {
     expect(await screen.findByText('1 line skipped')).toBeInTheDocument()
     await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('Inactive function type: this line is skipped when the template is applied.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Inactive function: this line is skipped when the template is applied.')).toBeInTheDocument()
     expect(within(dialog).queryByText(/Choose an active one/)).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('combobox', { name: /function type/i })).toHaveTextContent('Old switching (inactive)')
+    expect(within(dialog).getByRole('combobox', { name: /function/i })).toHaveTextContent('Old switching (inactive)')
 
-    // A new line with the same inactive function type would be kept too; one with another would not be offered.
+    // A new line with the same inactive function would be kept too; one with another would not be offered.
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(sent).toMatchObject({ expectedUpdatedAt: stored.updatedAt, lines: [{ functionTypeId: oldType.id, quantity: 2, powerW: null, loadTypeId: null }] }))
   })

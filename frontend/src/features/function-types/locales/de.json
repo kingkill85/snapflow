@@ -1,10 +1,10 @@
 {
-  "title": "Funktionstypen",
-  "description": "Das gemeinsame Vokabular von Bedarf und Angebot: Lasten brauchen einen Funktionstyp, Modulkanäle liefern ihn.",
-  "empty": "Noch keine Funktionstypen.",
-  "new": "Neuer Funktionstyp",
-  "edit": "Funktionstyp bearbeiten",
-  "deleteTitle": "Funktionstyp löschen",
+  "title": "Funktionen",
+  "description": "Was ein Raum braucht (Licht, Jalousie, Steckdose). Eine Funktion wird von Kanalarten bedient.",
+  "empty": "Noch keine Funktionen.",
+  "new": "Neue Funktion",
+  "edit": "Funktion bearbeiten",
+  "deleteTitle": "Funktion löschen",
   "deleteMessage": "\"{{name}}\" löschen? Das kann nicht rückgängig gemacht werden.",
   "field": {
     "key": "Schlüssel",
@@ -24,6 +24,6 @@
     "addKnxObject": "Objekt hinzufügen",
     "status": "Status",
     "active": "Aktiv",
-    "activeHint": "Inaktive Funktionstypen bleiben an bestehenden Bedarfen, können aber für neue Bedarfe und Raumvorlagen nicht gewählt werden."
+    "activeHint": "Inaktive Funktionen bleiben an bestehenden Bedarfen, können aber für neue Bedarfe und Raumvorlagen nicht gewählt werden."
   }
 }

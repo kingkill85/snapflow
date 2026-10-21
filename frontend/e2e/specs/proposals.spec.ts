@@ -73,7 +73,7 @@ test('proposals: generate combined and per product type, download DOCX, delete',
   // Split: one document per product type, each with its own total.
   await page.getByRole('button', { name: 'Create proposal' }).click()
   await dialog(page).getByRole('combobox', { name: 'Documents' }).click()
-  await page.getByRole('option', { name: 'One document per product type' }).click()
+  await page.getByRole('option', { name: 'One document per system' }).click()
   await expect(dialog(page).getByTestId('preview-total')).toHaveText(['$30.00', '$1,200.00'])
   const downloads: Download[] = []
   page.on('download', (d) => downloads.push(d))

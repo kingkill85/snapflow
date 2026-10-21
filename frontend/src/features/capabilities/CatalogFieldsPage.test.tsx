@@ -72,9 +72,9 @@ describe('CatalogFieldsPage', () => {
     await u.type(await translation(u, dialog, 'Label', 'en'), 'Max LED per output')
     await u.type(within(dialog).getByLabelText('Unit'), 'W')
     // No parameters until a meaning needs them.
-    expect(within(dialog).queryByRole('combobox', { name: 'Output kind' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('combobox', { name: 'Channel kind' })).not.toBeInTheDocument()
     await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Meaning' }), 'Max. load per channel (W)')
-    await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Output kind' }), 'Dimmer output')
+    await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Channel kind' }), 'Dimmer output')
     await chooseOption(u, within(dialog).getByRole('combobox', { name: 'Load type' }), 'LED')
     await u.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

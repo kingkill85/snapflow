@@ -78,7 +78,7 @@
     "line_stale": "Someone else has changed this line in the meantime. Their version is loaded now; saving again overwrites it.",
     "nothing_selected": "Select at least one item to update.",
     "order_mismatch": "The lines have changed in the meantime. The current order is loaded now; try again.",
-    "product_type_not_in_project": "This product's product type is not part of the project.",
+    "product_type_not_in_project": "This product's system is not part of the project.",
     "quantity_range": "Enter a whole number from {{min}} to {{max}}.",
     "too_many_lines": "A version can have at most {{max}} manual lines.",
     "unit_price_invalid": "Enter an amount of 0 or more with at most 2 decimals.",
@@ -122,14 +122,14 @@
   "catalog_field": {
     "in_use": "Categories link the field \"{{key}}\": its key and type cannot change and it cannot be deleted.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
-    "key_referenced": "Import profiles use the key \"{{key}}\": it cannot change.",
+    "key_referenced": "Saved import mappings use the key \"{{key}}\": it cannot change.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "meaning_options": "For this meaning the choices must be exactly: {{expected}}.",
     "meaning_type": "This meaning needs another value type ({{expected}}).",
     "not_found": "This field no longer exists.",
     "order_mismatch": "The fields have changed in the meantime. Please reload and try again.",
     "param_not_allowed": "This meaning has no such setting.",
-    "product_type_duplicate": "This product type is listed twice.",
+    "product_type_duplicate": "This system is listed twice.",
     "stale": "Someone else changed this field in the meantime. Reload it and make your changes again."
   },
   "category": {
@@ -153,13 +153,13 @@
     "type": "Only JPEG, PNG and WebP images are accepted."
   },
   "function_type": {
-    "in_use": "This function type is still used by output kinds, needs or room templates.",
+    "in_use": "This function is still used by channel kinds, needs or room templates.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "load_type_duplicate": "This load type is listed twice.",
     "knx_object_duplicate": "The object key \"{{key}}\" is used twice.",
     "dpst_format": "Enter the datapoint subtype like DPST-1-1.",
-    "not_found": "This function type no longer exists."
+    "not_found": "This function no longer exists."
   },
   "import": {
     "addon_ambiguous": "The add-on \"{{ref}}\" matches more than one variant; the first one is used.",
@@ -179,13 +179,13 @@
     "has_errors": "Rows have errors ({{count}}). Fix the file, or turn off \"All or nothing\" to skip them.",
     "image_invalid": "This picture cannot be used (only JPEG, PNG and WebP up to 10 MB and 25 megapixels).",
     "images_too_large": "The pictures in the sheet are too large together (at most {{maxMb}} MB).",
-    "mapping_required": "Choose a profile or a mapping.",
+    "mapping_required": "Choose a saved mapping or map the columns.",
     "mounting_unknown": "\"{{value}}\" is not a mounting (floorplan, board or both).",
     "no_rows": "The file has no data rows below the header row.",
     "not_found": "This import no longer exists.",
     "price_rounded": "The price {{value}} has more than two decimals and is rounded to {{rounded}}.",
     "product_field_conflict": "This product field differs from the product's first row ({{field}}); the first row is used.",
-    "product_type_unknown": "There is no product type \"{{value}}\". Create it under Product types first; the import does not create product types.",
+    "product_type_unknown": "There is no system \"{{value}}\". Create it under Systems first; the import does not create systems.",
     "sheet_not_found": "The file has no sheet \"{{sheet}}\".",
     "stale": "The catalog was changed since the preview. Run the preview again.",
     "state": "This is not possible in the import's current state. Reload it.",
@@ -203,18 +203,18 @@
     "constant_not_allowed": "This target cannot take a fixed value.",
     "data_start_row": "The data must start below the header row.",
     "model_number_required": "Map the model number.",
-    "name_taken": "The profile name \"{{name}}\" is already used.",
-    "not_found": "This import profile no longer exists.",
-    "product_type_conflict": "Choose a fixed product type or a product type column, not both.",
-    "product_type_required": "Map the product type or choose a fixed one.",
+    "name_taken": "A saved mapping named \"{{name}}\" already exists.",
+    "not_found": "This saved mapping no longer exists.",
+    "product_type_conflict": "Choose a fixed system or a system column, not both.",
+    "product_type_required": "Map the system or choose a fixed one.",
     "source_conflict": "Choose a column or a fixed value, not both.",
     "source_required": "Choose a column or a fixed value.",
-    "stale": "Someone else changed this profile in the meantime. Reload it and make your changes again.",
+    "stale": "Someone else changed this saved mapping in the meantime. Reload it and make your changes again.",
     "target_duplicate": "This target is mapped twice.",
     "target_unknown": "This target does not exist."
   },
   "load_type": {
-    "in_use": "This load type is still used by function types, catalog fields, needs or room templates.",
+    "in_use": "This load type is still used by functions, catalog fields, needs or room templates.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
     "not_found": "This load type no longer exists.",
@@ -222,9 +222,9 @@
     "stale": "Someone else changed this load type in the meantime. Reload it and make your changes again."
   },
   "need": {
-    "function_type_inactive": "This function type is no longer active. Choose another one.",
+    "function_type_inactive": "This function is no longer active. Choose another one.",
     "load_type_inactive": "This load type is no longer active. Choose another one.",
-    "load_type_not_allowed": "This load type does not fit the function type.",
+    "load_type_not_allowed": "This load type does not fit the function.",
     "position_partial": "Give both coordinates of the position, or neither.",
     "power_invalid": "Enter a power of 0 to {{max}} W with at most 2 decimals.",
     "zone_not_found": "This zone no longer exists."
@@ -241,16 +241,16 @@
     "changed": "A plan or bus line changed in the meantime. Reload and try again."
   },
   "output_kind": {
-    "alternative_cycle": "That output kind already has this one as an alternative.",
-    "alternative_duplicate": "This output kind is listed twice as an alternative.",
-    "alternative_self": "An output kind cannot be its own alternative.",
-    "function_type_duplicate": "This function type is listed twice.",
-    "in_use": "This output kind is still used by catalog fields or as another output kind's alternative.",
+    "alternative_cycle": "That channel kind already has this one as an alternative.",
+    "alternative_duplicate": "This channel kind is listed twice as an alternative.",
+    "alternative_self": "A channel kind cannot be its own alternative.",
+    "function_type_duplicate": "This function is listed twice.",
+    "in_use": "This channel kind is still used by catalog fields or as another channel kind's alternative.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
-    "not_found": "This output kind no longer exists.",
-    "order_mismatch": "The output kinds have changed in the meantime. Please reload and try again.",
-    "stale": "Someone else changed this output kind in the meantime. Reload it and make your changes again."
+    "not_found": "This channel kind no longer exists.",
+    "order_mismatch": "The channel kinds have changed in the meantime. Please reload and try again.",
+    "stale": "Someone else changed this channel kind in the meantime. Reload it and make your changes again."
   },
   "plan": {
     "not_found": "This plan no longer exists.",
@@ -284,17 +284,17 @@
     "model_number_taken": "The model number \"{{modelNumber}}\" is already used.",
     "not_found": "This product no longer exists.",
     "stale": "Someone else changed this product in the meantime. Reload it and make your changes again.",
-    "type_inactive": "This product type is inactive. Choose an active product type.",
-    "type_not_found": "The selected product type no longer exists."
+    "type_inactive": "This system is inactive. Choose an active system.",
+    "type_not_found": "The selected system no longer exists."
   },
   "product_type": {
     "color_format": "Enter a colour as #rrggbb, e.g. #1f6feb.",
-    "in_use": "This product type is still used by products or projects. Deactivate it instead.",
+    "in_use": "This system is still used by products or projects. Deactivate it instead.",
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
-    "not_found": "This product type no longer exists.",
-    "order_mismatch": "The product types have changed in the meantime. Please reload and try again.",
-    "stale": "Someone else changed this product type in the meantime. Reload it and make your changes again.",
+    "not_found": "This system no longer exists.",
+    "order_mismatch": "The systems have changed in the meantime. Please reload and try again.",
+    "stale": "Someone else changed this system in the meantime. Reload it and make your changes again.",
     "addressing_topology": "This addressing does not fit the topology: KNX and HDL need a bus, EUI-64 needs wireless."
   },
   "project": {
@@ -304,9 +304,9 @@
     "exchange_rate_implausible": "This rate is far off today's online rate of {{currency}} (1 USD = {{online}} {{currency}}): was it meant for the previous currency? Check it and save again to keep it.",
     "exchange_rate_usd": "USD projects have no exchange rate: catalog prices are in USD.",
     "not_found": "This project no longer exists.",
-    "product_type_inactive": "This product type is inactive. Choose an active product type.",
-    "product_type_not_found": "The selected product type no longer exists.",
-    "product_types_required": "Choose at least one product type.",
+    "product_type_inactive": "This system is inactive. Choose an active system.",
+    "product_type_not_found": "The selected system no longer exists.",
+    "product_types_required": "Choose at least one system.",
     "read_only": "This project is completed or cancelled and cannot be changed. Reopen it first.",
     "stale": "Someone else changed this project in the meantime. Reload it and make your changes again.",
     "tenant_forbidden": "You cannot place projects in another tenant.",
@@ -322,8 +322,8 @@
     "empty": "The bill of materials of this version is empty; there is nothing to offer yet.",
     "exporter_unknown": "This document format is not available ({{exporters}}).",
     "not_found": "This proposal no longer exists.",
-    "product_type_not_in_bom": "This version has no items of this product type.",
-    "product_types_required": "Choose at least one product type.",
+    "product_type_not_in_bom": "This version has no items of this system.",
+    "product_types_required": "Choose at least one system.",
     "rate_missing": "This project has no exchange rate for {{currency}} yet. Fetch or set it on the BOM or Pricing tab first."
   },
   "request": {
@@ -337,7 +337,7 @@
   "room_template": {
     "key_format": "Use lower case letters, digits and underscores, starting with a letter.",
     "key_taken": "The key \"{{key}}\" is already used.",
-    "line_reference": "A function type or load type of a line no longer exists. Reload and try again.",
+    "line_reference": "A function or load type of a line no longer exists. Reload and try again.",
     "not_found": "This room template no longer exists.",
     "order_mismatch": "The room templates have changed in the meantime. Please reload and try again.",
     "stale": "Someone else changed this room template in the meantime. Reload it and make your changes again."

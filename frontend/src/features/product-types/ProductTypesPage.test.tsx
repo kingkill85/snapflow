@@ -107,7 +107,7 @@ describe('ProductTypesPage', () => {
     expect(screen.getByRole('button', { name: 'Move HDL Buspro down' })).toBeDisabled()
     expect(within(row('Zigbee')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(within(row('Zigbee')).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New product type' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New system' })).toBeInTheDocument()
   })
 
   it('creates a product type in a dialog with a badge preview of the stored abbreviation', async () => {
@@ -126,8 +126,8 @@ describe('ProductTypesPage', () => {
     const { client } = renderWithProviders(<ProductTypesPage />, { me: adminMe })
     client.setQueryData(getSearchVariantsQueryKey({ search: 'x' }), { items: [], total: 0 })
 
-    await u.click(await screen.findByRole('button', { name: 'New product type' }))
-    const dialog = await screen.findByRole('dialog', { name: 'New product type' })
+    await u.click(await screen.findByRole('button', { name: 'New system' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New system' })
     const preview = within(dialog).getByTestId('badge-preview')
     // An empty form previews a dot and a placeholder name.
     expect(preview).toHaveTextContent('Name')
@@ -175,7 +175,7 @@ describe('ProductTypesPage', () => {
     server.use(listHandler(() => []))
     const u = userEvent.setup()
     renderWithProviders(<ProductTypesPage />, { me: adminMe })
-    await u.click((await screen.findAllByRole('button', { name: 'New product type' }))[0])
+    await u.click((await screen.findAllByRole('button', { name: 'New system' }))[0])
     const dialog = await screen.findByRole('dialog')
     // "ß" has no single upper-case character: kept, as Go's strings.ToUpper does.
     await u.type(within(dialog).getByLabelText('Abbreviation'), ' straße ')
@@ -200,8 +200,8 @@ describe('ProductTypesPage', () => {
     renderWithProviders(<ProductTypesPage />, { me: adminMe })
 
     // The empty state offers creating too.
-    expect(await screen.findByText('No product types yet.')).toBeInTheDocument()
-    await u.click(screen.getAllByRole('button', { name: 'New product type' })[0])
+    expect(await screen.findByText('No systems yet.')).toBeInTheDocument()
+    await u.click(screen.getAllByRole('button', { name: 'New system' })[0])
     const dialog = await screen.findByRole('dialog')
     await u.type(within(dialog).getByLabelText('Key'), 'Zig Bee')
     await u.type(within(dialog).getByLabelText('Abbreviation'), 'TOOLONG')
@@ -223,7 +223,7 @@ describe('ProductTypesPage', () => {
     const u = userEvent.setup()
     renderWithProviders(<ProductTypesPage />, { me: adminMe })
 
-    await u.click(await screen.findByRole('button', { name: 'New product type' }))
+    await u.click(await screen.findByRole('button', { name: 'New system' }))
     const dialog = await screen.findByRole('dialog')
     await u.type(within(dialog).getByLabelText('Key'), 'zigbee')
     await u.type((await translation(u, dialog, 'Name', 'en')), 'Zigbee')
@@ -268,7 +268,7 @@ describe('ProductTypesPage', () => {
 
     await screen.findByText('Zigbee')
     await u.click(within(row('Zigbee')).getByRole('button', { name: 'Edit' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Edit product type' })
+    const dialog = await screen.findByRole('dialog', { name: 'Edit system' })
     expect(within(dialog).getByLabelText('Key')).toHaveValue('zigbee')
     expect(within(dialog).getByLabelText('Abbreviation')).toHaveValue('ZB')
     expect(within(dialog).getByLabelText('Colour')).toHaveValue('#1f6feb')
@@ -283,7 +283,7 @@ describe('ProductTypesPage', () => {
     await u.click(within(dialog).getByRole('button', { name: 'Update' }))
 
     const alert = await within(dialog).findByRole('alert')
-    expect(alert).toHaveTextContent('Someone else changed this product type in the meantime.')
+    expect(alert).toHaveTextContent('Someone else changed this system in the meantime.')
     // The stored system settings are sent along (D294).
     expect(puts[0]).toEqual({
       key: 'zigbee',
@@ -379,7 +379,7 @@ describe('ProductTypesPage', () => {
 
     await u.click(button)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('The product types have changed in the meantime.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('The systems have changed in the meantime.')
     expect(sent).toBe(false)
   })
 
@@ -400,7 +400,7 @@ describe('ProductTypesPage', () => {
     let dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Delete "Zigbee"?')
     await u.click(within(dialog).getByRole('button', { name: 'Delete' }))
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('This product type is still used by products or projects. Deactivate it instead.')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('This system is still used by products or projects. Deactivate it instead.')
     await u.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     await u.click(within(row('HDL Buspro')).getByRole('button', { name: 'Delete' }))

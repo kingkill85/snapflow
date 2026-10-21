@@ -28,7 +28,7 @@ import { useCan, useMe } from './session'
 
 // The navigation groups features by section, in this order (D97); within a
 // section by `nav.order`, then in the order of the features list.
-const sectionOrder = ['projects', 'catalog', 'admin'] as const
+const sectionOrder = ['projects', 'catalog', 'setup', 'admin'] as const
 type Section = (typeof sectionOrder)[number]
 
 type NavItem = { path: string; label: string }

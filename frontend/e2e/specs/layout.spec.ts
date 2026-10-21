@@ -15,10 +15,10 @@ import { wiringSeed } from '../wiring-seed'
 // project), which also saves screenshots to e2e/screenshots/ for a look by eye.
 const pages = [
   { name: 'projects', path: '/projects', heading: 'Projects' },
-  { name: 'function-types', path: '/catalog/function-types', heading: 'Function types' },
-  { name: 'product-types', path: '/catalog/product-types', heading: 'Product types' },
+  { name: 'function-types', path: '/catalog/function-types', heading: 'Functions' },
+  { name: 'product-types', path: '/catalog/product-types', heading: 'Systems' },
   { name: 'catalog-fields', path: '/catalog/fields', heading: 'Fields' },
-  { name: 'output-kinds', path: '/catalog/output-kinds', heading: 'Output kinds' },
+  { name: 'output-kinds', path: '/catalog/output-kinds', heading: 'Channel kinds' },
   { name: 'load-types', path: '/catalog/load-types', heading: 'Load types' },
   { name: 'room-templates', path: '/catalog/room-templates', heading: 'Room templates' },
   { name: 'categories', path: '/catalog/categories', heading: 'Categories' },
@@ -54,10 +54,10 @@ const listPages = [
   { name: 'projects', path: '/projects', heading: { en: 'Projects', de: 'Projekte' } },
   { name: 'products', path: '/catalog/products', heading: { en: 'Products', de: 'Produkte' } },
   { name: 'categories', path: '/catalog/categories', heading: { en: 'Categories', de: 'Kategorien' } },
-  { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Product types', de: 'Produkttypen' } },
-  { name: 'function-types', path: '/catalog/function-types', heading: { en: 'Function types', de: 'Funktionstypen' } },
+  { name: 'product-types', path: '/catalog/product-types', heading: { en: 'Systems', de: 'Systeme' } },
+  { name: 'function-types', path: '/catalog/function-types', heading: { en: 'Functions', de: 'Funktionen' } },
   { name: 'catalog-fields', path: '/catalog/fields', heading: { en: 'Fields', de: 'Felder' } },
-  { name: 'output-kinds', path: '/catalog/output-kinds', heading: { en: 'Output kinds', de: 'Ausgangsarten' } },
+  { name: 'output-kinds', path: '/catalog/output-kinds', heading: { en: 'Channel kinds', de: 'Kanalarten' } },
   { name: 'load-types', path: '/catalog/load-types', heading: { en: 'Load types', de: 'Lastarten' } },
   { name: 'room-templates', path: '/catalog/room-templates', heading: { en: 'Room templates', de: 'Raumvorlagen' } },
   { name: 'users', path: '/admin/users', heading: { en: 'Users', de: 'Benutzer' } },
@@ -202,13 +202,24 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/admin/users')
         if (viewport.size.width < 768) {
           await page.getByRole('button', { name: 'Menu' }).click()
-          await expect(page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Products' })).toBeVisible()
+          const sheet = page.getByRole('dialog', { name: 'Menu' })
+          await expect(sheet.getByRole('link', { name: 'Products' })).toBeVisible()
+          // Four sections (D442): the setup pages under their own heading.
+          await expect(sheet.getByRole('region')).toHaveText([/^Projects/, /^Catalog/, /^Setup/, /^Administration/, /^Account/])
+          await expect(sheet.getByRole('region', { name: 'Setup' }).getByRole('link')).toHaveText(['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'])
+          await expectNoHorizontalOverflow(page)
           await screenshot(page, testInfo, `nav-sheet-${viewport.name}-${colorScheme}`)
           await page.keyboard.press('Escape')
         } else {
           await page.getByRole('banner').getByRole('button', { name: 'Catalog' }).click()
           await expect(page.getByRole('menuitem', { name: 'Products' })).toBeVisible()
           await screenshot(page, testInfo, `nav-menu-${viewport.name}-${colorScheme}`)
+          await page.keyboard.press('Escape')
+          // Four sections in one line (D442); Setup holds the pages the catalog builds on.
+          await expect(page.getByRole('navigation', { name: 'Main navigation' }).locator(':scope > *')).toHaveText(['Projects', 'Catalog', 'Setup', 'Administration'])
+          await page.getByRole('banner').getByRole('button', { name: 'Setup' }).click()
+          await expect(page.getByRole('menuitem')).toHaveText(['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'])
+          await screenshot(page, testInfo, `nav-setup-${viewport.name}-${colorScheme}`)
           await page.keyboard.press('Escape')
           await page.getByRole('banner').getByRole('button', { name: /^Account: / }).click()
           await expect(page.getByRole('menuitemradio', { name: 'Dark' })).toBeVisible()
@@ -288,7 +299,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(typeRow).toBeVisible()
         await expectNoHorizontalOverflow(page)
         await typeRow.getByRole('button', { name: 'Edit' }).click()
-        const dialog = page.getByRole('dialog', { name: 'Edit product type' })
+        const dialog = page.getByRole('dialog', { name: 'Edit system' })
         await expect(dialog.getByTestId('type-abbreviation')).toHaveText('ZB3PRO')
         await expectNoHorizontalOverflow(page)
         await screenshot(page, testInfo, `product-type-dialog-${viewport.name}-${colorScheme}`)

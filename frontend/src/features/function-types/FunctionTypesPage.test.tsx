@@ -49,7 +49,7 @@ describe('FunctionTypesPage', () => {
     renderWithProviders(<FunctionTypesPage />, { me: userMe })
 
     expect(await screen.findByText('dimmer')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /new function type/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new function/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
   })
 
@@ -57,7 +57,7 @@ describe('FunctionTypesPage', () => {
     server.use(http.get('/api/function-types', () => HttpResponse.json({ items: [] })))
     renderWithProviders(<FunctionTypesPage />)
 
-    expect(await screen.findByText('No function types yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No functions yet.')).toBeInTheDocument()
   })
 
   it('creates a function type and refreshes the list', async () => {
@@ -75,7 +75,7 @@ describe('FunctionTypesPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<FunctionTypesPage />)
 
-    await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
+    await user.click((await screen.findAllByRole('button', { name: /new function/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
     await user.type((await translation(user, dialog, 'Name', 'en')), 'Dimmer')
@@ -145,7 +145,7 @@ describe('FunctionTypesPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<FunctionTypesPage />)
 
-    await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
+    await user.click((await screen.findAllByRole('button', { name: /new function/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'Not Valid')
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
@@ -166,7 +166,7 @@ describe('FunctionTypesPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<FunctionTypesPage />)
 
-    await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
+    await user.click((await screen.findAllByRole('button', { name: /new function/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
     await user.type((await translation(user, dialog, 'Name', 'en')), 'Dimmer')
@@ -192,7 +192,7 @@ describe('FunctionTypesPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<FunctionTypesPage />)
 
-    await user.click((await screen.findAllByRole('button', { name: /new function type/i }))[0])
+    await user.click((await screen.findAllByRole('button', { name: /new function/i }))[0])
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Key'), 'dimmer')
     await user.type(await translation(user, dialog, 'Name', 'en'), 'Dimmer')

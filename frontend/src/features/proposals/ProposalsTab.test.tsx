@@ -171,10 +171,10 @@ describe('ProposalsTab', () => {
     renderWithProviders(<ProposalsTab versionId={versionId} canGenerate />)
     await user.click(await screen.findByRole('button', { name: 'Create proposal' }))
     const dialog = await screen.findByRole('dialog', { name: 'Create proposal' })
-    await chooseOption(user, within(dialog).getByRole('combobox', { name: 'Documents' }), 'One document per product type')
+    await chooseOption(user, within(dialog).getByRole('combobox', { name: 'Documents' }), 'One document per system')
 
-    // Every product type of the BOM is ticked; each document gets its totals.
-    const types = within(dialog).getByRole('group', { name: /Product types/ })
+    // Every system of the BOM is ticked; each document gets its totals.
+    const types = within(dialog).getByRole('group', { name: /Systems/ })
     expect(within(types).getByRole('checkbox', { name: /Zigbee/ })).toBeChecked()
     expect(within(types).getByRole('checkbox', { name: /KNX/ })).toBeChecked()
     await waitFor(() => expect(within(dialog).getAllByTestId('preview-total').map((e) => e.textContent)).toEqual(['$179.50', '$100.00']), { timeout: 2000 })
@@ -184,11 +184,11 @@ describe('ProposalsTab', () => {
     // None ticked: no preview, and creating says why.
     await user.click(within(types).getByRole('checkbox', { name: /Zigbee/ }))
     await user.click(within(types).getByRole('checkbox', { name: /KNX/ }))
-    expect(within(dialog).getByText('The totals appear once a product type is chosen.')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Choose at least one product type.')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('The totals appear once a system is chosen.')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Choose at least one system.')).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    // Now at the product types, as their error (once, D271).
-    expect(within(dialog).getAllByText('Choose at least one product type.')).toHaveLength(1)
+    // Now at the systems, as their error (once, D271).
+    expect(within(dialog).getAllByText('Choose at least one system.')).toHaveLength(1)
     expect(generated).toBeUndefined()
 
     await user.click(within(types).getByRole('checkbox', { name: /KNX/ }))

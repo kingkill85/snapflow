@@ -1,6 +1,6 @@
 {
   "title": "Room templates",
-  "description": "Typical needs of a room (lights, blinds, sockets, pushbuttons), applied to a zone in the floorplan editor in one step.",
+  "description": "Default needs for a room, applied to a zone in one click.",
   "empty": "No room templates yet.",
   "new": "New room template",
   "edit": "Edit room template",
@@ -25,7 +25,7 @@
   "line": {
     "title": "Line {{n}}",
     "add": "Add line",
-    "functionType": "Function type",
+    "functionType": "Function",
     "quantity": "Quantity",
     "powerW": "Power per unit (W)",
     "powerWHint": "Leave empty when unknown.",
@@ -35,14 +35,14 @@
     "labelHint": "e.g. Ceiling, Window",
     "choose": "Choose …",
     "inactiveOption": "{{name}} (inactive)",
-    "inactiveReference": "Uses an inactive function type or load type. Choose an active one before saving.",
+    "inactiveReference": "Uses an inactive function or load type. Choose an active one before saving.",
     "warning": {
-      "function_type_inactive": "Inactive function type: this line is skipped when the template is applied.",
+      "function_type_inactive": "Inactive function: this line is skipped when the template is applied.",
       "load_type_inactive": "Inactive load type: this line is skipped when the template is applied.",
-      "load_type_not_allowed": "The function type no longer allows this load type: this line is skipped when the template is applied."
+      "load_type_not_allowed": "The function no longer allows this load type: this line is skipped when the template is applied."
     }
   },
   "skipped_one": "{{count}} line skipped",
   "skipped_other": "{{count}} lines skipped",
-  "skippedHint": "Lines with an inactive function type or load type are skipped when the template is applied."
+  "skippedHint": "Lines with an inactive function or load type are skipped when the template is applied."
 }

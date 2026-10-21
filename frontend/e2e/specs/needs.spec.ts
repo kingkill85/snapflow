@@ -51,7 +51,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   await dialog.getByRole('textbox', { name: 'Name' }).fill(templateName)
   await dialog.getByRole('button', { name: 'Add line' }).click()
   const line = dialog.getByRole('group', { name: 'Line 1' })
-  await line.getByRole('combobox', { name: 'Function type' }).click()
+  await line.getByRole('combobox', { name: 'Function' }).click()
   await page.getByRole('option', { name: light }).click()
   await line.getByLabel('Quantity').fill('3')
   await line.getByLabel(/Power per unit/).fill('7.5')
@@ -79,7 +79,7 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
 
   // A load symbol in the kitchen.
   await page.getByRole('button', { name: 'Place need' }).click()
-  await page.getByRole('combobox', { name: 'Function type of the next symbol' }).click()
+  await page.getByRole('combobox', { name: 'Function of the next symbol' }).click()
   await page.getByRole('option', { name: light }).click()
   const at = await imageToPage(page)
   const spot = at(850, 300)
@@ -111,6 +111,6 @@ test('needs: room template, apply to a zone, add a need, place a load symbol, ov
   await expect(planRegion.getByRole('list', { name: 'Living' })).toContainText(`3 × ${light} · 7.5 W · Ceiling`)
   await expect(planRegion.getByRole('list', { name: 'Kitchen' })).toContainText('Symbol on plan')
   await expect(page.getByText('All plans: 5 units · 22.5 W')).toBeVisible()
-  const byFunction = page.getByRole('table', { name: 'Totals by function type' })
+  const byFunction = page.getByRole('table', { name: 'Totals by function' })
   await expect(byFunction.getByRole('row', { name: new RegExp(light) })).toContainText('4')
 })

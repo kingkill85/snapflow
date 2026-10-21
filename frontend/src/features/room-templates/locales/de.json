@@ -1,6 +1,6 @@
 {
   "title": "Raumvorlagen",
-  "description": "Typische Bedarfe eines Raums (Licht, Jalousien, Steckdosen, Taster), im Grundriss-Editor in einem Schritt einer Zone zugewiesen.",
+  "description": "Standardbedarfe eines Raums, mit einem Klick auf eine Zone angewendet.",
   "empty": "Noch keine Raumvorlagen.",
   "new": "Neue Raumvorlage",
   "edit": "Raumvorlage bearbeiten",
@@ -25,7 +25,7 @@
   "line": {
     "title": "Zeile {{n}}",
     "add": "Zeile hinzufügen",
-    "functionType": "Funktionstyp",
+    "functionType": "Funktion",
     "quantity": "Anzahl",
     "powerW": "Leistung je Stück (W)",
     "powerWHint": "Leer lassen, wenn unbekannt.",
@@ -35,14 +35,14 @@
     "labelHint": "z. B. Decke, Fenster",
     "choose": "Auswählen …",
     "inactiveOption": "{{name}} (inaktiv)",
-    "inactiveReference": "Verwendet einen inaktiven Funktionstyp oder eine inaktive Lastart. Vor dem Speichern eine aktive auswählen.",
+    "inactiveReference": "Verwendet eine inaktive Funktion oder Lastart. Vor dem Speichern eine aktive auswählen.",
     "warning": {
-      "function_type_inactive": "Inaktiver Funktionstyp: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
+      "function_type_inactive": "Inaktive Funktion: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
       "load_type_inactive": "Inaktive Lastart: Diese Zeile wird beim Anwenden der Vorlage übersprungen.",
-      "load_type_not_allowed": "Der Funktionstyp erlaubt diese Lastart nicht mehr: Diese Zeile wird beim Anwenden der Vorlage übersprungen."
+      "load_type_not_allowed": "Die Funktion erlaubt diese Lastart nicht mehr: Diese Zeile wird beim Anwenden der Vorlage übersprungen."
     }
   },
   "skipped_one": "{{count}} Zeile übersprungen",
   "skipped_other": "{{count}} Zeilen übersprungen",
-  "skippedHint": "Zeilen mit inaktivem Funktionstyp oder inaktiver Lastart werden beim Anwenden der Vorlage übersprungen."
+  "skippedHint": "Zeilen mit inaktiver Funktion oder Lastart werden beim Anwenden der Vorlage übersprungen."
 }

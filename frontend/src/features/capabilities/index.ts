@@ -4,16 +4,16 @@ import { CatalogFieldsPage } from './CatalogFieldsPage'
 import { LoadTypesPage } from './LoadTypesPage'
 import { OutputKindsPage } from './OutputKindsPage'
 
-// Catalog capabilities (step 3a): after function types, before imports.
+// Setup (D442): fields 3, channel kinds 5, load types 6.
 export const catalogFieldsFeature: FeatureModule = {
   path: 'catalog/fields',
   element: CatalogFieldsPage,
   permission: 'catalog.read',
   nav: {
-    section: 'catalog',
+    section: 'setup',
     namespace: 'capabilities',
     labelKey: 'fields.title',
-    order: 4.1,
+    order: 3,
   },
 }
 
@@ -22,10 +22,10 @@ export const outputKindsFeature: FeatureModule = {
   element: OutputKindsPage,
   permission: 'catalog.read',
   nav: {
-    section: 'catalog',
+    section: 'setup',
     namespace: 'capabilities',
     labelKey: 'outputKinds.title',
-    order: 4.2,
+    order: 5,
   },
 }
 
@@ -34,9 +34,9 @@ export const loadTypesFeature: FeatureModule = {
   element: LoadTypesPage,
   permission: 'catalog.read',
   nav: {
-    section: 'catalog',
+    section: 'setup',
     namespace: 'capabilities',
     labelKey: 'loadTypes.title',
-    order: 4.3,
+    order: 6,
   },
 }

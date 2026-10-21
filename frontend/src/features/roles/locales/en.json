@@ -6,7 +6,7 @@
   "denied": "Not allowed",
   "permissions": {
     "catalog": {
-      "read": { "label": "View catalog", "description": "Browse products, product types and function types." },
+      "read": { "label": "View catalog", "description": "Browse products, systems and functions." },
       "write": { "label": "Edit catalog", "description": "Create, change, import and delete catalog data." }
     },
     "projects": {

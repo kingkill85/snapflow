@@ -11,10 +11,10 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
   const key = `e2e_${Date.now().toString(36)}`
   const name = unique('Dimmer')
   await page.goto('/catalog/function-types')
-  await expect(page.getByRole('heading', { name: 'Function types' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Functions' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'New function type' }).first().click()
-  const dialog = page.getByRole('dialog', { name: 'New function type' })
+  await page.getByRole('button', { name: 'New function' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New function' })
   await dialog.getByLabel('Key').fill('Not A Key')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect(dialog.getByLabel('Key')).toHaveAccessibleDescription('Use lower case letters, digits and underscores, starting with a letter.')
@@ -27,7 +27,7 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
   await expect(dialog).toBeHidden()
   await expect(row(page, key)).toContainText(name)
 
-  await page.getByRole('button', { name: 'New function type' }).first().click()
+  await page.getByRole('button', { name: 'New function' }).first().click()
   await dialog.getByLabel('Key').fill(key)
   await (await translation(dialog, 'Name', 'en')).fill('Duplicate')
   await dialog.getByRole('button', { name: 'Create' }).click()
@@ -37,7 +37,7 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
 
   const renamed = unique('Switch')
   await row(page, key).getByRole('button', { name: 'Edit' }).click()
-  const edit = page.getByRole('dialog', { name: 'Edit function type' })
+  const edit = page.getByRole('dialog', { name: 'Edit function' })
   await expect(edit.getByLabel('Key')).toHaveValue(key)
   await (await translation(edit, 'Name', 'en')).fill(renamed)
   await edit.getByRole('button', { name: 'Update' }).click()
@@ -45,7 +45,7 @@ test('function types: create, duplicate key, edit, delete', async ({ page }) => 
   await expect(row(page, key)).toContainText(renamed)
 
   await row(page, key).getByRole('button', { name: 'Delete' }).click()
-  const confirm = page.getByRole('dialog', { name: 'Delete function type' })
+  const confirm = page.getByRole('dialog', { name: 'Delete function' })
   await expect(confirm).toContainText(`Delete "${renamed}"?`)
   await confirm.getByRole('button', { name: 'Delete' }).click()
   await expect(confirm).toBeHidden()

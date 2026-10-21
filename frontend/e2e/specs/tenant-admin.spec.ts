@@ -10,7 +10,7 @@ test('a partner tenant admin manages only their own tenant', async ({ api, sessi
 
   const page = await sessionFor(tenantAdmin)
   await page.goto('/')
-  expect(await navEntries(page)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types', 'Room templates'], Administration: ['Users', 'Roles', 'Company profile'] })
+  expect(await navEntries(page)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories'], Setup: ['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'], Administration: ['Users', 'Roles', 'Company profile'] })
 
   await navigate(page, 'Administration', 'Users')
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
@@ -58,5 +58,5 @@ test('a tenant admin has no access to tenants', async ({ api, sessionFor }) => {
   await page.goto('/admin/tenants')
   await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible()
   await expect(page.getByText('You do not have permission to see this page.')).toBeVisible()
-  expect(await navEntries(page)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories', 'Product types', 'Function types', 'Fields', 'Output kinds', 'Load types', 'Room templates'], Administration: ['Users', 'Roles', 'Company profile'] })
+  expect(await navEntries(page)).toEqual({ Projects: ['Projects'], Catalog: ['Products', 'Categories'], Setup: ['Systems', 'Functions', 'Fields', 'Room templates', 'Channel kinds', 'Load types'], Administration: ['Users', 'Roles', 'Company profile'] })
 })

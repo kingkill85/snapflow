@@ -11,8 +11,8 @@ test('an admin creates a product type with a badge in a dialog, edits and deacti
   const key = uniqueKey('zigbee')
   const name = unique('Zigbee')
   await page.goto(listPath)
-  await page.getByRole('button', { name: 'New product type' }).first().click()
-  const dialog = page.getByRole('dialog', { name: 'New product type' })
+  await page.getByRole('button', { name: 'New system' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New system' })
   const preview = dialog.getByTestId('badge-preview')
   await expect(preview.getByTestId('type-color')).toBeVisible()
 
@@ -39,7 +39,7 @@ test('an admin creates a product type with a badge in a dialog, edits and deacti
 
   // Edit: a light colour gets black text; deactivated, it is hidden unless inactive ones are shown.
   await listed.getByRole('button', { name: 'Edit' }).click()
-  const edit = page.getByRole('dialog', { name: 'Edit product type' })
+  const edit = page.getByRole('dialog', { name: 'Edit system' })
   await expect(edit.getByLabel('Abbreviation')).toHaveValue('ZB')
   await edit.getByLabel('Colour', { exact: true }).fill('#ffd33d')
   await expect(edit.getByTestId('type-abbreviation')).toHaveCSS('color', 'rgb(0, 0, 0)')
@@ -55,8 +55,8 @@ test('an admin creates a product type with a badge in a dialog, edits and deacti
 test('the dialog reports mistakes at their fields, a taken key from the server', async ({ page, api }) => {
   const taken = await api.createProductType()
   await page.goto(listPath)
-  await page.getByRole('button', { name: 'New product type' }).first().click()
-  const dialog = page.getByRole('dialog', { name: 'New product type' })
+  await page.getByRole('button', { name: 'New system' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New system' })
   await dialog.getByLabel('Key').fill('Bad Key')
   await dialog.getByLabel('Abbreviation').fill('TOOLONG')
   await dialog.getByLabel('Colour', { exact: true }).fill('blue')
@@ -80,14 +80,14 @@ test('a save over a newer version is refused, and Reload shows that version', as
   const type = await api.createProductType({ abbreviation: 'OLD' })
   await page.goto(listPath)
   await row(page, type.key).getByRole('button', { name: 'Edit' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Edit product type' })
+  const dialog = page.getByRole('dialog', { name: 'Edit system' })
   await expect(dialog.getByLabel('Abbreviation')).toHaveValue('OLD')
   const renamed = unique('Renamed')
   await api.updateProductType(type.id, { name: { en: renamed } })
 
   await dialog.getByLabel('Abbreviation').fill('NEW')
   await dialog.getByRole('button', { name: 'Update' }).click()
-  const stale = dialog.getByRole('alert').filter({ hasText: 'Someone else changed this product type in the meantime.' })
+  const stale = dialog.getByRole('alert').filter({ hasText: 'Someone else changed this system in the meantime.' })
   await expect(stale).toBeVisible()
   await stale.getByRole('button', { name: 'Reload' }).click()
   await expect(await translation(dialog, 'Name', 'en')).toHaveValue(renamed)
@@ -117,10 +117,10 @@ test('reorder and delete on the list; a type in use cannot be deleted', async ({
   expect((await api.productTypes()).slice(0, 3).map((t) => t.key)).toEqual([c.key, a.key, b.key])
 
   await row(page, a.key).getByRole('button', { name: 'Delete' }).click()
-  const confirm = page.getByRole('dialog', { name: 'Delete product type' })
+  const confirm = page.getByRole('dialog', { name: 'Delete system' })
   await expect(confirm).toContainText(`Delete "${a.name.en}"?`)
   await confirm.getByRole('button', { name: 'Delete' }).click()
-  await expect(confirm.getByRole('alert')).toHaveText('This product type is still used by products or projects. Deactivate it instead.')
+  await expect(confirm.getByRole('alert')).toHaveText('This system is still used by products or projects. Deactivate it instead.')
   await confirm.getByRole('button', { name: 'Cancel' }).click()
 
   await row(page, c.key).getByRole('button', { name: 'Delete' }).click()
@@ -138,10 +138,10 @@ for (const role of ['user', 'tenant_admin'] as const) {
     const page = await sessionFor(account)
 
     await page.goto('/')
-    await navigate(page, 'Catalog', 'Product types')
-    await expect(page.getByRole('heading', { name: 'Product types', level: 1 })).toBeVisible()
+    await navigate(page, 'Setup', 'Systems')
+    await expect(page.getByRole('heading', { name: 'Systems', level: 1 })).toBeVisible()
     await expect(row(page, type.key)).toContainText(`RO${type.name.en}`)
-    await expect(page.getByRole('button', { name: /New product type|Edit|Delete|^Move / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /New system|Edit|Delete|^Move / })).toHaveCount(0)
   })
 }
 
@@ -149,11 +149,11 @@ test('the list in German', async ({ page, api }) => {
   const type = await api.createProductType({ name: { en: unique('KNX'), de: unique('KNX DE') }, abbreviation: 'KNX' })
   await page.goto(listPath)
   await chooseLanguage(page, 'Deutsch')
-  await expect(page.getByRole('heading', { name: 'Produkttypen', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Systeme', level: 1 })).toBeVisible()
   await expect(row(page, type.key)).toContainText(`KNX${type.name.de!}`)
   await expect(page.getByRole('columnheader')).toContainText(['Position', 'Name', 'Schlüssel', 'Status'])
   await row(page, type.key).getByRole('button', { name: 'Bearbeiten' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Produkttyp bearbeiten' })
+  const dialog = page.getByRole('dialog', { name: 'System bearbeiten' })
   await expect(dialog.getByLabel('Kürzel')).toHaveValue('KNX')
   await expect(dialog.getByText('Vorschau des Abzeichens')).toBeVisible()
   await dialog.getByRole('button', { name: 'Abbrechen' }).click()

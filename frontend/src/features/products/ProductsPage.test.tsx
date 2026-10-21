@@ -68,11 +68,11 @@ describe('ProductsPage', () => {
     // Decorative (alt=""): the row names the product.
     expect(first.querySelector('img')).toHaveAttribute('src', `/api/files/${ids.id(901)}`)
     expect(first).toHaveTextContent('Dimmer 4ch')
-    // The product type with its badge (abbreviation on its colour, text for contrast), and the category.
+    // The system with its badge (abbreviation on its colour, text for contrast), and the category.
     const cells = within(first).getAllByRole('cell')
     expect(cells[3]).toHaveTextContent('ZBZigbeeDimmer actuators')
     expect(within(cells[3]).getByTestId('type-abbreviation')).toHaveStyle({ backgroundColor: '#1f6feb', color: '#ffffff' })
-    expect(screen.getByRole('columnheader', { name: 'Product type / Category' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'System / Category' })).toBeInTheDocument()
     expect(first).toHaveTextContent('$27.00 – $35.00')
     expect(first).toHaveTextContent('Active')
     expect(first).not.toHaveTextContent('attention')
@@ -93,7 +93,7 @@ describe('ProductsPage', () => {
 
     // Active, but its type or category is not: unavailable, with the reason; three values need attention.
     const typeOff = row('TYPE-OFF')
-    expect(within(typeOff).getByTitle('Active, but its product type or category is inactive.')).toHaveTextContent('Unavailable')
+    expect(within(typeOff).getByTitle('Active, but its system or category is inactive.')).toHaveTextContent('Unavailable')
     expect(within(typeOff).getByTitle('3 attribute values need attention')).toBeInTheDocument()
 
     expect(screen.getByRole('link', { name: 'New product' })).toHaveAttribute('href', '/catalog/products/new')
@@ -134,8 +134,8 @@ describe('ProductsPage', () => {
     expect(screen.getByLabelText('Search')).toHaveAttribute('maxlength', '200')
 
     // Inactive types are offered too.
-    const typeSelect = screen.getByLabelText('Product type')
-    expect(await optionTexts(u, typeSelect)).toEqual(['All product types', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
+    const typeSelect = screen.getByLabelText('System')
+    expect(await optionTexts(u, typeSelect)).toEqual(['All systems', 'ZBZigbee', 'KNX', 'Legacy (inactive)'])
     await chooseOption(u, typeSelect, 'KNX')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', productTypeId: knxType.id, limit: '50', offset: '0' }))
 
@@ -159,7 +159,7 @@ describe('ProductsPage', () => {
       }),
     )
 
-    await chooseOption(u, typeSelect, 'All product types')
+    await chooseOption(u, typeSelect, 'All systems')
     await chooseOption(u, categorySelect, 'All categories')
     await waitFor(() => expect(last()).toEqual({ search: 'dim 4', includeInactive: 'true', limit: '50', offset: '0' }))
   })
@@ -171,7 +171,7 @@ describe('ProductsPage', () => {
     )
     renderRoutes(routes, { me: adminMe, route: '/catalog/products' })
     const checkbox = await screen.findByLabelText('Show inactive')
-    const typeSelect = screen.getByLabelText('Product type')
+    const typeSelect = screen.getByLabelText('System')
     await userEvent.setup().click(typeSelect)
     const knx = await screen.findByRole('option', { name: 'KNX' })
 
@@ -272,13 +272,13 @@ describe('ProductsPage', () => {
 
     await screen.findByRole('link', { name: 'M485/DIM.4' })
     expect(screen.getByLabelText('Show inactive')).not.toBeChecked()
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Legacy (inactive)')
+    await chooseOption(u, screen.getByLabelText('System'), 'Legacy (inactive)')
 
     await waitFor(() => expect(last()).toEqual({ productTypeId: legacyType.id, includeInactive: 'true', limit: '50', offset: '0' }))
     expect(screen.getByLabelText('Show inactive')).toBeChecked()
 
     // An active type leaves the checkbox as it is.
-    await chooseOption(u, screen.getByLabelText('Product type'), 'Zigbee')
+    await chooseOption(u, screen.getByLabelText('System'), 'Zigbee')
     await waitFor(() => expect(last()).toEqual({ productTypeId: zigbeeType.id, includeInactive: 'true', limit: '50', offset: '0' }))
 
     // Likewise for categories.

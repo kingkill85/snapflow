@@ -39,7 +39,7 @@ describe('BomTab', () => {
     const headers = within(table()).getAllByRole('columnheader').map((h) => h.textContent)
     expect(headers).toEqual(['Image', 'Product', 'Ground floor', 'Upper floor', 'Manual', 'Qty', 'Unit price', 'Total'])
     const rows = within(table()).getAllByRole('row').map((r) => r.textContent)
-    // Product type, then its categories, each with its subtotal; free text last.
+    // System, then its categories, each with its subtotal; free text last.
     expect(rows[1]).toContain('Zigbee')
     expect(rows[1]).toContain('$155.00')
     expect(rows[2]).toContain('Sensors')
