@@ -58,7 +58,7 @@ export type ProductInput = {
   description?: Localized
   attributes?: Record<string, unknown>
   isActive?: boolean
-  /** Create only: the first variant (D449); left out, the API adds "Standard" at price 0. */
+  /** Create only: the first variant, in the same transaction (D449); left out, the product starts without variants. */
   firstVariant?: { name?: Localized; sku?: string; price: string; attributes?: Record<string, unknown> }
 }
 export type VariantInput = {
@@ -315,14 +315,7 @@ export class Api {
   /** Creates a product; unset fields get defaults (a unique model number, active). */
   async createProduct(input: Partial<ProductInput> & { productTypeId: string; categoryId: string }): Promise<Product> {
     const data = { modelNumber: unique('M').replace(/\s+/g, '-'), name: { en: unique('Product') }, isActive: true, attributes: {}, ...input }
-    const product = await this.json<Product>(await this.ctx.post('/api/products', { data }))
-    if (input.firstVariant) return product
-    // Without firstVariant the API adds a "Standard" variant (D449); the specs add their variants with createVariant, so it goes again.
-    for (const v of product.variants) {
-      const res = await this.ctx.delete(`/api/products/${product.id}/variants/${v.id}`)
-      expect(res.ok(), `delete the default variant: ${res.status()} ${await res.text()}`).toBe(true)
-    }
-    return { ...product, variants: [] }
+    return this.json<Product>(await this.ctx.post('/api/products', { data }))
   }
 
   async product(id: string): Promise<Product> {
