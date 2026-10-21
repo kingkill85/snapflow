@@ -38,6 +38,7 @@ import {
   Notice,
   Page,
   Section,
+  SectionActions,
   setApiFieldErrors,
   SwitchField,
   toFieldErrors,
@@ -343,39 +344,49 @@ export function VariantForm({
   const stale = mutation.error instanceof ApiError && mutation.error.code === 'variant.stale'
   const imageError = image.error ? errorMessage(image.error) : fieldError(errors.imageFileId?.message)
 
-  const formActions = (
-    <FormActions
-      error={
-        <ErrorMessage
-          error={mutation.error}
-          fields={errorFields}
-          action={
-            stale && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  // The form restarts: an upload still running is dropped.
-                  image.cancel()
-                  void onReload()
-                }}
-              >
-                <RotateCw /> {tCommon('action.reload')}
-              </Button>
-            )
-          }
-        />
+  const actionsError = (
+    <ErrorMessage
+      error={mutation.error}
+      fields={errorFields}
+      action={
+        stale && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              // The form restarts: an upload still running is dropped.
+              image.cancel()
+              void onReload()
+            }}
+          >
+            <RotateCw /> {tCommon('action.reload')}
+          </Button>
+        )
       }
-    >
-      {!embedded && (
-        <LeaveLink to={productPath(product.id)} state={listState} dirty={dirty && !readOnly} backLabel={t('variant.backToProduct')} />
-      )}
+    />
+  )
+  const formActions = (
+    <FormActions error={actionsError}>
+      <LeaveLink to={productPath(product.id)} state={listState} dirty={dirty && !readOnly} backLabel={t('variant.backToProduct')} />
       {!readOnly && (
         <Button type="submit" disabled={mutation.isPending || image.pending}>
           {loaded ? tCommon('action.update') : tCommon('action.create')}
         </Button>
       )}
     </FormActions>
+  )
+  // Embedded in the product page: the section's own end, not a second sticky bar beside the product form's (D449).
+  const sectionActions = (
+    <>
+      {actionsError}
+      {!readOnly && (
+        <SectionActions>
+          <Button type="submit" disabled={mutation.isPending || image.pending}>
+            {loaded ? tCommon('action.update') : tCommon('action.create')}
+          </Button>
+        </SectionActions>
+      )}
+    </>
   )
 
   return (
@@ -428,7 +439,7 @@ export function VariantForm({
               onKeptChange={(key, kept) => form.setValue(`keep.${key}`, kept, { shouldDirty: true })}
               disabled={readOnly}
             />
-            {formActions}
+            {sectionActions}
           </Section>
         </Fieldset>
       ) : (

@@ -117,7 +117,7 @@ async function seed(api: Api) {
     productTypeId: (await api.createProductType()).id,
     categoryId: category.id,
     name: { en: 'Presence detector with constant light control', de: 'Präsenzmelder mit Konstantlichtregelung' },
-    firstVariant: { price: '249.00', sku: 'PD-360-WH' },
+    firstVariant: { price: '249.00', sku: `PD-360-${tag}`.toUpperCase() },
   })
 
   return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board, oneVariant }
