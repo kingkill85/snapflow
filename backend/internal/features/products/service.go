@@ -425,6 +425,13 @@ func (s *Service) detail(ctx context.Context, actor auth.Actor, row store.Produc
 			p.VariantsWithProblems++
 		}
 	}
+	var active []capabilities.Capabilities
+	for _, v := range p.Variants {
+		if v.IsActive {
+			active = append(active, v.Capabilities)
+		}
+	}
+	p.Capabilities.Missing = capabilities.MergeMissing(p.Capabilities, active)
 	return p, nil
 }
 

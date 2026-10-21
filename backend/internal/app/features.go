@@ -17,6 +17,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/producttypes"
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/features/proposals"
+	"github.com/kingkill85/snapflow/backend/internal/features/readiness"
 	"github.com/kingkill85/snapflow/backend/internal/features/roomtemplates"
 	"github.com/kingkill85/snapflow/backend/internal/features/tenants"
 	tenantsstore "github.com/kingkill85/snapflow/backend/internal/features/tenants/store"
@@ -61,6 +62,7 @@ func registerFeatures(api huma.API, deps Deps, c core) {
 	c.tenants.UseFiles(fileSvc)
 	productSvc := products.NewService(deps.DB, productTypes, cats, fileSvc, capSvc)
 	products.Register(api, productSvc)
+	readiness.Register(api, readiness.NewService(productSvc, cats, productTypes, functionTypeSvc, capSvc))
 	importSvc := imports.NewService(deps.DB, productTypes, cats, productSvc, fileSvc, c.users, capSvc)
 	imports.Register(api, importSvc)
 	capSvc.OnProfileRefs(importSvc.ProfilesLinkingField)

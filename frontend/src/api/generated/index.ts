@@ -1,6 +1,7 @@
 export * from './auth/auth';
 export * from './bom/bom';
 export * from './catalog-fields/catalog-fields';
+export * from './catalog-readiness/catalog-readiness';
 export * from './categories/categories';
 export * from './files/files';
 export * from './function-types/function-types';

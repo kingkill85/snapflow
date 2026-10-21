@@ -43,6 +43,54 @@ type Capabilities struct {
 	WirelessPlacesUsedDefault bool     `json:"wirelessPlacesUsedDefault" doc:"wirelessPlacesUsed is the product type's default (the product has no value)"`
 	ZigbeeRouter              *bool    `json:"zigbeeRouter,omitempty"`
 	MotorType                 string   `json:"motorType,omitempty" enum:"ac,dc" doc:"Motors the blind outputs drive (D310)"`
+	// Missing lists what the checks still need of the product (D447);
+	// left out when nothing is missing.
+	Missing []Missing `json:"missing,omitempty" doc:"What the checks still need of the product (readiness codes); left out when nothing is missing"`
+}
+
+// MissingCode is a product-level readiness code (D446, D447).
+type MissingCode string
+
+const (
+	// MissingBusCurrent: a device of a bus system without a default bus
+	// current has no bus current value.
+	MissingBusCurrent MissingCode = "product_bus_current_missing"
+	// MissingBoardWidth: mounted on the board, but no rail width.
+	MissingBoardWidth MissingCode = "product_board_without_width"
+	// MissingChannels: the category has a channels field, the value is
+	// empty.
+	MissingChannels MissingCode = "product_channels_missing"
+	// MissingChannelLimit: channels, but no W or A limit for them.
+	MissingChannelLimit MissingCode = "product_channel_without_limit"
+)
+
+// MissingCodes are the product-level codes in display order.
+var MissingCodes = []MissingCode{MissingBoardWidth, MissingChannels, MissingBusCurrent, MissingChannelLimit}
+
+// Missing is one thing the checks still need of a product.
+type Missing struct {
+	Code MissingCode `json:"code" enum:"product_board_without_width,product_channels_missing,product_bus_current_missing,product_channel_without_limit"`
+}
+
+// HasMissing reports whether c lists the code.
+func (c Capabilities) HasMissing(code MissingCode) bool {
+	return slices.ContainsFunc(c.Missing, func(m Missing) bool { return m.Code == code })
+}
+
+// MergeMissing is the missing list of a product with variants: a code
+// counts when the product or any of its variants lacks it (variants carry
+// the product's values too). Without variants the product's own list.
+func MergeMissing(product Capabilities, variants []Capabilities) []Missing {
+	if len(variants) == 0 {
+		return product.Missing
+	}
+	var out []Missing
+	for _, code := range MissingCodes {
+		if slices.ContainsFunc(variants, func(v Capabilities) bool { return v.HasMissing(code) }) {
+			out = append(out, Missing{Code: code})
+		}
+	}
+	return out
 }
 
 // ChannelCapability is the channels of one output kind a product supplies.
@@ -168,6 +216,8 @@ func Compute(reg Registry, in Input) Capabilities {
 		alternativeAllowedSet bool
 	}
 	channels := map[uuid.UUID]*channelData{}
+	// Kinds whose channels_supplied field the category has (value or not).
+	channelFields := map[uuid.UUID]bool{}
 	ch := func(id uuid.UUID) *channelData {
 		c := channels[id]
 		if c == nil {
@@ -192,6 +242,9 @@ func Compute(reg Registry, in Input) Capabilities {
 		}
 		if len(f.ProductTypeIDs) > 0 && !slices.Contains(f.ProductTypeIDs, in.ProductTypeID) {
 			continue
+		}
+		if f.Meaning == MeaningChannelsSupplied {
+			channelFields[deref0(f.OutputKindID)] = true
 		}
 		raw, ok := in.Values[a.Key]
 		if !ok || raw == nil {
@@ -304,6 +357,40 @@ func Compute(reg Registry, in Input) Capabilities {
 			}
 		}
 		out.Channels = append(out.Channels, cc)
+	}
+	out.Missing = missing(reg, in, out, channelFields)
+	return out
+}
+
+// missing derives the product-level readiness codes (D446) in
+// MissingCodes order; nil when nothing is missing. Enclosures and bus power
+// supplies are not bus devices and need no width or bus current of their
+// own.
+func missing(reg Registry, in Input, c Capabilities, channelFields map[uuid.UUID]bool) []Missing {
+	enclosure := c.EnclosureRows != nil
+	var out []Missing
+	add := func(code MissingCode) { out = append(out, Missing{Code: code}) }
+	if (c.Mounting == string(MountingBoard) || c.Mounting == string(MountingBoth)) && c.RailWidthTE == nil && !enclosure {
+		add(MissingBoardWidth)
+	}
+	supplied := map[uuid.UUID]bool{}
+	for _, cc := range c.Channels {
+		supplied[cc.OutputKindID] = true
+	}
+	for _, k := range reg.OutputKinds {
+		if channelFields[k.ID] && !supplied[k.ID] {
+			add(MissingChannels)
+			break
+		}
+	}
+	if in.ProductType.Topology == TopologyBus && c.BusCurrentUsedMa == nil && c.BusCurrentSuppliedMa == nil && !enclosure {
+		add(MissingBusCurrent)
+	}
+	for _, cc := range c.Channels {
+		if len(cc.LimitsW) == 0 && len(cc.LimitsA) == 0 {
+			add(MissingChannelLimit)
+			break
+		}
 	}
 	return out
 }
