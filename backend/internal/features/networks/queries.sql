@@ -42,10 +42,10 @@ WHERE bus_lines.version_id = sqlc.arg(version_id)::uuid AND bus_lines.id = o.id;
 SELECT * FROM network_assignments WHERE version_id = $1 ORDER BY plan_id, item_id;
 
 -- name: UpsertAssignment :exec
-INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
-VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (plan_id, item_id) DO UPDATE SET bus_line_id = EXCLUDED.bus_line_id,
-    gateway_plan_id = EXCLUDED.gateway_plan_id, gateway_item_id = EXCLUDED.gateway_item_id, pinned = true;
+    gateway_plan_id = EXCLUDED.gateway_plan_id, gateway_item_id = EXCLUDED.gateway_item_id;
 
 -- name: DeleteAssignment :exec
 DELETE FROM network_assignments WHERE plan_id = $1 AND item_id = $2;
@@ -59,9 +59,9 @@ FROM bus_lines WHERE version_id = sqlc.arg(source_id)::uuid;
 -- CopyAssignments copies the assignments of a version into another with
 -- the plan ids mapped (a JSON object source id -> copy id).
 -- name: CopyAssignments :exec
-INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id, pinned)
+INSERT INTO network_assignments (tenant_id, version_id, plan_id, item_id, bus_line_id, gateway_plan_id, gateway_item_id)
 SELECT sqlc.arg(tenant_id)::uuid, sqlc.arg(target_id)::uuid, (m.map ->> a.plan_id::text)::uuid, a.item_id, a.bus_line_id,
-    (m.map ->> a.gateway_plan_id::text)::uuid, a.gateway_item_id, a.pinned
+    (m.map ->> a.gateway_plan_id::text)::uuid, a.gateway_item_id
 FROM network_assignments a, (SELECT sqlc.arg(plan_map)::jsonb AS map) m
 WHERE a.version_id = sqlc.arg(source_id)::uuid AND m.map ? a.plan_id::text
     AND (a.gateway_plan_id IS NULL OR m.map ? a.gateway_plan_id::text);

@@ -14,12 +14,10 @@ import (
 
 const copyItems = `-- name: CopyItems :exec
 INSERT INTO version_items (tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku,
-    product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color,
-    product_type_position, category_id, category_name, category_position, unit_price, image_file_id, required_addon_ids,
+    product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price, image_file_id, required_addon_ids,
     captured_at, updated_at)
 SELECT $1::uuid, $2::uuid, variant_id, product_id, product_name, variant_name,
-    model_number, sku, product_type_id, product_type_key, product_type_name, product_type_abbreviation,
-    product_type_color, product_type_position, category_id, category_name, category_position, unit_price,
+    model_number, sku, product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price,
     image_file_id, required_addon_ids, captured_at, updated_at
 FROM version_items WHERE version_id = $3::uuid
 `
@@ -134,37 +132,31 @@ func (q *Queries) GetPricing(ctx context.Context, versionID uuid.UUID) (VersionP
 
 const insertItem = `-- name: InsertItem :exec
 INSERT INTO version_items (tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku,
-    product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color,
-    product_type_position, category_id, category_name, category_position, unit_price, image_file_id, required_addon_ids)
+    product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price, image_file_id, required_addon_ids)
 VALUES ($1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10,
     $11, $12, $13,
-    $14, $15, $16, $17,
-    $18, $19, $20)
+    $14, $15, $16)
 ON CONFLICT (version_id, variant_id) DO NOTHING
 `
 
 type InsertItemParams struct {
-	TenantID                uuid.UUID
-	VersionID               uuid.UUID
-	VariantID               uuid.UUID
-	ProductID               uuid.UUID
-	ProductName             i18n.Text
-	VariantName             i18n.Text
-	ModelNumber             string
-	Sku                     *string
-	ProductTypeID           uuid.UUID
-	ProductTypeKey          string
-	ProductTypeName         i18n.Text
-	ProductTypeAbbreviation string
-	ProductTypeColor        string
-	ProductTypePosition     int32
-	CategoryID              uuid.UUID
-	CategoryName            i18n.Text
-	CategoryPosition        int32
-	UnitPrice               string
-	ImageFileID             *uuid.UUID
-	RequiredAddonIds        []uuid.UUID
+	TenantID         uuid.UUID
+	VersionID        uuid.UUID
+	VariantID        uuid.UUID
+	ProductID        uuid.UUID
+	ProductName      i18n.Text
+	VariantName      i18n.Text
+	ModelNumber      string
+	Sku              *string
+	ProductTypeID    uuid.UUID
+	ProductTypeKey   string
+	ProductTypeName  i18n.Text
+	CategoryID       uuid.UUID
+	CategoryName     i18n.Text
+	UnitPrice        string
+	ImageFileID      *uuid.UUID
+	RequiredAddonIds []uuid.UUID
 }
 
 // InsertItem takes a snapshot unless the version has one of the variant
@@ -182,12 +174,8 @@ func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) error {
 		arg.ProductTypeID,
 		arg.ProductTypeKey,
 		arg.ProductTypeName,
-		arg.ProductTypeAbbreviation,
-		arg.ProductTypeColor,
-		arg.ProductTypePosition,
 		arg.CategoryID,
 		arg.CategoryName,
-		arg.CategoryPosition,
 		arg.UnitPrice,
 		arg.ImageFileID,
 		arg.RequiredAddonIds,
@@ -266,7 +254,7 @@ func (q *Queries) ItemVariantIDs(ctx context.Context, versionID uuid.UUID) ([]uu
 
 const listItems = `-- name: ListItems :many
 
-SELECT id, tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku, product_type_id, product_type_key, product_type_name, product_type_abbreviation, product_type_color, product_type_position, category_id, category_name, category_position, unit_price, image_file_id, required_addon_ids, captured_at, updated_at FROM version_items WHERE version_id = $1 ORDER BY variant_id
+SELECT id, tenant_id, version_id, variant_id, product_id, product_name, variant_name, model_number, sku, product_type_id, product_type_key, product_type_name, category_id, category_name, unit_price, image_file_id, required_addon_ids, captured_at, updated_at FROM version_items WHERE version_id = $1 ORDER BY variant_id
 `
 
 // Snapshots (version_items) ------------------------------------------------
@@ -292,12 +280,8 @@ func (q *Queries) ListItems(ctx context.Context, versionID uuid.UUID) ([]Version
 			&i.ProductTypeID,
 			&i.ProductTypeKey,
 			&i.ProductTypeName,
-			&i.ProductTypeAbbreviation,
-			&i.ProductTypeColor,
-			&i.ProductTypePosition,
 			&i.CategoryID,
 			&i.CategoryName,
-			&i.CategoryPosition,
 			&i.UnitPrice,
 			&i.ImageFileID,
 			&i.RequiredAddonIds,
@@ -441,34 +425,28 @@ const updateItem = `-- name: UpdateItem :execrows
 UPDATE version_items SET product_id = $1, product_name = $2,
     variant_name = $3, model_number = $4, sku = $5,
     product_type_id = $6, product_type_key = $7,
-    product_type_name = $8, product_type_abbreviation = $9,
-    product_type_color = $10, product_type_position = $11,
-    category_id = $12, category_name = $13,
-    category_position = $14, unit_price = $15,
-    image_file_id = $16, required_addon_ids = $17, updated_at = now()
-WHERE version_id = $18 AND variant_id = $19
+    product_type_name = $8,
+    category_id = $9, category_name = $10, unit_price = $11,
+    image_file_id = $12, required_addon_ids = $13, updated_at = now()
+WHERE version_id = $14 AND variant_id = $15
 `
 
 type UpdateItemParams struct {
-	ProductID               uuid.UUID
-	ProductName             i18n.Text
-	VariantName             i18n.Text
-	ModelNumber             string
-	Sku                     *string
-	ProductTypeID           uuid.UUID
-	ProductTypeKey          string
-	ProductTypeName         i18n.Text
-	ProductTypeAbbreviation string
-	ProductTypeColor        string
-	ProductTypePosition     int32
-	CategoryID              uuid.UUID
-	CategoryName            i18n.Text
-	CategoryPosition        int32
-	UnitPrice               string
-	ImageFileID             *uuid.UUID
-	RequiredAddonIds        []uuid.UUID
-	VersionID               uuid.UUID
-	VariantID               uuid.UUID
+	ProductID        uuid.UUID
+	ProductName      i18n.Text
+	VariantName      i18n.Text
+	ModelNumber      string
+	Sku              *string
+	ProductTypeID    uuid.UUID
+	ProductTypeKey   string
+	ProductTypeName  i18n.Text
+	CategoryID       uuid.UUID
+	CategoryName     i18n.Text
+	UnitPrice        string
+	ImageFileID      *uuid.UUID
+	RequiredAddonIds []uuid.UUID
+	VersionID        uuid.UUID
+	VariantID        uuid.UUID
 }
 
 // UpdateItem re-snapshots a variant ("Update from catalog").
@@ -482,12 +460,8 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (int64, 
 		arg.ProductTypeID,
 		arg.ProductTypeKey,
 		arg.ProductTypeName,
-		arg.ProductTypeAbbreviation,
-		arg.ProductTypeColor,
-		arg.ProductTypePosition,
 		arg.CategoryID,
 		arg.CategoryName,
-		arg.CategoryPosition,
 		arg.UnitPrice,
 		arg.ImageFileID,
 		arg.RequiredAddonIds,

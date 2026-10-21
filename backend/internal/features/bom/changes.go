@@ -35,8 +35,7 @@ func resnapshot(it store.VersionItem, f products.BOMVariant) store.VersionItem {
 	p := insertParams(projectsRef(it), f)
 	it.ProductID, it.ProductName, it.VariantName, it.ModelNumber, it.Sku = p.ProductID, p.ProductName, p.VariantName, p.ModelNumber, p.Sku
 	it.ProductTypeID, it.ProductTypeKey, it.ProductTypeName = p.ProductTypeID, p.ProductTypeKey, p.ProductTypeName
-	it.ProductTypeAbbreviation, it.ProductTypeColor, it.ProductTypePosition = p.ProductTypeAbbreviation, p.ProductTypeColor, p.ProductTypePosition
-	it.CategoryID, it.CategoryName, it.CategoryPosition = p.CategoryID, p.CategoryName, p.CategoryPosition
+	it.CategoryID, it.CategoryName = p.CategoryID, p.CategoryName
 	it.UnitPrice, it.ImageFileID, it.RequiredAddonIds = p.UnitPrice, p.ImageFileID, p.RequiredAddonIds
 	return it
 }
@@ -97,7 +96,7 @@ func (s *Service) CatalogChanges(ctx context.Context, versionID uuid.UUID) (Cata
 	for _, id := range st.used() {
 		it := st.items[id]
 		f, exists := st.catalog[id]
-		c := CatalogChange{VariantID: id, ProductID: it.ProductID, Snapshot: snapshotOf(it), Before: st.values(it), Effect: "0.00"}
+		c := CatalogChange{VariantID: id, ProductID: it.ProductID, Snapshot: st.live.snapshotOf(it), Before: st.values(it), Effect: "0.00"}
 		if !exists {
 			c.Deleted, c.Fields = true, []string{}
 			out.Items = append(out.Items, c)
@@ -232,9 +231,7 @@ func updateParams(p store.InsertItemParams) store.UpdateItemParams {
 	return store.UpdateItemParams{
 		ProductID: p.ProductID, ProductName: p.ProductName, VariantName: p.VariantName, ModelNumber: p.ModelNumber,
 		Sku: p.Sku, ProductTypeID: p.ProductTypeID, ProductTypeKey: p.ProductTypeKey, ProductTypeName: p.ProductTypeName,
-		ProductTypeAbbreviation: p.ProductTypeAbbreviation, ProductTypeColor: p.ProductTypeColor,
-		ProductTypePosition: p.ProductTypePosition, CategoryID: p.CategoryID, CategoryName: p.CategoryName,
-		CategoryPosition: p.CategoryPosition, UnitPrice: p.UnitPrice, ImageFileID: p.ImageFileID,
+		CategoryID: p.CategoryID, CategoryName: p.CategoryName, UnitPrice: p.UnitPrice, ImageFileID: p.ImageFileID,
 		RequiredAddonIds: p.RequiredAddonIds, VersionID: p.VersionID, VariantID: p.VariantID,
 	}
 }

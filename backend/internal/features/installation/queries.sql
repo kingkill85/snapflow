@@ -1,11 +1,12 @@
 -- Every query of this feature runs in database.InScope: row-level security
 -- limits it to the tenants the caller may see.
 
--- NextSeq reserves the next sequence of a version and document kind.
+-- NextSeq reserves the next sequence of a version and document kind (all
+-- kinds, proposals included: installation owns the table, D456).
 -- name: NextSeq :one
-INSERT INTO generated_document_counters (version_id, kind, tenant_id, last_seq)
+INSERT INTO document_counters (version_id, kind, tenant_id, last_seq)
 VALUES (sqlc.arg(version_id), sqlc.arg(kind), sqlc.arg(tenant_id), 1)
-ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = generated_document_counters.last_seq + 1
+ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = document_counters.last_seq + 1
 RETURNING last_seq;
 
 -- name: InsertDocument :one

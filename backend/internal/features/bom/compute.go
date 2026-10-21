@@ -167,9 +167,9 @@ func sameID(a, b *uuid.UUID) bool {
 }
 
 // order settles one position (and one shown snapshot) per product type and
-// per category, so a catalog reorder between two snapshots never splits a
-// group: the live catalog position when a used variant of it still exists,
-// else the newest snapshot's (D244).
+// per category: the live catalog position of the system and category, last
+// for a deleted one (D456, amends D244); the newest snapshot gives the
+// group header's frozen name.
 type order struct {
 	types, cats map[uuid.UUID]int32
 	// typeItem and catItem are the newest snapshot of each, whose names and
@@ -185,19 +185,11 @@ func (st *state) order() order {
 	for _, it := range st.items {
 		if prev, ok := o.typeItem[it.ProductTypeID]; !ok || newer(it, prev) {
 			o.typeItem[it.ProductTypeID] = it
-			o.types[it.ProductTypeID] = it.ProductTypePosition
+			o.types[it.ProductTypeID] = st.live.typePosition(it.ProductTypeID)
 		}
 		if prev, ok := o.catItem[it.CategoryID]; !ok || newer(it, prev) {
 			o.catItem[it.CategoryID] = it
-			o.cats[it.CategoryID] = it.CategoryPosition
-		}
-	}
-	for _, f := range st.catalog {
-		if _, ok := o.types[f.ProductType.ID]; ok {
-			o.types[f.ProductType.ID] = f.ProductType.SortOrder
-		}
-		if _, ok := o.cats[f.Category.ID]; ok {
-			o.cats[f.Category.ID] = f.Category.SortOrder
+			o.cats[it.CategoryID] = st.live.categoryPosition(it.CategoryID)
 		}
 	}
 	return o
@@ -299,7 +291,7 @@ func (st *state) bom() BOM {
 			kind = KindAddOn
 		}
 		variantID, productID := it.VariantID, it.ProductID
-		snap := snapshotOf(it)
+		snap := st.live.snapshotOf(it)
 		status := st.status(it)
 		line := BOMLine{
 			Key: it.VariantID.String(), Kind: kind, VariantID: &variantID, ProductID: &productID, Snapshot: &NullableItemSnapshot{ItemSnapshot: snap},
@@ -313,13 +305,13 @@ func (st *state) bom() BOM {
 
 		if group == nil || group.ProductType.ID != it.ProductTypeID {
 			closeGroup()
-			pt := snapshotOf(ord.typeItem[it.ProductTypeID]).ProductType
+			pt := st.live.snapshotOf(ord.typeItem[it.ProductTypeID]).ProductType
 			group = &BOMGroup{Kind: "productType", ProductType: &NullableSnapshotProductType{SnapshotProductType: pt}, Categories: []BOMCategoryGroup{}, Lines: []string{}}
 			groupSum, convGroupSum = money.Zero, money.Zero
 		}
 		if n := len(group.Categories); n == 0 || group.Categories[n-1].Category.ID != it.CategoryID {
 			closeCat()
-			group.Categories = append(group.Categories, BOMCategoryGroup{Category: snapshotOf(ord.catItem[it.CategoryID]).Category, Lines: []string{}})
+			group.Categories = append(group.Categories, BOMCategoryGroup{Category: st.live.snapshotOf(ord.catItem[it.CategoryID]).Category, Lines: []string{}})
 			catSum, convCatSum = money.Zero, money.Zero
 		}
 		c := &group.Categories[len(group.Categories)-1]

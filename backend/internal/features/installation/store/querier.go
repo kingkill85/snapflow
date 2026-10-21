@@ -27,7 +27,8 @@ type Querier interface {
 	ListGroupAddresses(ctx context.Context, versionID uuid.UUID) ([]GroupAddress, error)
 	// Every query of this feature runs in database.InScope: row-level security
 	// limits it to the tenants the caller may see.
-	// NextSeq reserves the next sequence of a version and document kind.
+	// NextSeq reserves the next sequence of a version and document kind (all
+	// kinds, proposals included: installation owns the table, D456).
 	NextSeq(ctx context.Context, arg NextSeqParams) (int32, error)
 	ReferencedFiles(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	// UpsertGroupAddress inserts a new group address or renames an existing one

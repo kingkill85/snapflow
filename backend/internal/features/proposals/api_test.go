@@ -23,6 +23,7 @@ import (
 
 	"github.com/kingkill85/snapflow/backend/internal/app/apptest"
 	"github.com/kingkill85/snapflow/backend/internal/features/bom"
+	installationstore "github.com/kingkill85/snapflow/backend/internal/features/installation/store"
 	"github.com/kingkill85/snapflow/backend/internal/features/plans"
 	"github.com/kingkill85/snapflow/backend/internal/features/proposals"
 	"github.com/kingkill85/snapflow/backend/internal/features/proposals/store"
@@ -407,7 +408,9 @@ func TestAccessAndRLS(t *testing.T) {
 	if rows, err := q.ListProposals(ctx, v); err != nil || len(rows) != 0 {
 		t.Errorf("foreign proposals: %v %v", rows, err)
 	}
-	_, err = q.NextSeq(ctx, store.NextSeqParams{VersionID: v, TenantID: acme})
+	// The document counters belong to installation (D456); the proposal
+	// counter row of another tenant is out of reach as well.
+	_, err = installationstore.New(tx).NextSeq(ctx, installationstore.NextSeqParams{VersionID: v, Kind: proposals.KindProposal, TenantID: acme})
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
 		t.Errorf("foreign counter: %v", err)

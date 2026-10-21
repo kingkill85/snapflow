@@ -305,9 +305,9 @@ func (q *Queries) ListGroupAddresses(ctx context.Context, versionID uuid.UUID) (
 
 const nextSeq = `-- name: NextSeq :one
 
-INSERT INTO generated_document_counters (version_id, kind, tenant_id, last_seq)
+INSERT INTO document_counters (version_id, kind, tenant_id, last_seq)
 VALUES ($1, $2, $3, 1)
-ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = generated_document_counters.last_seq + 1
+ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = document_counters.last_seq + 1
 RETURNING last_seq
 `
 
@@ -319,7 +319,8 @@ type NextSeqParams struct {
 
 // Every query of this feature runs in database.InScope: row-level security
 // limits it to the tenants the caller may see.
-// NextSeq reserves the next sequence of a version and document kind.
+// NextSeq reserves the next sequence of a version and document kind (all
+// kinds, proposals included: installation owns the table, D456).
 func (q *Queries) NextSeq(ctx context.Context, arg NextSeqParams) (int32, error) {
 	row := q.db.QueryRow(ctx, nextSeq, arg.VersionID, arg.Kind, arg.TenantID)
 	var last_seq int32
