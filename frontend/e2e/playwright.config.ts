@@ -52,7 +52,7 @@ export default defineConfig({
   projects: [
     { name: 'setup', testDir: '.', testMatch: /global\.setup\.ts/ },
     visual
-      ? { name: 'visual', dependencies: ['setup'], testMatch: /(layout|capabilities-visual|imports-visual|projects-visual|plans-visual|needs-visual|bom-visual|proposals-visual|rates-visual|boards-visual|connections-visual|installation-visual|setup-visual)\.spec\.ts/, use: { storageState: adminStorageState } }
+      ? { name: 'visual', dependencies: ['setup'], testMatch: /(layout|capabilities-visual|imports-visual|projects-visual|plans-visual|needs-visual|bom-visual|proposals-visual|rates-visual|boards-visual|bus-lines|connections-visual|findings-visual|installation-visual|setup-visual)\.spec\.ts/, use: { storageState: adminStorageState } }
       : { name: 'chromium', dependencies: ['setup'], grepInvert: /@visual/, use: { storageState: adminStorageState } },
   ],
   webServer: [

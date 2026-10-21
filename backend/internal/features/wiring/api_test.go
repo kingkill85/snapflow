@@ -165,15 +165,20 @@ func setup(t *testing.T, pair ...bool) world {
 	return w
 }
 
-func (w world) floorplan(t *testing.T) uuid.UUID {
+// floorplan creates a floorplan named "Ground" (or name).
+func (w world) floorplan(t *testing.T, name ...string) uuid.UUID {
 	t.Helper()
+	planName := "Ground"
+	if len(name) > 0 {
+		planName = name[0]
+	}
 	var png1 bytes.Buffer
 	if err := png.Encode(&png1, image.NewNRGBA(image.Rect(0, 0, 10, 10))); err != nil {
 		t.Fatal(err)
 	}
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
-	_ = mw.WriteField("name", "Ground")
+	_ = mw.WriteField("name", planName)
 	part, _ := mw.CreateFormFile("image", "plan.png")
 	_, _ = part.Write(png1.Bytes())
 	_ = mw.Close()

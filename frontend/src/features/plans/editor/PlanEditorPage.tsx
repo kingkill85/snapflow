@@ -170,6 +170,9 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   const [params, setParams] = useSearchParams()
   const selectParam = params.get('select')
   const focusParam = params.get('focus')
+  // The pending focus attempt stops when the editor closes (not when the params are dropped below).
+  const stopFocus = useRef<(() => void) | null>(null)
+  useEffect(() => () => stopFocus.current?.(), [])
   useEffect(() => {
     if (!selectParam) return
     const d = docRef.current
@@ -178,7 +181,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       dispatchEditor({ type: 'select', ids: [selectionFor(selectParam, d)] })
       setTab('inspector')
       // &focus=template (the Needs tab's "Apply a room template"): focus the zone's template picker once it is shown.
-      if (focusParam === 'template') focusWhenShown(templatePickerId)
+      if (focusParam === 'template') stopFocus.current = focusWhenShown(templatePickerId)
     }
     setParams(
       (p) => {
@@ -697,7 +700,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : canvasArea}</div>
         <aside ref={setPanel} aria-label={t('panel.label')} className="relative flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
-          <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
+          <Tabs label={t('panel.label')} size="sm" tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
       <CalibrateDialog

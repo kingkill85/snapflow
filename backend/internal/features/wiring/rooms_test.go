@@ -3,6 +3,7 @@ package wiring_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -72,6 +73,7 @@ func TestRooms(t *testing.T) {
 	if o := got[2]; o.ZoneID != nil || o.Name != "" || o.Status != "covered" || o.Units != 1 || o.ConnectedUnits != 1 || o.Needs[0].Label != "Terrace" {
 		t.Fatalf("outside %+v", o)
 	}
+	sameAsChecks(t, r, w.checks(t))
 	if tt := r.Totals; tt.Needs != 2 || tt.Units != 4 || tt.ConnectedUnits != 3 || tt.PowerW != "130.00" {
 		t.Fatalf("totals %+v", tt)
 	}
@@ -88,4 +90,89 @@ func TestRooms(t *testing.T) {
 	// Other tenants do not see the version.
 	other := api.NewUser(api.NewTenant("Other"), auth.RoleUser)
 	want(t, api.Get(w.url("/rooms"), other.Cookie), http.StatusNotFound, "")
+}
+
+// sameAsChecks: every room's counts and status equal the checks' zone, and
+// the totals the checks' counts (one coverage rule, D455).
+func sameAsChecks(t *testing.T, r wiring.Rooms, c wiring.Checks) {
+	t.Helper()
+	type key struct{ plan, zone uuid.UUID }
+	zones := map[key]wiring.ZoneStatus{}
+	for _, z := range c.Zones {
+		k := key{plan: z.PlanID}
+		if z.ZoneID != nil {
+			k.zone = *z.ZoneID
+		}
+		zones[k] = z
+	}
+	n := 0
+	for _, p := range r.Plans {
+		for _, room := range p.Rooms {
+			n++
+			k := key{plan: p.PlanID}
+			if room.ZoneID != nil {
+				k.zone = *room.ZoneID
+			}
+			z, ok := zones[k]
+			if !ok || z.Units != room.Units || z.ConnectedUnits != room.ConnectedUnits || z.Status != room.Status {
+				t.Fatalf("room %+v, checks zone %+v", room, z)
+			}
+		}
+	}
+	if n != len(c.Zones) || r.Totals.Units != c.Counts.Units || r.Totals.ConnectedUnits != c.Counts.ConnectedUnits {
+		t.Fatalf("rooms %+v, checks %+v", r.Totals, c.Counts)
+	}
+}
+
+// TestRoomsErrorsReadOnlyAndNoZones: a connection with an error does not
+// count (D412) in the rooms nor the checks; a floorplan without zones has no
+// rooms; a completed project cannot be updated.
+func TestRoomsErrorsReadOnlyAndNoZones(t *testing.T) {
+	w := setup(t)
+	api, cookie := w.api, w.user.Cookie
+	rooms := func() wiring.Rooms {
+		t.Helper()
+		resp := api.Get(w.url("/rooms"), cookie)
+		want(t, resp, http.StatusOK, "")
+		return decode[wiring.Rooms](t, resp)
+	}
+	want(t, api.Post(w.url("/connections"), cookie, w.connect(2, 1)), http.StatusCreated, "")
+	r := rooms()
+	if k := r.Plans[0].Rooms[0]; k.ConnectedUnits != 2 || k.Status != "partial" {
+		t.Fatalf("kitchen %+v", k)
+	}
+	sameAsChecks(t, r, w.checks(t))
+
+	// 2 × 60 W on a 100 W channel: the connection is overloaded (an error).
+	c := decode[plans.PlanContent](t, api.Get("/api/plans/"+w.floor.String()+"/content", cookie))
+	want(t, api.Put("/api/plans/"+w.floor.String()+"/content", cookie, map[string]any{
+		"expectedContentUpdatedAt": c.ContentUpdatedAt, "scale": nil, "placements": []any{},
+		"zones": []any{map[string]any{"id": w.zone, "name": "Kitchen", "color": "#aabbcc", "opacity": 0.3, "points": [][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}}},
+		"needs": []any{map[string]any{"id": w.need, "zoneId": w.zone, "functionTypeId": w.light, "quantity": 3, "powerW": "60", "loadTypeId": w.led,
+			"label": "Spots", "note": "", "x": nil, "y": nil}},
+	}), http.StatusOK, "")
+	second := w.floorplan(t, "Upper")
+
+	r = rooms()
+	if k := r.Plans[0].Rooms[0]; k.ConnectedUnits != 0 || k.Status != "missing" || k.Needs[0].ConnectedUnits != 0 {
+		t.Fatalf("kitchen with an overloaded connection %+v", k)
+	}
+	checks := w.checks(t)
+	if checks.Counts.Errors == 0 {
+		t.Fatalf("no error for the overloaded channel: %+v", checks.Findings)
+	}
+	sameAsChecks(t, r, checks)
+	if len(r.Plans) != 2 || r.Plans[1].PlanID != second || len(r.Plans[1].Rooms) != 0 {
+		t.Fatalf("plans %+v", r.Plans)
+	}
+
+	p := decode[struct {
+		Name      string
+		UpdatedAt time.Time
+	}](t, api.Get("/api/projects/"+w.project.String(), cookie))
+	want(t, api.Put("/api/projects/"+w.project.String(), cookie, map[string]any{
+		"name": p.Name, "status": "completed", "expectedUpdatedAt": p.UpdatedAt}), http.StatusOK, "")
+	if r := rooms(); r.Can.Update {
+		t.Fatal("a completed project can be updated")
+	}
 }

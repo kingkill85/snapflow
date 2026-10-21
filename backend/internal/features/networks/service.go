@@ -228,8 +228,12 @@ func (s *Service) DeleteBusLine(ctx context.Context, versionID, id uuid.UUID) er
 		// devices would be without a line until the next plan save. The
 		// lines and items as of this transaction (the version is locked;
 		// content saves create default lines under LockVersionLines), the
-		// catalog from the snapshot (D243): items of variants unknown to
-		// it (placed after the read) do not count.
+		// catalog from the snapshot (D243): an item whose variant the
+		// snapshot did not load (placed by a save committed between the
+		// read and the lock) counts as a possible device of the system, to
+		// be safe (like an assignment made after the read for in_use). Not
+		// covered by a test: the API offers no point between the snapshot
+		// and the lock to place such an item.
 		if err := q.LockVersionLines(ctx, versionID); err != nil {
 			return err
 		}
@@ -258,6 +262,10 @@ func (s *Service) DeleteBusLine(ctx context.Context, versionID, id uuid.UUID) er
 			for _, p := range planItems {
 				for _, it := range p.Items {
 					if it.VariantID == nil {
+						continue
+					}
+					if !st.loaded[*it.VariantID] {
+						devices++
 						continue
 					}
 					if v, ok := st.variants[*it.VariantID]; ok && v.ProductType.Topology == TopologyBus && v.ProductType.ID == system {

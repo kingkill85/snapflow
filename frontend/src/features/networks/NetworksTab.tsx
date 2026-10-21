@@ -309,7 +309,7 @@ function BusSystemSection({
               lines={system.lines}
               first={index === 0}
               last={index === system.lines.length - 1}
-              lastWithDevices={system.lines.length === 1 && (line.members.length > 0 || system.unassigned.length > 0)}
+              lastWithDevices={system.lines.length === 1 && line.members.length > 0}
               actions={actions}
               onAssign={assignLine ? () => assignLine(line.id) : null}
               assignBusy={assignBusy}

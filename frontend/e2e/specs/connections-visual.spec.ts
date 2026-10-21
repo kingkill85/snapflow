@@ -34,7 +34,7 @@ const labels = {
     preview: 'Vorschau',
     apply: 'Übernehmen',
     undo: 'Automatisches Verbinden rückgängig',
-    inspector: 'Eigenschaften',
+    inspector: 'Details',
     zones: 'Zonen',
     saved: 'Gespeichert',
     connectChannel: /^Bedarf mit .* verbinden$/,

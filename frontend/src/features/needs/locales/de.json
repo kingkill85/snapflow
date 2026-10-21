@@ -5,10 +5,6 @@
     "power": "{{power}} W",
     "unknown": "Unbekannte Funktion"
   },
-  "totals_one": "{{count}} Stück",
-  "totals_other": "{{count}} Stück",
-  "totalsPower_one": "{{count}} Stück · {{power}} W",
-  "totalsPower_other": "{{count}} Stück · {{power}} W",
   "rooms": {
     "title": "Räume",
     "description": "Jede Zone der Grundrisse mit ihrem Bedarf und wie viele seiner Einheiten angeschlossen sind. Bedarf ist kein Produkt und erscheint nie in der Stückliste.",
@@ -29,7 +25,7 @@
       "covered": "Alles angeschlossen",
       "partial": "Teilweise offen",
       "missing": "Nichts angeschlossen",
-      "none": "Kein Bedarf"
+      "none": "Noch kein Bedarf"
     },
     "openEditor": "Im Editor öffnen",
     "openEditorFor": "{{name}} im Editor öffnen",

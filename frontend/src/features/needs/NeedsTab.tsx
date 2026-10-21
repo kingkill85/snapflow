@@ -12,6 +12,9 @@ import { useLocalized } from '@/i18n/localized'
 
 import { hasPower, useFormatWatts, useNeedText } from './format'
 
+/** A function type deleted from the catalog comes without a name: shown as "Unknown function". */
+const named = (name: Record<string, string>) => (Object.keys(name).length > 0 ? name : undefined)
+
 /** Needs and connections change in the editors and on the Checks tab: fetched on every visit. */
 const everyVisit = { staleTime: 0, refetchOnMount: 'always' } as const
 
@@ -45,9 +48,7 @@ export function NeedsTab({ projectId, versionId }: { projectId: string; versionI
       <Totals totals={rooms.totals} functionTypes={rooms.functionTypes} />
 
       {applied != null && (
-        <Notice tone="success">
-          <span role="status">{t('rooms.applied', { count: applied })}</span>
-        </Notice>
+        <Notice tone="success">{t('rooms.applied', { count: applied })}</Notice>
       )}
 
       {rooms.plans.map((plan) => (
@@ -113,7 +114,7 @@ function Totals({ totals, functionTypes }: { totals: RoomCounts; functionTypes: 
           {functionTypes.map((f) => (
             <li key={f.functionType.id}>
               <Badge wrap>
-                {localize(f.functionType.name)}: {t('rooms.connected', { connected: f.counts.connectedUnits, units: f.counts.units })}
+                {named(f.functionType.name) ? localize(f.functionType.name) : t('line.unknown')}: {t('rooms.connected', { connected: f.counts.connectedUnits, units: f.counts.units })}
               </Badge>
             </li>
           ))}
@@ -180,7 +181,7 @@ function RoomRow({ room, path, canUpdate, onAutoConnect }: { room: Room; path: s
         </h3>
         <span className="flex flex-wrap items-center gap-2 text-sm">
           {room.units > 0 && <span className="text-muted tabular-nums">{t('rooms.connected', { connected: room.connectedUnits, units: room.units })}</span>}
-          <Badge variant={room.status === 'none' ? 'neutral' : statusTone(room.status)}>{t(`rooms.status.${room.status}`)}</Badge>
+          {room.status !== 'none' && <Badge variant={statusTone(room.status)}>{t(`rooms.status.${room.status}`)}</Badge>}
         </span>
       </div>
 
@@ -189,7 +190,7 @@ function RoomRow({ room, path, canUpdate, onAutoConnect }: { room: Room; path: s
           {room.needs.map((n) => (
             <li key={n.id} className="min-w-0 max-w-full">
               <Badge wrap variant={n.connectedUnits >= n.quantity ? 'neutral' : 'warning'}>
-                {needText({ quantity: n.quantity, functionTypeName: n.functionType.name, powerW: n.powerW, label: n.label })}
+                {needText({ quantity: n.quantity, functionTypeName: named(n.functionType.name), powerW: n.powerW, label: n.label })}
                 {n.connectedUnits < n.quantity && <span className="sr-only">{t('rooms.connected', { connected: n.connectedUnits, units: n.quantity })}</span>}
               </Badge>
             </li>
@@ -215,7 +216,14 @@ function RoomRow({ room, path, canUpdate, onAutoConnect }: { room: Room; path: s
           </Button>
         )}
         {open && canUpdate && (
-          <Button variant="secondary" size="sm" onClick={onAutoConnect} aria-label={room.zoneId ? t('rooms.autoConnectFor', { name }) : t('rooms.autoConnectAll')}>
+          <Button
+            variant="secondary"
+            size="sm"
+            // The whole-version label is long: on a phone it wraps inside the card instead of running past it.
+            className="h-auto min-h-8 max-w-full py-1 text-left whitespace-normal"
+            onClick={onAutoConnect}
+            aria-label={room.zoneId ? t('rooms.autoConnectFor', { name }) : t('rooms.autoConnectAll')}
+          >
             <Plug aria-hidden />
             {room.zoneId ? t('rooms.autoConnect') : t('rooms.autoConnectAll')}
           </Button>

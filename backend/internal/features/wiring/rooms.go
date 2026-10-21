@@ -7,6 +7,7 @@ package wiring
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 
@@ -76,27 +77,15 @@ type Rooms struct {
 	Can           ConnectionActions   `json:"can"`
 }
 
-func newCounts() RoomCounts { return RoomCounts{PowerW: watts.Sum{}.String()} }
-
 func (c *RoomCounts) add(n RoomNeed) {
 	c.Needs++
 	c.Units += int64(n.Quantity)
 	c.ConnectedUnits += n.ConnectedUnits
 	c.sum.Add(n.Quantity, n.PowerW)
-	c.PowerW = c.sum.String()
 }
 
-func roomStatus(units, connected int64) string {
-	switch {
-	case units == 0:
-		return "none"
-	case connected >= units:
-		return "covered"
-	case connected > 0:
-		return "partial"
-	}
-	return "missing"
-}
+// done writes the power sum.
+func (c *RoomCounts) done() { c.PowerW = c.sum.String() }
 
 // Rooms returns the room overview of a version (projects.read).
 func (s *Service) Rooms(ctx context.Context, versionID uuid.UUID) (Rooms, error) {
@@ -121,86 +110,49 @@ func (s *Service) Rooms(ctx context.Context, versionID uuid.UUID) (Rooms, error)
 	return buildRooms(sn, ftRef, order, ConnectionActions{Update: actor.Can(auth.PermProjectsWrite) && sn.ref.Writable()}), nil
 }
 
-// buildRooms is the pure part of Rooms. Connected units count like the
-// zone coverage of the checks (D412): only connections without errors, each
-// need up to its quantity (circuits and partial units add their units).
+// buildRooms is the pure part of Rooms: the zone coverage the checks use
+// (D412, D455), with the function types named.
 func buildRooms(sn *snapshot, ftRef map[uuid.UUID]RoomFunctionType, ftOrder []uuid.UUID, can ConnectionActions) Rooms {
 	st := sn.st
-	broken := map[uuid.UUID]bool{}
-	for _, p := range st.evaluate() {
-		if p.Severity == SeverityError {
-			for _, id := range p.Conns {
-				broken[id] = true
-			}
+	ref := func(id uuid.UUID) RoomFunctionType {
+		if f, ok := ftRef[id]; ok {
+			return f
 		}
+		return RoomFunctionType{ID: id, Key: st.cat.FunctionKey[id], Name: i18n.Text{}}
 	}
-	out := Rooms{VersionID: sn.ref.ID, Plans: []RoomPlan{}, Totals: newCounts(), FunctionTypes: []RoomFunctionTotal{}, Can: can}
+	out := Rooms{VersionID: sn.ref.ID, Plans: []RoomPlan{}, FunctionTypes: []RoomFunctionTotal{}, Can: can}
 	byFT := map[uuid.UUID]*RoomCounts{}
-	for _, p := range sn.data.Plans {
-		if p.Kind != "floorplan" {
-			continue
-		}
-		plan := RoomPlan{PlanID: p.ID, Name: p.Name, Rooms: []Room{}}
-		index := map[uuid.UUID]int{}
-		for _, z := range p.Zones {
-			id := z.ID
-			index[id] = len(plan.Rooms)
-			plan.Rooms = append(plan.Rooms, Room{PlanID: p.ID, ZoneID: &id, Name: z.Name, ShortName: z.ShortName, Needs: []RoomNeed{}})
-		}
-		outside := Room{PlanID: p.ID, Needs: []RoomNeed{}}
-		for _, n := range p.Needs {
-			good := int64(0)
-			for _, c := range st.byNeed[NeedKey{p.ID, n.ID}] {
-				if !broken[c.ID] {
-					good += int64(c.Units)
+	var unlisted []uuid.UUID
+	for _, pc := range zoneCoverage(sn, brokenConnections(st.evaluate())) {
+		plan := RoomPlan{PlanID: pc.PlanID, Name: pc.Name, Rooms: make([]Room, 0, len(pc.Rooms))}
+		for _, rc := range pc.Rooms {
+			room := Room{PlanID: pc.PlanID, ZoneID: rc.ZoneID, Name: rc.Name, ShortName: rc.ShortName, Needs: make([]RoomNeed, 0, len(rc.Needs)),
+				Units: rc.Units, ConnectedUnits: rc.Good, Status: rc.Status}
+			for _, nc := range rc.Needs {
+				n := nc.Need
+				need := RoomNeed{ID: n.ID, FunctionType: ref(n.FunctionTypeID), Quantity: n.Quantity, PowerW: watts.FormatPtr(n.PowerW), Label: n.Label,
+					ConnectedUnits: nc.Good}
+				room.Needs = append(room.Needs, need)
+				out.Totals.add(need)
+				c := byFT[n.FunctionTypeID]
+				if c == nil {
+					c = &RoomCounts{}
+					byFT[n.FunctionTypeID] = c
+					if _, ok := ftRef[n.FunctionTypeID]; !ok {
+						unlisted = append(unlisted, n.FunctionTypeID)
+					}
 				}
+				c.add(need)
 			}
-			ft, ok := ftRef[n.FunctionTypeID]
-			if !ok {
-				ft = RoomFunctionType{ID: n.FunctionTypeID, Key: st.cat.FunctionKey[n.FunctionTypeID], Name: i18n.Text{}}
-			}
-			need := RoomNeed{ID: n.ID, FunctionType: ft, Quantity: n.Quantity, PowerW: watts.FormatPtr(n.PowerW), Label: n.Label,
-				ConnectedUnits: min(good, int64(n.Quantity))}
-			room := &outside
-			// A need of a zone removed meanwhile counts as outside.
-			if n.ZoneID != nil {
-				if i, ok := index[*n.ZoneID]; ok {
-					room = &plan.Rooms[i]
-				}
-			}
-			room.Needs = append(room.Needs, need)
-			room.Units += int64(n.Quantity)
-			room.ConnectedUnits += need.ConnectedUnits
-			out.Totals.add(need)
-			if byFT[n.FunctionTypeID] == nil {
-				c := newCounts()
-				byFT[n.FunctionTypeID] = &c
-			}
-			byFT[n.FunctionTypeID].add(need)
-		}
-		if len(outside.Needs) > 0 {
-			plan.Rooms = append(plan.Rooms, outside)
-		}
-		for i := range plan.Rooms {
-			r := &plan.Rooms[i]
-			r.Status = roomStatus(r.Units, r.ConnectedUnits)
+			plan.Rooms = append(plan.Rooms, room)
 		}
 		out.Plans = append(out.Plans, plan)
 	}
-	seen := map[uuid.UUID]bool{}
-	for _, id := range ftOrder {
+	out.Totals.done()
+	for _, id := range append(slices.Clone(ftOrder), unlisted...) {
 		if c := byFT[id]; c != nil {
-			seen[id] = true
-			out.FunctionTypes = append(out.FunctionTypes, RoomFunctionTotal{FunctionType: ftRef[id], Counts: *c})
-		}
-	}
-	for _, p := range sn.data.Plans {
-		for _, n := range p.Needs {
-			if c := byFT[n.FunctionTypeID]; c != nil && !seen[n.FunctionTypeID] {
-				seen[n.FunctionTypeID] = true
-				ft := RoomFunctionType{ID: n.FunctionTypeID, Key: st.cat.FunctionKey[n.FunctionTypeID], Name: i18n.Text{}}
-				out.FunctionTypes = append(out.FunctionTypes, RoomFunctionTotal{FunctionType: ft, Counts: *c})
-			}
+			c.done()
+			out.FunctionTypes = append(out.FunctionTypes, RoomFunctionTotal{FunctionType: ref(id), Counts: *c})
 		}
 	}
 	return out

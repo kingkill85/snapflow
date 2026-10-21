@@ -17,6 +17,8 @@ export type Attribute = {
   required?: boolean
   unit?: string
   scope?: 'product' | 'variant'
+  /** The catalog field this attribute fills (capabilities). */
+  fieldKey?: string
   min?: number
   max?: number
   itemType?: 'text' | 'number' | 'integer' | 'boolean' | 'enum'
@@ -369,7 +371,7 @@ export class Api {
     planId: string,
     content: {
       zones?: PlanContent['zones']
-      placements: { variantId: string; x: number; y: number; existing?: boolean }[]
+      placements: { variantId: string; x: number; y: number; existing?: boolean; label?: string; addonVariantIds?: string[] }[]
       /** Needs as `PlanContent['needs']` without ids and defaults: `{ functionTypeId, quantity, zoneId | x/y, ... }`. */
       needs?: (Partial<PlanContent['needs'][number]> & { functionTypeId: string })[]
     },

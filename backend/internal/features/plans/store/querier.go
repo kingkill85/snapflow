@@ -85,7 +85,8 @@ type Querier interface {
 	// clock tick) and sets the scale.
 	TouchContent(ctx context.Context, arg TouchContentParams) (time.Time, error)
 	UpdatePlan(ctx context.Context, arg UpdatePlanParams) error
-	// VersionNeeds returns the needs of a version's plans (the needs summary).
+	// VersionNeeds returns the needs of a version's plans (WiringData: the
+	// wiring feature's checks and room overview).
 	VersionNeeds(ctx context.Context, versionID uuid.UUID) ([]VersionNeedsRow, error)
 	WiringModules(ctx context.Context, versionID uuid.UUID) ([]WiringModulesRow, error)
 	WiringPlacements(ctx context.Context, versionID uuid.UUID) ([]WiringPlacementsRow, error)

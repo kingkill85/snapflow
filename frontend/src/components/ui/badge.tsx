@@ -1,9 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { ReactNode } from 'react'
 
-import { cn } from '@/lib/cn'
-
-const badgeVariants = cva('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap [&_svg]:size-3.5', {
+const badgeVariants = cva('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium [&_svg]:size-3.5', {
   variants: {
     variant: {
       neutral: 'border-line bg-canvas text-muted',
@@ -13,7 +11,7 @@ const badgeVariants = cva('inline-flex items-center gap-1 rounded-full border px
       danger: 'border-danger/30 bg-danger/10 text-danger',
     },
     /** Long texts (a need chip) wrap inside the badge instead of widening the page. */
-    wrap: { true: 'max-w-full whitespace-normal break-words', false: '' },
+    wrap: { true: 'max-w-full whitespace-normal break-words', false: 'whitespace-nowrap' },
   },
   defaultVariants: { variant: 'neutral', wrap: false },
 })
@@ -26,7 +24,7 @@ type BadgeProps = VariantProps<typeof badgeVariants> & {
 
 export function Badge({ variant, wrap, title, children }: BadgeProps) {
   return (
-    <span className={cn(badgeVariants({ variant, wrap }))} title={title}>
+    <span className={badgeVariants({ variant, wrap })} title={title}>
       {children}
       {title && <span className="sr-only">{title}</span>}
     </span>

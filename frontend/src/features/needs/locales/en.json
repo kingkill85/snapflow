@@ -5,10 +5,6 @@
     "power": "{{power}} W",
     "unknown": "Unknown function"
   },
-  "totals_one": "{{count}} unit",
-  "totals_other": "{{count}} units",
-  "totalsPower_one": "{{count}} unit · {{power}} W",
-  "totalsPower_other": "{{count}} units · {{power}} W",
   "rooms": {
     "title": "Rooms",
     "description": "Every zone of the floorplans with its needs and how many of their units are connected. Needs are not products and never appear in the bill of materials.",
@@ -29,7 +25,7 @@
       "covered": "All connected",
       "partial": "Some missing",
       "missing": "None connected",
-      "none": "No needs"
+      "none": "No needs yet"
     },
     "openEditor": "Open in editor",
     "openEditorFor": "Open {{name}} in the editor",

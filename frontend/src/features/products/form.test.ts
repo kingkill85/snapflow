@@ -27,6 +27,7 @@ const product = (overrides: Partial<ProductFormValues> = {}): ProductFormValues 
   keep: {},
   price: '',
   sku: '',
+  variantValues: {},
   ...overrides,
 })
 
