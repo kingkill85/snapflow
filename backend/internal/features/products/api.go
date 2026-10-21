@@ -133,10 +133,10 @@ func Register(api huma.API, svc *Service) {
 		Method:        http.MethodPost,
 		Path:          "/api/products",
 		Summary:       "Create a product",
-		Description:   "Without variants; add them with createVariant.",
+		Description:   "With firstVariant the product and that variant are created in one transaction; without it the product has no variants (add them with createVariant).",
 		Tags:          []string{tag},
 		DefaultStatus: http.StatusCreated,
-	}, func(ctx context.Context, in *struct{ Body ProductInput }) (*productOutput, error) {
+	}, func(ctx context.Context, in *struct{ Body ProductCreate }) (*productOutput, error) {
 		p, err := svc.Create(ctx, in.Body)
 		if err != nil {
 			return nil, err

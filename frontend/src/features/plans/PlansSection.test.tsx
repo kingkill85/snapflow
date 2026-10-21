@@ -39,8 +39,16 @@ describe('PlansSection', () => {
   it('shows the empty state and no actions when read-only', async () => {
     servePlans([])
     renderWithProviders(<PlansSection projectId={projectId} versionId={versionId} canWrite={false} />)
-    expect(await screen.findByText('No plans yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Start with a floorplan (an image of the building) or a distribution board.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add plan' })).not.toBeInTheDocument()
+  })
+
+  it('offers the add buttons in the empty state, not twice', async () => {
+    servePlans([])
+    renderWithProviders(<PlansSection projectId={projectId} versionId={versionId} canWrite />)
+    expect(await screen.findByText('Start with a floorplan (an image of the building) or a distribution board.')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Add plan' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Add board' })).toHaveLength(1)
   })
 
   it('hides card actions when read-only', async () => {
@@ -156,7 +164,7 @@ describe('PlansSection', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Delete plan' })
     expect(deleted).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
-    expect(await screen.findByText('No plans yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Start with a floorplan (an image of the building) or a distribution board.')).toBeInTheDocument()
     expect(deleted).toBe(true)
   })
 

@@ -6,7 +6,7 @@
   "new": "Neues Produkt",
   "edit": "Produkt bearbeiten",
   "readOnly": "Sie können dieses Produkt ansehen, aber nicht ändern.",
-  "created": "Produkt erstellt. Fügen Sie unten seine Varianten hinzu.",
+  "created": "Produkt mit seiner ersten Variante erstellt.",
   "showInactive": "Inaktive anzeigen",
   "search": "Suche",
   "searchHint": "Modellnummer, Name oder SKU",
@@ -34,7 +34,9 @@
     "attributes": "Attribute",
     "attributesHint": "Werte der Attribute der Kategorie, die pro Produkt gesetzt werden.",
     "variants": "Varianten",
-    "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör."
+    "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör.",
+    "variant": "Variante",
+    "variantHint": "Werte der Attribute der ersten Variante; weitere Varianten fügen Sie auf der Produktseite hinzu."
   },
   "field": {
     "productType": "System",
@@ -51,7 +53,10 @@
     "name": "Name",
     "description": "Beschreibung",
     "mounting": "Montage",
-    "mountingHint": "Wo dieses Produkt platziert wird; standardmäßig wie seine Kategorie."
+    "mountingHint": "Wo dieses Produkt platziert wird; standardmäßig wie seine Kategorie.",
+    "price": "Preis",
+    "priceHint": "Listenpreis in USD der ersten Variante „Standard“; weitere Varianten nach dem Anlegen",
+    "skuHint": "Optional; im Katalog eindeutig"
   },
   "categoryChange": "Sie haben die Kategorie geändert. Beim Speichern werden die Werte dieses Produkts gegen die Attribute der neuen Kategorie geprüft; Werte, die die neue Kategorie nicht hat, bleiben als Werte gespeichert, die nicht mehr im Schema sind. Die Werte der Varianten werden durch die Änderung nie abgelehnt oder entfernt: Werte, die nicht zur neuen Kategorie passen, werden an den Varianten markiert.",
   "chooseCategoryFirst": "Wählen Sie eine Kategorie, um ihre Attribute auszufüllen.",
@@ -174,5 +179,10 @@
     "moduleTotalsW": "max. {{limits}} für das ganze Modul",
     "systemDefault": "{{text}} (Systemvorgabe)",
     "missing": "Fehlt noch"
+  },
+  "single": {
+    "title": "Preis und Variante",
+    "description": "Die einzige Variante des Produkts. Mit einer zweiten werden die Varianten hier aufgelistet.",
+    "open": "Name und Zubehör"
   }
 }

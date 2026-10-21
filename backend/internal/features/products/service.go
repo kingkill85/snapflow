@@ -214,17 +214,85 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Product, error) {
 	return s.detail(ctx, actor, row)
 }
 
-// Create adds a product (without variants).
-func (s *Service) Create(ctx context.Context, in ProductInput) (Product, error) {
+// Create adds a product and, with in.FirstVariant, its first variant in the
+// same transaction (D449): a refused variant leaves no product.
+func (s *Service) Create(ctx context.Context, in ProductCreate) (Product, error) {
 	actor, err := auth.Require(ctx, auth.PermCatalogWrite)
 	if err != nil {
 		return Product{}, err
 	}
-	row, err := s.createProduct(ctx, in, Known{})
-	if err != nil {
+	if in.FirstVariant == nil {
+		row, err := s.createProduct(ctx, in.ProductInput, Known{})
+		if err != nil {
+			return Product{}, err
+		}
+		return s.detail(ctx, actor, row)
+	}
+	// Product and variant errors come back together, so the form shows all of them in one round.
+	var errs []apperr.FieldError
+	pin, err := s.validateProduct(ctx, in.ProductInput, nil, Known{})
+	var invalid *apperr.Error
+	switch {
+	case err == nil:
+	case errors.As(err, &invalid) && invalid.Code == "validation.failed":
+		errs = append(errs, invalid.Fields...)
+	default:
 		return Product{}, err
 	}
+	fv := *in.FirstVariant
+	vin := VariantInput{Name: fv.Name, SKU: fv.SKU, Price: fv.Price, Attributes: fv.Attributes, IsActive: true}
+	if len(vin.Name.Trimmed()) == 0 {
+		vin.Name = standardVariantName()
+	}
+	// Without a valid category (reported above) the variant attributes cannot be checked; the rest can.
+	var cat categories.Category
+	if c, err := s.cats.Get(ctx, pin.CategoryID); err == nil {
+		cat = c
+	} else if !hasCode(err, "category.not_found") {
+		return Product{}, err
+	} else {
+		vin.Attributes = nil
+	}
+	vin, verrs := NormalizeVariant(cat, vin, nil, "body.firstVariant")
+	errs = append(errs, verrs...)
+	if len(errs) > 0 {
+		return Product{}, apperr.Validation(errs...)
+	}
+	var row store.Product
+	variantFailed := false
+	err = s.inTx(ctx, func(q *store.Queries) error {
+		var err error
+		variantFailed = false
+		row, err = q.CreateProduct(ctx, store.CreateProductParams{
+			ProductTypeID: pin.ProductTypeID, CategoryID: pin.CategoryID, ModelNumber: pin.ModelNumber, Name: pin.Name,
+			Description: textPtr(pin.Description), Attributes: pin.Attributes, IsActive: pin.IsActive, Mounting: mountingPtr(pin.Mounting),
+		})
+		if err != nil {
+			return err
+		}
+		variantFailed = true
+		_, err = q.CreateVariant(ctx, store.CreateVariantParams{
+			ProductID: row.ID, Name: vin.Name, Sku: strPtr(vin.SKU), Price: vin.Price, Attributes: vin.Attributes, IsActive: true,
+		})
+		return err
+	})
+	if err != nil {
+		if variantFailed {
+			return Product{}, mapVariantErr(err, vin, "product.not_found")
+		}
+		return Product{}, mapProductErr(err, pin.ModelNumber)
+	}
 	return s.detail(ctx, actor, row)
+}
+
+// standardVariantName is the first variant's name when none is sent: the
+// word is the same in every content language.
+func standardVariantName() i18n.Text {
+	t := i18n.Text{}
+	for _, l := range i18n.Locales {
+		t[l] = "Standard"
+	}
+	return t
 }
 
 func (s *Service) createProduct(ctx context.Context, in ProductInput, known Known) (store.Product, error) {

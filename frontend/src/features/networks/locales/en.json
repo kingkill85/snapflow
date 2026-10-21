@@ -2,8 +2,9 @@
   "overview": {
     "title": "Networks",
     "description": "Bus lines and wireless gateways of this version. Devices go to the first line or the nearest gateway of their system unless assigned to another one.",
-    "empty": "No bus or wireless devices on the plans of this version yet.",
-    "readOnly": "Read only: assignments cannot be changed here."
+    "empty": "No bus or wireless devices on the plans of this version yet. Place products of a bus or wireless system on a floorplan or board; they appear here.",
+    "readOnly": "Read only: assignments cannot be changed here.",
+    "toPlans": "Go to the plans"
   },
   "columns": {
     "plan": "Plan",
@@ -50,7 +51,9 @@
     "deleteTitle": "Delete line?",
     "deleteMessage": "The line \"{{name}}\" will be deleted. Devices that follow the default move to the first remaining line.",
     "unassigned": "Without line",
-    "unassignedNotice": "These devices have no line yet: the first line is created with the next save of a plan that contains them."
+    "unassignedNotice": "These devices have no line yet: the first line is created with the next save of a plan that contains them.",
+    "needsLine": "These devices need a bus line.",
+    "createLine": "Create line"
   },
   "lineDialog": {
     "newTitle": "New line",

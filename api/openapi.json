@@ -4204,6 +4204,38 @@
         ],
         "type": "object"
       },
+      "FirstVariantInput": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "additionalProperties": {},
+            "description": "Variant-scope values by key",
+            "type": "object"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Left out or empty = \"Standard\" in every content language; otherwise as on createVariant",
+            "type": "object"
+          },
+          "price": {
+            "description": "USD as a decimal string, as on createVariant",
+            "examples": [
+              "27.00"
+            ],
+            "type": "string"
+          },
+          "sku": {
+            "description": "As on createVariant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price"
+        ],
+        "type": "object"
+      },
       "FunctionType": {
         "additionalProperties": false,
         "properties": {
@@ -9083,13 +9115,13 @@
         ],
         "type": "object"
       },
-      "ProductInput": {
+      "ProductCreate": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
-              "https://example.com/api/schemas/ProductInput.json"
+              "https://example.com/api/schemas/ProductCreate.json"
             ],
             "format": "uri",
             "readOnly": true,
@@ -9110,6 +9142,10 @@
             },
             "description": "At most 5000 characters; if set, \"en\" is required",
             "type": "object"
+          },
+          "firstVariant": {
+            "$ref": "#/components/schemas/FirstVariantInput",
+            "description": "The product's first variant, created with it in one transaction; left out = a product without variants (add them with createVariant)"
           },
           "isActive": {
             "type": "boolean"
@@ -16015,13 +16051,13 @@
         ]
       },
       "post": {
-        "description": "Without variants; add them with createVariant.",
+        "description": "With firstVariant the product and that variant are created in one transaction; without it the product has no variants (add them with createVariant).",
         "operationId": "createProduct",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProductInput"
+                "$ref": "#/components/schemas/ProductCreate"
               }
             }
           },

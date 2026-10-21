@@ -127,7 +127,9 @@
   },
   "tab": {
     "title": "Prüfungen",
-    "description": "Ob jeder Bedarf verbunden ist und jeder Verteiler, jede Buslinie und jedes Gateway innerhalb der Grenzen bleibt."
+    "description": "Ob jeder Bedarf verbunden ist und jeder Verteiler, jede Buslinie und jedes Gateway innerhalb der Grenzen bleibt.",
+    "nothing": "Noch nichts zu prüfen. Fügen Sie den Räumen eines Grundrisses Bedarfe und einem Verteiler Geräte hinzu.",
+    "toPlans": "Zu den Plänen"
   },
   "overview": {
     "zones": "Abgedeckte Zonen",
@@ -162,7 +164,7 @@
   "findings": {
     "title": "Befunde",
     "count": "Fehler: {{errors}} · Warnungen: {{warnings}} · Hinweise: {{infos}}",
-    "none": "Nichts zu melden.",
+    "none": "Keine Probleme gefunden.",
     "open": "Öffnen",
     "openFor": "Öffnen: {{text}}",
     "unconnected_one": "{{count}} Bedarf hat nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",

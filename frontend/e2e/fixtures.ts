@@ -17,6 +17,8 @@ export type Attribute = {
   required?: boolean
   unit?: string
   scope?: 'product' | 'variant'
+  /** The catalog field this attribute fills (capabilities). */
+  fieldKey?: string
   min?: number
   max?: number
   itemType?: 'text' | 'number' | 'integer' | 'boolean' | 'enum'
@@ -58,6 +60,8 @@ export type ProductInput = {
   description?: Localized
   attributes?: Record<string, unknown>
   isActive?: boolean
+  /** Create only: the first variant, in the same transaction (D449); left out, the product starts without variants. */
+  firstVariant?: { name?: Localized; sku?: string; price: string; attributes?: Record<string, unknown> }
 }
 export type VariantInput = {
   name: Localized

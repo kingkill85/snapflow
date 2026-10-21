@@ -69,9 +69,8 @@ export async function wiringSeed(api: Api, { systemKey = 'knx' }: { systemKey?: 
   const category = await post('/api/categories', { key: uniqueKey('act'), name: text(unique('Actuators')), isActive: true, mounting: 'board', attributes, instanceAttributes: [] })
   const product = async (name: string, values: Partial<Record<keyof typeof f, number | boolean>>) => {
     const attrs = Object.fromEntries(Object.entries(values).map(([k, v]) => [f[k as keyof typeof f].key, v]))
-    const p = await post('/api/products', { productTypeId: knx.id, categoryId: category.id, modelNumber: uniqueKey('m'), name: text(name), isActive: true, attributes: attrs })
-    const v = await post(`/api/products/${p.id}/variants`, { name: text('Std'), price: '50.00', isActive: true })
-    return { id: p.id, name, variantId: v.id, attrs }
+    const p = await post<Id & { variants: Id[] }>('/api/products', { productTypeId: knx.id, categoryId: category.id, modelNumber: uniqueKey('m'), name: text(name), isActive: true, attributes: attrs, firstVariant: { name: text('Std'), price: '50.00' } })
+    return { id: p.id, name, variantId: p.variants[0].id, attrs }
   }
   const psu = await product(unique('Power supply'), { width: 2, supply: 160 })
   const dimmer = await product(unique('Dimmer'), { width: 4, dimCh: 2, busMa: 30 })

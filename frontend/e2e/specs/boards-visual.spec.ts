@@ -94,9 +94,8 @@ async function seed(api: Api, lang: Lang) {
   const products: Record<string, { productId: string; variantId: string; name: string }> = {}
   const product = async (key: string, t: Named, c: Named, name: { en: string; de: string }, values: Record<string, number | boolean>) => {
     const attributes = Object.fromEntries(Object.entries(values).map(([k, v]) => [f[k as keyof typeof f].key, v]))
-    const p = await post('/api/products', { productTypeId: t.id, categoryId: c.id, modelNumber: uniqueKey(key.slice(0, 4)).toUpperCase(), name, isActive: true, attributes })
-    const v = await post(`/api/products/${p.id}/variants`, { name: L('Standard', 'Standard'), price: '120.00', isActive: true })
-    products[key] = { productId: p.id, variantId: v.id, name: name[lang] }
+    const p = await post<Named & { variants: { id: string }[] }>('/api/products', { productTypeId: t.id, categoryId: c.id, modelNumber: uniqueKey(key.slice(0, 4)).toUpperCase(), name, isActive: true, attributes, firstVariant: { name: L('Standard', 'Standard'), price: '120.00' } })
+    products[key] = { productId: p.id, variantId: p.variants[0].id, name: name[lang] }
     return products[key]
   }
   await product('enclosure', inst, enclosures, L('Surface-mounted enclosure 3 rows × 18 TE', 'Aufputz-Verteiler 3-reihig 18 TE'), { rows: 3, perRow: 18 })

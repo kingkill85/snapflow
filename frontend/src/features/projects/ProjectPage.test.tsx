@@ -47,7 +47,7 @@ describe('ProjectPage', () => {
     expect(screen.getByText('Max Müller, Müller GmbH')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
     expect(screen.getByLabelText('Version')).toHaveTextContent('V1')
-    expect(await screen.findByText('No plans yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Start with a floorplan (an image of the building) or a distribution board.')).toBeInTheDocument()
     expect(screen.queryByRole('status', { name: /completed/ })).not.toBeInTheDocument()
     expect(screen.getByText('Project notes')).toBeInTheDocument()
     expect(screen.getByText('Gate code 1234')).toBeInTheDocument()
@@ -243,5 +243,24 @@ describe('ProjectPage', () => {
     server.use(http.get('/api/projects/:id', () => problem(404, { code: 'project.not_found' })))
     renderWithProviders(routes, { route: `/projects/${villa.id}` })
     expect(await screen.findByText('This project does not exist or you cannot see it.')).toBeInTheDocument()
+  })
+
+  it('splits the Documents tab by audience, the customer first', async () => {
+    serveProject()
+    server.use(
+      http.get('/api/versions/:versionId/proposals', () => HttpResponse.json([])),
+      http.get('/api/versions/:versionId/documents', () => HttpResponse.json([])),
+      http.get('/api/versions/:versionId/addresses', () => HttpResponse.json({ versionId: villa.versions[0].id, items: [], lines: [], can: { update: true } })),
+      http.get('/api/versions/:versionId/bom', () => HttpResponse.json({ lines: [] })),
+      http.get('/api/exporters', () => HttpResponse.json([])),
+    )
+    renderWithProviders(routes, { route: `/projects/${villa.id}/versions/${villa.versions[0].id}?tab=documents` })
+    const customer = await screen.findByRole('region', { name: 'For the customer' })
+    const installer = screen.getByRole('region', { name: 'For the installer' })
+    expect(customer).toHaveTextContent('Proposals with prices for this version.')
+    expect(installer).toHaveTextContent('Manual, channel labels and programming data for the site.')
+    expect(customer.compareDocumentPosition(installer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(customer).getAllByRole('heading', { level: 3 }).length).toBeGreaterThan(0)
+    expect(within(installer).getAllByRole('heading', { level: 3 }).length).toBeGreaterThan(1)
   })
 })

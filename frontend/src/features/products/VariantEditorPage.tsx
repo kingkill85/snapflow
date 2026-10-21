@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
@@ -38,6 +38,7 @@ import {
   Notice,
   Page,
   Section,
+  SectionActions,
   setApiFieldErrors,
   SwitchField,
   toFieldErrors,
@@ -201,10 +202,29 @@ type VariantFormProps = {
   onSaved: (variant: Variant) => void
   onDirtyChange: (dirty: boolean) => void
   onLeave: () => void
+  /**
+   * Shown on the product page as its "Price and variant" section (a product
+   * with one variant, D449): price, SKU, image and the variant's attribute
+   * values in one section with these actions; name and status stay as stored
+   * and are edited on the variant page.
+   */
+  embedded?: { actions: ReactNode }
 }
 
 /** A variant's own fields, image and attribute values (add-ons are saved separately). */
-function VariantForm({ product, item, category, readOnly, dirty, listState, onReload, onSaved, onDirtyChange, onLeave }: VariantFormProps) {
+export function VariantForm({
+  product,
+  item,
+  category,
+  readOnly,
+  dirty,
+  listState,
+  onReload,
+  onSaved,
+  onDirtyChange,
+  onLeave,
+  embedded,
+}: VariantFormProps) {
   const { t } = useTranslation('products')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
@@ -242,7 +262,12 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
   const keep = useWatch({ control: form.control, name: 'keep' })
   const imageFileId = useWatch({ control: form.control, name: 'imageFileId' })
 
-  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
+  // Only a change of isDirty is reported: callers pass inline callbacks, which must not re-fire it every render.
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  })
+  useEffect(() => onDirtyChangeRef.current(isDirty), [isDirty])
 
   const [errorFields, setErrorFields] = useState<ApiFieldMap>()
   const [errorRevision, setErrorRevision] = useState(0)
@@ -324,97 +349,165 @@ function VariantForm({ product, item, category, readOnly, dirty, listState, onRe
   const stale = mutation.error instanceof ApiError && mutation.error.code === 'variant.stale'
   const imageError = image.error ? errorMessage(image.error) : fieldError(errors.imageFileId?.message)
 
-  return (
-    <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
-      {loaded && loaded.isActive && !loaded.available && <Notice tone="warning">{t('variant.productInactive')}</Notice>}
-      <Fieldset disabled={readOnly}>
-        <Section title={t('variant.section.basics')}>
-          <FormTranslatableField
-            control={form.control}
-            name="name"
-            label={t('variant.field.name')}
-            hint={t('variant.field.nameHint')}
-            required
-          />
-          <div className="grid items-start gap-4 sm:grid-cols-2">
-            <Field
-              label={t('variant.field.sku')}
-              hint={t('variant.field.skuHint')}
-              autoComplete="off"
-              error={fieldError(errors.sku?.message)}
-              {...form.register('sku')}
-            />
-            <Field
-              label={t('variant.field.price')}
-              hint={t('variant.field.priceHint')}
-              required
-              suffix={catalogCurrency}
-              inputMode="decimal"
-              autoComplete="off"
-              error={fieldError(errors.price?.message)}
-              {...form.register('price')}
-            />
-          </div>
-          <ImageUpload
-            label={t('variant.field.image')}
-            hint={t('variant.field.imageHint')}
-            src={fileUrl(imageFileId || undefined)}
-            accept={imageTypes.join(',')}
-            pending={image.pending}
-            progress={image.progress}
-            error={imageError}
-            disabled={readOnly}
-            onSelect={(file) => void chooseImage(file)}
-            onRemove={removeImage}
-          />
-          <SwitchField label={t('variant.field.active')} hint={t('variant.field.activeHint')} {...form.register('isActive')} />
-        </Section>
-        <Section title={t('variant.section.attributes')} description={t('variant.section.attributesHint')}>
-          {loaded && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}
-          <AttributeValuesEditor
-            definitions={definitions}
-            values={values}
-            onChange={(key, value) => form.setValue(`values.${key}`, value, { shouldDirty: true })}
-            errors={Object.fromEntries(definitions.map((d) => [d.key, errorAt(`values.${d.key}`)]))}
-            disabled={readOnly}
-          />
-          <ExtraValues
-            entries={extras.map((key) => ({ key, value: stored[key], kept: keep[key] !== false, error: errorAt(`keep.${key}`) }))}
-            onKeptChange={(key, kept) => form.setValue(`keep.${key}`, kept, { shouldDirty: true })}
-            disabled={readOnly}
-          />
-        </Section>
-      </Fieldset>
-      <FormActions
-        error={
-          <ErrorMessage
-            error={mutation.error}
-            fields={errorFields}
-            action={
-              stale && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    // The form restarts: an upload still running is dropped.
-                    image.cancel()
-                    void onReload()
-                  }}
-                >
-                  <RotateCw /> {tCommon('action.reload')}
-                </Button>
-              )
-            }
-          />
-        }
-      >
-        <LeaveLink to={productPath(product.id)} state={listState} dirty={dirty && !readOnly} backLabel={t('variant.backToProduct')} />
-        {!readOnly && (
+  const actionsError = (
+    <ErrorMessage
+      error={mutation.error}
+      fields={errorFields}
+      action={
+        stale && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              // The form restarts: an upload still running is dropped.
+              image.cancel()
+              void onReload()
+            }}
+          >
+            <RotateCw /> {tCommon('action.reload')}
+          </Button>
+        )
+      }
+    />
+  )
+  const formActions = (
+    <FormActions error={actionsError}>
+      <LeaveLink to={productPath(product.id)} state={listState} dirty={dirty && !readOnly} backLabel={t('variant.backToProduct')} />
+      {!readOnly && (
+        <Button type="submit" disabled={mutation.isPending || image.pending}>
+          {loaded ? tCommon('action.update') : tCommon('action.create')}
+        </Button>
+      )}
+    </FormActions>
+  )
+  // Embedded in the product page: the section's own end, not a second sticky bar beside the product form's (D449).
+  const sectionActions = (
+    <>
+      {actionsError}
+      {!readOnly && (
+        <SectionActions>
           <Button type="submit" disabled={mutation.isPending || image.pending}>
             {loaded ? tCommon('action.update') : tCommon('action.create')}
           </Button>
-        )}
-      </FormActions>
+        </SectionActions>
+      )}
+    </>
+  )
+
+  return (
+    <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="space-y-6">
+      {loaded && loaded.isActive && !loaded.available && <Notice tone="warning">{t('variant.productInactive')}</Notice>}
+      {embedded ? (
+        <Fieldset disabled={readOnly}>
+          <Section title={t('single.title')} description={t('single.description')} actions={embedded.actions}>
+            <div className="grid items-start gap-4 sm:grid-cols-2">
+              <Field
+                label={t('variant.field.sku')}
+                hint={t('variant.field.skuHint')}
+                autoComplete="off"
+                error={fieldError(errors.sku?.message)}
+                {...form.register('sku')}
+              />
+              <Field
+                label={t('variant.field.price')}
+                hint={t('variant.field.priceHint')}
+                required
+                suffix={catalogCurrency}
+                inputMode="decimal"
+                autoComplete="off"
+                error={fieldError(errors.price?.message)}
+                {...form.register('price')}
+              />
+            </div>
+            <ImageUpload
+              label={t('variant.field.image')}
+              hint={t('variant.field.imageHint')}
+              src={fileUrl(imageFileId || undefined)}
+              accept={imageTypes.join(',')}
+              pending={image.pending}
+              progress={image.progress}
+              error={imageError}
+              disabled={readOnly}
+              onSelect={(file) => void chooseImage(file)}
+              onRemove={removeImage}
+            />
+            {loaded && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}
+            <AttributeValuesEditor
+              definitions={definitions}
+              values={values}
+              onChange={(key, value) => form.setValue(`values.${key}`, value, { shouldDirty: true })}
+              errors={Object.fromEntries(definitions.map((d) => [d.key, errorAt(`values.${d.key}`)]))}
+              disabled={readOnly}
+            />
+            <ExtraValues
+              entries={extras.map((key) => ({ key, value: stored[key], kept: keep[key] !== false, error: errorAt(`keep.${key}`) }))}
+              onKeptChange={(key, kept) => form.setValue(`keep.${key}`, kept, { shouldDirty: true })}
+              disabled={readOnly}
+            />
+            {sectionActions}
+          </Section>
+        </Fieldset>
+      ) : (
+        <Fieldset disabled={readOnly}>
+          <Section title={t('variant.section.basics')}>
+            <FormTranslatableField
+              control={form.control}
+              name="name"
+              label={t('variant.field.name')}
+              hint={t('variant.field.nameHint')}
+              required
+            />
+            <div className="grid items-start gap-4 sm:grid-cols-2">
+              <Field
+                label={t('variant.field.sku')}
+                hint={t('variant.field.skuHint')}
+                autoComplete="off"
+                error={fieldError(errors.sku?.message)}
+                {...form.register('sku')}
+              />
+              <Field
+                label={t('variant.field.price')}
+                hint={t('variant.field.priceHint')}
+                required
+                suffix={catalogCurrency}
+                inputMode="decimal"
+                autoComplete="off"
+                error={fieldError(errors.price?.message)}
+                {...form.register('price')}
+              />
+            </div>
+            <ImageUpload
+              label={t('variant.field.image')}
+              hint={t('variant.field.imageHint')}
+              src={fileUrl(imageFileId || undefined)}
+              accept={imageTypes.join(',')}
+              pending={image.pending}
+              progress={image.progress}
+              error={imageError}
+              disabled={readOnly}
+              onSelect={(file) => void chooseImage(file)}
+              onRemove={removeImage}
+            />
+            <SwitchField label={t('variant.field.active')} hint={t('variant.field.activeHint')} {...form.register('isActive')} />
+          </Section>
+          <Section title={t('variant.section.attributes')} description={t('variant.section.attributesHint')}>
+            {loaded && loaded.attributeErrors.length > 0 && <Notice tone="warning">{t('storedErrors')}</Notice>}
+            <AttributeValuesEditor
+              definitions={definitions}
+              values={values}
+              onChange={(key, value) => form.setValue(`values.${key}`, value, { shouldDirty: true })}
+              errors={Object.fromEntries(definitions.map((d) => [d.key, errorAt(`values.${d.key}`)]))}
+              disabled={readOnly}
+            />
+            <ExtraValues
+              entries={extras.map((key) => ({ key, value: stored[key], kept: keep[key] !== false, error: errorAt(`keep.${key}`) }))}
+              onKeptChange={(key, kept) => form.setValue(`keep.${key}`, kept, { shouldDirty: true })}
+              disabled={readOnly}
+            />
+          </Section>
+        </Fieldset>
+      )}
+      {!embedded && formActions}
     </form>
   )
 }

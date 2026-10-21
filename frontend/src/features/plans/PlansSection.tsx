@@ -70,28 +70,28 @@ export function PlansSection({ projectId, versionId, canWrite, productTypeIds = 
   }
 
   const plans = query.data ?? []
+  // In the header once there are plans; before, in the empty state as the next step (D448).
+  const addButtons = (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="secondary" onClick={() => setEditingBoard(null)}>
+        <Plus /> {t('addBoard')}
+      </Button>
+      <Button onClick={() => setEditing(null)}>
+        <Plus /> {t('add')}
+      </Button>
+    </div>
+  )
   return (
     <Section
       title={t('title')}
-      actions={
-        canWrite ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => setEditingBoard(null)}>
-              <Plus /> {t('addBoard')}
-            </Button>
-            <Button onClick={() => setEditing(null)}>
-              <Plus /> {t('add')}
-            </Button>
-          </div>
-        ) : undefined
-      }
+      actions={canWrite && (query.isError || plans.length > 0) ? addButtons : undefined}
     >
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
         <ErrorMessage error={query.error} />
       ) : plans.length === 0 ? (
-        <EmptyState title={t('empty')} />
+        <EmptyState title={t('empty')} action={canWrite && addButtons} />
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label={t('title')}>
           {plans.map((plan, index) => (

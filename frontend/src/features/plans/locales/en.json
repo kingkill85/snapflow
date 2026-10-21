@@ -1,7 +1,7 @@
 {
   "title": "Plans",
   "add": "Add plan",
-  "empty": "No plans yet.",
+  "empty": "Start with a floorplan (an image of the building) or a distribution board.",
   "counts": "Products: {{products}} · Zones: {{zones}} · Needs: {{needs}}",
   "lockedBy": "Being edited by {{name}}",
   "moveLeft": "Move {{name}} left",
@@ -88,7 +88,12 @@
     "hint": "Drag a product onto the plan, or click it and then the spot.",
     "armedHint": "Click on the plan to place the product. Esc cancels.",
     "empty": "The project's systems have no available products.",
-    "noMatch": "No products match the search."
+    "noMatch": "No products match the search.",
+    "noSystems": "This project has no systems yet. Choose the systems you plan with to see their products.",
+    "chooseSystems": "Choose systems",
+    "noneOnFloorplan": "No products of the project's systems go on a floorplan.",
+    "noneOnBoard": "No products of the project's systems go on a board.",
+    "openCatalog": "Open the catalog"
   },
   "inspector": {
     "none": "Select a product, zone or need symbol on the plan to see its details.",

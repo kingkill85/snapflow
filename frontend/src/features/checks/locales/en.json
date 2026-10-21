@@ -127,7 +127,9 @@
   },
   "tab": {
     "title": "Checks",
-    "description": "Whether every need is connected and every board, bus line and gateway stays within its limits."
+    "description": "Whether every need is connected and every board, bus line and gateway stays within its limits.",
+    "nothing": "Nothing to check yet. Add needs to the rooms of a floorplan and devices to a board.",
+    "toPlans": "Go to the plans"
   },
   "overview": {
     "zones": "Zones covered",
@@ -162,7 +164,7 @@
   "findings": {
     "title": "Findings",
     "count": "Errors: {{errors}} · Warnings: {{warnings}} · Notes: {{infos}}",
-    "none": "Nothing to report.",
+    "none": "No problems found.",
     "open": "Open",
     "openFor": "Open: {{text}}",
     "unconnected_one": "{{count}} need has units that are not connected (listed under Unconnected needs)",

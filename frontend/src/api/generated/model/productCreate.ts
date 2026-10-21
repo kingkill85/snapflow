@@ -4,26 +4,29 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { ProductInputAttributes } from './productInputAttributes';
-import type { ProductInputDescription } from './productInputDescription';
-import type { ProductInputName } from './productInputName';
+import type { FirstVariantInput } from './firstVariantInput';
+import type { ProductCreateAttributes } from './productCreateAttributes';
+import type { ProductCreateDescription } from './productCreateDescription';
+import type { ProductCreateName } from './productCreateName';
 
-export interface ProductInput {
+export interface ProductCreate {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** Product-scope values by key; stale values are kept only if they are sent back */
-  attributes?: ProductInputAttributes;
+  attributes?: ProductCreateAttributes;
   /** The kind of device, whose schema the attributes follow; must be active (product.category_inactive), except the category the product already has */
   categoryId: string;
   /** At most 5000 characters; if set, "en" is required */
-  description?: ProductInputDescription;
+  description?: ProductCreateDescription;
+  /** The product's first variant, created with it in one transaction; left out = a product without variants (add them with createVariant) */
+  firstVariant?: FirstVariantInput;
   isActive: boolean;
   /** Unique ignoring case, at most 100 characters, no control characters; stored trimmed and in Unicode NFC */
   modelNumber: string;
   /** Override of the category's mounting: floorplan, board or both; empty for the category's. On update, left out keeps the stored override (D294) */
   mounting?: string;
   /** At most 200 characters; "en" is required */
-  name: ProductInputName;
+  name: ProductCreateName;
   /** The system or product line; must be active (product.type_inactive), except the type the product already has */
   productTypeId: string;
 }

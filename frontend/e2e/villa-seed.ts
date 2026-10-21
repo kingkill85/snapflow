@@ -112,9 +112,8 @@ export async function catalog(api: Api, lang: Lang) {
   const products: Record<string, { productId: string; variantId: string; name: string }> = {}
   const product = async (key: string, t: Named, c: Named, name: T, values: Record<string, number | boolean | string>) => {
     const attributes = Object.fromEntries(Object.entries(values).map(([k, v]) => [f[k as keyof typeof f].key, v]))
-    const p = await post('/api/products', { productTypeId: t.id, categoryId: c.id, modelNumber: uniqueKey(key.slice(0, 4)).toUpperCase(), name, isActive: true, attributes })
-    const v = await post(`/api/products/${p.id}/variants`, { name: L('Standard', 'Standard'), price: '120.00', isActive: true })
-    products[key] = { productId: p.id, variantId: v.id, name: name[lang] }
+    const p = await post<Named & { variants: { id: string }[] }>('/api/products', { productTypeId: t.id, categoryId: c.id, modelNumber: uniqueKey(key.slice(0, 4)).toUpperCase(), name, isActive: true, attributes, firstVariant: { name: L('Standard', 'Standard'), price: '120.00' } })
+    products[key] = { productId: p.id, variantId: p.variants[0].id, name: name[lang] }
   }
   await product('hdlPsu', hdl, actuators, L('HDL power supply 2400 mA', 'HDL Netzteil 2400 mA'), { width: 4, supplyMa: 2400 })
   await product('dimmer', hdl, actuators, L('HDL dimmer 6-channel 1 A', 'HDL Dimmaktor 6-fach 1 A'), { width: 6, dimCh: 6, ledW: 200, halW: 230, minW: 10, busMa: 30 })

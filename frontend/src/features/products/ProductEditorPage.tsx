@@ -20,6 +20,7 @@ import { useCan } from '@/app/session'
 import { definitionsFor, extraKeys, storedValueErrors } from '@/catalog/attribute-values'
 import { AttributeValuesEditor, ExtraValues } from '@/catalog/AttributeValuesEditor'
 import { useDecimalSeparator } from '@/catalog/decimal'
+import { catalogCurrency } from '@/catalog/money'
 import {
   type ApiFieldMap,
   Button,
@@ -49,9 +50,12 @@ import { useLocalized } from '@/i18n/localized'
 import {
   editorFields,
   type ProductFormValues,
+  productCreateSchema,
   productSchema,
   storedValues,
   toAttributes,
+  toFirstVariantAttributes,
+  toProductCreate,
   toProductFormValues,
   toProductInput,
 } from './form'
@@ -68,6 +72,7 @@ import {
   useFreshProductTypes,
 } from './paths'
 import { CapabilitiesSection } from './CapabilitiesSection'
+import { SingleVariantSection } from './SingleVariantSection'
 import { VariantsSection } from './VariantsSection'
 
 /** catalog/products/new and catalog/products/:id */
@@ -142,7 +147,8 @@ function ExistingProduct({ id }: { id: string }) {
   const [generation, setGeneration] = useState(0)
   const [notice, setNotice] = useSaveNotice()
   const [dirty, setDirty] = useState(false)
-  const unsaved = useUnsavedChanges(dirty)
+  const [variantDirty, setVariantDirty] = useState(false)
+  const unsaved = useUnsavedChanges(dirty || variantDirty)
 
   if (query.isError) return <LoadFailed error={query.error} />
   if (types.isError) return <LoadFailed error={types.error} />
@@ -192,7 +198,24 @@ function ExistingProduct({ id }: { id: string }) {
         }}
         onLeave={unsaved.allow}
       />
-      <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
+      {/* One variant: its price and values right here; the list from two on (D449). */}
+      {product.variants.length === 1 ? (
+        <SingleVariantSection
+          product={product}
+          variant={product.variants[0]}
+          category={categories.data.items.find((c) => c.id === product.categoryId)}
+          locked={dirty}
+          linkState={{ listSearch }}
+          onDirtyChange={(changed) => {
+            setVariantDirty(changed)
+            if (changed) setNotice(null)
+          }}
+          onSaved={() => setNotice('saved')}
+          onLeave={unsaved.allow}
+        />
+      ) : (
+        <VariantsSection product={product} locked={dirty} linkState={{ listSearch }} />
+      )}
       <CapabilitiesSection product={product} />
       {unsaved.dialog}
     </Page>
@@ -245,7 +268,7 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
       : undefined,
   )
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(loaded ? productSchema : productCreateSchema),
     defaultValues: defaults,
     errors: storedErrors,
     // Focus goes to the first error in page order.
@@ -258,8 +281,16 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
   const category = categoryById(categoryId)
   const definitions = definitionsFor(category, 'product')
   const extras = category ? extraKeys(definitions, stored) : []
+  // A new product asks its first variant's attribute values too (D449).
+  const variantValues = useWatch({ control: form.control, name: 'variantValues' })
+  const variantDefinitions = loaded ? [] : definitionsFor(category, 'variant')
 
-  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
+  // Only a change of isDirty is reported: callers pass inline callbacks, which must not re-fire it every render.
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  })
+  useEffect(() => onDirtyChangeRef.current(isDirty), [isDirty])
 
   // The fields the last failed save showed its errors at (see editorFields).
   const [errorFields, setErrorFields] = useState<ApiFieldMap>()
@@ -276,12 +307,15 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
     setErrorRevision((r) => r + 1)
   }
 
-  const errorAt = (name: `values.${string}` | `keep.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
+  const errorAt = (name: `values.${string}` | `keep.${string}` | `variantValues.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
 
   const save = async (v: ProductFormValues) => {
     const defs = definitionsFor(categoryById(v.categoryId), 'product')
-    const fields = editorFields('product', defs, v.values, stored)
-    const { attributes, errors: inputErrors } = toAttributes(defs, v.values, v.keep, stored)
+    const variantDefs = loaded ? [] : definitionsFor(categoryById(v.categoryId), 'variant')
+    const fields = editorFields('product', defs, v.values, stored, loaded ? undefined : { defs: variantDefs, values: v.variantValues })
+    const { attributes, errors: productErrors } = toAttributes(defs, v.values, v.keep, stored)
+    const firstVariant = toFirstVariantAttributes(variantDefs, v.variantValues)
+    const inputErrors = [...productErrors, ...firstVariant.errors]
     if (inputErrors.length > 0) {
       for (const e of inputErrors) form.setError(e.name, { type: 'input', message: e.message })
       failed()
@@ -292,13 +326,16 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
     try {
       result = loaded
         ? await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
-        : await create.mutateAsync({ data })
+        : await create.mutateAsync({ data: toProductCreate(v, attributes, firstVariant.attributes) })
     } catch (error) {
       setErrorFields(fields)
       setApiFieldErrors(error, form.setError, fields)
       // A taken model number comes without a location (409), but belongs to its field.
       if (error instanceof ApiError && error.code === 'product.model_number_taken') {
         form.setError('modelNumber', { type: 'server', message: errorKey('product.model_number_taken', { modelNumber: data.modelNumber }) })
+      }
+      if (!loaded && error instanceof ApiError && error.code === 'variant.sku_taken') {
+        form.setError('sku', { type: 'server', message: errorKey('variant.sku_taken', { sku: v.sku.trim() }) })
       }
       failed()
       return // the rest is shown by ErrorMessage via mutation.error
@@ -392,6 +429,27 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
             />
           </div>
           {categoryChanged && <Notice tone="warning">{t('categoryChange')}</Notice>}
+          {!loaded && (
+            <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field
+                label={t('field.price')}
+                hint={t('field.priceHint')}
+                required
+                suffix={catalogCurrency}
+                inputMode="decimal"
+                autoComplete="off"
+                error={fieldError(errors.price?.message)}
+                {...form.register('price')}
+              />
+              <Field
+                label={t('variant.field.sku')}
+                hint={t('field.skuHint')}
+                autoComplete="off"
+                error={fieldError(errors.sku?.message)}
+                {...form.register('sku')}
+              />
+            </div>
+          )}
           <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FormSelectField
               control={form.control}
@@ -427,6 +485,17 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
             <p className="text-sm text-muted">{t('chooseCategoryFirst')}</p>
           )}
         </Section>
+        {variantDefinitions.length > 0 && (
+          <Section title={t('section.variant')} description={t('section.variantHint')}>
+            <AttributeValuesEditor
+              definitions={variantDefinitions}
+              values={variantValues}
+              onChange={(key, value) => form.setValue(`variantValues.${key}`, value, { shouldDirty: true })}
+              errors={Object.fromEntries(variantDefinitions.map((d) => [d.key, errorAt(`variantValues.${d.key}`)]))}
+              disabled={readOnly}
+            />
+          </Section>
+        )}
       </Fieldset>
       <FormActions
         error={

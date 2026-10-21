@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { type Page } from '@playwright/test'
 
-import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
+import { type Api, chooseOption, expect, test, unique, uniqueKey } from '../fixtures'
 
 // Every page, dialog and state of projects and versions (step 2a) and the
 // tenant archive at phone and desktop width, light and dark, English and
@@ -11,6 +14,7 @@ import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
 
 const viewports = [
   { name: 'phone', size: { width: 390, height: 844 } },
+  { name: 'tablet', size: { width: 768, height: 1024 } },
   { name: 'desktop', size: { width: 1280, height: 800 } },
 ]
 
@@ -28,6 +32,12 @@ const labels = {
     empty: 'Empty version',
     version: 'Version',
     showArchived: 'Show archived',
+    chooseSystems: 'Choose systems',
+    system: 'System',
+    category: 'Category',
+    single: 'Price and variant',
+    update: 'Update',
+    saved: 'Saved.',
   },
   de: {
     newProject: 'Neues Projekt',
@@ -42,6 +52,12 @@ const labels = {
     empty: 'Leere Version',
     version: 'Version',
     showArchived: 'Archivierte anzeigen',
+    chooseSystems: 'Systeme wählen',
+    system: 'System',
+    category: 'Kategorie',
+    single: 'Preis und Variante',
+    update: 'Aktualisieren',
+    saved: 'Gespeichert.',
   },
 }
 
@@ -98,7 +114,44 @@ async function seed(api: Api) {
   await api.createProject({ tenantId: toArchive.id, name: `Partnerprojekt ${tag}` })
   const toDelete = await api.createTenant(unique('Partner without projects'))
 
-  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete }
+  // The empty planning states (D448): a project whose only system has no products, with an empty floorplan and board.
+  const palette = await create({ name: `Neubau Schulze ${tag}`, productTypeIds: [type.id] })
+  const paletteVersion = palette.versions![0].id
+  const image = { name: 'floorplan.png', mimeType: 'image/png', buffer: readFileSync(join(import.meta.dirname, '../assets/floorplan.png')) }
+  const floor = await api.createPlan(paletteVersion, 'Erdgeschoss', image)
+  const board = await json<{ id: string }>(await api.ctx.post(`/api/versions/${paletteVersion}/boards`, { data: { name: 'Hauptverteiler', rows: [{ capacityTe: 12 }] } }))
+
+  // A product with exactly one variant (D449): the product page shows "Price and variant" instead of the list.
+  const category = await api.createCategory()
+  const oneVariant = await api.createProduct({
+    productTypeId: (await api.createProductType()).id,
+    categoryId: category.id,
+    name: { en: 'Presence detector with constant light control', de: 'Präsenzmelder mit Konstantlichtregelung' },
+    firstVariant: { price: '249.00', sku: `PD-360-${tag}`.toUpperCase() },
+  })
+
+  // A category with variant-scope attributes (one required, one linked to a capability field): the create form's "Variant" section,
+  // and a one-variant product whose capabilities follow a saved variant value.
+  const busField = uniqueKey('busma')
+  expect((await api.ctx.post('/api/catalog-fields', { data: { key: busField, label: { en: 'Bus current', de: 'Busstrom' }, type: 'number', unit: 'mA', meaning: 'bus_current_used_ma' } })).ok()).toBe(true)
+  const variantType = await api.createProductType({ name: { en: unique('KNX building automation'), de: unique('KNX Gebäudeautomation') }, abbreviation: 'KNX', color: '#0a7d33', topology: 'bus' })
+  const variantCategory = await api.createCategory({
+    name: { en: unique('Switch actuators'), de: unique('Schaltaktoren') },
+    attributes: [
+      { key: 'channels', label: { en: 'Channels', de: 'Kanäle' }, type: 'integer', scope: 'product' },
+      { key: 'finish', label: { en: 'Finish', de: 'Oberfläche' }, type: 'text', scope: 'variant', required: true },
+      { key: busField, fieldKey: busField, label: { en: 'Bus current', de: 'Busstrom' }, type: 'number', unit: 'mA', scope: 'variant' },
+    ],
+  })
+  const withVariantAttrs = await api.createProduct({
+    productTypeId: variantType.id,
+    categoryId: variantCategory.id,
+    name: { en: 'Switch actuator 8-fold, 16 A, with manual operation', de: 'Schaltaktor 8-fach, 16 A, mit Handbedienung' },
+    attributes: { channels: 8 },
+    firstVariant: { price: '389.00', sku: `SA-8-${tag}`.toUpperCase(), attributes: { finish: 'Light grey', [busField]: 10 } },
+  })
+
+  return { tag, variantType, variantCategory, withVariantAttrs, busField, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board, oneVariant }
 }
 
 for (const lang of ['en', 'de'] as const) {
@@ -110,7 +163,57 @@ for (const lang of ['en', 'de'] as const) {
       const row = (p: Page, text: string) => p.getByRole('row').filter({ hasText: text })
       const dialogShot = { fullPage: false }
 
-      const steps: { name: string; path: string; fullPage?: boolean; act?: (p: Page) => Promise<void> }[] = [
+      const versionOf = (p: Project) => `/projects/${p.id}/versions/${p.versions![0].id}`
+      const floorEditor = `/projects/${s.palette.id}/versions/${s.paletteVersion}/plans/${s.floor.id}`
+      const boardEditor = `/projects/${s.palette.id}/versions/${s.paletteVersion}/boards/${s.board.id}`
+      // The API never returns a project without systems: the palette's "Choose systems" state through a changed response.
+      const withoutSystems = (p: Page) =>
+        p.route(`**/api/projects/${s.palette.id}`, async (route) => {
+          if (route.request().method() !== 'GET') return route.continue()
+          const res = await route.fetch()
+          await route.fulfill({ response: res, json: { ...(await res.json()), productTypeIds: [] } })
+        })
+      const steps: { name: string; path: string; fullPage?: boolean; wideOnly?: boolean; before?: (p: Page) => Promise<unknown>; act?: (p: Page) => Promise<void> }[] = [
+        { name: 'product-one-variant', path: `/catalog/products/${s.oneVariant.id}` },
+        {
+          name: 'product-create-variant-section',
+          path: '/catalog/products/new',
+          act: async (p) => {
+            await chooseOption(p.getByRole('combobox', { name: l.system }), s.variantType.name[lang] ?? s.variantType.name.en)
+            await chooseOption(p.getByRole('combobox', { name: l.category }), s.variantCategory.name[lang] ?? s.variantCategory.name.en)
+            await expect(p.getByLabel(lang === 'en' ? 'Finish' : 'Oberfläche')).toBeVisible()
+          },
+        },
+        {
+          name: 'product-one-variant-saved',
+          path: `/catalog/products/${s.withVariantAttrs.id}`,
+          act: async (p) => {
+            const single = p.getByRole('region', { name: l.single, exact: true })
+            const current = Number((await single.getByLabel(lang === 'en' ? 'Bus current' : 'Busstrom').inputValue()).replace(',', '.'))
+            await single.getByLabel(lang === 'en' ? 'Bus current' : 'Busstrom').fill(String(current + 5))
+            await single.getByRole('button', { name: l.update }).click()
+            await expect(p.getByText(l.saved)).toBeVisible()
+            await expect(p.getByTestId('capabilities')).toContainText(String(current + 5))
+          },
+        },
+        { name: 'empty-networks', path: `${versionOf(s.palette)}?tab=networks` },
+        { name: 'empty-checks', path: `${versionOf(s.palette)}?tab=checks` },
+        { name: 'empty-bom', path: `${versionOf(s.single)}?tab=bom` },
+        { name: 'documents', path: `${versionOf(s.single)}?tab=documents` },
+        { name: 'palette-floorplan-nothing-fits', path: floorEditor, wideOnly: true, fullPage: false },
+        { name: 'palette-board-nothing-fits', path: boardEditor, wideOnly: true, fullPage: false },
+        { name: 'palette-no-systems', path: floorEditor, wideOnly: true, fullPage: false, before: withoutSystems },
+        {
+          name: 'palette-choose-systems',
+          path: boardEditor,
+          wideOnly: true,
+          fullPage: false,
+          before: withoutSystems,
+          act: async (p) => {
+            await p.getByRole('button', { name: l.chooseSystems }).click()
+            await expect(p.getByRole('dialog', { name: l.editProject })).toBeVisible()
+          },
+        },
         { name: 'list', path: `/projects?search=${s.tag}` },
         { name: 'list-all-statuses', path: `/projects?search=${s.tag}&status=all` },
         { name: 'list-empty-filtered', path: '/projects?search=nothing-matches-this' },
@@ -249,6 +352,8 @@ for (const lang of ['en', 'de'] as const) {
           await p.screenshot({ path: `e2e/screenshots/project-${name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage })
         }
         for (const step of steps) {
+          if (step.wideOnly && viewport.name === 'phone') continue
+          await step.before?.(page)
           await page.goto(step.path)
           await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
           await page.waitForLoadState('networkidle')
@@ -256,6 +361,7 @@ for (const lang of ['en', 'de'] as const) {
           if (step.act) await step.act(page)
           await shoot(page, step.name, step.fullPage ?? true)
           await page.keyboard.press('Escape')
+          await page.unrouteAll({ behavior: 'ignoreErrors' })
         }
         await other.goto('/projects')
         await expect(other.getByRole('heading', { level: 1 })).toBeVisible()

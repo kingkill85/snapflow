@@ -28,9 +28,11 @@ import {
   RowAction,
   Section,
   Select,
+  TextLink,
   TypeBadge,
 } from '@/components/ui'
 import { StatusChip } from '@/features/checks'
+import { versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 
 import { AddressCell } from './AddressCell'
@@ -83,7 +85,7 @@ function useDeviceName() {
  * computes them (D363; totals are informational, checks come in 3d). Writers
  * (`can.update`) add, edit, reorder and delete lines and move devices.
  */
-export function NetworksTab({ versionId }: { versionId: string }) {
+export function NetworksTab({ projectId, versionId }: { projectId: string; versionId: string }) {
   const { t } = useTranslation('networks')
   const query = useGetNetworks(versionId, { query: everyVisit })
   const refresh = useRefreshNetworks(versionId)
@@ -163,7 +165,8 @@ export function NetworksTab({ versionId }: { versionId: string }) {
     await refresh()
   }
 
-  if (data.busSystems.length === 0 && data.wirelessSystems.length === 0) return <EmptyState title={t('overview.empty')} />
+  if (data.busSystems.length === 0 && data.wirelessSystems.length === 0)
+    return <EmptyState title={t('overview.empty')} action={<TextLink to={versionPath(projectId, versionId)}>{t('overview.toPlans')}</TextLink>} />
 
   const canAddress = !!addresses.data?.can.update
   const addressBusy = assignAddresses.isPending || clearAddresses.isPending
@@ -298,6 +301,18 @@ function BusSystemSection({
       }
     >
       <SystemHeader system={system.productType} />
+      {system.lines.length === 0 && system.unassigned.length > 0 && (
+        <EmptyState
+          title={t('bus.needsLine')}
+          action={
+            actions && (
+              <Button onClick={() => setDialog({ item: null })}>
+                <Plus aria-hidden /> {t('bus.createLine')}
+              </Button>
+            )
+          }
+        />
+      )}
       <ol aria-label={t('bus.lines', { system: name })} className="space-y-6">
         {system.lines.map((line, index) => (
           <li key={line.id}>
@@ -321,7 +336,8 @@ function BusSystemSection({
       {system.unassigned.length > 0 && (
         <div className="space-y-2">
           <h3 className="font-medium">{t('bus.unassigned')}</h3>
-          <Notice tone="warning">{t('bus.unassignedNotice')}</Notice>
+          {/* Without any line the empty state above already says what is missing. */}
+          {system.lines.length > 0 && <Notice tone="warning">{t('bus.unassignedNotice')}</Notice>}
           <MemberTable label={`${name}: ${t('bus.unassigned')}`} members={system.unassigned} lines={[]} actions={null} />
         </div>
       )}

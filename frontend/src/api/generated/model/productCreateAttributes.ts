@@ -8,4 +8,4 @@
 /**
  * Product-scope values by key; stale values are kept only if they are sent back
  */
-export type ProductInputAttributes = {[key: string]: unknown};
+export type ProductCreateAttributes = {[key: string]: unknown};

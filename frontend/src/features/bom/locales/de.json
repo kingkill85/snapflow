@@ -11,7 +11,7 @@
   },
   "bom": {
     "title": "Stückliste",
-    "empty": "Noch nichts aufzulisten: Platzieren Sie Produkte in einem Plan oder fügen Sie eine manuelle Position hinzu.",
+    "empty": "Die Stückliste füllt sich aus den Produkten auf den Plänen. Alles andere fügen Sie als manuelle Position hinzu.",
     "filterPlan": "Plan",
     "filterZone": "Zone",
     "allPlans": "Alle Pläne",
@@ -133,5 +133,11 @@
     },
     "noImage": "Kein Bild",
     "noAddons": "Keins"
+  },
+  "documents": {
+    "customer": "Für den Kunden",
+    "customerHint": "Angebote mit Preisen für diese Version.",
+    "installer": "Für den Installateur",
+    "installerHint": "Handbuch, Kanalbeschriftungen und Programmierdaten für die Baustelle."
   }
 }

@@ -45,7 +45,7 @@ const rows = (table: HTMLElement) => within(table).getAllByRole('row').slice(1)
 describe('NetworksTab', () => {
   it('shows bus lines with totals and members, and gateways with their devices', async () => {
     serve(networks)
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     const bus = await screen.findByRole('region', { name: 'KNX' })
     expect(within(bus).getByRole('heading', { name: 'KNX 1' })).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('NetworksTab', () => {
     const user = userEvent.setup()
     serve(networks)
     const bodies = captureAssignments()
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     await user.click(await screen.findByRole('combobox', { name: 'Line of Switch actuator 8-fold · Kitchen, Ground floor' }))
     await user.click(screen.getByRole('option', { name: 'KNX 2' }))
@@ -91,7 +91,7 @@ describe('NetworksTab', () => {
     const user = userEvent.setup()
     serve(networks)
     const bodies = captureAssignments()
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     const two = await screen.findByRole('table', { name: 'KNX 2' })
     await user.click(within(rows(two)[0]).getByRole('button', { name: 'Reset to default' }))
@@ -112,7 +112,7 @@ describe('NetworksTab', () => {
     const user = userEvent.setup()
     serve(networks)
     const bodies = captureAssignments()
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     await user.click(await screen.findByRole('combobox', { name: 'Gateway of Door sensor · Front door, Ground floor' }))
     await user.click(screen.getByRole('option', { name: 'Zigbee gateway, First floor' }))
@@ -139,7 +139,7 @@ describe('NetworksTab', () => {
         return new HttpResponse(null, { status: 204 })
       }),
     )
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     await user.click(await screen.findByRole('button', { name: 'Add line' }))
     const dialog = await screen.findByRole('dialog', { name: 'New line' })
@@ -165,21 +165,34 @@ describe('NetworksTab', () => {
 
   it('shows readers the networks without controls and members without a line', async () => {
     serve(readOnlyNetworks)
-    renderWithProviders(<NetworksTab versionId={versionId} />)
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
 
     const bus = await screen.findByRole('region', { name: 'KNX' })
     expect(within(bus).getByText('Without line')).toBeInTheDocument()
     expect(within(bus).getByRole('table', { name: 'KNX: Without line' })).toHaveTextContent('Kitchen')
     expect(screen.getByText('Read only: assignments cannot be changed here.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add line' })).not.toBeInTheDocument()
+    expect(screen.getByText('These devices need a bus line.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create line' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument()
   })
 
+  it('asks for a bus line when bus devices have none, with "Create line" only for writers', async () => {
+    const user = userEvent.setup()
+    serve({ ...readOnlyNetworks, can: { update: true } })
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
+    expect(await screen.findByText('These devices need a bus line.')).toBeInTheDocument()
+    expect(screen.queryByText(/^These devices have no line yet/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create line' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
   it('shows the empty state without systems', async () => {
     serve(emptyNetworks)
-    renderWithProviders(<NetworksTab versionId={versionId} />)
-    expect(await screen.findByText('No bus or wireless devices on the plans of this version yet.')).toBeInTheDocument()
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
+    expect(await screen.findByText(/^No bus or wireless devices on the plans of this version yet\. Place products of a bus or wireless system/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the plans' })).toHaveAttribute('href', `/projects/p1/versions/${versionId}`)
   })
 
   it('shows the reserve statuses of lines and gateways from the checks and scrolls to a linked line', async () => {
@@ -196,7 +209,7 @@ describe('NetworksTab', () => {
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled.push(this.id)
     }
-    renderWithProviders(<NetworksTab versionId={versionId} />, { route: `/?tab=networks#line-${lineOne.id}` })
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />, { route: `/?tab=networks#line-${lineOne.id}` })
 
     const line = await screen.findByTestId(`bus-line-${lineOne.id}`)
     expect(line).toHaveAttribute('id', `line-${lineOne.id}`)
@@ -213,7 +226,7 @@ describe('NetworksTab', () => {
   describe('addresses', () => {
     it('shows addresses with by-hand and automatic markers and line prefixes', async () => {
       serve(networks)
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       const bus = await screen.findByRole('region', { name: 'KNX' })
       const [supplyRow, actuatorRow] = rows(within(bus).getByRole('table', { name: 'KNX 1' }))
       expect(await within(actuatorRow).findByText('1.1.1')).toBeInTheDocument()
@@ -239,7 +252,7 @@ describe('NetworksTab', () => {
           return HttpResponse.json(addresses)
         }),
       )
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       await user.click(await screen.findByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
       const input = screen.getByRole('textbox', { name: 'Address of Switch actuator 8-fold · Kitchen, Ground floor' })
       await user.clear(input)
@@ -269,7 +282,7 @@ describe('NetworksTab', () => {
           return HttpResponse.json(addresses)
         }),
       )
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       await user.click(await screen.findByRole('button', { name: 'Edit address of Door sensor · Front door, Ground floor' }))
       await user.type(screen.getByRole('textbox', { name: /Address of Door sensor/ }), '00:12:4b:00:1c:a1:b2:c4{Enter}')
       await waitFor(() => expect(bodies).toEqual([{ addresses: [{ planId: doorSensor.planId, itemId: doorSensor.itemId, ieee: '00:12:4b:00:1c:a1:b2:c4' }] }]))
@@ -285,7 +298,7 @@ describe('NetworksTab', () => {
           return HttpResponse.json(addresses)
         }),
       )
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       const edit = await screen.findByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' })
       const input = () => screen.getByRole('textbox', { name: 'Address of Switch actuator 8-fold · Kitchen, Ground floor' })
 
@@ -310,7 +323,7 @@ describe('NetworksTab', () => {
 
     it('shows the address of devices without a line or gateway', async () => {
       serve({ ...networks, busSystems: [{ ...networks.busSystems[0], unassigned: [actuator] }] })
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       const table = await screen.findByRole('table', { name: 'KNX: Without line' })
       expect(within(table).getByRole('columnheader', { name: 'Address' })).toBeInTheDocument()
       expect(within(table).getByText('1.1.1')).toBeInTheDocument()
@@ -323,7 +336,7 @@ describe('NetworksTab', () => {
         http.post('/api/versions/:versionId/addresses/assign', () => HttpResponse.json({ ...addresses, assigned: 2, unassigned: 0 })),
         http.put('/api/versions/:versionId/addresses', () => HttpResponse.json(addresses)),
       )
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       await user.click(await screen.findByRole('button', { name: 'Assign addresses on KNX 2' }))
       expect(await screen.findByText('2 devices got an automatic address.')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Edit address of Switch actuator 8-fold · Kitchen, Ground floor' }))
@@ -334,7 +347,7 @@ describe('NetworksTab', () => {
 
     it('warns about a line without a free default prefix', async () => {
       serve(networks, noChecks, { ...addresses, lines: [addresses.lines[0], { ...addresses.lines[1], prefix: undefined, noPrefix: true }] })
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       expect(await screen.findByText(/No default line address is free/)).toBeInTheDocument()
     })
 
@@ -353,7 +366,7 @@ describe('NetworksTab', () => {
           return HttpResponse.json(addresses)
         }),
       )
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       await user.click(await screen.findByRole('button', { name: 'Assign addresses on KNX 2' }))
       await user.click(screen.getAllByRole('button', { name: 'Assign addresses' })[0])
       await waitFor(() => expect(assigns).toEqual([{ busLineIds: [lineTwo.id] }, {}]))
@@ -367,13 +380,13 @@ describe('NetworksTab', () => {
 
     it('warns about an unreadable line address', async () => {
       serve(networks, noChecks, { ...addresses, lines: [{ ...addresses.lines[0], prefix: undefined, invalid: true }, addresses.lines[1]] })
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       expect(await screen.findByText('The line address “1.1” cannot be read: no automatic addresses on this line until it is corrected.')).toBeInTheDocument()
     })
 
     it('hides address controls when read only', async () => {
       serve({ ...networks, can: { update: false } })
-      renderWithProviders(<NetworksTab versionId={versionId} />)
+      renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
       expect(await screen.findByText('1.1.1')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /Assign addresses|Clear automatic|Edit address/ })).not.toBeInTheDocument()
     })

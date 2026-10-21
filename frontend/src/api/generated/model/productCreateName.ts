@@ -8,4 +8,4 @@
 /**
  * At most 200 characters; "en" is required
  */
-export type ProductInputName = {[key: string]: string};
+export type ProductCreateName = {[key: string]: string};

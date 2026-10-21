@@ -162,6 +162,22 @@ type ProductInput struct {
 	Mounting      *string           `json:"mounting,omitempty" doc:"Override of the category's mounting: floorplan, board or both; empty for the category's. On update, left out keeps the stored override (D294)"`
 }
 
+// ProductCreate is the create body: the product plus, optionally, its first
+// variant, written in one transaction (D449).
+type ProductCreate struct {
+	ProductInput
+	FirstVariant *FirstVariantInput `json:"firstVariant,omitempty" doc:"The product's first variant, created with it in one transaction; left out = a product without variants (add them with createVariant)"`
+}
+
+// FirstVariantInput is the first variant sent with a new product. It is
+// active; the image and add-ons are set on the variant afterwards.
+type FirstVariantInput struct {
+	Name       i18n.Text         `json:"name,omitempty" doc:"Left out or empty = \"Standard\" in every content language; otherwise as on createVariant"`
+	SKU        string            `json:"sku,omitempty" doc:"As on createVariant"`
+	Price      string            `json:"price" doc:"USD as a decimal string, as on createVariant" example:"27.00"`
+	Attributes attrschema.Values `json:"attributes,omitempty" doc:"Variant-scope values by key"`
+}
+
 type ProductUpdate struct {
 	ProductInput
 	ExpectedUpdatedAt time.Time `json:"expectedUpdatedAt" doc:"updatedAt as last read; if the product changed since, the update fails with product.stale"`

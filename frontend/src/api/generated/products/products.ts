@@ -28,7 +28,7 @@ import type {
   Error,
   ListProductsParams,
   Product,
-  ProductInput,
+  ProductCreate,
   ProductPage,
   ProductUpdate,
   SearchVariantsParams,
@@ -182,11 +182,11 @@ export function useListProducts<TData = Awaited<ReturnType<typeof listProducts>>
 
 
 /**
- * Without variants; add them with createVariant.
+ * With firstVariant the product and that variant are created in one transaction; without it the product has no variants (add them with createVariant).
  * @summary Create a product
  */
 export const createProduct = (
-    productInput: BodyType<NonReadonly<ProductInput>>,
+    productCreate: BodyType<NonReadonly<ProductCreate>>,
  signal?: AbortSignal
 ) => {
 
@@ -194,7 +194,7 @@ export const createProduct = (
       return apiClient<Product>(
       {url: `/api/products`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: productInput, signal
+      data: productCreate, signal
     },
       );
     }
@@ -232,9 +232,9 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CreateProductMutationResult = NonNullable<Awaited<ReturnType<typeof createProduct>>>
-    export type CreateProductMutationBody = BodyType<NonReadonly<ProductInput>>
+    export type CreateProductMutationBody = BodyType<NonReadonly<ProductCreate>>
     export type CreateProductMutationError = ErrorType<Error>
-    export type CreateProductMutationVariables = {data: BodyType<NonReadonly<ProductInput>>}
+    export type CreateProductMutationVariables = {data: BodyType<NonReadonly<ProductCreate>>}
 
     /**
  * @summary Create a product
