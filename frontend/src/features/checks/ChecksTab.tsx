@@ -61,8 +61,8 @@ export function ChecksTab({ projectId, versionId }: { projectId: string; version
       <p className="text-sm text-muted">{t('tab.description')}</p>
     </div>
   )
-  // No needs and no devices: nothing to check, the next step is on the plans (D448).
-  if (wiring.data.needs.length === 0 && wiring.data.items.length === 0)
+  // No needs, no devices and no findings: nothing to check, the next step is on the plans (D448).
+  if (wiring.data.needs.length === 0 && wiring.data.items.length === 0 && data.findings.length === 0)
     return (
       <div className="space-y-6">
         {header}

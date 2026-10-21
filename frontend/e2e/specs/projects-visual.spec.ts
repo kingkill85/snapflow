@@ -111,7 +111,16 @@ async function seed(api: Api) {
   const floor = await api.createPlan(paletteVersion, 'Erdgeschoss', image)
   const board = await json<{ id: string }>(await api.ctx.post(`/api/versions/${paletteVersion}/boards`, { data: { name: 'Hauptverteiler', rows: [{ capacityTe: 12 }] } }))
 
-  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board }
+  // A product with exactly one variant (D449): the product page shows "Price and variant" instead of the list.
+  const category = await api.createCategory()
+  const oneVariant = await api.createProduct({
+    productTypeId: (await api.createProductType()).id,
+    categoryId: category.id,
+    name: { en: 'Presence detector with constant light control', de: 'Präsenzmelder mit Konstantlichtregelung' },
+    firstVariant: { price: '249.00', sku: 'PD-360-WH' },
+  })
+
+  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board, oneVariant }
 }
 
 for (const lang of ['en', 'de'] as const) {
@@ -134,6 +143,7 @@ for (const lang of ['en', 'de'] as const) {
           await route.fulfill({ response: res, json: { ...(await res.json()), productTypeIds: [] } })
         })
       const steps: { name: string; path: string; fullPage?: boolean; wideOnly?: boolean; before?: (p: Page) => Promise<unknown>; act?: (p: Page) => Promise<void> }[] = [
+        { name: 'product-one-variant', path: `/catalog/products/${s.oneVariant.id}` },
         { name: 'empty-networks', path: `${versionOf(s.palette)}?tab=networks` },
         { name: 'empty-checks', path: `${versionOf(s.palette)}?tab=checks` },
         { name: 'empty-bom', path: `${versionOf(s.single)}?tab=bom` },
