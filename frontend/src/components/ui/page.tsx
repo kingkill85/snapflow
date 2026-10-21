@@ -35,11 +35,19 @@ export function Page({ title, description, actions, width = 'default', children 
   )
 }
 
-export function EmptyState({ title, action }: { title: string; action?: ReactNode }) {
+/**
+ * An empty list or panel: what is missing and, as `action`, the button or link
+ * that fixes it (D448). `icon` before the text, e.g. the success mark of "No
+ * problems found"; `compact` for narrow panels (the editor palette).
+ */
+export function EmptyState({ title, action, icon, compact }: { title: string; action?: ReactNode; icon?: ReactNode; compact?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-control border border-dashed border-line px-6 py-12 text-center">
-      <p className="text-sm text-muted">{title}</p>
-      {action}
+    <div className={cn('flex flex-col items-center gap-3 rounded-control border border-dashed border-line text-center', compact ? 'px-3 py-6' : 'px-6 py-12')}>
+      <p className="flex items-center gap-2 text-sm text-muted">
+        {icon}
+        <span>{title}</span>
+      </p>
+      {action && <div className="flex flex-wrap items-center justify-center gap-2">{action}</div>}
     </div>
   )
 }

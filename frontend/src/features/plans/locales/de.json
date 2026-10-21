@@ -1,7 +1,7 @@
 {
   "title": "Pläne",
   "add": "Plan hinzufügen",
-  "empty": "Noch keine Pläne.",
+  "empty": "Beginnen Sie mit einem Grundriss (ein Bild des Gebäudes) oder einem Verteiler.",
   "counts": "Produkte: {{products}} · Zonen: {{zones}} · Bedarf: {{needs}}",
   "lockedBy": "Wird von {{name}} bearbeitet",
   "moveLeft": "{{name}} nach links verschieben",
@@ -88,7 +88,12 @@
     "hint": "Ziehen Sie ein Produkt auf den Plan, oder klicken Sie es und dann die Stelle an.",
     "armedHint": "Klicken Sie auf den Plan, um das Produkt zu platzieren. Esc bricht ab.",
     "empty": "Die Systeme des Projekts haben keine verfügbaren Produkte.",
-    "noMatch": "Keine Produkte passen zur Suche."
+    "noMatch": "Keine Produkte passen zur Suche.",
+    "noSystems": "Dieses Projekt hat noch keine Systeme. Wählen Sie die Systeme, mit denen Sie planen, um deren Produkte zu sehen.",
+    "chooseSystems": "Systeme wählen",
+    "noneOnFloorplan": "Keine Produkte der Projektsysteme gehören auf einen Grundriss.",
+    "noneOnBoard": "Keine Produkte der Projektsysteme gehören in einen Verteiler.",
+    "openCatalog": "Katalog öffnen"
   },
   "inspector": {
     "none": "Wählen Sie ein Produkt, eine Zone oder ein Bedarfssymbol auf dem Plan, um Details zu sehen.",

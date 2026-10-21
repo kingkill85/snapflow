@@ -19,7 +19,7 @@ import { NetworksTab } from '@/features/networks'
 import { PlansSection } from '@/features/plans'
 import { InstallationDocumentsSection, ProgrammingExportsSection } from '@/features/installation'
 import { ProposalsTab } from '@/features/proposals'
-import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SelectField, Tabs, TextLink } from '@/components/ui'
+import { Button, ConfirmDialog, EmptyState, ErrorMessage, Loading, Notice, Page, SectionGroup, SelectField, Tabs, TextLink } from '@/components/ui'
 
 import { fresh, isNotFound, listPath, projectPath, versionPath } from './paths'
 import { ProjectFormDialog } from './ProjectFormDialog'
@@ -241,7 +241,7 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
       tabs={[
         { key: 'plans', label: t('tabs.plans'), content: <PlansSection projectId={project.id} versionId={version.id} canWrite={canWrite} productTypeIds={project.productTypeIds} /> },
         { key: 'needs', label: t('tabs.needs'), content: <NeedsTab key={version.id} versionId={version.id} /> },
-        { key: 'networks', label: t('tabs.networks'), content: <NetworksTab key={version.id} versionId={version.id} /> },
+        { key: 'networks', label: t('tabs.networks'), content: <NetworksTab key={version.id} projectId={project.id} versionId={version.id} /> },
         { key: 'checks', label: t('tabs.checks'), content: <ChecksTab key={version.id} projectId={project.id} versionId={version.id} /> },
         {
           key: 'bom',
@@ -266,10 +266,15 @@ function VersionTabs({ project, version, canWrite }: { project: Project; version
           key: 'documents',
           label: t('tabs.documents'),
           content: (
-            <div key={version.id} className="space-y-6">
-              <ProposalsTab versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
-              <InstallationDocumentsSection versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
-              <ProgrammingExportsSection versionId={version.id} />
+            // By audience, the customer first (D450).
+            <div key={version.id} className="space-y-10">
+              <SectionGroup title={t('documents.customer')} description={t('documents.customerHint')}>
+                <ProposalsTab versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
+              </SectionGroup>
+              <SectionGroup title={t('documents.installer')} description={t('documents.installerHint')}>
+                <InstallationDocumentsSection versionId={version.id} canGenerate={project.can.update || project.can.reopen} />
+                <ProgrammingExportsSection versionId={version.id} />
+              </SectionGroup>
             </div>
           ),
         },

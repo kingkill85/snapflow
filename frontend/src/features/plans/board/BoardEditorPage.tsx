@@ -22,6 +22,7 @@ import { useCatalogVariants } from '../editor/catalog'
 import { canRedo, canUndo } from '../editor/history'
 import { LockBanner } from '../editor/LockBanner'
 import { Palette } from '../editor/Palette'
+import { PaletteEmpty } from '../editor/PaletteEmpty'
 import { SaveIndicator } from '../editor/SaveIndicator'
 import { shortcutOf } from '../editor/use-shortcuts'
 import { useAutosave } from '../editor/use-autosave'
@@ -445,7 +446,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
     {
       key: 'products',
       label: t('panel.products'),
-      content: <Palette products={products} armed={armed} onArm={setArmed} editable={editable} hints={{ hint: t('board.paletteHint'), armedHint: t('board.armedHint') }} />,
+      content: <Palette products={products} armed={armed} onArm={setArmed} editable={editable} hints={{ hint: t('board.paletteHint'), armedHint: t('board.armedHint') }} empty={<PaletteEmpty project={project} kind="board" />} />,
     },
     {
       key: 'board',

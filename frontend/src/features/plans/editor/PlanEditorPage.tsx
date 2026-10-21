@@ -31,6 +31,7 @@ import { LockBanner } from './LockBanner'
 import { maxNeeds, newNeed, symbolIcon, symbolLetter, usableForNewNeed } from './needs'
 import { useNeedCatalog, useNeedText } from './need-catalog'
 import { Palette } from './Palette'
+import { PaletteEmpty } from './PaletteEmpty'
 import { type ActiveVertex, PlanCanvas, type SymbolLook, type Tool } from './PlanCanvas'
 import { newPlacement } from './placements'
 import { SaveIndicator } from './SaveIndicator'
@@ -574,7 +575,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   }
 
   const tabs: TabItem<PanelTab>[] = [
-    { key: 'products', label: t('panel.products'), content: <Palette products={products} armed={armed} onArm={setArmed} editable={editable} /> },
+    { key: 'products', label: t('panel.products'), content: <Palette products={products} armed={armed} onArm={setArmed} editable={editable} empty={<PaletteEmpty project={project} kind="floorplan" />} /> },
     {
       key: 'zones',
       label: t('panel.zones'),

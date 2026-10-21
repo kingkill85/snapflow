@@ -201,7 +201,7 @@ describe('BomTab', () => {
   it('shows the empty state without filters or update for an empty BOM', async () => {
     serve({ ...bom, lines: [], groups: [], manualLines: [] })
     render()
-    expect(await screen.findByText('Nothing to list yet: place products in a plan or add a manual line.')).toBeInTheDocument()
+    expect(await screen.findByText('The bill of materials fills itself from the products on the plans. Add lines by hand for anything else.')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Plan' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Update from catalog' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add product' })).toBeInTheDocument()

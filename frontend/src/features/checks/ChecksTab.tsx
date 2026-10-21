@@ -1,4 +1,4 @@
-import { Plug, Undo2, Wand2 } from 'lucide-react'
+import { CircleCheck, Plug, Undo2, Wand2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -55,13 +55,24 @@ export function ChecksTab({ projectId, versionId }: { projectId: string; version
 
   const unconnected = wiring.data.needs.filter((n) => n.connectedUnits < n.quantity)
   const missingZones = data.zones.filter((z) => z.status === 'partial' || z.status === 'missing')
+  const header = (
+    <div className="space-y-1">
+      <h2 className="text-lg font-semibold">{t('tab.title')}</h2>
+      <p className="text-sm text-muted">{t('tab.description')}</p>
+    </div>
+  )
+  // No needs and no devices: nothing to check, the next step is on the plans (D448).
+  if (wiring.data.needs.length === 0 && wiring.data.items.length === 0)
+    return (
+      <div className="space-y-6">
+        {header}
+        <EmptyState title={t('tab.nothing')} action={<TextLink to={versionPath(projectId, versionId)}>{t('tab.toPlans')}</TextLink>} />
+      </div>
+    )
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold">{t('tab.title')}</h2>
-          <p className="text-sm text-muted">{t('tab.description')}</p>
-        </div>
+        {header}
         {wiring.canUpdate && (
           <Button onClick={() => setAutoOpen(true)} disabled={unconnected.length === 0}>
             <Wand2 aria-hidden />
@@ -204,7 +215,7 @@ function Findings({
 }) {
   const { t } = useTranslation('checks')
   const text = useFindingText()
-  if (checks.findings.length === 0) return <EmptyState title={t('findings.none')} />
+  if (checks.findings.length === 0) return <EmptyState title={t('findings.none')} icon={<CircleCheck aria-hidden className="size-4 text-success" />} />
   const linkOf = (f: Finding): string | null => {
     const r = f.refs
     if (f.code === 'network_assignment_dangling') return `${versionPath(projectId, versionId)}?tab=networks`

@@ -68,6 +68,8 @@ type Props = {
   defaultTenantId?: string
   /** After a successful save, with the saved project. */
   onSaved?: (project: Project) => void
+  /** Focus the systems field on open, e.g. from an empty editor palette ("Choose systems", D448). */
+  focusSystems?: boolean
 }
 
 /**
@@ -81,7 +83,7 @@ type RateOrigin = { kind: 'stored' } | { kind: 'fetched'; rate: string; date: st
  * A new project gets its currency only (no rate: set later on the BOM or Pricing tab); editing a non-USD
  * project shows its rate with its origin and "Fetch current rate". A rate typed in is never replaced.
  */
-export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, onSaved }: Props) {
+export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, onSaved, focusSystems }: Props) {
   const { t, i18n } = useTranslation('projects')
   const { t: tCommon } = useTranslation()
   const fieldError = useFieldError()
@@ -120,6 +122,15 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
   // New projects use every active product type, which arrive after the dialog opened.
   const activeTypeIds = types.data?.items.filter((pt) => pt.isActive).map((pt) => pt.id)
   const uiLanguage = i18n.resolvedLanguage ?? 'en'
+
+  // "Choose systems": the first system checkbox gets the focus once the options are there (after the dialog's own autofocus).
+  const systemsRef = useRef<HTMLDivElement>(null)
+  const typesLoaded = !!types.data
+  useEffect(() => {
+    if (!open || !focusSystems || !typesLoaded) return
+    const timer = setTimeout(() => systemsRef.current?.querySelector('input')?.focus())
+    return () => clearTimeout(timer)
+  }, [open, focusSystems, typesLoaded])
 
   // Reset only when the dialog opens or switches record.
   useEffect(() => {
@@ -326,21 +337,23 @@ export function ProjectFormDialog({ open, onOpenChange, item, defaultTenantId, o
           error={fieldError(errors.status?.message)}
         />
       )}
-      <Controller
-        control={form.control}
-        name="productTypeIds"
-        render={({ field }) => (
-          <CheckboxGroupField
-            label={t('field.productTypes')}
-            hint={t('field.productTypesHint')}
-            required
-            options={typeOptions}
-            value={field.value ?? []}
-            onChange={field.onChange}
-            error={fieldError(errors.productTypeIds?.message)}
-          />
-        )}
-      />
+      <div ref={systemsRef}>
+        <Controller
+          control={form.control}
+          name="productTypeIds"
+          render={({ field }) => (
+            <CheckboxGroupField
+              label={t('field.productTypes')}
+              hint={t('field.productTypesHint')}
+              required
+              options={typeOptions}
+              value={field.value ?? []}
+              onChange={field.onChange}
+              error={fieldError(errors.productTypeIds?.message)}
+            />
+          )}
+        />
+      </div>
 
       <Heading>{t('section.pricing')}</Heading>
       <FormSelectField

@@ -24,6 +24,20 @@ const preview = (extra: Partial<AutoConnectPreview> = {}): AutoConnectPreview =>
 })
 
 describe('ChecksTab', () => {
+  it('without needs and devices says there is nothing to check and links to the plans', async () => {
+    serveChecks({ checks: { ...checks, findings: [], counts: { ...checks.counts, errors: 0, warnings: 0, infos: 0 } }, wiring: { ...wiring, items: [], needs: [], connections: [] } })
+    render()
+    expect(await screen.findByText('Nothing to check yet. Add needs to the rooms of a floorplan and devices to a board.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the plans' })).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}`)
+    expect(screen.queryByText('Zones covered')).not.toBeInTheDocument()
+  })
+
+  it('says "No problems found." when there are no findings', async () => {
+    serveChecks({ checks: { ...checks, findings: [], counts: { ...checks.counts, errors: 0, warnings: 0, infos: 0 } } })
+    render()
+    expect(await screen.findByText('No problems found.')).toBeInTheDocument()
+  })
+
   it('shows the overview cards with statuses', async () => {
     serveChecks()
     render()

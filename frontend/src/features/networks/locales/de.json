@@ -2,8 +2,9 @@
   "overview": {
     "title": "Netzwerke",
     "description": "Buslinien und Funk-Gateways dieser Version. Geräte kommen auf die erste Linie oder an das nächste Gateway ihres Systems, solange sie nicht einer anderen zugeordnet sind.",
-    "empty": "Auf den Plänen dieser Version sind noch keine Bus- oder Funkgeräte.",
-    "readOnly": "Nur lesen: Zuordnungen lassen sich hier nicht ändern."
+    "empty": "Auf den Plänen dieser Version sind noch keine Bus- oder Funkgeräte. Platzieren Sie Produkte eines Bus- oder Funksystems auf einem Grundriss oder Verteiler; sie erscheinen dann hier.",
+    "readOnly": "Nur lesen: Zuordnungen lassen sich hier nicht ändern.",
+    "toPlans": "Zu den Plänen"
   },
   "columns": {
     "plan": "Plan",
@@ -50,7 +51,9 @@
     "deleteTitle": "Linie löschen?",
     "deleteMessage": "Die Linie „{{name}}“ wird gelöscht. Geräte mit Standardzuordnung kommen auf die erste verbleibende Linie.",
     "unassigned": "Ohne Linie",
-    "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie entsteht beim nächsten Speichern eines Plans, der sie enthält."
+    "unassignedNotice": "Diese Geräte haben noch keine Linie: Die erste Linie entsteht beim nächsten Speichern eines Plans, der sie enthält.",
+    "needsLine": "Diese Geräte brauchen eine Buslinie.",
+    "createLine": "Linie anlegen"
   },
   "lineDialog": {
     "newTitle": "Neue Linie",

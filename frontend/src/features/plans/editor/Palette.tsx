@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, Field, Thumbnail, TypeBadge } from '@/components/ui'
@@ -15,13 +15,15 @@ type Props = {
   editable: boolean
   /** The hints above the list (the board editor has its own). */
   hints?: { hint: string; armedHint: string }
+  /** Shown instead of the list when there are no products at all: the next step (PaletteEmpty). */
+  empty?: ReactNode
 }
 
 /**
  * The Products tab: the project's products by category with a search. Drag
  * one onto the canvas, or click it and then click the spot.
  */
-export function Palette({ products, armed, onArm, editable, hints }: Props) {
+export function Palette({ products, armed, onArm, editable, hints, empty }: Props) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const [search, setSearch] = useState('')
@@ -32,7 +34,7 @@ export function Palette({ products, armed, onArm, editable, hints }: Props) {
       <Field label={t('palette.search')} type="search" value={search} onChange={(e) => setSearch(e.target.value)} hint={t('palette.searchHint')} />
       {editable && <p className="text-xs text-muted">{hints ? (armed ? hints.armedHint : hints.hint) : t(armed ? 'palette.armedHint' : 'palette.hint')}</p>}
       {products.length === 0 ? (
-        <p className="text-sm text-muted">{t('palette.empty')}</p>
+        (empty ?? <p className="text-sm text-muted">{t('palette.empty')}</p>)
       ) : groups.length === 0 ? (
         <p className="text-sm text-muted">{t('palette.noMatch')}</p>
       ) : (

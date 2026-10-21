@@ -11,7 +11,7 @@
   },
   "bom": {
     "title": "Bill of materials",
-    "empty": "Nothing to list yet: place products in a plan or add a manual line.",
+    "empty": "The bill of materials fills itself from the products on the plans. Add lines by hand for anything else.",
     "filterPlan": "Plan",
     "filterZone": "Zone",
     "allPlans": "All plans",
@@ -133,5 +133,11 @@
     },
     "noImage": "No image",
     "noAddons": "None"
+  },
+  "documents": {
+    "customer": "For the customer",
+    "customerHint": "Proposals with prices for this version.",
+    "installer": "For the installer",
+    "installerHint": "Manual, channel labels and programming data for the site."
   }
 }
