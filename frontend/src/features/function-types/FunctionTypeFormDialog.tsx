@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { useEffect } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
@@ -13,11 +13,14 @@ import {
   useUpdateFunctionType,
 } from '@/api/generated/function-types/function-types'
 import { useListLoadTypes } from '@/api/generated/load-types/load-types'
-import type { FunctionType } from '@/api/generated/model'
+import type { FunctionType, FunctionTypeInput } from '@/api/generated/model'
+import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
+import { useListProductTypes } from '@/api/generated/product-types/product-types'
 import {
   apiFields,
   Button,
   CheckboxGroupField,
+  Disclosure,
   errorKey,
   emptyTranslatable,
   ErrorMessage,
@@ -41,6 +44,7 @@ const schema = z.object({
   name: translatableSchema({ required: errorKey('validation.required') }),
   allowsCircuit: z.boolean(),
   loadTypeIds: z.array(z.string()),
+  outputKindIds: z.array(z.string()),
   isActive: z.boolean(),
   knxObjects: z.array(
     z.object({
@@ -52,7 +56,7 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
-const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds', 'isActive']), ...translatableApiFields('name') }
+const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds', 'outputKindIds', 'isActive']), ...translatableApiFields('name') }
 
 type Props = {
   open: boolean
@@ -61,6 +65,11 @@ type Props = {
   functionType: FunctionType | null
 }
 
+/**
+ * Creates or edits a function (D444): key, name, the channel kinds that serve
+ * it and whether needs share a circuit; then Details (allowed load types, KNX
+ * objects only when a KNX system exists); then Active.
+ */
 export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Props) {
   const { t } = useTranslation('functionTypes')
   const { t: tCommon } = useTranslation()
@@ -73,7 +82,25 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
   // Inactive load types stay listed: a function type may still allow one.
   const loadTypes = useListLoadTypes({ includeInactive: true }, { query: { enabled: open } })
   const loadTypeOptions = (loadTypes.data?.items ?? []).map((l) => ({ value: l.id, label: localized(l.name) }))
+  // Active channel kinds in their order; a linked inactive one shows as an extra box (unknownLabel).
+  const kinds = useListOutputKinds({ includeInactive: true }, { query: { enabled: open } })
+  const kindOptions = (kinds.data?.items ?? []).filter((k) => k.isActive).map((k) => ({ value: k.id, label: localized(k.name) }))
+  const kindName = (id: string) => {
+    const k = kinds.data?.items.find((x) => x.id === id)
+    return k ? localized(k.name) : id
+  }
+  // KNX objects only matter with a KNX system (addressing knx_individual).
+  const systems = useListProductTypes({ includeInactive: true }, { query: { enabled: open } })
+  const knx = (systems.data?.items ?? []).some((p) => p.addressing === 'knx_individual')
 
+  // Details start collapsed when empty and open on an error inside.
+  const hasDetails = (ft: FunctionType | null) => (ft?.loadTypeIds.length ?? 0) > 0 || (ft?.knxObjects.length ?? 0) > 0
+  const [detailsOpen, setDetailsOpen] = useState(() => hasDetails(functionType))
+  const [openedWith, setOpenedWith] = useState({ open, functionType })
+  if (openedWith.open !== open || openedWith.functionType !== functionType) {
+    setOpenedWith({ open, functionType })
+    if (open) setDetailsOpen(hasDetails(functionType))
+  }
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
   const { errors } = form.formState
   const { reset } = form
@@ -88,21 +115,26 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       name: toTranslatable(functionType?.name),
       allowsCircuit: functionType?.allowsCircuit ?? false,
       loadTypeIds: functionType?.loadTypeIds ?? [],
+      outputKindIds: functionType?.outputKindIds ?? [],
       isActive: functionType?.isActive ?? true,
       knxObjects: (functionType?.knxObjects ?? []).map((o) => ({ key: o.key, name: toTranslatable(o.name), dpst: o.dpst })),
     })
     resetCreate()
     resetUpdate()
   }, [open, functionType, reset, resetCreate, resetUpdate])
+  const detailsError = !!(errors.loadTypeIds || errors.knxObjects)
+  const outputKindIds = useWatch({ control: form.control, name: 'outputKindIds' }) ?? []
 
   const submit = form.handleSubmit(async (values) => {
-    const data = {
+    const data: FunctionTypeInput = {
       key: values.key,
       name: fromTranslatable(values.name),
       allowsCircuit: values.allowsCircuit,
       loadTypeIds: values.loadTypeIds,
+      outputKindIds: values.outputKindIds,
       isActive: values.isActive,
-      knxObjects: values.knxObjects.map((o) => ({ key: o.key, name: fromTranslatable(o.name), dpst: o.dpst.trim() })),
+      // Hidden without a KNX system: left out, so the API keeps them (D294).
+      ...(knx ? { knxObjects: values.knxObjects.map((o) => ({ key: o.key, name: fromTranslatable(o.name), dpst: o.dpst.trim() })) } : {}),
     }
     try {
       if (functionType) await update.mutateAsync({ id: functionType.id, data })
@@ -129,20 +161,37 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       <FormTranslatableField control={form.control} name="name" label={t('field.name')} required />
       <Controller
         control={form.control}
-        name="loadTypeIds"
+        name="outputKindIds"
         render={({ field }) => (
           <CheckboxGroupField
-            label={t('field.loadTypes')}
-            hint={t('field.loadTypesHint')}
-            options={loadTypeOptions}
-            value={field.value}
+            label={t('field.servedBy')}
+            hint={outputKindIds.length === 0 ? t('field.servedByNone') : t('field.servedByHint')}
+            options={kindOptions}
+            value={field.value ?? []}
             onChange={field.onChange}
-            error={fieldError(errors.loadTypeIds?.message)}
+            unknownLabel={kindName}
+            error={fieldError(errors.outputKindIds?.message)}
           />
         )}
       />
       <SwitchField label={t('field.allowsCircuit')} hint={t('field.allowsCircuitHint')} {...form.register('allowsCircuit')} />
-      <KnxObjectsEditor form={form} />
+      <Disclosure title={t('field.details')} description={knx ? t('field.detailsHint') : t('field.detailsHintNoKnx')} open={detailsOpen || detailsError} onOpenChange={setDetailsOpen}>
+        <Controller
+          control={form.control}
+          name="loadTypeIds"
+          render={({ field }) => (
+            <CheckboxGroupField
+              label={t('field.loadTypes')}
+              hint={t('field.loadTypesHint')}
+              options={loadTypeOptions}
+              value={field.value}
+              onChange={field.onChange}
+              error={fieldError(errors.loadTypeIds?.message)}
+            />
+          )}
+        />
+        {knx && <KnxObjectsEditor form={form} />}
+      </Disclosure>
       <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
     </FormDialog>
   )

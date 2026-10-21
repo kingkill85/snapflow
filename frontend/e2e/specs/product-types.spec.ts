@@ -1,4 +1,4 @@
-import { chooseLanguage, expect, navigate, row, test, unique, uniqueKey, translation } from '../fixtures'
+import { chooseLanguage, chooseOption, expect, navigate, row, test, unique, uniqueKey, translation } from '../fixtures'
 
 // Product types (the remodel replacing D14): the systems and product lines
 // (Zigbee, KNX, …) with a badge, edited in a dialog. Product types are
@@ -128,6 +128,49 @@ test('reorder and delete on the list; a type in use cannot be deleted', async ({
   await expect(confirm).toBeHidden()
   await expect(row(page, c.key)).toHaveCount(0)
   expect((await api.productTypes()).map((t) => t.id)).not.toContain(c.id)
+})
+
+// D443: only the chosen topology's settings; voltage and reserve under Advanced.
+test('the editor follows the topology and keeps voltage and reserve under Advanced', async ({ page, api }) => {
+  const type = await api.createProductType({ topology: 'bus', addressing: 'knx_individual', defaultBusCurrentMa: 10, busDevicesMax: 64 })
+  await page.goto(listPath)
+  await expect(row(page, type.key)).toContainText('Bus')
+  await expect(row(page, type.key)).toContainText('KNX individual address')
+  await row(page, type.key).getByRole('button', { name: 'Edit' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Edit system' })
+  await expect(dialog.getByLabel('Default bus current')).toHaveValue('10')
+  await expect(dialog.getByLabel('Devices per line')).toHaveValue('64')
+  await expect(dialog.getByLabel('Default wireless places')).toHaveCount(0)
+  // At their defaults, voltage and reserve are tucked away.
+  const advanced = dialog.getByRole('button', { name: /^Advanced/ })
+  await expect(advanced).toHaveAttribute('aria-expanded', 'false')
+  await expect(dialog.getByLabel(/^Reserve/)).toBeHidden()
+
+  // Wireless: the bus settings go and are cleared, addressing offers EUI-64.
+  await chooseOption(dialog.getByLabel('Topology'), 'Wireless')
+  await expect(dialog.getByLabel('Default bus current')).toHaveCount(0)
+  await dialog.getByLabel('Default wireless places').fill('2')
+  await chooseOption(dialog.getByLabel('Addressing'), 'EUI-64 (Zigbee IEEE)')
+  await advanced.click()
+  await dialog.getByLabel(/^Reserve/).fill('30')
+  await dialog.getByRole('button', { name: 'Update' }).click()
+  await expect(dialog).toBeHidden()
+  expect(await api.productType(type.id)).toMatchObject({ topology: 'wireless', addressing: 'eui64', defaultWirelessPlacesUsed: 2, reservePercent: 30, nominalVoltage: 230 })
+  const stored = await api.productType(type.id)
+  expect(stored.defaultBusCurrentMa ?? 0).toBe(0)
+  expect(stored.busDevicesMax ?? 0).toBe(0)
+
+  // A non-default reserve opens Advanced; None shows no topology settings and no addressing.
+  await row(page, type.key).getByRole('button', { name: 'Edit' }).click()
+  await expect(advanced).toHaveAttribute('aria-expanded', 'true')
+  await expect(dialog.getByLabel(/^Reserve/)).toHaveValue('30')
+  await chooseOption(dialog.getByLabel('Topology'), 'None')
+  await expect(dialog.getByLabel('Addressing')).toHaveCount(0)
+  await expect(dialog.getByLabel('Default wireless places')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Update' }).click()
+  await expect(dialog).toBeHidden()
+  expect(await api.productType(type.id)).toMatchObject({ topology: 'none', addressing: 'none' })
+  await expect(row(page, type.key).getByRole('cell').nth(4)).toHaveText('–')
 })
 
 for (const role of ['user', 'tenant_admin'] as const) {

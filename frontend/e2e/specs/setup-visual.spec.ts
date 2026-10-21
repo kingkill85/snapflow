@@ -115,6 +115,47 @@ test('the setup pages, the catalog menu and the saved mapping fit the screen', {
   }
 })
 
+// Step 4a-2 (D443, D444): the Systems editor (bus, Advanced open) and the
+// Functions editor (served by, Details open) in every layout; screenshots in
+// e2e/screenshots/setup-editor-*.png.
+test('the Systems and Functions editors fit the screen', { tag: '@visual' }, async ({ page, api }) => {
+  test.setTimeout(300_000)
+  const system = await api.createProductType({ topology: 'bus', addressing: 'knx_individual', defaultBusCurrentMa: 10, busDevicesMax: 64, reservePercent: 25 })
+  const kind = await api.createOutputKind(uniqueKey('visual_kind'), 'Visual dimmer output')
+  const fn = uniqueKey('visual_fn')
+  const created = await api.ctx.post('/api/function-types', {
+    data: { key: fn, name: { en: 'Visual dimmer', de: 'Visueller Dimmer' }, allowsCircuit: true, outputKindIds: [kind.id], knxObjects: [{ key: 'switch', name: { en: 'Switch', de: 'Schalten' }, dpst: 'DPST-1-1' }] },
+  })
+  expect(created.ok(), await created.text()).toBe(true)
+  const editors = [
+    { name: 'system', path: '/catalog/product-types', key: system.key, dialog: { en: 'Edit system', de: 'System bearbeiten' } },
+    { name: 'function', path: '/catalog/function-types', key: fn, dialog: { en: 'Edit function', de: 'Funktion bearbeiten' } },
+  ]
+  for (const lang of ['en', 'de'] as const) {
+    await page.addInitScript((lng) => window.localStorage.setItem('i18nextLng', lng), lang)
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport.size)
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme })
+        for (const e of editors) {
+          await page.goto(e.path)
+          await settle(page)
+          await page.getByRole('row').filter({ hasText: e.key }).getByRole('button', { name: lang === 'de' ? 'Bearbeiten' : 'Edit' }).click()
+          const dialog = page.getByRole('dialog', { name: e.dialog[lang] })
+          await expect(dialog).toBeVisible()
+          await settle(page)
+          // Advanced (reserve 25) and Details (objects) open by themselves.
+          await expect(dialog.getByRole('button', { expanded: true })).toHaveCount(1)
+          await expectNoHorizontalOverflow(page)
+          await page.screenshot({ path: `e2e/screenshots/setup-editor-${e.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: true, animations: 'disabled' })
+          await page.keyboard.press('Escape')
+          await expect(dialog).toBeHidden()
+        }
+      }
+    }
+  }
+})
+
 test('both menus lead to their pages, in German too, and a tenant admin gets theirs', { tag: '@visual' }, async ({ page, api, sessionFor }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')

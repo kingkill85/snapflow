@@ -19,6 +19,7 @@ import {
   apiFields,
   Button,
   ColorField,
+  Disclosure,
   errorKey,
   ErrorMessage,
   Field,
@@ -26,6 +27,7 @@ import {
   FormSelectField,
   FormTranslatableField,
   fromTranslatable,
+  SelectField,
   setApiFieldErrors,
   SwitchField,
   toTranslatable,
@@ -134,6 +136,11 @@ const toInput = (v: FormValues): ProductTypeInput => {
   }
 }
 
+/** The Advanced settings' defaults: the section opens when a value differs. */
+const advancedDefaults = { nominalVoltage: '230', reservePercent: '20' }
+const advancedChanged = (v: Pick<FormValues, 'nominalVoltage' | 'reservePercent'>) =>
+  v.nominalVoltage.trim() !== advancedDefaults.nominalVoltage || v.reservePercent.trim() !== advancedDefaults.reservePercent
+
 const addressingByTopology: Record<FormValues['topology'], readonly FormValues['addressing'][]> = {
   none: ['none'],
   bus: ['none', 'knx_individual', 'hdl'],
@@ -149,9 +156,11 @@ type Props = {
 
 /**
  * Creates or edits a product type (a system or product line such as Zigbee):
- * key, name, badge abbreviation and colour with a preview, active flag. An
- * update sends the version it was opened with as expectedUpdatedAt (D37); on
- * product_type.stale, Reload starts over from the current version.
+ * key, name, badge abbreviation and colour with a preview; then the topology
+ * and only its settings, voltage and reserve under Advanced (D443); active
+ * flag last. An update sends the version it was opened with as
+ * expectedUpdatedAt (D37); on product_type.stale, Reload starts over from the
+ * current version.
  */
 export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
   const { t } = useTranslation('productTypes')
@@ -164,10 +173,15 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
   // The version being edited: the item the dialog was opened with, until
   // Reload replaces it with the current one.
   const [base, setBase] = useState<ProductType | null>(item)
+  // Advanced starts open when a value differs from its default, and opens on an error inside.
+  const [advancedOpen, setAdvancedOpen] = useState(() => advancedChanged(toFormValues(item)))
   const [openedWith, setOpenedWith] = useState({ open, item })
   if (openedWith.open !== open || openedWith.item !== item) {
     setOpenedWith({ open, item })
-    if (open) setBase(item)
+    if (open) {
+      setBase(item)
+      setAdvancedOpen(advancedChanged(toFormValues(item)))
+    }
   }
   const mutation = base ? update : create
 
@@ -195,6 +209,20 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
   useEffect(() => {
     if (!allowedAddressing.includes(addressing)) setValue('addressing', 'none')
   }, [allowedAddressing, addressing, setValue])
+  // Choosing another topology clears the settings only the previous one uses
+  // (D443): the form never sends a combination the API refuses, nor hidden
+  // values. Only on the user's change, not when the form is reset.
+  const chooseTopology = (value: string) => {
+    const next = value as FormValues['topology']
+    setValue('topology', next, { shouldDirty: true })
+    if (next !== 'bus') {
+      setValue('defaultBusCurrentMa', '')
+      setValue('busDevicesMax', '')
+    }
+    if (next !== 'wireless') setValue('defaultWirelessPlacesUsed', '')
+    if (!addressingByTopology[next].includes(form.getValues('addressing'))) setValue('addressing', 'none')
+  }
+  const advancedError = !!(errors.nominalVoltage || errors.reservePercent)
   const previewColor = /^#[0-9a-fA-F]{6}$/.test(color.trim()) ? color.trim() : undefined
 
   const submit = form.handleSubmit(async (values) => {
@@ -227,6 +255,7 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
     }
     setBase(current)
     reset(toFormValues(current))
+    setAdvancedOpen(advancedChanged(toFormValues(current)))
     resetUpdate()
   }
   const stale = mutation.error instanceof ApiError && mutation.error.code === 'product_type.stale'
@@ -296,56 +325,60 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
           </TypeBadge>
         </div>
       </div>
-      <div className="space-y-3">
-        <p className="text-sm font-medium">{t('field.systemSettings')}</p>
+      <SelectField
+        label={t('field.topology')}
+        hint={t('field.topologyHint')}
+        options={topologyOptions}
+        value={topology}
+        onValueChange={chooseTopology}
+        error={fieldError(errors.topology?.message)}
+      />
+      {/* Only the settings of the chosen topology (D443). */}
+      {topology !== 'none' && (
+        <FormSelectField
+          control={form.control}
+          name="addressing"
+          label={t('field.addressing')}
+          hint={t('field.addressingHint')}
+          options={addressingOptions}
+          error={fieldError(errors.addressing?.message)}
+        />
+      )}
+      {topology === 'bus' && (
         <div className="grid items-start gap-4 sm:grid-cols-2">
-          <FormSelectField
-            control={form.control}
-            name="topology"
-            label={t('field.topology')}
-            hint={t('field.topologyHint')}
-            options={topologyOptions}
-            error={fieldError(errors.topology?.message)}
+          <Field
+            label={t('field.defaultBusCurrentMa')}
+            hint={t('field.defaultBusCurrentMaHint')}
+            suffix="mA"
+            inputMode="numeric"
+            error={fieldError(errors.defaultBusCurrentMa?.message)}
+            {...form.register('defaultBusCurrentMa')}
           />
-          <FormSelectField
-            control={form.control}
-            name="addressing"
-            label={t('field.addressing')}
-            hint={t('field.addressingHint')}
-            options={addressingOptions}
-            error={fieldError(errors.addressing?.message)}
+          <Field
+            label={t('field.busDevicesMax')}
+            hint={t('field.busDevicesMaxHint')}
+            inputMode="numeric"
+            error={fieldError(errors.busDevicesMax?.message)}
+            {...form.register('busDevicesMax')}
           />
         </div>
-        {/* The defaults of the other topologies stay in the form and are sent as they are (D294). */}
-        <div className="grid items-start gap-4 sm:grid-cols-3">
-          {topology === 'bus' && (
-            <Field
-              label={t('field.defaultBusCurrentMa')}
-              hint={t('field.defaultBusCurrentMaHint')}
-              suffix="mA"
-              inputMode="numeric"
-              error={fieldError(errors.defaultBusCurrentMa?.message)}
-              {...form.register('defaultBusCurrentMa')}
-            />
-          )}
-          {topology === 'wireless' && (
-            <Field
-              label={t('field.defaultWirelessPlacesUsed')}
-              hint={t('field.defaultWirelessPlacesUsedHint')}
-              inputMode="numeric"
-              error={fieldError(errors.defaultWirelessPlacesUsed?.message)}
-              {...form.register('defaultWirelessPlacesUsed')}
-            />
-          )}
-          <Field
-            label={t('field.reservePercent')}
-            hint={t('field.reservePercentHint')}
-            suffix="%"
-            inputMode="numeric"
-            required
-            error={fieldError(errors.reservePercent?.message)}
-            {...form.register('reservePercent')}
-          />
+      )}
+      {topology === 'wireless' && (
+        <Field
+          label={t('field.defaultWirelessPlacesUsed')}
+          hint={t('field.defaultWirelessPlacesUsedHint')}
+          inputMode="numeric"
+          error={fieldError(errors.defaultWirelessPlacesUsed?.message)}
+          {...form.register('defaultWirelessPlacesUsed')}
+        />
+      )}
+      <Disclosure
+        title={t('field.advanced')}
+        description={t('field.advancedHint')}
+        open={advancedOpen || advancedError}
+        onOpenChange={setAdvancedOpen}
+      >
+        <div className="grid items-start gap-4 sm:grid-cols-2">
           <Field
             label={t('field.nominalVoltage')}
             hint={t('field.nominalVoltageHint')}
@@ -355,17 +388,17 @@ export function ProductTypeFormDialog({ open, onOpenChange, item }: Props) {
             error={fieldError(errors.nominalVoltage?.message)}
             {...form.register('nominalVoltage')}
           />
-          {topology === 'bus' && (
-            <Field
-              label={t('field.busDevicesMax')}
-              hint={t('field.busDevicesMaxHint')}
-              inputMode="numeric"
-              error={fieldError(errors.busDevicesMax?.message)}
-              {...form.register('busDevicesMax')}
-            />
-          )}
+          <Field
+            label={t('field.reservePercent')}
+            hint={t('field.reservePercentHint')}
+            suffix="%"
+            inputMode="numeric"
+            required
+            error={fieldError(errors.reservePercent?.message)}
+            {...form.register('reservePercent')}
+          />
         </div>
-      </div>
+      </Disclosure>
       <SwitchField label={t('field.active')} hint={t('field.activeHint')} {...form.register('isActive')} />
     </FormDialog>
   )

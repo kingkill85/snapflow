@@ -10,6 +10,7 @@ export { ConfirmDialog, Dialog, FormDialog } from './dialog'
 export { Field, Input } from './field'
 export { FieldLabel, RequiredMark } from './label'
 export { FileDrop } from './file-drop'
+export { Disclosure } from './disclosure'
 export { Fieldset, FormActions } from './form-layout'
 export {
   type ApiFieldMap,

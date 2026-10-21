@@ -112,6 +112,7 @@ export const functionType = (n: number, over: Partial<FunctionType> = {}): Funct
   knxObjects: [],
   isActive: true,
   loadTypeIds: [],
+  outputKindIds: [],
   createdAt: at,
   updatedAt: at,
   ...over,
