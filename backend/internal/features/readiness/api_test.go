@@ -281,3 +281,107 @@ func TestReadinessPermissions(t *testing.T) {
 		}
 	}
 }
+
+func put[T any](t *testing.T, api *apptest.API, path string, body any) T {
+	t.Helper()
+	return send[T](t, api.Put(path, api.Admin.Cookie, body), http.StatusOK)
+}
+
+func refsOf(items map[string]readiness.ReadinessItem, code string) map[uuid.UUID]bool {
+	out := map[uuid.UUID]bool{}
+	for _, r := range items[code].Refs {
+		out[r.ID] = true
+	}
+	return out
+}
+
+// Channels: a category lists a channels field per kind, a device fills one
+// (0 counts as given); infrastructure has none. Limits only for kinds with a
+// limit field; the floorplan warning only for products placed there;
+// variants, inactive categories and system defaults.
+func TestReadinessRules(t *testing.T) {
+	api := apptest.New(t)
+	w := setup(t, api)
+	create[capabilities.CatalogField](t, api, "/api/catalog-fields", map[string]any{"key": "relay_outputs", "label": name("Relays"),
+		"type": "integer", "meaning": "channels_supplied", "outputKindId": w.relay.ID})
+	mixed := create[categories.Category](t, api, "/api/categories", map[string]any{"key": "mixed", "name": name("Mixed"), "isActive": true,
+		"mounting": "board", "instanceAttributes": []any{}, "attributes": []any{
+			attr("dimmers", "integer", "dimmer_outputs"), attr("relays", "integer", "relay_outputs"), attr("dimmer_led", "number", "dimmer_led_w"),
+			attr("bus", "number", "bus_ma"), attr("supply", "number", "supply_ma"), attr("width", "number", "width_te"), attr("rows", "integer", "rows"),
+		}})
+	relayOnly := product(t, api, w.knx.ID, mixed.ID, "R-1", map[string]any{"relays": 12, "width": 2, "bus": 10}, true)
+	empty := product(t, api, w.knx.ID, mixed.ID, "E-1", map[string]any{"width": 2, "bus": 10}, true)
+	zero := product(t, api, w.knx.ID, mixed.ID, "Z-0", map[string]any{"dimmers": 0, "width": 2, "bus": 10}, true)
+	supply := product(t, api, w.knx.ID, mixed.ID, "PS-1", map[string]any{"supply": 640, "width": 4}, true)
+	enclosure := product(t, api, w.knx.ID, mixed.ID, "ENC-1", map[string]any{"rows": 3}, true)
+	dimmer := product(t, api, w.knx.ID, mixed.ID, "D-1", map[string]any{"dimmers": 2, "width": 2, "bus": 10}, true)
+	for _, p := range []products.Product{relayOnly, zero, supply, enclosure} {
+		if got := missing(p); len(got) != 0 {
+			t.Errorf("%s missing %v", p.ModelNumber, got)
+		}
+	}
+	if got := missing(empty); len(got) != 1 || got[0] != "product_channels_missing" {
+		t.Errorf("E-1 missing %v", got)
+	}
+	// Dimmers have a limit field, relays none.
+	if got := missing(dimmer); len(got) != 1 || got[0] != "product_channel_without_limit" {
+		t.Errorf("D-1 missing %v", got)
+	}
+
+	// Overridden to the board: no floorplan warning for its category.
+	send[products.Product](t, api.Post("/api/products", api.Admin.Cookie, map[string]any{"productTypeId": w.zigbee.ID, "categoryId": w.sensors.ID,
+		"modelNumber": "S-B", "name": name("S-B"), "isActive": true, "mounting": "board", "attributes": map[string]any{"width": 1}}), http.StatusCreated)
+
+	// Variants: the active one fills the width, the inactive one is ignored.
+	vcat := create[categories.Category](t, api, "/api/categories", map[string]any{"key": "vcat", "name": name("Vcat"), "isActive": true,
+		"mounting": "board", "instanceAttributes": []any{}, "attributes": []any{
+			attr("bus", "number", "bus_ma"),
+			map[string]any{"key": "width", "label": name("width"), "type": "number", "fieldKey": "width_te", "scope": "variant"},
+		}})
+	v := product(t, api, w.knx.ID, vcat.ID, "V-1", map[string]any{"bus": 10}, true)
+	variant := func(n string, attrs map[string]any, active bool) {
+		create[map[string]any](t, api, "/api/products/"+v.ID.String()+"/variants", map[string]any{"name": name(n), "price": "10",
+			"attributes": attrs, "isActive": active})
+	}
+	variant("A", map[string]any{"width": 2}, true)
+	variant("B", map[string]any{}, false)
+	if got := missing(send[products.Product](t, api.Get("/api/products/"+v.ID.String(), api.Admin.Cookie), http.StatusOK)); len(got) != 0 {
+		t.Errorf("V-1 missing %v", got)
+	}
+	// An inactive category is skipped.
+	gone := create[categories.Category](t, api, "/api/categories", map[string]any{"key": "gone", "name": name("Gone"), "isActive": true,
+		"mounting": "board", "instanceAttributes": []any{}, "attributes": []any{attr("bus", "number", "bus_ma")}})
+	hidden := product(t, api, w.knx.ID, gone.ID, "G-1", map[string]any{"bus": 10}, true)
+	put[categories.Category](t, api, "/api/categories/"+gone.ID.String(), map[string]any{"key": "gone", "name": name("Gone"), "isActive": false,
+		"mounting": "board", "instanceAttributes": []any{}, "attributes": gone.Attributes, "expectedUpdatedAt": gone.UpdatedAt})
+	// A bus system with a default bus current needs none per product.
+	knxd := create[producttypes.ProductType](t, api, "/api/product-types", map[string]any{"key": "knxd", "name": name("knxd"), "isActive": true,
+		"topology": "bus", "defaultBusCurrentMa": 10})
+	product(t, api, knxd.ID, mixed.ID, "K-1", map[string]any{"relays": 4, "width": 2}, true)
+
+	r := get(t, api)
+	knx := system(t, r, "knx")
+	if refs := refsOf(knx, "product_channels_missing"); len(refs) != 1 || !refs[empty.ID] {
+		t.Errorf("channels refs %v", knx["product_channels_missing"])
+	}
+	if refs := refsOf(knx, "product_channel_without_limit"); len(refs) != 1 || !refs[dimmer.ID] {
+		t.Errorf("limit refs %v", knx["product_channel_without_limit"])
+	}
+	for _, it := range knx {
+		for _, ref := range it.Refs {
+			if ref.ID == v.ID || ref.ID == hidden.ID || ref.ID == supply.ID || ref.ID == enclosure.ID {
+				t.Errorf("%s lists %s", it.Code, ref.Label["en"])
+			}
+		}
+	}
+	expectNone(t, system(t, r, "knxd"), "product_bus_current_missing")
+	// Sensors has only a product overridden to the board.
+	expectNone(t, codes(r.Global), "categories_without_mounting_board")
+}
+
+// Without a KNX system no KNX object warning.
+func TestReadinessNoKNX(t *testing.T) {
+	api := apptest.New(t)
+	create[map[string]any](t, api, "/api/function-types", map[string]any{"key": "socket", "name": name("Socket")})
+	expectNone(t, codes(get(t, api).Global), "function_no_knx_objects", "functions_none")
+}

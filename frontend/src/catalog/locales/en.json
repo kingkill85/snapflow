@@ -47,7 +47,7 @@
       "system_no_enclosure": "No enclosure: no product has enclosure rows"
     },
     "missing": {
-      "product_board_without_width": "Width on the DIN rail (TE): the board cannot place it without one",
+      "product_board_without_width": "Width on the rail (TE): the board cannot place it without one",
       "product_channels_missing": "Number of channels: the category has the field, the value is empty",
       "product_bus_current_missing": "Bus current the device draws (mA): the line's power supply check skips it",
       "product_channel_without_limit": "Load limit per channel (W or A): loads on its channels are not checked"

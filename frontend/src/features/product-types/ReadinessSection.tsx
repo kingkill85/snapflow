@@ -69,7 +69,7 @@ export function ReadinessSection() {
           {cards.map((c) => (
             <li key={c.key} aria-label={c.name} className="min-w-0 space-y-3 rounded-control border border-line bg-surface p-4">
               <div className="space-y-0.5">
-                <div className="text-sm font-semibold">{c.title}</div>
+                <h3 className="text-sm font-semibold">{c.title}</h3>
                 <p className="text-xs text-muted">{c.subtitle}</p>
               </div>
               <ReadinessItems items={c.items} />
@@ -99,7 +99,7 @@ function ReadinessItems({ items }: { items: ReadinessItem[] }) {
         if (group.length === 0) return null
         return (
           <div key={sev} className="space-y-2">
-            <h3 className="text-xs font-medium tracking-wide text-muted uppercase">{tCatalog(`readiness.severity.${sev}`)}</h3>
+            <h4 className="text-xs font-medium tracking-wide text-muted uppercase">{tCatalog(`readiness.severity.${sev}`)}</h4>
             <ul className="space-y-2">
               {group.map((it) => (
                 <li key={it.code} className="space-y-1 text-sm" data-code={it.code}>

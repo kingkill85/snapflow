@@ -210,7 +210,10 @@ func compute(types []producttypes.ProductType, cats []categories.Category, funct
 	byType := map[uuid.UUID][]products.ReadinessProduct{}
 	for _, p := range prods {
 		byType[p.ProductTypeID] = append(byType[p.ProductTypeID], p)
-		if anyCaps(p, func(c capabilities.Capabilities) bool { return c.RailWidthTE != nil }) {
+		// Only products placed on the floorplan: an override to the board
+		// already puts them there.
+		if p.Capabilities.Mounting == string(capabilities.MountingFloorplan) &&
+			anyCaps(p, func(c capabilities.Capabilities) bool { return c.RailWidthTE != nil }) {
 			withWidth[p.CategoryID] = true
 		}
 	}

@@ -42,7 +42,8 @@ describe('ReadinessSection', () => {
     const knx = await screen.findByRole('listitem', { name: 'KNX' })
     expect(within(knx).getByText('Bus')).toBeInTheDocument()
     // Errors, then warnings, then notes.
-    expect(within(knx).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Error', 'Warning', 'Note'])
+    expect(within(knx).getByRole('heading', { level: 3 })).toHaveTextContent('KNX')
+    expect(within(knx).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Error', 'Warning', 'Note'])
     const width = knx.querySelector('[data-code="product_board_without_width"]') as HTMLElement
     expect(width).toHaveTextContent('Products on the board without a width (TE) (22)')
     expect(within(width).getAllByRole('link')).toHaveLength(20)

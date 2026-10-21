@@ -78,7 +78,7 @@ func (c Capabilities) HasMissing(code MissingCode) bool {
 }
 
 // MergeMissing is the missing list of a product with variants: a code
-// counts when the product or any of its variants lacks it (variants carry
+// counts when any active variant lacks it (variants carry
 // the product's values too). Without variants the product's own list.
 func MergeMissing(product Capabilities, variants []Capabilities) []Missing {
 	if len(variants) == 0 {
@@ -216,7 +216,8 @@ func Compute(reg Registry, in Input) Capabilities {
 		alternativeAllowedSet bool
 	}
 	channels := map[uuid.UUID]*channelData{}
-	// Kinds whose channels_supplied field the category has (value or not).
+	// Kinds whose channels_supplied field the category has; true once the
+	// product gives a value (0 counts as given).
 	channelFields := map[uuid.UUID]bool{}
 	ch := func(id uuid.UUID) *channelData {
 		c := channels[id]
@@ -244,7 +245,9 @@ func Compute(reg Registry, in Input) Capabilities {
 			continue
 		}
 		if f.Meaning == MeaningChannelsSupplied {
-			channelFields[deref0(f.OutputKindID)] = true
+			if _, seen := channelFields[deref0(f.OutputKindID)]; !seen {
+				channelFields[deref0(f.OutputKindID)] = false
+			}
 		}
 		raw, ok := in.Values[a.Key]
 		if !ok || raw == nil {
@@ -289,6 +292,7 @@ func Compute(reg Registry, in Input) Capabilities {
 		}
 		switch f.Meaning {
 		case MeaningChannelsSupplied:
+			channelFields[deref0(f.OutputKindID)] = true
 			setOnce(&ch(deref0(f.OutputKindID)).count, n)
 		case MeaningChannelLimitW:
 			ch(deref0(f.OutputKindID)).limitW.add(f.LoadTypeID, n)
@@ -373,21 +377,33 @@ func missing(reg Registry, in Input, c Capabilities, channelFields map[uuid.UUID
 	if (c.Mounting == string(MountingBoard) || c.Mounting == string(MountingBoth)) && c.RailWidthTE == nil && !enclosure {
 		add(MissingBoardWidth)
 	}
-	supplied := map[uuid.UUID]bool{}
-	for _, cc := range c.Channels {
-		supplied[cc.OutputKindID] = true
-	}
+	// Channels: the category has channels fields of active kinds and the
+	// product gives none of them a value (a device has channels of one or
+	// two kinds, not of every kind its category lists). Power supplies,
+	// gateways and enclosures have no channels.
+	infrastructure := c.BusCurrentSuppliedMa != nil || c.WirelessPlacesSupplied != nil || enclosure
+	hasField, given := false, false
 	for _, k := range reg.OutputKinds {
-		if channelFields[k.ID] && !supplied[k.ID] {
-			add(MissingChannels)
-			break
+		if v, ok := channelFields[k.ID]; ok {
+			hasField, given = true, given || v
 		}
+	}
+	if hasField && !given && !infrastructure {
+		add(MissingChannels)
 	}
 	if in.ProductType.Topology == TopologyBus && c.BusCurrentUsedMa == nil && c.BusCurrentSuppliedMa == nil && !enclosure {
 		add(MissingBusCurrent)
 	}
+	// Limits: only for kinds the catalog has a W or A limit field for
+	// (inputs have none).
+	limitFields := map[uuid.UUID]bool{}
+	for _, f := range reg.Fields {
+		if (f.Meaning == MeaningChannelLimitW || f.Meaning == MeaningChannelLimitA) && f.OutputKindID != nil {
+			limitFields[*f.OutputKindID] = true
+		}
+	}
 	for _, cc := range c.Channels {
-		if len(cc.LimitsW) == 0 && len(cc.LimitsA) == 0 {
+		if limitFields[cc.OutputKindID] && len(cc.LimitsW) == 0 && len(cc.LimitsA) == 0 {
 			add(MissingChannelLimit)
 			break
 		}

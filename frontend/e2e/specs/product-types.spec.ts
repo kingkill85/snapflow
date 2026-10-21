@@ -237,7 +237,7 @@ test('a readiness card shows a missing width, fixed on the product the card goes
   await card.getByRole('link', { name: `ACT-${tag}` }).click()
 
   await expect(page.getByRole('heading', { name: 'Edit product' })).toBeVisible()
-  await expect(page.getByTestId('still-missing')).toContainText('Width on the DIN rail (TE): the board cannot place it without one')
+  await expect(page.getByTestId('still-missing')).toContainText('Width on the rail (TE): the board cannot place it without one')
   await page.getByRole('textbox', { name: /^Width/ }).fill('2')
   await page.getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText('Saved.')).toBeVisible()

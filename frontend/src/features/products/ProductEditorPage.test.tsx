@@ -227,7 +227,7 @@ describe('ProductEditorPage', () => {
     const missing = await screen.findByTestId('still-missing')
     expect(within(missing).getByRole('heading', { name: 'Still missing' })).toBeInTheDocument()
     expect(within(missing).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'Width on the DIN rail (TE): the board cannot place it without one',
+      'Width on the rail (TE): the board cannot place it without one',
       'Load limit per channel (W or A): loads on its channels are not checked',
     ])
   })
