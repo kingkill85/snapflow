@@ -34,7 +34,9 @@
     "attributes": "Attributes",
     "attributesHint": "Values of the category's attributes that are set per product.",
     "variants": "Variants",
-    "variantsHint": "The sellable versions of this product, each with its own price, image and add-ons."
+    "variantsHint": "The sellable versions of this product, each with its own price, image and add-ons.",
+    "variant": "Variant",
+    "variantHint": "Values of the first variant's attributes; further variants are added on the product page."
   },
   "field": {
     "productType": "System",

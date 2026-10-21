@@ -54,6 +54,7 @@ import {
   productSchema,
   storedValues,
   toAttributes,
+  toFirstVariantAttributes,
   toProductCreate,
   toProductFormValues,
   toProductInput,
@@ -280,8 +281,16 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
   const category = categoryById(categoryId)
   const definitions = definitionsFor(category, 'product')
   const extras = category ? extraKeys(definitions, stored) : []
+  // A new product asks its first variant's attribute values too (D449).
+  const variantValues = useWatch({ control: form.control, name: 'variantValues' })
+  const variantDefinitions = loaded ? [] : definitionsFor(category, 'variant')
 
-  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
+  // Only a change of isDirty is reported: callers pass inline callbacks, which must not re-fire it every render.
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  })
+  useEffect(() => onDirtyChangeRef.current(isDirty), [isDirty])
 
   // The fields the last failed save showed its errors at (see editorFields).
   const [errorFields, setErrorFields] = useState<ApiFieldMap>()
@@ -298,12 +307,15 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
     setErrorRevision((r) => r + 1)
   }
 
-  const errorAt = (name: `values.${string}` | `keep.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
+  const errorAt = (name: `values.${string}` | `keep.${string}` | `variantValues.${string}`) => fieldError(form.getFieldState(name, form.formState).error?.message)
 
   const save = async (v: ProductFormValues) => {
     const defs = definitionsFor(categoryById(v.categoryId), 'product')
-    const fields = editorFields('product', defs, v.values, stored)
-    const { attributes, errors: inputErrors } = toAttributes(defs, v.values, v.keep, stored)
+    const variantDefs = loaded ? [] : definitionsFor(categoryById(v.categoryId), 'variant')
+    const fields = editorFields('product', defs, v.values, stored, loaded ? undefined : { defs: variantDefs, values: v.variantValues })
+    const { attributes, errors: productErrors } = toAttributes(defs, v.values, v.keep, stored)
+    const firstVariant = toFirstVariantAttributes(variantDefs, v.variantValues)
+    const inputErrors = [...productErrors, ...firstVariant.errors]
     if (inputErrors.length > 0) {
       for (const e of inputErrors) form.setError(e.name, { type: 'input', message: e.message })
       failed()
@@ -314,7 +326,7 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
     try {
       result = loaded
         ? await update.mutateAsync({ id: loaded.id, data: { ...data, expectedUpdatedAt: loaded.updatedAt } })
-        : await create.mutateAsync({ data: toProductCreate(v, attributes) })
+        : await create.mutateAsync({ data: toProductCreate(v, attributes, firstVariant.attributes) })
     } catch (error) {
       setErrorFields(fields)
       setApiFieldErrors(error, form.setError, fields)
@@ -473,6 +485,17 @@ function ProductForm({ item, types, categories, listSearch, onReload, onSaved, o
             <p className="text-sm text-muted">{t('chooseCategoryFirst')}</p>
           )}
         </Section>
+        {variantDefinitions.length > 0 && (
+          <Section title={t('section.variant')} description={t('section.variantHint')}>
+            <AttributeValuesEditor
+              definitions={variantDefinitions}
+              values={variantValues}
+              onChange={(key, value) => form.setValue(`variantValues.${key}`, value, { shouldDirty: true })}
+              errors={Object.fromEntries(variantDefinitions.map((d) => [d.key, errorAt(`variantValues.${d.key}`)]))}
+              disabled={readOnly}
+            />
+          </Section>
+        )}
       </Fieldset>
       <FormActions
         error={

@@ -29,13 +29,14 @@ export function Palette({ products, armed, onArm, editable, hints, empty }: Prop
   const [search, setSearch] = useState('')
   const groups = groupPalette(products, search, localize)
 
+  // Nothing to search or drag: only the next step (D448).
+  if (products.length === 0) return <div className="space-y-3">{empty ?? <p className="text-sm text-muted">{t('palette.empty')}</p>}</div>
+
   return (
     <div className="space-y-3">
       <Field label={t('palette.search')} type="search" value={search} onChange={(e) => setSearch(e.target.value)} hint={t('palette.searchHint')} />
       {editable && <p className="text-xs text-muted">{hints ? (armed ? hints.armedHint : hints.hint) : t(armed ? 'palette.armedHint' : 'palette.hint')}</p>}
-      {products.length === 0 ? (
-        (empty ?? <p className="text-sm text-muted">{t('palette.empty')}</p>)
-      ) : groups.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="text-sm text-muted">{t('palette.noMatch')}</p>
       ) : (
         groups.map((group) => (

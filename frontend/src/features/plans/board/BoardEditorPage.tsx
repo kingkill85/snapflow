@@ -524,7 +524,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : grid}</div>
         <aside aria-label={t('panel.label')} className="relative flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
-          <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
+          <Tabs label={t('panel.label')} size="sm" tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
     </div>
@@ -536,7 +536,7 @@ function BoardCheck({ check, kindName }: { check: BoardStatus; kindName: (id: st
   const { t } = useTranslation('plans')
   const list = check.channels.map((c) => `${kindName(c.outputKindId)}${c.alternative ? ` (${t('board.channelAlternative')})` : ''} ${c.free}/${c.total}`).join(', ')
   return (
-    <span data-testid="board-check" className="flex items-center gap-2 text-sm text-muted">
+    <span data-testid="board-check" className="flex min-w-0 max-w-full items-center gap-2 text-sm text-muted">
       <StatusChip status={boardStatus(check)} />
       {list && <span className="hidden truncate lg:inline">{t('board.channelTotals', { list })}</span>}
     </span>

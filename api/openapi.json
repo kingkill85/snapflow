@@ -18585,7 +18585,7 @@
     },
     "/api/versions/{versionId}/bus-lines/{id}": {
       "delete": {
-        "description": "Refused while devices are explicitly assigned to it (409 bus_line.in_use).",
+        "description": "Refused while devices are explicitly assigned to it (409 bus_line.in_use), and for the last line of its system while devices of that system are on the version's plans (409 bus_line.last_with_devices, params count; D451).",
         "operationId": "deleteBusLine",
         "parameters": [
           {

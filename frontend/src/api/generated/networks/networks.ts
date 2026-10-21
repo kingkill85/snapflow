@@ -616,7 +616,7 @@ export const useReorderBusLines = <TError = ErrorType<Error>,
       return useMutation(getReorderBusLinesMutationOptions(options), queryClient);
     }
     /**
- * Refused while devices are explicitly assigned to it (409 bus_line.in_use).
+ * Refused while devices are explicitly assigned to it (409 bus_line.in_use), and for the last line of its system while devices of that system are on the version's plans (409 bus_line.last_with_devices, params count; D451).
  * @summary Delete a bus line
  */
 export const deleteBusLine = (

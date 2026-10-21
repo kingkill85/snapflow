@@ -262,7 +262,12 @@ export function VariantForm({
   const keep = useWatch({ control: form.control, name: 'keep' })
   const imageFileId = useWatch({ control: form.control, name: 'imageFileId' })
 
-  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
+  // Only a change of isDirty is reported: callers pass inline callbacks, which must not re-fire it every render.
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  })
+  useEffect(() => onDirtyChangeRef.current(isDirty), [isDirty])
 
   const [errorFields, setErrorFields] = useState<ApiFieldMap>()
   const [errorRevision, setErrorRevision] = useState(0)

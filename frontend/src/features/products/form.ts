@@ -54,6 +54,8 @@ export const productSchema = z.object({
   /** The first variant's price and SKU: asked only on create (D449), unchecked on update. */
   price: z.string(),
   sku: z.string(),
+  /** The first variant's attribute values (the category's variant scope): asked only on create (D449). */
+  variantValues: attributeValues,
 })
 export type ProductFormValues = z.infer<typeof productSchema>
 
@@ -103,6 +105,7 @@ export function toProductFormValues(item: Product | null, defs: Definition[], se
     keep: keepAll(storedValues(item)),
     price: '',
     sku: '',
+    variantValues: {},
   }
 }
 
@@ -148,12 +151,18 @@ export function toProductInput(v: ProductFormValues, attributes: Record<string, 
 }
 
 /** A new product with its first variant (D449): the variant's name is the server's "Standard". */
-export function toProductCreate(v: ProductFormValues, attributes: Record<string, unknown>): ProductCreate {
+export function toProductCreate(v: ProductFormValues, attributes: Record<string, unknown>, variantAttributes: Record<string, unknown>): ProductCreate {
   const sku = v.sku.trim()
   return {
     ...toProductInput(v, attributes),
-    firstVariant: { price: apiPrice(v.price) ?? v.price.trim(), ...(sku ? { sku } : {}) },
+    firstVariant: { price: apiPrice(v.price) ?? v.price.trim(), ...(sku ? { sku } : {}), attributes: variantAttributes },
   }
+}
+
+/** The first variant's attributes on the new-product form; input errors at `variantValues.<key>`. */
+export function toFirstVariantAttributes(defs: Definition[], values: AttributeFormValues) {
+  const { attributes, errors } = toApiValues(defs, values)
+  return { attributes, errors: Object.entries(errors).map(([key, message]) => ({ name: `variantValues.${key}` as const, message })) }
 }
 
 export function toVariantInput(v: VariantFormValues, attributes: Record<string, unknown>): VariantInput {
@@ -176,10 +185,20 @@ const firstVariantFields = { 'firstVariant.price': 'price', 'firstVariant.sku': 
 const variantFields = ['sku', 'price', 'imageFileId']
 
 /** API error locations shown at the form's fields, for the definitions shown and the stored values outside them. */
-export function editorFields(kind: 'product' | 'variant', defs: Definition[], values: AttributeFormValues, stored: Record<string, unknown>): ApiFieldMap {
+export function editorFields(
+  kind: 'product' | 'variant',
+  defs: Definition[],
+  values: AttributeFormValues,
+  stored: Record<string, unknown>,
+  /** The new-product form's first variant attributes (D449). */
+  firstVariant?: { defs: Definition[]; values: AttributeFormValues },
+): ApiFieldMap {
   const own = Object.fromEntries((kind === 'product' ? productFields : variantFields).map((f) => [f, f]))
   const texts =
     kind === 'product' ? { ...translatableApiFields('name'), ...translatableApiFields('description') } : translatableApiFields('name')
   const first = kind === 'product' ? firstVariantFields : {}
-  return { ...own, ...first, ...texts, ...attributeFieldMap(defs, values, extraKeys(defs, stored)) }
+  const variantAttributes = firstVariant
+    ? attributeFieldMap(firstVariant.defs, firstVariant.values, [], { location: 'firstVariant.attributes', valuesField: 'variantValues' })
+    : {}
+  return { ...own, ...first, ...texts, ...attributeFieldMap(defs, values, extraKeys(defs, stored)), ...variantAttributes }
 }

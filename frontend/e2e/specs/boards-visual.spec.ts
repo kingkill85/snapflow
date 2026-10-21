@@ -21,7 +21,7 @@ const viewports = [
 
 const labels = {
   en: { addBoard: 'Add board', saved: 'Saved', board: 'Board', inspector: 'Inspector', networks: 'Networks', lineOf: 'Line of', boardName: 'Main distribution board' },
-  de: { addBoard: 'Verteiler hinzufügen', saved: 'Gespeichert', board: 'Verteiler', inspector: 'Eigenschaften', networks: 'Netzwerke', lineOf: 'Linie von', boardName: 'Hauptverteiler im Keller' },
+  de: { addBoard: 'Verteiler hinzufügen', saved: 'Gespeichert', board: 'Verteiler', inspector: 'Details', networks: 'Netzwerke', lineOf: 'Linie von', boardName: 'Hauptverteiler im Keller' },
 }
 type Lang = keyof typeof labels
 

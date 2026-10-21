@@ -37,7 +37,7 @@ const labels = {
     csv: /KNX group addresses \(CSV\)/,
   },
   de: {
-    inspector: 'Eigenschaften',
+    inspector: 'Details',
     zones: 'Zonen',
     saved: 'Gespeichert',
     edit: 'Bearbeiten',

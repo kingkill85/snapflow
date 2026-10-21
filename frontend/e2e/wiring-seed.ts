@@ -117,6 +117,6 @@ export async function wiringSeed(api: Api, { systemKey = 'knx' }: { systemKey?: 
   })
   expect(res.ok(), await res.text()).toBe(true)
   await api.ctx.delete(`/api/plans/${board.id}/lock`)
-  return { project, versionId, floor, kitchen, living, board, lightName, blindName, dimmer, relay, blindAct, f }
+  return { project, versionId, floor, kitchen, living, board, lightName, blindName, dimmer, relay, blindAct, f, knx, category, light, blind, dimmerKind }
 }
 
