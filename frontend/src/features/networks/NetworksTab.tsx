@@ -336,7 +336,8 @@ function BusSystemSection({
       {system.unassigned.length > 0 && (
         <div className="space-y-2">
           <h3 className="font-medium">{t('bus.unassigned')}</h3>
-          <Notice tone="warning">{t('bus.unassignedNotice')}</Notice>
+          {/* Without any line the empty state above already says what is missing. */}
+          {system.lines.length > 0 && <Notice tone="warning">{t('bus.unassignedNotice')}</Notice>}
           <MemberTable label={`${name}: ${t('bus.unassigned')}`} members={system.unassigned} lines={[]} actions={null} />
         </div>
       )}

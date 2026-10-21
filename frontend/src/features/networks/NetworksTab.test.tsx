@@ -183,6 +183,7 @@ describe('NetworksTab', () => {
     serve({ ...readOnlyNetworks, can: { update: true } })
     renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
     expect(await screen.findByText('These devices need a bus line.')).toBeInTheDocument()
+    expect(screen.queryByText(/^These devices have no line yet/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Create line' }))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
