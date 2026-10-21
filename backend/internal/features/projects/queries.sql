@@ -126,18 +126,18 @@ DELETE FROM project_versions WHERE id = $1 AND project_id = $2;
 -- orders content changes against status changes (which update the row),
 -- FOR UPDATE also against each other and against version changes.
 -- name: VersionAccess :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1;
 
 -- name: VersionAccessShare :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR SHARE OF p;
 
 -- name: VersionAccessLock :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR UPDATE OF p;

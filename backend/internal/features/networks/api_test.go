@@ -147,7 +147,7 @@ func TestNetworks(t *testing.T) {
 
 	// The first GET creates the default line of KNX; every bus device is on it.
 	n := decode[networks.Networks](t, api.Get("/api/versions/"+v+"/networks", cookie))
-	if len(n.BusSystems) != 1 || len(n.BusSystems[0].Lines) != 1 || n.BusSystems[0].Lines[0].Name != "KNX 1" {
+	if len(n.BusSystems) != 1 || len(n.BusSystems[0].Lines) != 1 || n.BusSystems[0].Lines[0].Name != "Line 1" {
 		t.Fatalf("bus systems: %+v", n.BusSystems)
 	}
 	line1 := n.BusSystems[0].Lines[0]

@@ -2,6 +2,7 @@ package networks_test
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,26 +31,50 @@ func (w world) lines(t *testing.T, cookie string) []networks.BusLine {
 	return decode[[]networks.BusLine](t, w.api.Get("/api/versions/"+w.version.String()+"/bus-lines", cookie))
 }
 
-// D372: the default line comes with a content save, GET never writes.
+// D372, D451: the first line ("Line 1") comes with a content save, GET
+// never writes, the last line of a system with devices stays.
 func TestDefaultLineOnSave(t *testing.T) {
 	w := setup(t)
 	api, v := w.api, w.version.String()
-	act := uuid.New()
+	act, gw := uuid.New(), uuid.New()
 
-	// A board without bus modules creates nothing.
+	// A board without bus modules and a floorplan with only a wireless
+	// gateway create nothing.
 	board := w.board(t, "Board")
+	w.floorplan(t, "Ground", [2]uuid.UUID{gw, w.c.Gateway})
 	if l := w.lines(t, w.user.Cookie); len(l) != 0 {
-		t.Fatalf("lines without members: %+v", l)
+		t.Fatalf("lines without bus members: %+v", l)
 	}
-	// Saving a bus module creates "KNX 1".
+	// Saving a bus module creates "Line 1" (the project is en); a second
+	// save creates no other.
 	w.saveBoard(t, board, [2]uuid.UUID{act, w.c.Actuator})
+	w.saveBoard(t, board, [2]uuid.UUID{act, w.c.Actuator}, [2]uuid.UUID{uuid.New(), w.c.PSU})
 	l := w.lines(t, w.user.Cookie)
-	if len(l) != 1 || l[0].Name != "KNX 1" || l[0].ProductTypeID != w.c.KNX {
+	if len(l) != 1 || l[0].Name != "Line 1" || l[0].ProductTypeID != w.c.KNX {
 		t.Fatalf("default line: %+v", l)
 	}
-	// Without a line (deleted: no member pinned), members are unassigned,
-	// and GET creates nothing (every role writes; read-only projects below).
+	// The only line of a system with devices cannot be deleted.
+	resp := api.Delete("/api/versions/"+v+"/bus-lines/"+l[0].ID.String(), w.user.Cookie)
+	want(t, resp, http.StatusConflict, "bus_line.last_with_devices")
+	if !contains(resp.Body.String(), `"count":2`) {
+		t.Errorf("count: %s", resp.Body)
+	}
+	// Without devices it can; GET creates nothing, the next save with a
+	// device brings it back.
+	w.saveBoard(t, board)
 	want(t, api.Delete("/api/versions/"+v+"/bus-lines/"+l[0].ID.String(), w.user.Cookie), http.StatusNoContent, "")
+	w.saveBoard(t, board, [2]uuid.UUID{act, w.c.Actuator})
+	l = w.lines(t, w.user.Cookie)
+	if len(l) != 1 || l[0].Name != "Line 1" {
+		t.Fatalf("default line again: %+v", l)
+	}
+
+	// Members without a line (a line removed outside the API, data from
+	// before D451) are unassigned; GET creates nothing (every role writes;
+	// read-only projects below).
+	if _, err := api.DB.Exec(t.Context(), `DELETE FROM bus_lines WHERE version_id = $1`, w.version); err != nil {
+		t.Fatal(err)
+	}
 	for _, cookie := range []string{w.user.Cookie, api.Admin.Cookie} {
 		n := decode[networks.Networks](t, api.Get("/api/versions/"+v+"/networks", cookie))
 		if len(n.BusSystems) != 1 || len(n.BusSystems[0].Lines) != 0 || len(n.BusSystems[0].Unassigned) != 1 {
@@ -59,12 +84,6 @@ func TestDefaultLineOnSave(t *testing.T) {
 			t.Errorf("GET created a line")
 		}
 	}
-	// The next save brings it back.
-	w.saveBoard(t, board, [2]uuid.UUID{act, w.c.Actuator})
-	if l := w.lines(t, w.user.Cookie); len(l) != 1 || l[0].Name != "KNX 1" {
-		t.Fatalf("default line again: %+v", l)
-	}
-	want(t, api.Delete("/api/versions/"+v+"/bus-lines/"+w.lines(t, w.user.Cookie)[0].ID.String(), w.user.Cookie), http.StatusNoContent, "")
 
 	// A completed project: GET still writes nothing, can.update false.
 	p := decode[struct {
@@ -76,6 +95,137 @@ func TestDefaultLineOnSave(t *testing.T) {
 	n := decode[networks.Networks](t, api.Get("/api/versions/"+v+"/networks", w.user.Cookie))
 	if n.Can.Update || len(n.BusSystems[0].Lines) != 0 || len(n.BusSystems[0].Unassigned) != 1 || len(w.lines(t, w.user.Cookie)) != 0 {
 		t.Errorf("read-only: %+v", n)
+	}
+}
+
+// D451: the line's name is in the project's language; two bus systems get
+// a line each; the last line refusal is per system.
+func TestDefaultLineLanguageAndSystems(t *testing.T) {
+	w := setup(t)
+	api, admin, cookie, v := w.api, w.api.Admin.Cookie, w.user.Cookie, w.version.String()
+	text := func(en string) map[string]string { return map[string]string{"en": en} }
+	resp := api.Post("/api/product-types", admin, map[string]any{"key": "hdl", "name": text("HDL"), "abbreviation": "HDL", "isActive": true, "topology": "bus"})
+	want(t, resp, http.StatusCreated, "")
+	hdl := decode[struct{ ID uuid.UUID }](t, resp).ID
+	cat := decode[struct {
+		Items []struct {
+			ID  uuid.UUID
+			Key string
+		}
+	}](t, api.Get("/api/categories", admin))
+	var boardCat uuid.UUID
+	for _, c := range cat.Items {
+		if c.Key == "board_devices" {
+			boardCat = c.ID
+		}
+	}
+	resp = api.Post("/api/products", admin, map[string]any{"productTypeId": hdl, "categoryId": boardCat, "modelNumber": "HDL-ACT",
+		"name": text("HDL-ACT"), "isActive": true, "attributes": map[string]any{"width_te": 4}})
+	want(t, resp, http.StatusCreated, "")
+	prod := decode[struct{ ID uuid.UUID }](t, resp).ID
+	resp = api.Post("/api/products/"+prod.String()+"/variants", admin, map[string]any{"name": text("HDL-ACT"), "price": "10.00", "isActive": true})
+	want(t, resp, http.StatusCreated, "")
+	hdlAct := decode[struct{ ID uuid.UUID }](t, resp).ID
+
+	p := decode[struct {
+		Name      string
+		UpdatedAt time.Time
+	}](t, api.Get("/api/projects/"+w.project.String(), cookie))
+	want(t, api.Put("/api/projects/"+w.project.String(), cookie, map[string]any{"name": p.Name, "status": "active", "language": "de",
+		"expectedUpdatedAt": p.UpdatedAt, "productTypeIds": []any{w.c.KNX, w.c.Zigbee, hdl}}), http.StatusOK, "")
+
+	w.board(t, "Board", [2]uuid.UUID{uuid.New(), w.c.Actuator}, [2]uuid.UUID{uuid.New(), hdlAct})
+	l := w.lines(t, cookie)
+	if len(l) != 2 || l[0].Name != "Linie 1" || l[1].Name != "Linie 1" || l[0].ProductTypeID == l[1].ProductTypeID {
+		t.Fatalf("two systems: %+v", l)
+	}
+	// With a second KNX line, the first one can go (its default members
+	// follow the remaining line, D360); the HDL line cannot.
+	resp = api.Post("/api/versions/"+v+"/bus-lines", cookie, map[string]any{"productTypeId": w.c.KNX, "name": "Linie 2"})
+	want(t, resp, http.StatusCreated, "")
+	line2 := decode[networks.BusLine](t, resp)
+	for _, x := range l {
+		if x.ProductTypeID == hdl {
+			want(t, api.Delete("/api/versions/"+v+"/bus-lines/"+x.ID.String(), cookie), http.StatusConflict, "bus_line.last_with_devices")
+		} else {
+			want(t, api.Delete("/api/versions/"+v+"/bus-lines/"+x.ID.String(), cookie), http.StatusNoContent, "")
+		}
+	}
+	want(t, api.Delete("/api/versions/"+v+"/bus-lines/"+line2.ID.String(), cookie), http.StatusConflict, "bus_line.last_with_devices")
+}
+
+// D451: saves of two plans of one version at once create one line; a
+// version copy keeps it and creates no second one.
+func TestDefaultLineConcurrentAndCopy(t *testing.T) {
+	w := setup(t)
+	api, cookie := w.api, w.user.Cookie
+	a, b := w.board(t, "A"), w.board(t, "B")
+	var wg sync.WaitGroup
+	for _, id := range []uuid.UUID{a, b} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w.saveBoard(t, id, [2]uuid.UUID{uuid.New(), w.c.Actuator})
+		}()
+	}
+	wg.Wait()
+	if l := w.lines(t, cookie); len(l) != 1 || l[0].Name != "Line 1" {
+		t.Fatalf("concurrent saves: %+v", l)
+	}
+
+	resp := api.Post("/api/projects/"+w.project.String()+"/versions", cookie, map[string]any{"name": "Copy", "sourceVersionId": w.version})
+	want(t, resp, http.StatusCreated, "")
+	copied := world{api: api, c: w.c, user: w.user, project: w.project, version: decode[struct{ ID uuid.UUID }](t, resp).ID}
+	l := copied.lines(t, cookie)
+	if len(l) != 1 || l[0].Name != "Line 1" {
+		t.Fatalf("copy: %+v", l)
+	}
+	n := decode[networks.Networks](t, api.Get("/api/versions/"+copied.version.String()+"/networks", cookie))
+	if len(n.BusSystems[0].Lines[0].Members) != 2 {
+		t.Errorf("copy members: %+v", n.BusSystems[0].Lines)
+	}
+	plansOf := decode[[]struct{ ID uuid.UUID }](t, api.Get("/api/versions/"+copied.version.String()+"/plans", cookie))
+	want(t, api.Post("/api/plans/"+plansOf[0].ID.String()+"/lock", cookie), http.StatusOK, "")
+	copied.saveBoard(t, plansOf[0].ID, [2]uuid.UUID{uuid.New(), w.c.Actuator})
+	if l := copied.lines(t, cookie); len(l) != 1 {
+		t.Errorf("save in the copy: %+v", l)
+	}
+}
+
+// D452: devices without an explicit row are members of the system's line,
+// marked not pinned, in the view and in the checks (capacity counts them).
+func TestDefaultMembersInViewAndChecks(t *testing.T) {
+	w := setup(t)
+	api, cookie, v := w.api, w.user.Cookie, w.version.String()
+	w.board(t, "Board", [2]uuid.UUID{uuid.New(), w.c.PSU}, [2]uuid.UUID{uuid.New(), w.c.Actuator}, [2]uuid.UUID{uuid.New(), w.c.Actuator})
+	n := decode[networks.Networks](t, api.Get("/api/versions/"+v+"/networks", cookie))
+	line := n.BusSystems[0].Lines[0]
+	if len(line.Members) != 3 || len(n.BusSystems[0].Unassigned) != 0 || line.BusCurrentUsedMa != 20 || line.BusCurrentSuppliedMa != 640 {
+		t.Fatalf("line: %+v", line)
+	}
+	for _, m := range line.Members {
+		if m.Pinned {
+			t.Errorf("default member pinned: %+v", m)
+		}
+	}
+	checks := decode[struct {
+		BusLines []struct {
+			BusLineID         uuid.UUID
+			Devices           int
+			CurrentUsedMa     float64
+			CurrentSuppliedMa float64
+			CurrentStatus     string
+		}
+		Findings []struct{ Code string }
+	}](t, api.Get("/api/versions/"+v+"/checks", cookie))
+	if len(checks.BusLines) != 1 || checks.BusLines[0].BusLineID != line.ID || checks.BusLines[0].Devices != 3 ||
+		checks.BusLines[0].CurrentUsedMa != 20 || checks.BusLines[0].CurrentSuppliedMa != 640 || checks.BusLines[0].CurrentStatus != "ok" {
+		t.Errorf("checks: %+v", checks.BusLines)
+	}
+	for _, f := range checks.Findings {
+		if f.Code == "bus_device_unassigned" || f.Code == "bus_line_no_power_supply" {
+			t.Errorf("finding %s", f.Code)
+		}
 	}
 }
 

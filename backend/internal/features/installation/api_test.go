@@ -356,7 +356,7 @@ func TestCommissioningLists(t *testing.T) {
 		t.Fatal(err)
 	}
 	sheets := f.GetSheetList()
-	if len(sheets) != 1 || sheets[0] != "KNX 1" {
+	if len(sheets) != 1 || sheets[0] != "Linie 1" {
 		t.Fatalf("sheets %v", sheets)
 	}
 	rows, _ := f.GetRows(sheets[0])
@@ -409,7 +409,7 @@ func TestDocuments(t *testing.T) {
 	}
 	parts := unzip(t, data)
 	body := plain(parts["word/document.xml"])
-	for _, s := range []string{"Installation manual", "Overview", "Bus lines", "KNX 1", "Main board", "D2", "Lights", "Dimmer 1",
+	for _, s := range []string{"Installation manual", "Overview", "Bus lines", "Line 1", "Main board", "D2", "Lights", "Dimmer 1",
 		"Ceiling spots", "3 × 40 W LED", "1.1.1", "existing", "Living room", "Free channels", "Kunde GmbH", "Cables and terminals",
 		"Gateways", "Hub", "00124B001CA1B2C3", "Reading lamp", "1.1 (default)"} {
 		if !strings.Contains(body, s) {
