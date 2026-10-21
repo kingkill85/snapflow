@@ -92,7 +92,7 @@ test('connections: checks, auto-connect, a hand move, a bus line near its limit,
   await api.updateProduct(s.dimmer.id, { isActive: false })
   await page.goto(checksUrl)
   const findings = page.getByRole('region', { name: 'Findings' })
-  const boardGroup = findings.getByRole('region', { name: s.board.name })
+  const boardGroup = findings.getByRole('region', { name: 'Main board' })
   const inactive = /^D1\b.*: the product is inactive in the catalog\.$/
   await expect(boardGroup.getByText(inactive)).toBeVisible()
   await expect(findings.getByRole('region', { name: 'Version (networks)' })).toContainText('Line 1: 130 of 160 mA used')
