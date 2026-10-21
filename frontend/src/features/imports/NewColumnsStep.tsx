@@ -30,7 +30,7 @@ import {
   type TranslatableValue,
   useFieldError,
 } from '@/components/ui'
-import { useFixedOptionLabel, useMeaningLabel } from '@/catalog/meaning-labels'
+import { useDescribeMeaning, useFixedOptionLabel, useMeaningLabel } from '@/catalog/meaning-labels'
 import { useLocalized } from '@/i18n/localized'
 
 // The mapping's "New columns – what do they mean?" step (D188): every
@@ -150,14 +150,24 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
   const productTypes = useListProductTypes()
   const answer = useAnswerImportColumns()
 
-  const meaningLabel = useMeaningLabel()
+  const { t: tc } = useTranslation('capabilities')
   const fixedOption = useFixedOptionLabel()
   /** The choices a meaning prescribes (motor_type: ac, dc), if any. */
   const fixedOptionsOf = (meaning: string) => {
     const keys = meanings.data?.items.find((m) => m.meaning === meaning)?.options ?? []
     return keys.length > 0 ? keys : undefined
   }
-  const meaningOptions = [{ value: '', label: meaningLabel() }, ...(meanings.data?.items ?? []).map((m) => ({ value: m.meaning, label: meaningLabel(m.meaning) }))]
+  const describeMeaning = useDescribeMeaning()
+  const meaningOption = (m: string) => {
+    const d = describeMeaning(m)
+    return { value: m, label: d.title, description: d.description }
+  }
+  const meaningOptions = [meaningOption(''), ...(meanings.data?.items ?? []).map((m) => meaningOption(m.meaning))]
+  /** The chosen meaning in one line with its example (D445). */
+  const meaningHint = (m: string) => {
+    const d = describeMeaning(m)
+    return `${d.description}. ${tc('meaningExample', { example: d.example })}`
+  }
   const typeOptions = fieldTypes.map((v) => ({ value: v, label: t(`columns.type.${v}`) }))
   const modeOptions = [
     { value: 'field', label: t('columns.modeField') },
@@ -265,7 +275,7 @@ export function NewColumnsStep({ mapping, check, onAnswered, onBack }: Props) {
                           // Choosing a meaning also adjusts the type and the parameters.
                           <SelectField
                             label={t('columns.meaning')}
-                            hint={t('columns.meaningHint')}
+                            hint={meaningHint(field.value)}
                             value={field.value}
                             options={meaningOptions}
                             error={fieldError(fieldState.error?.message)}

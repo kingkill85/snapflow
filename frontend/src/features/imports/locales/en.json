@@ -394,7 +394,6 @@
     "optionsHint": "Type a choice and press Enter.",
     "optionsFixed": "This meaning needs exactly these choices.",
     "meaning": "Meaning for the checks",
-    "meaningHint": "What SnapFlow does with the value; \"Just information\" keeps it on the product without checking it.",
     "outputKind": "Channel kind",
     "loadType": "Load type",
     "productTypes": "Only for these systems",

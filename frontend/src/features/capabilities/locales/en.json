@@ -60,7 +60,6 @@
     "etimFeature": "ETIM feature",
     "etimFeatureHint": "For information, e.g. EF000008.",
     "meaning": "Meaning",
-    "meaningHint": "What SnapFlow uses the value for. \"Just information\" is shown but not checked.",
     "meaningTypes": "This meaning needs the value type: {{types}}.",
     "outputKind": "Channel kind",
     "loadType": "Load type",
@@ -105,5 +104,84 @@
   "fixedOption": {
     "ac": "AC motor",
     "dc": "DC motor"
-  }
+  },
+  "meaningHelp": {
+    "none": {
+      "description": "Shown on the product and exported, never checked",
+      "example": "Colour, ETIM class, notes"
+    },
+    "channels_supplied": {
+      "description": "How many channels of one kind the device has",
+      "example": "4 dimmer channels"
+    },
+    "channel_limit_w": {
+      "description": "The most load one channel may switch, for one load type; checked against the needs it serves",
+      "example": "300 W LED per dimmer channel"
+    },
+    "channel_limit_a": {
+      "description": "The most current one channel may switch; the needs' W are converted with the voltage",
+      "example": "16 A per relay channel"
+    },
+    "channel_min_load_w": {
+      "description": "The least load one channel needs to work properly",
+      "example": "3 W per dimmer channel"
+    },
+    "channel_voltage": {
+      "description": "The voltage the channels switch when it differs from the system's",
+      "example": "24 V for a low-voltage relay"
+    },
+    "module_total_a": {
+      "description": "The most current the whole device may switch over all its channels",
+      "example": "20 A for the whole actuator"
+    },
+    "module_total_w": {
+      "description": "The most load the whole device may switch over all its channels",
+      "example": "1000 W over all channels"
+    },
+    "bus_current_used_ma": {
+      "description": "mA taken from the bus line; used for the line's power supply check",
+      "example": "10 mA"
+    },
+    "bus_current_supplied_ma": {
+      "description": "mA a power supply feeds into the bus line; the line's devices may not draw more",
+      "example": "640 mA"
+    },
+    "bus_devices_max": {
+      "description": "How many devices one bus line may hold",
+      "example": "64 devices"
+    },
+    "rail_width_te": {
+      "description": "In TE (17.5 mm); used for the board's capacity",
+      "example": "4 TE"
+    },
+    "enclosure_rows": {
+      "description": "How many DIN rails an enclosure has; marks the product as an enclosure",
+      "example": "3 rows"
+    },
+    "enclosure_te_per_row": {
+      "description": "How many TE fit on one rail of the enclosure",
+      "example": "12 TE per row"
+    },
+    "wireless_places_supplied": {
+      "description": "How many wireless devices a gateway or coordinator can take",
+      "example": "64 devices"
+    },
+    "wireless_place_used": {
+      "description": "How many places of the gateway a wireless device takes (yes = 1)",
+      "example": "1 place"
+    },
+    "zigbee_router": {
+      "description": "The device forwards Zigbee messages and extends the mesh",
+      "example": "Mains-powered plug: yes"
+    },
+    "motor_type": {
+      "description": "Whether the blind channels drive AC or DC motors; matched against the motor of a blind",
+      "example": "AC"
+    },
+    "alternative_allowed": {
+      "description": "The device's channels may act as another kind, e.g. 2 relays as 1 blind channel",
+      "example": "Yes: relays as blinds"
+    }
+  },
+  "meaningExample": "Example: {{example}}"
 }

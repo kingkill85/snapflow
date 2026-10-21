@@ -10,8 +10,10 @@ import { FieldLabel, FieldMessage } from './label'
 /**
  * One choice. `label` is the plain text (typeahead, accessible name);
  * `content` optionally replaces it on screen, e.g. a TypeBadge with its colour dot.
+ * `description` is one muted line under the label in the open list only
+ * (the closed dropdown shows the label), e.g. a meaning in plain words.
  */
-export type SelectOption = { value: string; label: string; content?: ReactNode; disabled?: boolean }
+export type SelectOption = { value: string; label: string; content?: ReactNode; description?: string; disabled?: boolean }
 
 // Radix reserves the empty string for "nothing selected"; options with the
 // value "" ("All types", "Not set") use this stand-in inside the component.
@@ -71,7 +73,11 @@ export function Select({ value, onValueChange, options, className, placeholder, 
           position="popper"
           sideOffset={4}
           collisionPadding={8}
-          className="z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-edge bg-raised text-ink shadow-lg"
+          className={cn(
+            'z-50 max-h-(--radix-select-content-available-height) max-w-[calc(100vw-1rem)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-control border border-edge bg-raised text-ink shadow-lg',
+            // Lines under the labels wrap instead of widening the list to the screen.
+            options.some((o) => o.description) && 'max-w-[min(28rem,calc(100vw-1rem))]',
+          )}
         >
           <SelectPrimitive.ScrollUpButton className="flex h-6 items-center justify-center text-muted">
             <ChevronUp className="size-4" />
@@ -85,7 +91,14 @@ export function Select({ value, onValueChange, options, className, placeholder, 
                 disabled={o.disabled}
                 className="relative flex cursor-default items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none select-none data-disabled:opacity-50 data-highlighted:bg-primary/10"
               >
-                <SelectPrimitive.ItemText>{o.content ?? o.label}</SelectPrimitive.ItemText>
+                {o.description ? (
+                  <span className="flex min-w-0 flex-col">
+                    <SelectPrimitive.ItemText>{o.content ?? o.label}</SelectPrimitive.ItemText>
+                    <span className="text-xs text-muted">{o.description}</span>
+                  </span>
+                ) : (
+                  <SelectPrimitive.ItemText>{o.content ?? o.label}</SelectPrimitive.ItemText>
+                )}
                 <SelectPrimitive.ItemIndicator className="absolute right-2 inline-flex items-center">
                   <Check className="size-4 text-primary" />
                 </SelectPrimitive.ItemIndicator>

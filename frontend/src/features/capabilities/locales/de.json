@@ -60,7 +60,6 @@
     "etimFeature": "ETIM-Merkmal",
     "etimFeatureHint": "Zur Information, z. B. EF000008.",
     "meaning": "Bedeutung",
-    "meaningHint": "Wofür SnapFlow den Wert verwendet. „Nur Information“ wird angezeigt, aber nicht geprüft.",
     "meaningTypes": "Diese Bedeutung braucht den Werttyp: {{types}}.",
     "outputKind": "Kanalart",
     "loadType": "Lastart",
@@ -105,5 +104,84 @@
   "fixedOption": {
     "ac": "AC-Motor",
     "dc": "DC-Motor"
-  }
+  },
+  "meaningHelp": {
+    "none": {
+      "description": "Wird am Produkt angezeigt und exportiert, nie geprüft",
+      "example": "Farbe, ETIM-Klasse, Notizen"
+    },
+    "channels_supplied": {
+      "description": "Wie viele Kanäle einer Art das Gerät hat",
+      "example": "4 Dimmerkanäle"
+    },
+    "channel_limit_w": {
+      "description": "Die größte Last, die ein Kanal für eine Lastart schalten darf; geprüft gegen die Bedarfe, die er bedient",
+      "example": "300 W LED je Dimmerkanal"
+    },
+    "channel_limit_a": {
+      "description": "Der größte Strom, den ein Kanal schalten darf; die W der Bedarfe werden über die Spannung umgerechnet",
+      "example": "16 A je Schaltkanal"
+    },
+    "channel_min_load_w": {
+      "description": "Die kleinste Last, die ein Kanal zum sauberen Arbeiten braucht",
+      "example": "3 W je Dimmerkanal"
+    },
+    "channel_voltage": {
+      "description": "Die Spannung, die die Kanäle schalten, wenn sie von der des Systems abweicht",
+      "example": "24 V bei einem Kleinspannungsrelais"
+    },
+    "module_total_a": {
+      "description": "Der größte Strom, den das ganze Gerät über alle Kanäle schalten darf",
+      "example": "20 A für den ganzen Aktor"
+    },
+    "module_total_w": {
+      "description": "Die größte Last, die das ganze Gerät über alle Kanäle schalten darf",
+      "example": "1000 W über alle Kanäle"
+    },
+    "bus_current_used_ma": {
+      "description": "mA, die das Gerät der Buslinie entnimmt; für die Prüfung der Linienversorgung",
+      "example": "10 mA"
+    },
+    "bus_current_supplied_ma": {
+      "description": "mA, die ein Netzteil in die Buslinie speist; die Geräte der Linie dürfen nicht mehr ziehen",
+      "example": "640 mA"
+    },
+    "bus_devices_max": {
+      "description": "Wie viele Geräte eine Buslinie aufnehmen darf",
+      "example": "64 Geräte"
+    },
+    "rail_width_te": {
+      "description": "In TE (17,5 mm); für die Belegung des Verteilers",
+      "example": "4 TE"
+    },
+    "enclosure_rows": {
+      "description": "Wie viele Hutschienen ein Verteiler hat; macht das Produkt zum Verteiler",
+      "example": "3 Reihen"
+    },
+    "enclosure_te_per_row": {
+      "description": "Wie viele TE auf eine Schiene des Verteilers passen",
+      "example": "12 TE je Reihe"
+    },
+    "wireless_places_supplied": {
+      "description": "Wie viele Funkgeräte ein Gateway oder Koordinator aufnehmen kann",
+      "example": "64 Geräte"
+    },
+    "wireless_place_used": {
+      "description": "Wie viele Plätze des Gateways ein Funkgerät belegt (ja = 1)",
+      "example": "1 Platz"
+    },
+    "zigbee_router": {
+      "description": "Das Gerät leitet Zigbee-Nachrichten weiter und erweitert das Mesh",
+      "example": "Steckdose mit Netzbetrieb: ja"
+    },
+    "motor_type": {
+      "description": "Ob die Jalousiekanäle AC- oder DC-Motoren fahren; abgeglichen mit dem Motor einer Jalousie",
+      "example": "AC"
+    },
+    "alternative_allowed": {
+      "description": "Die Kanäle des Geräts dürfen als andere Art dienen, z. B. 2 Relais als 1 Jalousiekanal",
+      "example": "Ja: Relais als Jalousie"
+    }
+  },
+  "meaningExample": "Beispiel: {{example}}"
 }

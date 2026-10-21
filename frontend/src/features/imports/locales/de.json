@@ -394,7 +394,6 @@
     "optionsHint": "Wert eingeben und Enter drücken.",
     "optionsFixed": "Diese Bedeutung braucht genau diese Auswahlwerte.",
     "meaning": "Bedeutung für die Prüfungen",
-    "meaningHint": "Was SnapFlow mit dem Wert macht; „Nur Information“ behält ihn am Produkt, ohne ihn zu prüfen.",
     "outputKind": "Kanalart",
     "loadType": "Lastart",
     "productTypes": "Nur für diese Systeme",

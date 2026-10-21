@@ -35,3 +35,30 @@ export function useFixedOptionLabel() {
     text,
   }
 }
+
+/** A meaning in plain words (D445): title, one line, and an example. */
+export interface MeaningDescription {
+  title: string
+  description: string
+  example: string
+}
+
+/**
+ * Describes a meaning in plain words wherever one is chosen or shown (the
+ * import's new columns, the Fields page, the category attribute row). The
+ * title is the meaning's label; empty or missing = "Just information".
+ */
+export function useDescribeMeaning() {
+  const { t } = useTranslation('capabilities')
+  return useCallback(
+    (meaning?: string | null): MeaningDescription => {
+      const m = (meaning || 'none') as CatalogFieldMeaning | 'none'
+      return {
+        title: t(`meaning.${m}`, { defaultValue: m }),
+        description: t(`meaningHelp.${m}.description`, { defaultValue: '' }),
+        example: t(`meaningHelp.${m}.example`, { defaultValue: '' }),
+      }
+    },
+    [t],
+  )
+}

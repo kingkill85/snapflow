@@ -40,3 +40,7 @@ export const loadTypesFeature: FeatureModule = {
     order: 6,
   },
 }
+
+// The field dialog, also opened from a category attribute ("Create a new field…", D445).
+export { CatalogFieldFormDialog } from './CatalogFieldFormDialog'
+export type { CatalogFieldFormValues } from './field-form'

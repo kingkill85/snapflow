@@ -96,6 +96,7 @@
     "hint": "Linking takes the field's type, unit and options, and its meaning.",
     "meaning": "Meaning",
     "locked": "Set by the linked catalog field.",
-    "summary": "field {{key}}"
+    "summary": "field {{key}}",
+    "create": "Create a new field…"
   }
 }
