@@ -161,7 +161,8 @@ JOIN output_kinds k ON k.id = l.output_kind_id
 ORDER BY l.function_type_id, k.sort_order, k.key;
 
 -- name: ExistingOutputKindIDs :many
-SELECT id FROM output_kinds WHERE id = ANY(sqlc.arg(ids)::uuid[]);
+-- FOR KEY SHARE: a concurrent delete of one of them waits for the caller's transaction.
+SELECT id FROM output_kinds WHERE id = ANY(sqlc.arg(ids)::uuid[]) FOR KEY SHARE;
 
 -- name: DeleteServingKinds :many
 -- Removes the links of a function type; returns the kinds that served it.

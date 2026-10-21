@@ -241,9 +241,10 @@ func (q *Queries) DeleteServingKinds(ctx context.Context, functionTypeID uuid.UU
 }
 
 const existingOutputKindIDs = `-- name: ExistingOutputKindIDs :many
-SELECT id FROM output_kinds WHERE id = ANY($1::uuid[])
+SELECT id FROM output_kinds WHERE id = ANY($1::uuid[]) FOR KEY SHARE
 `
 
+// FOR KEY SHARE: a concurrent delete of one of them waits for the caller's transaction.
 func (q *Queries) ExistingOutputKindIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, existingOutputKindIDs, ids)
 	if err != nil {

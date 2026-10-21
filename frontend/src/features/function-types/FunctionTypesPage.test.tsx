@@ -139,7 +139,7 @@ describe('FunctionTypesPage', () => {
     await user.type(key, 'dimming')
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
 
-    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], outputKindIds: [], isActive: true, knxObjects: [] }))
+    await waitFor(() => expect(sent).toEqual({ key: 'dimming', name: { en: 'Dimmer', de: 'Dimmer' }, allowsCircuit: true, loadTypeIds: [led.id], isActive: true, knxObjects: [] }))
   })
 
   it('shows the status and deactivates with the Active switch (the last field)', async () => {
@@ -361,12 +361,74 @@ describe('FunctionTypesPage', () => {
 
     await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
     const dialog = await screen.findByRole('dialog')
-    // Details open (the function has objects), but without a KNX system the editor is not shown.
+    // Without a KNX system the editor is not shown, even with Details open.
+    await within(dialog).findByRole('checkbox', { name: 'Dimmer output' })
+    await user.click(within(dialog).getByRole('button', { name: /details/i }))
     expect(await within(dialog).findByRole('checkbox', { name: 'LED' })).toBeVisible()
     expect(within(dialog).queryByRole('group', { name: 'KNX objects' })).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Update' }))
 
     await waitFor(() => expect(sent).toBeDefined())
     expect(sent).not.toHaveProperty('knxObjects')
+  })
+
+  it('leaves the channel kinds out of an update unless they were changed, then sends the full list', async () => {
+    const sent: Record<string, unknown>[] = []
+    const stored = { ...dimmer, outputKindIds: [dimmerOutput.id] }
+    server.use(
+      loadTypes(),
+      http.get('/api/function-types', () => HttpResponse.json({ items: [stored] })),
+      http.put('/api/function-types/:id', async ({ request }) => {
+        sent.push((await request.json()) as Record<string, unknown>)
+        return HttpResponse.json(stored)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    // Untouched: left out, so links made on the Channel kinds page meanwhile stay.
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    let dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('checkbox', { name: 'Dimmer output' })
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).not.toHaveProperty('outputKindIds')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    // Ticking one sends the whole list.
+    await user.click(screen.getAllByRole('button', { name: /edit/i })[0])
+    dialog = await screen.findByRole('dialog')
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'Relay output' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(sent).toHaveLength(2))
+    expect(sent[1].outputKindIds).toEqual([dimmerOutput.id, relayOutput.id])
+  })
+
+  it('says when no channel kind serves the function, as boxes are ticked', async () => {
+    server.use(loadTypes(), http.get('/api/function-types', () => HttpResponse.json({ items: [] })))
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    await user.click((await screen.findAllByRole('button', { name: /new function/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    const group = within(dialog).getByRole('group', { name: 'Served by channel kinds' })
+    const hint = 'No channel kind serves this function yet: needs of it cannot be connected.'
+    expect(within(group).getByText(hint)).toBeInTheDocument()
+    await user.click(await within(group).findByRole('checkbox', { name: 'Relay output' }))
+    expect(within(group).queryByText(hint)).not.toBeInTheDocument()
+    await user.click(within(group).getByRole('checkbox', { name: 'Relay output' }))
+    expect(within(group).getByText(hint)).toBeInTheDocument()
+  })
+
+  it('keeps Details closed for KNX objects that are not shown', async () => {
+    const stored: FunctionType = { ...dimmer, knxObjects: [{ key: 'switch', name: { en: 'Switch' }, dpst: 'DPST-1-1' }] }
+    server.use(loadTypes(), systems('none'), http.get('/api/function-types', () => HttpResponse.json({ items: [stored] })))
+    const user = userEvent.setup()
+    renderWithProviders(<FunctionTypesPage />)
+
+    await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('checkbox', { name: 'Dimmer output' })
+    expect(within(dialog).getByRole('button', { name: /details/i })).toHaveAttribute('aria-expanded', 'false')
   })
 })

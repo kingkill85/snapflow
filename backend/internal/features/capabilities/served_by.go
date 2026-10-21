@@ -46,6 +46,11 @@ func (h ServedByHook) ListServedBy(ctx context.Context, tx pgx.Tx) (map[uuid.UUI
 // new updated_at, so their open editors are stale (D56).
 func (h ServedByHook) SetServedBy(ctx context.Context, tx pgx.Tx, functionTypeID uuid.UUID, kindIDs []uuid.UUID) error {
 	q := h.queries(tx)
+	// The lock the kind-side editors take: a concurrent edit of the same links
+	// waits instead of failing on the primary key.
+	if err := q.LockOrder(ctx, outputKindOrderLock); err != nil {
+		return err
+	}
 	existing, err := q.ExistingOutputKindIDs(ctx, kindIDs)
 	if err != nil {
 		return err

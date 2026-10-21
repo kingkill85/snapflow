@@ -26,6 +26,7 @@ type Querier interface {
 	DeleteOutputKindFunctionTypes(ctx context.Context, outputKindID uuid.UUID) error
 	// Removes the links of a function type; returns the kinds that served it.
 	DeleteServingKinds(ctx context.Context, functionTypeID uuid.UUID) ([]uuid.UUID, error)
+	// FOR KEY SHARE: a concurrent delete of one of them waits for the caller's transaction.
 	ExistingOutputKindIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	GetCatalogField(ctx context.Context, id uuid.UUID) (CatalogField, error)
 	GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, error)

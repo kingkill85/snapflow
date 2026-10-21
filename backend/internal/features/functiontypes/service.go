@@ -108,8 +108,11 @@ func (s *Service) served(ctx context.Context, tx pgx.Tx) (map[uuid.UUID][]uuid.U
 
 // setServed replaces the serving output kinds; nil keeps them.
 func (s *Service) setServed(ctx context.Context, tx pgx.Tx, id uuid.UUID, kindIDs []uuid.UUID) error {
-	if kindIDs == nil || s.servedBy == nil {
+	if kindIDs == nil {
 		return nil
+	}
+	if s.servedBy == nil {
+		return errors.New("functiontypes: outputKindIds given but no ServedBy hook is registered")
 	}
 	return s.servedBy.SetServedBy(ctx, tx, id, kindIDs)
 }

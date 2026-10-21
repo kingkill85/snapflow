@@ -58,6 +58,8 @@ type FormValues = z.infer<typeof schema>
 
 const fields = { ...apiFields<FormValues>(['key', 'loadTypeIds', 'outputKindIds', 'isActive']), ...translatableApiFields('name') }
 
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id))
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -94,12 +96,15 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
   const knx = (systems.data?.items ?? []).some((p) => p.addressing === 'knx_individual')
 
   // Details start collapsed when empty and open on an error inside.
-  const hasDetails = (ft: FunctionType | null) => (ft?.loadTypeIds.length ?? 0) > 0 || (ft?.knxObjects.length ?? 0) > 0
-  const [detailsOpen, setDetailsOpen] = useState(() => hasDetails(functionType))
+  // Until the user toggles it, Details is open when it shows something: load
+  // types, or KNX objects while their editor is shown.
+  const [detailsToggled, setDetailsOpen] = useState<boolean | null>(null)
+  const hasDetails = (functionType?.loadTypeIds.length ?? 0) > 0 || (knx && (functionType?.knxObjects.length ?? 0) > 0)
+  const detailsOpen = detailsToggled ?? hasDetails
   const [openedWith, setOpenedWith] = useState({ open, functionType })
   if (openedWith.open !== open || openedWith.functionType !== functionType) {
     setOpenedWith({ open, functionType })
-    if (open) setDetailsOpen(hasDetails(functionType))
+    if (open) setDetailsOpen(null)
   }
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
   const { errors } = form.formState
@@ -131,7 +136,10 @@ export function FunctionTypeFormDialog({ open, onOpenChange, functionType }: Pro
       name: fromTranslatable(values.name),
       allowsCircuit: values.allowsCircuit,
       loadTypeIds: values.loadTypeIds,
-      outputKindIds: values.outputKindIds,
+      // On update only when changed: function types have no stale check, so
+      // an unchanged list must not revert links made on the Channel kinds page
+      // meanwhile (left out keeps them).
+      ...(!functionType || !sameIds(values.outputKindIds, functionType.outputKindIds) ? { outputKindIds: values.outputKindIds } : {}),
       isActive: values.isActive,
       // Hidden without a KNX system: left out, so the API keeps them (D294).
       ...(knx ? { knxObjects: values.knxObjects.map((o) => ({ key: o.key, name: fromTranslatable(o.name), dpst: o.dpst.trim() })) } : {}),
