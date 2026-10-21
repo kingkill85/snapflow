@@ -39,7 +39,24 @@
     "bus_line_address_invalid": "{{name}}: Die Linienadresse „{{address}}“ ist nicht lesbar",
     "bus_line_address_duplicate": "{{name}}: {{count}} Linien nutzen die Linienadresse {{prefix}}",
     "address_device_zero": "{{item}}: Adresse {{address}} nutzt Gerät 0, das dem Linienkoppler vorbehalten ist",
-    "unknown": "Prüfung {{code}}"
+    "unknown": "Prüfung {{code}}",
+    "variant_deleted": "{{item}}: Das Produkt wurde aus dem Katalog gelöscht.",
+    "variant_inactive": "{{item}}: Die Variante ist im Katalog inaktiv.",
+    "product_inactive": "{{item}}: Das Produkt ist im Katalog inaktiv.",
+    "category_inactive": "{{item}}: Die Kategorie des Produkts ist inaktiv.",
+    "product_type_inactive": "{{item}}: Das System ist inaktiv.",
+    "product_type_not_in_project": "{{item}}: Das System ist für dieses Projekt nicht gewählt.",
+    "required_addon_unavailable": "{{item}}: Ein erforderliches Zubehör ist nicht verfügbar.",
+    "addon_unavailable": "{{item}}: Ein gewähltes Zubehör ist nicht verfügbar.",
+    "addon_not_linked": "{{item}}: Ein gewähltes Zubehör gehört nicht mehr zu dieser Variante.",
+    "module_width_unknown": "{{item}}: Die Breite auf der Hutschiene ist unbekannt, gezählt als 1 TE.",
+    "module_mounting_floorplan": "{{item}}: Dieses Produkt ist nicht für den Verteiler gedacht.",
+    "row_overflow": "{{item}}: Das Gerät reicht über die Kapazität der Reihe hinaus.",
+    "enclosure_size_unknown": "Reihen und TE pro Reihe des Gehäuses sind unbekannt: Reihen selbst eingeben.",
+    "module_overlap": "{{item}}: Das Gerät überlappt ein anderes (seine Breite hat sich im Katalog geändert): verschieben.",
+    "need_function_type_inactive": "{{need}}: Die Funktion ist im Katalog inaktiv.",
+    "need_outside_zones": "{{need}}: Das Symbol liegt außerhalb aller Zonen.",
+    "need_load_type_not_allowed": "{{need}}: Die Funktion erlaubt diese Lastart nicht mehr."
   },
   "candidate": {
     "channel_overload_w": "würde {{loadW}} W aufnehmen (höchstens {{limitW}} W)",
@@ -168,13 +185,10 @@
     "open": "Öffnen",
     "openFor": "Öffnen: {{text}}",
     "unconnected_one": "{{count}} Bedarf hat nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
-    "unconnected_other": "{{count}} Bedarfe haben nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)"
-  },
-  "area": {
-    "needs": "Bedarfe",
-    "connections": "Verbindungen",
-    "boards": "Verteiler",
-    "networks": "Netzwerke"
+    "unconnected_other": "{{count}} Bedarfe haben nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
+    "version": "Version (Netze)",
+    "show": "Zeigen",
+    "showFor": "Zeigen: {{text}}"
   },
   "unconnected": {
     "title": "Nicht verbundene Bedarfe",
@@ -214,5 +228,10 @@
     "bus_line": "einer Buslinie, die es nicht mehr gibt",
     "gateway": "einem Gateway, das es nicht mehr gibt",
     "other": "einem Netzwerk, das es nicht mehr gibt"
+  },
+  "severityOne": {
+    "error": "Fehler",
+    "warning": "Warnung",
+    "info": "Hinweis"
   }
 }

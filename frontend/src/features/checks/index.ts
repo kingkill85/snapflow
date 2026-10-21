@@ -5,3 +5,5 @@ export { boardStatus, type FindingNames, statusTone, useFindingText, useReasonTe
 export { StatusChip } from './StatusChip'
 export { channelKey, type ChannelRef, itemKey, needKey, useRefreshWiring, useWiringModel, type WiringModel } from './wiring'
 export { ChecksTab } from './ChecksTab'
+export { findingPlanId, findingsOf } from './findings'
+export { FindingsList } from './FindingsList'

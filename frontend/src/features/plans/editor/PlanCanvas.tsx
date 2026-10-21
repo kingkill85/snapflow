@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text, Wedge } from 'react-konva'
 
 import type { Floorplan } from '../api'
-import type { PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { Finding, PlanNeed, PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import {
   angleTo,
   boundsOf,
@@ -84,7 +84,8 @@ type Props = {
   document: PlanDocument
   selection: string[]
   variants: Map<string, VariantSearchItem>
-  warnings: Map<string, PlanWarning[]>
+  /** The plan's findings by placement (a marker on the symbol). */
+  warnings: Map<string, Finding[]>
   /** Items with a save error (drawn in the danger colour). */
   errorIds: Set<string>
   editable: boolean

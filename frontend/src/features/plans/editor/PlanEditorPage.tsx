@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { NeedWarning, Plan, PlanContent, PlanWarning, Project, VariantSearchItem } from '@/api/generated/model'
+import type { Finding, Plan, PlanContent, Project, VariantSearchItem } from '@/api/generated/model'
 import { getGetPlanContentQueryKey, getListPlansQueryKey, getPlanContent, savePlanContent, useGetPlan, useGetPlanContent } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { type Point, useViewport, type Viewport } from '@/canvas'
@@ -15,6 +15,7 @@ import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, N
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
+import { FindingsList } from '@/features/checks'
 
 import { defaultPlacementSize, imageAspect, paletteProducts, useCatalogVariants } from './catalog'
 import { documentOf, isSymbol, type PlanDocument, toContentInput } from './document'
@@ -116,7 +117,9 @@ function useFillHeight() {
   return { ref, height }
 }
 
-type PanelTab = 'products' | 'zones' | 'layers' | 'inspector'
+type PanelTab = 'products' | 'zones' | 'layers' | 'inspector' | 'findings'
+
+const noFindings: Finding[] = []
 
 type Props = { plan: Floorplan; content: PlanContent; project: Project; variants: VariantSearchItem[] }
 
@@ -220,17 +223,19 @@ function PlanEditor({ plan, content, project, variants }: Props) {
     const kept = state.selection.filter((id) => visible.has(id))
     if (kept.length !== state.selection.length) dispatch({ type: 'select', ids: kept })
   }
+  // The plan's findings (D453, D454) by placement and by need: canvas markers and the inspector; as saved
+  // (the checks are refreshed after each save).
+  const findings = planWiring?.findings ?? noFindings
   const warnings = useMemo(() => {
-    const map = new Map<string, PlanWarning[]>()
-    for (const w of server.warnings) map.set(w.placementId, [...(map.get(w.placementId) ?? []), w])
+    const map = new Map<string, Finding[]>()
+    for (const f of findings) if (f.refs.targetPlanId === plan.id && f.refs.itemId) map.set(f.refs.itemId, [...(map.get(f.refs.itemId) ?? []), f])
     return map
-  }, [server.warnings])
-
+  }, [findings, plan.id])
   const needWarnings = useMemo(() => {
-    const map = new Map<string, NeedWarning[]>()
-    for (const w of server.needWarnings ?? []) map.set(w.needId, [...(map.get(w.needId) ?? []), w])
+    const map = new Map<string, Finding[]>()
+    for (const f of findings) if (f.refs.planId === plan.id && f.refs.needId) map.set(f.refs.needId, [...(map.get(f.refs.needId) ?? []), f])
     return map
-  }, [server.needWarnings])
+  }, [findings, plan.id])
   const needWarningIds = useMemo(() => new Set(needWarnings.keys()), [needWarnings])
 
   const save = useCallback(
@@ -625,6 +630,23 @@ function PlanEditor({ plan, content, project, variants }: Props) {
           errors={saveErrors}
           editable={editable}
           dispatch={dispatch}
+        />
+      ),
+    },
+    {
+      key: 'findings',
+      label: findings.length > 0 ? t('panel.findingsCount', { count: findings.length }) : t('panel.findings'),
+      content: (
+        <FindingsList
+          findings={findings}
+          names={planWiring?.wiring.findingNames}
+          onShow={(f) => {
+            const id = f.refs.needId && f.refs.planId === plan.id ? f.refs.needId : f.refs.targetPlanId === plan.id ? f.refs.itemId : undefined
+            if (!id || !(doc.placements.some((p) => p.id === id) || doc.needs.some((n) => n.id === id))) return
+            dispatch({ type: 'select', ids: [selectionFor(id, doc)] })
+            setTab('inspector')
+          }}
+          collapseUnconnected={false}
         />
       ),
     },

@@ -2,7 +2,7 @@ import { TriangleAlert } from 'lucide-react'
 import { type CSSProperties, type DragEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BoardWarning, VariantSearchItem } from '@/api/generated/model'
+import type { Finding, VariantSearchItem } from '@/api/generated/model'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -23,7 +23,8 @@ type Props = {
   selection: string[]
   variants: Map<string, VariantSearchItem>
   widthOf: (m: BoardModuleDoc) => number
-  warnings: Map<string, BoardWarning[]>
+  /** The board's findings by module (a marker on the module). */
+  warnings: Map<string, Finding[]>
   errorIds: Set<string>
   editable: boolean
   dispatch: (action: BoardEditorAction) => void

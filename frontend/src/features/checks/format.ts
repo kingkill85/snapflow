@@ -93,6 +93,24 @@ export const findingCodes = [
   'bus_line_address_invalid',
   'bus_line_address_duplicate',
   'address_device_zero',
+  // The plans' content warnings (D453): one namespace with the checks codes.
+  'variant_deleted',
+  'variant_inactive',
+  'product_inactive',
+  'category_inactive',
+  'product_type_inactive',
+  'product_type_not_in_project',
+  'required_addon_unavailable',
+  'addon_unavailable',
+  'addon_not_linked',
+  'module_width_unknown',
+  'module_mounting_floorplan',
+  'row_overflow',
+  'enclosure_size_unknown',
+  'module_overlap',
+  'need_function_type_inactive',
+  'need_outside_zones',
+  'need_load_type_not_allowed',
 ] as const
 export type FindingCode = (typeof findingCodes)[number]
 
@@ -166,16 +184,3 @@ export function useReasonText() {
       ? t(`reason.${reason as UnconnectableReason}`, { functionType: functionType ?? t('fallback.functionType') })
       : reason
 }
-
-export const areas = ['needs', 'connections', 'boards', 'networks'] as const
-type Area = (typeof areas)[number]
-
-/** The area a finding belongs to (only for grouping the list). */
-export function areaOf(code: string): Area {
-  if (code === 'need_unconnected' || code === 'units_exceeded') return 'needs'
-  if (code.startsWith('board_')) return 'boards'
-  if (code.startsWith('address_')) return 'networks'
-  if (code.startsWith('bus_') || code.startsWith('network_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
-  return 'connections'
-}
-

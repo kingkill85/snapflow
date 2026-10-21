@@ -54,7 +54,10 @@
     "products": "Products",
     "zones": "Zones",
     "inspector": "Inspector",
-    "layers": "Layers"
+    "layers": "Layers",
+    "findings": "Problems",
+    "findingsCount_one": "Problems ({{count}})",
+    "findingsCount_other": "Problems ({{count}})"
   },
   "zones": {
     "empty": "No zones yet.",
@@ -123,22 +126,6 @@
     "resizeAllHint_one": "Size changes apply to the {{count}} placement of this product on the plan",
     "resizeAllHint_other": "Size changes apply to all {{count}} placements of this product on the plan",
     "manyDetailNeeds": "Products: {{products}} · Zones: {{zones}} · Need symbols: {{needs}}"
-  },
-  "warning": {
-    "variant_deleted": "This product was deleted from the catalog.",
-    "variant_inactive": "This variant is inactive in the catalog.",
-    "product_inactive": "This product is inactive in the catalog.",
-    "category_inactive": "The product's category is inactive.",
-    "product_type_inactive": "The system is inactive.",
-    "product_type_not_in_project": "The system is not chosen for this project.",
-    "required_addon_unavailable": "A required add-on is not available.",
-    "addon_unavailable": "A chosen add-on is not available.",
-    "addon_not_linked": "A chosen add-on no longer belongs to this variant.",
-    "module_width_unknown": "The product's rail width is unknown: counted as 1 TE.",
-    "module_mounting_floorplan": "This product is not meant for a board.",
-    "row_overflow": "The module reaches beyond the row's capacity.",
-    "enclosure_size_unknown": "The enclosure's rows and TE per row are unknown: enter the rows yourself.",
-    "module_overlap": "The module overlaps another one (its width changed in the catalog): move it."
   },
   "save": {
     "saved": "Saved",
@@ -222,11 +209,6 @@
     "zoneOfSymbol": "Zone",
     "noZone": "Outside every zone",
     "limit": "A plan can have at most {{max}} needs: nothing was added."
-  },
-  "needWarning": {
-    "need_function_type_inactive": "The function is inactive in the catalog.",
-    "need_outside_zones": "The symbol lies outside every zone.",
-    "need_load_type_not_allowed": "The function no longer allows this load type."
   },
   "needUnits_one": "{{count}} unit",
   "needUnits_other": "{{count}} units",
