@@ -334,19 +334,18 @@ test('variants: add one with an image, replace and remove it; other files are re
     attributes: { finish: 'glossy' },
   })
 
-  // Thumbnails in the product's variant list and in the product list.
+  // The only variant: in the product page's "Price and variant" section (D449), and a thumbnail in the product list.
   await page.getByRole('link', { name: 'Back to product' }).click()
-  const listed = variantRows(page).filter({ hasText: 'Ivory White' })
-  await expect(listed).toContainText(sku)
-  await expect(listed).toContainText('$27.50')
-  await expectImage(listed.locator('img'), blue.id)
+  await expect(single(page).getByLabel('SKU')).toHaveValue(sku)
+  await expect(single(page).getByLabel(/^Price/)).toHaveValue(/^27[.,]50?$/)
+  await expectImage(single(page).getByRole('img', { name: 'Image' }), blue.id)
   await openListOfType(page, type)
   await expectImage(row(page, product.modelNumber).locator('img'), blue.id)
   await expect(row(page, product.modelNumber)).toContainText('$27.50')
 
   // Replace: a new file; Remove: no image after the update.
   await row(page, product.modelNumber).getByRole('link', { name: product.modelNumber }).click()
-  await listed.getByRole('link', { name: 'Ivory White' }).click()
+  await single(page).getByRole('link', { name: 'Name and add-ons' }).click()
   await expectImage(basics(page).getByRole('img', { name: 'Image' }), blue.id)
   const redUpload = nextUpload(page)
   await chooseImage(page, 'Replace', asset('red.png'))
@@ -364,7 +363,7 @@ test('variants: add one with an image, replace and remove it; other files are re
   await expect(page.getByText('Saved.')).toBeVisible()
   expect((await api.product(product.id)).variants[0]).not.toHaveProperty('imageFileId')
   await page.getByRole('link', { name: 'Back to product' }).click()
-  await expect(listed.getByTestId('thumbnail-placeholder')).toBeVisible()
+  await expect(single(page).getByRole('img', { name: 'Image' })).toHaveCount(0)
 })
 
 test('a photo with EXIF orientation is stored upright', async ({ page, api }) => {
@@ -677,7 +676,7 @@ test('the product editor reports each mistake at its field', async ({ page, api 
 
   await basics(page).getByLabel('Model number').fill(modelNumber())
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page.getByText('Product created.')).toBeVisible()
+  await expect(page.getByText('Product created with its first variant.')).toBeVisible()
 
   // Variant: price format and a taken SKU.
   const other = await api.createVariant(taken.id, { sku: modelNumber('SKU') })
@@ -814,7 +813,7 @@ test('the list searches, filters by type and category and shows inactive product
   await expect(row(page, p2.modelNumber)).toBeVisible()
   const bySku = page.url()
   await row(page, p2.modelNumber).getByRole('link', { name: p2.modelNumber }).click()
-  await variantRows(page).getByRole('link', { name: 'Standard' }).click()
+  await single(page).getByRole('link', { name: 'Name and add-ons' }).click()
   await page.getByRole('link', { name: 'Back to product' }).click()
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(bySku)
