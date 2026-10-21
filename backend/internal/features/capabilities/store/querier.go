@@ -24,12 +24,16 @@ type Querier interface {
 	DeleteOutputKind(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteOutputKindAlternatives(ctx context.Context, outputKindID uuid.UUID) error
 	DeleteOutputKindFunctionTypes(ctx context.Context, outputKindID uuid.UUID) error
+	// Removes the links of a function type; returns the kinds that served it.
+	DeleteServingKinds(ctx context.Context, functionTypeID uuid.UUID) ([]uuid.UUID, error)
+	ExistingOutputKindIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	GetCatalogField(ctx context.Context, id uuid.UUID) (CatalogField, error)
 	GetLoadType(ctx context.Context, id uuid.UUID) (LoadType, error)
 	GetOutputKind(ctx context.Context, id uuid.UUID) (OutputKind, error)
 	InsertCatalogFieldProductTypes(ctx context.Context, arg InsertCatalogFieldProductTypesParams) error
 	InsertOutputKindAlternative(ctx context.Context, arg InsertOutputKindAlternativeParams) error
 	InsertOutputKindFunctionTypes(ctx context.Context, arg InsertOutputKindFunctionTypesParams) error
+	InsertServingKinds(ctx context.Context, arg InsertServingKindsParams) error
 	ListCatalogFieldProductTypes(ctx context.Context) ([]CatalogFieldProductType, error)
 	// ---------------------------------------------------------------- catalog fields
 	ListCatalogFields(ctx context.Context) ([]CatalogField, error)
@@ -39,6 +43,8 @@ type Querier interface {
 	ListOutputKindFunctionTypes(ctx context.Context) ([]OutputKindFunctionType, error)
 	// ---------------------------------------------------------------- output kinds
 	ListOutputKinds(ctx context.Context, includeInactive bool) ([]OutputKind, error)
+	// The output kinds serving each function type, in the kinds' order.
+	ListServingKinds(ctx context.Context) ([]ListServingKindsRow, error)
 	LoadTypeExists(ctx context.Context, id uuid.UUID) (bool, error)
 	// LockCatalogField locks a field against concurrent links (categories take
 	// FOR SHARE on the fields they link, D305) before its key or type changes.
@@ -56,6 +62,8 @@ type Querier interface {
 	// ShareCatalogFields locks the linked fields of a category save: their type
 	// cannot change until the save commits.
 	ShareCatalogFields(ctx context.Context, keys []string) ([]CatalogField, error)
+	// Bumps updated_at so open editors of these kinds see they are stale (D56).
+	TouchOutputKinds(ctx context.Context, ids []uuid.UUID) error
 	UpdateCatalogField(ctx context.Context, arg UpdateCatalogFieldParams) (CatalogField, error)
 	UpdateLoadType(ctx context.Context, arg UpdateLoadTypeParams) (LoadType, error)
 	UpdateOutputKind(ctx context.Context, arg UpdateOutputKindParams) (OutputKind, error)

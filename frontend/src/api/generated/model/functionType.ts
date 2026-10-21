@@ -24,5 +24,7 @@ export interface FunctionType {
   loadTypeIds: string[];
   /** Display name per locale */
   name: FunctionTypeName;
+  /** The output (channel) kinds that serve this function, in their order; empty = needs of it cannot be connected */
+  outputKindIds: string[];
   updatedAt: string;
 }
