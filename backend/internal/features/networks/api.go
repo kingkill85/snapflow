@@ -103,7 +103,7 @@ func Register(api huma.API, svc *Service) {
 		Method:        http.MethodDelete,
 		Path:          "/api/versions/{versionId}/bus-lines/{id}",
 		Summary:       "Delete a bus line",
-		Description:   "Refused while devices are explicitly assigned to it (409 bus_line.in_use).",
+		Description:   "Refused while devices are explicitly assigned to it (409 bus_line.in_use), and for the last line of its system while devices of that system are on the version's plans (409 bus_line.last_with_devices, params count; D451).",
 		Tags:          []string{tag},
 		DefaultStatus: http.StatusNoContent,
 	}, func(ctx context.Context, in *lineParam) (*struct{}, error) {
