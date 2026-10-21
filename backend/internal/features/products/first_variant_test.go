@@ -50,14 +50,26 @@ func TestFirstVariantValidation(t *testing.T) {
 		"body.firstVariant.sku validation.control_chars",
 		"body.firstVariant.price variant.price_format")
 
-	// Product errors come first; the variant is not checked without a valid product.
+	// Product and variant errors in one round.
 	b = dimmerBody(pt, "")
 	b["firstVariant"] = map[string]any{"price": "x"}
-	if resp := api.Post("/api/products", api.Admin.Cookie, b); resp.Code != http.StatusUnprocessableEntity {
-		t.Errorf("invalid product: got %d: %s", resp.Code, resp.Body)
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b),
+		"body.modelNumber validation.required",
+		"body.firstVariant.price variant.price_format")
+
+	// A required variant attribute of the category is checked on the first variant.
+	required := append(schema(), map[string]any{"key": "voltage", "label": text("Voltage"), "type": "integer", "scope": "variant", "required": true})
+	rt := newType(t, api, "relay", required)
+	b = dimmerBody(rt, "R1")
+	b["firstVariant"] = map[string]any{"price": "1"}
+	assertFields(t, api.Post("/api/products", api.Admin.Cookie, b), "body.firstVariant.attributes.voltage attribute.required")
+	b["firstVariant"] = map[string]any{"price": "1", "attributes": map[string]any{"voltage": 230}}
+	if v := newProduct(t, api, b).Variants[0]; !reflect.DeepEqual(v.Attributes, map[string]any{"voltage": float64(230)}) {
+		t.Errorf("variant attributes: %+v", v.Attributes)
 	}
-	if got := list(t, api, api.Admin.Cookie, ""); len(got.Items) != 0 {
-		t.Errorf("refused creates left products: %v", models(got))
+
+	if got := models(list(t, api, api.Admin.Cookie, "")); !reflect.DeepEqual(got, []string{"R1"}) {
+		t.Errorf("refused creates left products: %v", got)
 	}
 }
 

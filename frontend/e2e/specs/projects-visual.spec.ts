@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { type Page } from '@playwright/test'
 
-import { type Api, expect, test, unique, uniqueKey } from '../fixtures'
+import { type Api, chooseOption, expect, test, unique, uniqueKey } from '../fixtures'
 
 // Every page, dialog and state of projects and versions (step 2a) and the
 // tenant archive at phone and desktop width, light and dark, English and
@@ -33,6 +33,11 @@ const labels = {
     version: 'Version',
     showArchived: 'Show archived',
     chooseSystems: 'Choose systems',
+    system: 'System',
+    category: 'Category',
+    single: 'Price and variant',
+    update: 'Update',
+    saved: 'Saved.',
   },
   de: {
     newProject: 'Neues Projekt',
@@ -48,6 +53,11 @@ const labels = {
     version: 'Version',
     showArchived: 'Archivierte anzeigen',
     chooseSystems: 'Systeme wählen',
+    system: 'System',
+    category: 'Kategorie',
+    single: 'Preis und Variante',
+    update: 'Aktualisieren',
+    saved: 'Gespeichert.',
   },
 }
 
@@ -120,7 +130,28 @@ async function seed(api: Api) {
     firstVariant: { price: '249.00', sku: `PD-360-${tag}`.toUpperCase() },
   })
 
-  return { tag, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board, oneVariant }
+  // A category with variant-scope attributes (one required, one linked to a capability field): the create form's "Variant" section,
+  // and a one-variant product whose capabilities follow a saved variant value.
+  const busField = uniqueKey('busma')
+  expect((await api.ctx.post('/api/catalog-fields', { data: { key: busField, label: { en: 'Bus current', de: 'Busstrom' }, type: 'number', unit: 'mA', meaning: 'bus_current_used_ma' } })).ok()).toBe(true)
+  const variantType = await api.createProductType({ name: { en: unique('KNX building automation'), de: unique('KNX Gebäudeautomation') }, abbreviation: 'KNX', color: '#0a7d33', topology: 'bus' })
+  const variantCategory = await api.createCategory({
+    name: { en: unique('Switch actuators'), de: unique('Schaltaktoren') },
+    attributes: [
+      { key: 'channels', label: { en: 'Channels', de: 'Kanäle' }, type: 'integer', scope: 'product' },
+      { key: 'finish', label: { en: 'Finish', de: 'Oberfläche' }, type: 'text', scope: 'variant', required: true },
+      { key: busField, fieldKey: busField, label: { en: 'Bus current', de: 'Busstrom' }, type: 'number', unit: 'mA', scope: 'variant' },
+    ],
+  })
+  const withVariantAttrs = await api.createProduct({
+    productTypeId: variantType.id,
+    categoryId: variantCategory.id,
+    name: { en: 'Switch actuator 8-fold, 16 A, with manual operation', de: 'Schaltaktor 8-fach, 16 A, mit Handbedienung' },
+    attributes: { channels: 8 },
+    firstVariant: { price: '389.00', sku: `SA-8-${tag}`.toUpperCase(), attributes: { finish: 'Light grey', [busField]: 10 } },
+  })
+
+  return { tag, variantType, variantCategory, withVariantAttrs, busField, main, v2, withRetired, single, completed, cancelled, archived, oldProject, toArchive, toDelete, palette, paletteVersion, floor, board, oneVariant }
 }
 
 for (const lang of ['en', 'de'] as const) {
@@ -144,6 +175,27 @@ for (const lang of ['en', 'de'] as const) {
         })
       const steps: { name: string; path: string; fullPage?: boolean; wideOnly?: boolean; before?: (p: Page) => Promise<unknown>; act?: (p: Page) => Promise<void> }[] = [
         { name: 'product-one-variant', path: `/catalog/products/${s.oneVariant.id}` },
+        {
+          name: 'product-create-variant-section',
+          path: '/catalog/products/new',
+          act: async (p) => {
+            await chooseOption(p.getByRole('combobox', { name: l.system }), s.variantType.name[lang] ?? s.variantType.name.en)
+            await chooseOption(p.getByRole('combobox', { name: l.category }), s.variantCategory.name[lang] ?? s.variantCategory.name.en)
+            await expect(p.getByLabel(lang === 'en' ? 'Finish' : 'Oberfläche')).toBeVisible()
+          },
+        },
+        {
+          name: 'product-one-variant-saved',
+          path: `/catalog/products/${s.withVariantAttrs.id}`,
+          act: async (p) => {
+            const single = p.getByRole('region', { name: l.single, exact: true })
+            const current = Number((await single.getByLabel(lang === 'en' ? 'Bus current' : 'Busstrom').inputValue()).replace(',', '.'))
+            await single.getByLabel(lang === 'en' ? 'Bus current' : 'Busstrom').fill(String(current + 5))
+            await single.getByRole('button', { name: l.update }).click()
+            await expect(p.getByText(l.saved)).toBeVisible()
+            await expect(p.getByTestId('capabilities')).toContainText(String(current + 5))
+          },
+        },
         { name: 'empty-networks', path: `${versionOf(s.palette)}?tab=networks` },
         { name: 'empty-checks', path: `${versionOf(s.palette)}?tab=checks` },
         { name: 'empty-bom', path: `${versionOf(s.single)}?tab=bom` },
