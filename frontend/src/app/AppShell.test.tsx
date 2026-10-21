@@ -116,13 +116,17 @@ describe('AppShell', () => {
     const user = userEvent.setup()
     renderWithProviders(routes, { me: { ...userMe, permissions: ['projects.read'] } })
     const nav = await screen.findByRole('navigation', { name: 'Main navigation' })
-    // Without catalog.read the catalog is gone; Setup keeps Functions (open to every user), as a plain link.
-    expect(within(nav).queryByRole('button', { name: 'Catalog' })).not.toBeInTheDocument()
-    expect(within(nav).getByRole('link', { name: 'Functions' })).toHaveAttribute('href', '/catalog/function-types')
+    // Without catalog.read neither the catalog nor Setup has a page to open.
+    for (const name of ['Catalog', 'Setup']) {
+      expect(within(nav).queryByRole('button', { name })).not.toBeInTheDocument()
+      expect(within(nav).queryByRole('link', { name })).not.toBeInTheDocument()
+    }
+    expect(within(nav).queryByRole('link', { name: 'Functions' })).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Projects' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Menu' }))
     const sheet = await screen.findByRole('dialog', { name: 'Menu' })
     expect(within(sheet).queryByRole('region', { name: 'Catalog' })).not.toBeInTheDocument()
-    expect(within(within(sheet).getByRole('region', { name: 'Setup' })).getAllByRole('link').map((l) => l.textContent)).toEqual(['Functions'])
+    expect(within(sheet).queryByRole('region', { name: 'Setup' })).not.toBeInTheDocument()
   })
 
   it('links a single page of a section directly', async () => {

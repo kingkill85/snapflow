@@ -100,7 +100,7 @@ async function expectImage(image: Locator, fileId: string) {
 /** Opens the list filtered by a product type (through the filter, as a user would). */
 async function openListOfType(page: Page, type: ProductType) {
   await page.goto(listPath)
-  await chooseOption(page.getByLabel('System'), type.name.en)
+  await chooseOption(page.getByLabel('System', { exact: true }), type.name.en)
   await expect(page).toHaveURL(new RegExp(`type=${type.id}`))
 }
 
@@ -123,7 +123,7 @@ test('an admin creates a product with every kind of attribute; the values persis
   await page.getByRole('link', { name: 'New product' }).first().click()
   await expect(page.getByRole('heading', { name: 'New product', level: 1 })).toBeVisible()
   await expect(attributes(page)).toContainText('Choose a category to fill in its attributes.')
-  await chooseOption(basics(page).getByLabel('System'), type.name.en)
+  await chooseOption(basics(page).getByLabel('System', { exact: true }), type.name.en)
   // The attributes come from the category, not the product type.
   await expect(attributes(page)).toContainText('Choose a category to fill in its attributes.')
   await chooseOption(basics(page).getByLabel('Category'), category.name.en)
@@ -211,7 +211,7 @@ test('in German, numbers and prices take a decimal comma', async ({ page, api })
 
   await page.getByRole('link', { name: 'Neues Produkt' }).first().click()
   const grunddaten = region(page, 'Grunddaten')
-  await chooseOption(grunddaten.getByLabel('System'), type.name.de!)
+  await chooseOption(grunddaten.getByLabel('System', { exact: true }), type.name.de!)
   await chooseOption(grunddaten.getByLabel('Kategorie'), category.name.de!)
   await grunddaten.getByLabel('Modellnummer').fill(model)
   await (await translation(grunddaten, 'Name', 'en', 'de')).fill(unique('Dimmer'))
@@ -402,7 +402,7 @@ test('add-ons: browse, filter, search by SKU, add, mark required, reorder and sa
   await expect(results(page).getByRole('listitem').first()).toBeVisible()
   await expect(results(page)).toContainText(/\d+ variants? shown/)
 
-  await chooseOption(addons(page).getByLabel('System'), accessoryKind.type.name.en)
+  await chooseOption(addons(page).getByLabel('System', { exact: true }), accessoryKind.type.name.en)
   await expect(results(page).getByRole('listitem')).toHaveCount(20)
   await expect(results(page)).toContainText('20 variants shown')
   // Rows name the product with its type badge and its category.
@@ -612,7 +612,7 @@ test('the product editor reports each mistake at its field', async ({ page, api 
 
   await page.goto(`${listPath}/new`)
   // A new product cannot use an inactive type or category (D78).
-  const typeSelect = basics(page).getByLabel('System')
+  const typeSelect = basics(page).getByLabel('System', { exact: true })
   const categorySelect = basics(page).getByLabel('Category')
   const offered = await optionTexts(typeSelect)
   expect(offered).toContain(type.name.en)
@@ -746,7 +746,7 @@ test('the list searches, filters by type and category and shows inactive product
 
   // The type filter; the inactive product only with Show inactive.
   await page.getByLabel('Search').fill('')
-  await chooseOption(page.getByLabel('System'), type.name.en)
+  await chooseOption(page.getByLabel('System', { exact: true }), type.name.en)
   await expect(page.getByRole('row')).toHaveCount(4)
   await expect(row(page, p3.modelNumber)).toHaveCount(0)
   await page.getByLabel('Show inactive').check()
@@ -769,7 +769,7 @@ test('the list searches, filters by type and category and shows inactive product
   await page.getByRole('link', { name: 'Back to list' }).click()
   await expect(page).toHaveURL(filtered)
   await expect(page.getByLabel('Search')).toHaveValue(word)
-  await expect(page.getByLabel('System')).toContainText(type.name.en)
+  await expect(page.getByLabel('System', { exact: true })).toContainText(type.name.en)
 
   // Cancel after a change asks first, then returns to the filtered list.
   await row(page, p1.modelNumber).getByRole('link', { name: 'Edit' }).click()
@@ -899,7 +899,7 @@ for (const role of ['user', 'tenant_admin'] as const) {
     await expect(page.getByRole('heading', { name: product.name.en, level: 1 })).toBeVisible()
     await expect(page.getByText('You can view this product but not change it.')).toBeVisible()
     await expect(basics(page).getByLabel('Model number')).toBeDisabled()
-    await expect(basics(page).getByLabel('System')).toBeDisabled()
+    await expect(basics(page).getByLabel('System', { exact: true })).toBeDisabled()
     await expect(basics(page).getByLabel('Category')).toBeDisabled()
     await expect(attributes(page).getByLabel('Power')).toBeDisabled()
     await expect(page.getByRole('button', { name: /Update|Create|Add variant|Delete|Move/ })).toHaveCount(0)

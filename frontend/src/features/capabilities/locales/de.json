@@ -24,7 +24,7 @@
   },
   "outputKinds": {
     "title": "Kanalarten",
-    "description": "Die Arten von Kanälen, die ein Gerät hat (Dimmer, Schalten, Jalousie, Eingang). Jede Art nennt die Funktionen, die sie bedienen kann. Vorbelegt; selten geändert.",
+    "description": "Die Arten von Kanälen, die ein Gerät hat (Dimmer, Relais, Jalousie, Eingang). Jede Art nennt die Funktionen, die sie bedienen kann. Vorbelegt; selten geändert.",
     "empty": "Noch keine Kanalarten.",
     "new": "Neue Kanalart",
     "edit": "Kanalart bearbeiten",
