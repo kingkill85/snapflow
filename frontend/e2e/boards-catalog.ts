@@ -4,10 +4,10 @@ type Id = { id: string }
 
 /** A small board catalog (as apptest.NewBoardCatalog): KNX (bus) and Zigbee (wireless) with capability fields. */
 export async function boardCatalog(api: Api) {
-  const post = async (path: string, data: object) => {
+  const post = async <T = Id,>(path: string, data: object) => {
     const res = await api.ctx.post(path, { data })
     expect(res.ok(), `${path}: ${await res.text()}`).toBe(true)
-    return (await res.json()) as Id
+    return (await res.json()) as T
   }
   const text = (en: string) => ({ en })
   const knx = await post('/api/product-types', { key: uniqueKey('knx'), name: text(unique('KNX')), abbreviation: 'KNX', color: '#0a7d33', isActive: true, topology: 'bus' })
@@ -26,9 +26,8 @@ export async function boardCatalog(api: Api) {
   const floor = await post('/api/categories', { key: uniqueKey('floor'), name: text(unique('Floor devices')), isActive: true, mounting: 'floorplan', attributes, instanceAttributes: [] })
   const [width, encRows, encTe, busMa, supply, places] = fields.map((f) => f.key)
   const product = async (typeId: string, categoryId: string, name: string, values: Record<string, number>) => {
-    const p = await post('/api/products', { productTypeId: typeId, categoryId, modelNumber: uniqueKey('m'), name: text(name), isActive: true, attributes: values })
-    const v = await post(`/api/products/${p.id}/variants`, { name: text('Std'), price: '10.00', isActive: true })
-    return { name, variantId: v.id }
+    const p = await post<Id & { variants: Id[] }>('/api/products', { productTypeId: typeId, categoryId, modelNumber: uniqueKey('m'), name: text(name), isActive: true, attributes: values, firstVariant: { name: text('Std'), price: '10.00' } })
+    return { name, variantId: p.variants[0].id }
   }
   return {
     knx,
