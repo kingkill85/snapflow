@@ -145,9 +145,9 @@ func TestNetworks(t *testing.T) {
 	second := w.floorplan(t, "Second", [2]uuid.UUID{gw2, w.c.Gateway}, [2]uuid.UUID{bulb3, w.c.Bulb})
 	board := w.board(t, "Board", [2]uuid.UUID{act, w.c.Actuator}, [2]uuid.UUID{psu, w.c.PSU})
 
-	// The first GET creates the default line of KNX; every bus device is on it.
+	// The plan saves created the default line of KNX (D372, D451); every bus device is on it.
 	n := decode[networks.Networks](t, api.Get("/api/versions/"+v+"/networks", cookie))
-	if len(n.BusSystems) != 1 || len(n.BusSystems[0].Lines) != 1 || n.BusSystems[0].Lines[0].Name != "KNX 1" {
+	if len(n.BusSystems) != 1 || len(n.BusSystems[0].Lines) != 1 || n.BusSystems[0].Lines[0].Name != "Line 1" {
 		t.Fatalf("bus systems: %+v", n.BusSystems)
 	}
 	line1 := n.BusSystems[0].Lines[0]

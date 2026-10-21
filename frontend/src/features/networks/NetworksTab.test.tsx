@@ -172,20 +172,31 @@ describe('NetworksTab', () => {
     expect(within(bus).getByRole('table', { name: 'KNX: Without line' })).toHaveTextContent('Kitchen')
     expect(screen.getByText('Read only: assignments cannot be changed here.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add line' })).not.toBeInTheDocument()
-    expect(screen.getByText('These devices need a bus line.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Create line' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument()
   })
 
-  it('asks for a bus line when bus devices have none, with "Create line" only for writers', async () => {
-    const user = userEvent.setup()
-    serve({ ...readOnlyNetworks, can: { update: true } })
+  it('shows the automatic first line with its default members and keeps its Delete disabled (D451)', async () => {
+    const auto = { ...lineOne, name: 'Line 1', address: '' }
+    serve({ ...networks, busSystems: [{ productType: knx, lines: [auto], unassigned: [] }] })
     renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
-    expect(await screen.findByText('These devices need a bus line.')).toBeInTheDocument()
-    expect(screen.queryByText(/^These devices have no line yet/)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Create line' }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+
+    const bus = await screen.findByRole('region', { name: 'KNX' })
+    expect(within(bus).getByRole('heading', { name: 'Line 1' })).toBeInTheDocument()
+    const table = within(bus).getByRole('table', { name: 'Line 1' })
+    expect(table).toHaveTextContent('Kitchen')
+    expect(within(table).getAllByText('Default')).toHaveLength(2)
+    expect(within(bus).queryByText('These devices need a bus line.')).not.toBeInTheDocument()
+    const del = within(bus).getByRole('button', { name: 'Delete Line 1' })
+    expect(del).toBeDisabled()
+    expect(del).toHaveAttribute('title', 'The last line of a system with devices stays: add another line or remove the devices from the plans first.')
+  })
+
+  it('allows deleting the only line of a system without devices', async () => {
+    const empty = { ...lineOne, name: 'Line 1', members: [], deviceCount: 0 }
+    serve({ ...networks, busSystems: [{ productType: knx, lines: [empty], unassigned: [] }] })
+    renderWithProviders(<NetworksTab projectId="p1" versionId={versionId} />)
+    expect(await screen.findByRole('button', { name: 'Delete Line 1' })).toBeEnabled()
   })
 
   it('shows the empty state without systems', async () => {

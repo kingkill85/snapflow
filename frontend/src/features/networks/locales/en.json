@@ -52,8 +52,7 @@
     "deleteMessage": "The line \"{{name}}\" will be deleted. Devices that follow the default move to the first remaining line.",
     "unassigned": "Without line",
     "unassignedNotice": "These devices have no line yet: the first line is created with the next save of a plan that contains them.",
-    "needsLine": "These devices need a bus line.",
-    "createLine": "Create line"
+    "deleteLast": "The last line of a system with devices stays: add another line or remove the devices from the plans first."
   },
   "lineDialog": {
     "newTitle": "New line",

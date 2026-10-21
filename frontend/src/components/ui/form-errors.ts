@@ -74,6 +74,7 @@ export const errorParamNames = {
   'address.taken': ['address'],
   'export.too_many_group_addresses': ['max'],
   'bus_line.in_use': ['count'],
+  'bus_line.last_with_devices': ['count'],
   'bus_line.name_taken': ['name'],
   'bus_line.devices_max_invalid': ['max'],
   'connection.motor_mismatch': ['motorType', 'needMotorType'],

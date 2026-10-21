@@ -203,7 +203,8 @@ func (s *Service) UpdateBusLine(ctx context.Context, versionID, id uuid.UUID, in
 // to it (bus_line.in_use, D373): explicit assignments of items that are
 // still members of the line's system. Dangling assignments (item removed,
 // product changed) do not count and go with the line. Members by default
-// follow the system's first remaining line (D360).
+// follow the system's first remaining line (D360). The last line of a
+// system with devices is refused (bus_line.last_with_devices, D451).
 func (s *Service) DeleteBusLine(ctx context.Context, versionID, id uuid.UUID) error {
 	actor, err := auth.Require(ctx, auth.PermProjectsWrite)
 	if err != nil {
@@ -222,6 +223,59 @@ func (s *Service) DeleteBusLine(ctx context.Context, versionID, id uuid.UUID) er
 	return s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, q *store.Queries) error {
 		if _, err := s.projects.WriteVersion(ctx, tx, versionID, true); err != nil {
 			return err
+		}
+		// The last line of a system with devices stays (D451): the
+		// devices would be without a line until the next plan save. The
+		// lines and items as of this transaction (the version is locked;
+		// content saves create default lines under LockVersionLines), the
+		// catalog from the snapshot (D243): an item whose variant the
+		// snapshot did not load (placed by a save committed between the
+		// read and the lock) counts as a possible device of the system, to
+		// be safe (like an assignment made after the read for in_use). Not
+		// covered by a test: the API offers no point between the snapshot
+		// and the lock to place such an item.
+		if err := q.LockVersionLines(ctx, versionID); err != nil {
+			return err
+		}
+		lines, err := q.ListBusLines(ctx, versionID)
+		if err != nil {
+			return err
+		}
+		var system uuid.UUID
+		others := 0
+		for _, l := range lines {
+			if l.ID == id {
+				system = l.ProductTypeID
+			}
+		}
+		for _, l := range lines {
+			if l.ID != id && l.ProductTypeID == system {
+				others++
+			}
+		}
+		if system != uuid.Nil && others == 0 {
+			planItems, err := s.plans.NetworkItems(ctx, tx, versionID)
+			if err != nil {
+				return err
+			}
+			devices := 0
+			for _, p := range planItems {
+				for _, it := range p.Items {
+					if it.VariantID == nil {
+						continue
+					}
+					if !st.loaded[*it.VariantID] {
+						devices++
+						continue
+					}
+					if v, ok := st.variants[*it.VariantID]; ok && v.ProductType.Topology == TopologyBus && v.ProductType.ID == system {
+						devices++
+					}
+				}
+			}
+			if devices > 0 {
+				return apperr.Conflict("bus_line.last_with_devices", "the system's last line cannot be deleted while it has devices").With("count", devices)
+			}
 		}
 		rows, err := q.ListLineAssignments(ctx, store.ListLineAssignmentsParams{VersionID: versionID, BusLineID: &id})
 		if err != nil {
@@ -516,7 +570,7 @@ func (st state) members() []Member {
 	return out
 }
 
-// defaultLinesHook creates the default line ("<badge> 1") of every bus
+// defaultLinesHook creates the default line ("Line 1", D451) of every bus
 // system that has members in the version but no line yet, inside the
 // content save of a floorplan or board (D372). Prepare finds the bus
 // systems of the saved variants; Apply checks the version's items in the
@@ -576,7 +630,7 @@ func (s *Service) defaultLinesHook() plans.ContentHook {
 						continue
 					}
 					if _, err := q.CreateBusLine(ctx, store.CreateBusLineParams{
-						TenantID: ref.TenantID, VersionID: ref.ID, ProductTypeID: t.ID, Name: defaultLineName(t),
+						TenantID: ref.TenantID, VersionID: ref.ID, ProductTypeID: t.ID, Name: defaultLineName(ref.Language),
 					}); err != nil {
 						return err
 					}
@@ -588,14 +642,17 @@ func (s *Service) defaultLinesHook() plans.ContentHook {
 	}
 }
 
-// defaultLineName is the name of a system's default line: its badge (or
-// key) and 1, e.g. "KNX 1" (data, not UI text: the user renames it).
-func defaultLineName(t producttypes.ProductType) string {
-	base := t.Abbreviation
-	if base == "" {
-		base = strings.ToUpper(t.Key)
+// defaultLineNames are the names of a system's automatic first line per
+// content language (data in the project's language, not UI text: the user
+// renames it, D451). Languages without an entry use en.
+var defaultLineNames = map[string]string{"en": "Line 1", "de": "Linie 1"}
+
+// defaultLineName is the automatic first line's name in a project language.
+func defaultLineName(language string) string {
+	if n, ok := defaultLineNames[language]; ok {
+		return n
 	}
-	return base + " 1"
+	return defaultLineNames["en"]
 }
 
 // view computes the networks from the state (members, D372).

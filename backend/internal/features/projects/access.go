@@ -35,6 +35,9 @@ type VersionRef struct {
 	// ExchangeRate is empty for a non-USD project without a rate yet.
 	ExchangeRateDate   *time.Time
 	ExchangeRateSource string
+	// Language is the project's content language (data the version's
+	// features create, e.g. the name of an automatic bus line, D451).
+	Language string
 }
 
 // HasRate reports whether amounts can be converted (USD or a rate set).
@@ -137,7 +140,7 @@ func versionRef(ctx context.Context, actor auth.Actor, q *store.Queries, get fun
 		return VersionRef{}, err
 	}
 	ref := VersionRef{ID: r.ID, ProjectID: r.ProjectID, TenantID: r.TenantID, Status: ProjectStatus(r.Status), ProductTypeIDs: types,
-		Currency: r.Currency}
+		Currency: r.Currency, Language: r.Language}
 	if r.ExchangeRate != nil {
 		ref.ExchangeRate = *r.ExchangeRate
 	}

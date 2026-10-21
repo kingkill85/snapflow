@@ -709,7 +709,7 @@ func (q *Queries) UpdateVersion(ctx context.Context, arg UpdateVersionParams) (P
 }
 
 const versionAccess = `-- name: VersionAccess :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 `
@@ -723,6 +723,7 @@ type VersionAccessRow struct {
 	ExchangeRate       *string
 	ExchangeRateDate   *time.Time
 	ExchangeRateSource *string
+	Language           string
 }
 
 // VersionAccess reads a version with what other features (plans) need of
@@ -741,12 +742,13 @@ func (q *Queries) VersionAccess(ctx context.Context, id uuid.UUID) (VersionAcces
 		&i.ExchangeRate,
 		&i.ExchangeRateDate,
 		&i.ExchangeRateSource,
+		&i.Language,
 	)
 	return i, err
 }
 
 const versionAccessLock = `-- name: VersionAccessLock :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR UPDATE OF p
@@ -761,6 +763,7 @@ type VersionAccessLockRow struct {
 	ExchangeRate       *string
 	ExchangeRateDate   *time.Time
 	ExchangeRateSource *string
+	Language           string
 }
 
 func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionAccessLockRow, error) {
@@ -775,12 +778,13 @@ func (q *Queries) VersionAccessLock(ctx context.Context, id uuid.UUID) (VersionA
 		&i.ExchangeRate,
 		&i.ExchangeRateDate,
 		&i.ExchangeRateSource,
+		&i.Language,
 	)
 	return i, err
 }
 
 const versionAccessShare = `-- name: VersionAccessShare :one
-SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source
+SELECT v.id, v.project_id, p.tenant_id, p.status, p.currency, p.exchange_rate, p.exchange_rate_date, p.exchange_rate_source, p.language
 FROM project_versions v JOIN projects p ON p.id = v.project_id
 WHERE v.id = $1
 FOR SHARE OF p
@@ -795,6 +799,7 @@ type VersionAccessShareRow struct {
 	ExchangeRate       *string
 	ExchangeRateDate   *time.Time
 	ExchangeRateSource *string
+	Language           string
 }
 
 func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (VersionAccessShareRow, error) {
@@ -809,6 +814,7 @@ func (q *Queries) VersionAccessShare(ctx context.Context, id uuid.UUID) (Version
 		&i.ExchangeRate,
 		&i.ExchangeRateDate,
 		&i.ExchangeRateSource,
+		&i.Language,
 	)
 	return i, err
 }
