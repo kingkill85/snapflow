@@ -1233,12 +1233,6 @@
             "description": "Sum of the modules' widths",
             "format": "double",
             "type": "number"
-          },
-          "warnings": {
-            "items": {
-              "$ref": "#/components/schemas/BoardWarning"
-            },
-            "type": "array"
           }
         },
         "required": [
@@ -1252,8 +1246,7 @@
           "modules",
           "capacityTe",
           "usedTe",
-          "capabilities",
-          "warnings"
+          "capabilities"
         ],
         "type": "object"
       },
@@ -1637,46 +1630,6 @@
           "usedTe",
           "capacityTe",
           "status"
-        ],
-        "type": "object"
-      },
-      "BoardWarning": {
-        "additionalProperties": false,
-        "properties": {
-          "addonVariantId": {
-            "description": "The add-on of an add-on warning",
-            "type": "string"
-          },
-          "code": {
-            "enum": [
-              "module_width_unknown",
-              "module_mounting_floorplan",
-              "row_overflow",
-              "enclosure_size_unknown",
-              "module_overlap",
-              "variant_deleted",
-              "variant_inactive",
-              "product_inactive",
-              "category_inactive",
-              "product_type_inactive",
-              "product_type_not_in_project",
-              "required_addon_unavailable",
-              "addon_unavailable",
-              "addon_not_linked"
-            ],
-            "type": "string"
-          },
-          "moduleId": {
-            "description": "The module; null for a warning of the enclosure",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "moduleId",
-          "code"
         ],
         "type": "object"
       },
@@ -7188,27 +7141,6 @@
         ],
         "type": "object"
       },
-      "NeedWarning": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "enum": [
-              "need_function_type_inactive",
-              "need_outside_zones",
-              "need_load_type_not_allowed"
-            ],
-            "type": "string"
-          },
-          "needId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "needId",
-          "code"
-        ],
-        "type": "object"
-      },
       "NetworkActions": {
         "additionalProperties": false,
         "properties": {
@@ -8111,12 +8043,6 @@
             "format": "date-time",
             "type": "string"
           },
-          "needWarnings": {
-            "items": {
-              "$ref": "#/components/schemas/NeedWarning"
-            },
-            "type": "array"
-          },
           "needs": {
             "description": "In order (per zone in the order of this list)",
             "items": {
@@ -8142,12 +8068,6 @@
               "null"
             ]
           },
-          "warnings": {
-            "items": {
-              "$ref": "#/components/schemas/PlanWarning"
-            },
-            "type": "array"
-          },
           "zones": {
             "description": "In draw order",
             "items": {
@@ -8162,9 +8082,7 @@
           "scale",
           "zones",
           "placements",
-          "needs",
-          "warnings",
-          "needWarnings"
+          "needs"
         ],
         "type": "object"
       },
@@ -8599,37 +8517,6 @@
           "existing",
           "addonVariantIds",
           "instanceValues"
-        ],
-        "type": "object"
-      },
-      "PlanWarning": {
-        "additionalProperties": false,
-        "properties": {
-          "addonVariantId": {
-            "description": "The add-on of required_addon_unavailable, addon_unavailable and addon_not_linked",
-            "type": "string"
-          },
-          "code": {
-            "enum": [
-              "variant_deleted",
-              "variant_inactive",
-              "product_inactive",
-              "category_inactive",
-              "product_type_inactive",
-              "product_type_not_in_project",
-              "required_addon_unavailable",
-              "addon_unavailable",
-              "addon_not_linked"
-            ],
-            "type": "string"
-          },
-          "placementId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "placementId",
-          "code"
         ],
         "type": "object"
       },
@@ -15362,7 +15249,7 @@
     },
     "/api/plans/{id}/board": {
       "get": {
-        "description": "With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.",
+        "description": "With the capability summary of every variant used (warnings: the checks, D453). A floorplan is 409 plan.wrong_kind.",
         "operationId": "getBoardContent",
         "parameters": [
           {
@@ -15403,7 +15290,7 @@
         ]
       },
       "put": {
-        "description": "Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+        "description": "Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities (warnings: the checks, D453). Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
         "operationId": "saveBoardContent",
         "parameters": [
           {
@@ -15496,7 +15383,7 @@
         ]
       },
       "put": {
-        "description": "Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
+        "description": "Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol (warnings: GET /api/versions/{versionId}/checks, D453). Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
         "operationId": "savePlanContent",
         "parameters": [
           {

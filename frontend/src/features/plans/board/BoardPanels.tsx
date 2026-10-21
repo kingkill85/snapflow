@@ -226,8 +226,9 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
     }
     update({ rowId, offsetTe: offset })
   }
-  // Channel and connection findings show at their channel (ModuleChannels); the rest here.
-  const itemWarnings = (warnings.get(m.id) ?? []).filter((f) => !f.refs.outputKindId && !f.refs.connectionIds?.length)
+  // Channel and connection errors show at their channel (ModuleChannels); everything else here, channel
+  // warnings (min_load, power_unknown, limit_unknown) included (D454).
+  const itemWarnings = (warnings.get(m.id) ?? []).filter((f) => !(f.severity === 'error' && (f.refs.outputKindId || f.refs.connectionIds?.length)))
   const te = (n: number) => formatDecimal(n, separator)
 
   return (
@@ -248,7 +249,7 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
           ))}
         </ul>
       )}
-      {itemWarnings.length > 0 && <FindingsList findings={itemWarnings} names={wiring?.findingNames} headings={false} />}
+      {itemWarnings.length > 0 && <FindingsList findings={itemWarnings} names={wiring ? (f) => wiring.findingNames(f, planId) : undefined} headings={false} />}
       {variant && (
         <SelectField
           label={t('inspector.variant')}

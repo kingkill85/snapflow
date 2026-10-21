@@ -7,7 +7,6 @@
 import type { BoardContentCapabilities } from './boardContentCapabilities';
 import type { BoardModule } from './boardModule';
 import type { BoardRow } from './boardRow';
-import type { BoardWarning } from './boardWarning';
 
 export interface BoardContent {
   /** A URL to the JSON Schema for this object. */
@@ -33,5 +32,4 @@ export interface BoardContent {
   rowsFromEnclosure: boolean;
   /** Sum of the modules' widths */
   usedTe: number;
-  warnings: BoardWarning[];
 }

@@ -253,3 +253,49 @@ func placement(id uuid.UUID, variantID string, x, y float64) map[string]any {
 		"label": "", "existing": false, "addonVariantIds": []any{}, "instanceValues": map[string]any{},
 	}
 }
+
+// checkFinding is a finding of the checks endpoint as the tests read it.
+type checkFinding struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Refs     struct {
+		PlanID       *uuid.UUID `json:"planId"`
+		NeedID       *uuid.UUID `json:"needId"`
+		TargetPlanID *uuid.UUID `json:"targetPlanId"`
+		ItemID       *uuid.UUID `json:"itemId"`
+	} `json:"refs"`
+	Params map[string]any `json:"params"`
+}
+
+// planFindings are the content findings (codes of plans.WarningSeverity)
+// of one plan from GET …/checks?planId= (D453).
+func planFindings(t *testing.T, api *apptest.API, cookie string, planID uuid.UUID) []checkFinding {
+	t.Helper()
+	version := getPlan(t, api, cookie, planID).VersionID
+	resp := api.Get("/api/versions/"+version.String()+"/checks?planId="+planID.String(), cookie)
+	wantCode(t, resp, http.StatusOK, "")
+	var out []checkFinding
+	for _, f := range decode[struct {
+		Findings []checkFinding `json:"findings"`
+	}](t, resp).Findings {
+		if _, ok := plans.WarningSeverity[f.Code]; ok {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// codesOf lists the codes of the findings about an item or need (uuid.Nil:
+// the board's own, e.g. the enclosure).
+func codesOf(list []checkFinding, id uuid.UUID) []string {
+	var out []string
+	for _, f := range list {
+		switch {
+		case id == uuid.Nil && f.Refs.ItemID == nil && f.Refs.NeedID == nil,
+			f.Refs.ItemID != nil && *f.Refs.ItemID == id,
+			f.Refs.NeedID != nil && *f.Refs.NeedID == id:
+			out = append(out, f.Code)
+		}
+	}
+	return out
+}

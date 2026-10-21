@@ -158,8 +158,9 @@ func TestNeeds(t *testing.T) {
 	if n1.ZoneID == nil || *n1.ZoneID != inner || n2.ZoneID == nil || *n2.ZoneID != outer || n3.ZoneID != nil {
 		t.Errorf("symbol zones: %v %v %v", n1.ZoneID, n2.ZoneID, n3.ZoneID)
 	}
-	if len(content.NeedWarnings) != 1 || content.NeedWarnings[0].NeedID != sNone || content.NeedWarnings[0].Code != plans.WarnNeedOutsideZones {
-		t.Errorf("warnings: %+v", content.NeedWarnings)
+	if fs := planFindings(t, api, user.Cookie, pl.ID); len(fs) != 1 || fs[0].Refs.NeedID == nil || *fs[0].Refs.NeedID != sNone || fs[0].Code != string(plans.WarnNeedOutsideZones) ||
+		fs[0].Refs.PlanID == nil || *fs[0].Refs.PlanID != pl.ID || fs[0].Severity != "warning" {
+		t.Errorf("warnings: %+v", fs)
 	}
 	if got := getContent(t, api, user.Cookie, pl.ID); len(got.Needs) != 4 || got.Needs[0].ID != zn {
 		t.Errorf("reload: %+v", got.Needs)
@@ -181,11 +182,12 @@ func TestNeeds(t *testing.T) {
 		"key": "n_light", "name": text("n_light"), "isActive": false}), http.StatusOK, "")
 	content = getContent(t, api, user.Cookie, pl.ID)
 	codes := map[string]int{}
-	for _, w := range content.NeedWarnings {
-		codes[string(w.Code)]++
+	fs := planFindings(t, api, user.Cookie, pl.ID)
+	for _, f := range fs {
+		codes[f.Code]++
 	}
 	if codes["need_load_type_not_allowed"] != 1 || codes["need_function_type_inactive"] != 3 || codes["need_outside_zones"] != 1 {
-		t.Errorf("warnings after catalog change: %+v", content.NeedWarnings)
+		t.Errorf("warnings after catalog change: %+v", fs)
 	}
 	resp = saveNeeds(api, user.Cookie, content, zones, []any{
 		withLoad, symbol(sInner, f.Light, 150, 150), symbol(uuid.New(), f.Light, 10, 10),

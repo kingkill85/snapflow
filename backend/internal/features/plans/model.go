@@ -246,8 +246,10 @@ type PlanContent struct {
 	Zones            []PlanZone      `json:"zones" doc:"In draw order"`
 	Placements       []PlanPlacement `json:"placements" doc:"In draw order"`
 	Needs            []PlanNeed      `json:"needs" doc:"In order (per zone in the order of this list)"`
-	Warnings         []PlanWarning   `json:"warnings"`
-	NeedWarnings     []NeedWarning   `json:"needWarnings"`
+	// Warnings and NeedWarnings are reported by the checks (D453), not in
+	// the content response.
+	Warnings     []PlanWarning `json:"-"`
+	NeedWarnings []NeedWarning `json:"-"`
 }
 
 // PlanContentInput replaces a plan's content as a whole.

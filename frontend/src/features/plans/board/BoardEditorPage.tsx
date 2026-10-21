@@ -12,7 +12,7 @@ import { useGetChecks } from '@/api/generated/wiring/wiring'
 import { isModKey, isTypingTarget } from '@/canvas'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
-import { boardStatus, FindingsList, itemKey, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
+import { boardStatus, FindingsList, itemKey, markedIds, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -181,6 +181,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
     for (const f of findings) if (f.refs.targetPlanId === plan.id && f.refs.itemId) map.set(f.refs.itemId, [...(map.get(f.refs.itemId) ?? []), f])
     return map
   }, [findings, plan.id])
+  const markedModules = useMemo(() => markedIds(warnings), [warnings])
   const boardFindings = useMemo(() => findings.filter((f) => f.refs.targetPlanId === plan.id && !f.refs.itemId && !f.refs.planId), [findings, plan.id])
 
   const save = useCallback(
@@ -417,7 +418,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
       selection={state.selection}
       variants={variantsById}
       widthOf={widthOf}
-      warnings={warnings}
+      marked={markedModules}
       errorIds={errorIds}
       editable={editable}
       dispatch={(action) => {
@@ -490,7 +491,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
       content: (
         <FindingsList
           findings={findings}
-          names={wiring.findingNames}
+          names={(f) => wiring.findingNames(f, plan.id)}
           onShow={(f) => {
             const id = f.refs.targetPlanId === plan.id ? f.refs.itemId : undefined
             if (!id || !doc.modules.some((m) => m.id === id)) return

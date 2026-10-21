@@ -143,7 +143,7 @@ var messages = map[string]map[string]string{
 		"f-product_type_not_in_project": "the system is not chosen for this project",
 		"f-required_addon_unavailable":  "a required add-on is not available",
 		"f-addon_unavailable":           "a chosen add-on is not available",
-		"f-addon_not_linked":            "a chosen add-on no longer belongs to the variant",
+		"f-addon_not_linked":            "a chosen add-on no longer belongs to this variant",
 		"f-module_width_unknown":        "rail width unknown, counted as 1 TE",
 		"f-module_mounting_floorplan":   "the product is not meant for a board",
 		"f-row_overflow":                "the module reaches beyond the row's capacity",

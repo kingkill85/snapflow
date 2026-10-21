@@ -325,7 +325,7 @@ export const useUpdatePlan = <TError = ErrorType<Error>,
       return useMutation(getUpdatePlanMutationOptions(options), queryClient);
     }
     /**
- * With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.
+ * With the capability summary of every variant used (warnings: the checks, D453). A floorplan is 409 plan.wrong_kind.
  * @summary Get a board's enclosure, rows and modules
  */
 export const getBoardContent = (
@@ -418,7 +418,7 @@ export function useGetBoardContent<TData = Awaited<ReturnType<typeof getBoardCon
 
 
 /**
- * Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
+ * Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it with widths, capabilities (warnings: the checks, D453). Overlapping modules in a row are 422 board.overlap. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
  * @summary Replace a board's enclosure, rows and modules
  */
 export const saveBoardContent = (
@@ -579,7 +579,7 @@ export function useGetPlanContent<TData = Awaited<ReturnType<typeof getPlanConte
 
 
 /**
- * Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
+ * Saves the whole content in one transaction and returns it with the computed zone of every placement and load symbol (warnings: GET /api/versions/{versionId}/checks, D453). Needs the caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).
  * @summary Replace a plan's zones, placements and needs
  */
 export const savePlanContent = (

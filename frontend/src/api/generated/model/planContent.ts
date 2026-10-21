@@ -4,10 +4,8 @@
  * SnapFlow API
  * OpenAPI spec version: 0.1.0
  */
-import type { NeedWarning } from './needWarning';
 import type { PlanNeed } from './planNeed';
 import type { PlanPlacement } from './planPlacement';
-import type { PlanWarning } from './planWarning';
 import type { PlanZone } from './planZone';
 
 export interface PlanContent {
@@ -15,7 +13,6 @@ export interface PlanContent {
   readonly $schema?: string;
   /** Send it back as expectedContentUpdatedAt */
   contentUpdatedAt: string;
-  needWarnings: NeedWarning[];
   /** In order (per zone in the order of this list) */
   needs: PlanNeed[];
   /** In draw order */
@@ -26,7 +23,6 @@ export interface PlanContent {
      * @nullable
      */
   scale: number | null;
-  warnings: PlanWarning[];
   /** In draw order */
   zones: PlanZone[];
 }

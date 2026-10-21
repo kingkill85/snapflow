@@ -126,7 +126,7 @@ func TestContentValidation(t *testing.T) {
 	pl := createPlan(t, api, user.Cookie, version, "Ground", 1000, 500)
 	lock(t, api, user.Cookie, pl.ID)
 	content := getContent(t, api, user.Cookie, pl.ID)
-	if len(content.Zones) != 0 || len(content.Placements) != 0 || len(content.Warnings) != 0 {
+	if len(content.Zones) != 0 || len(content.Placements) != 0 || len(planFindings(t, api, user.Cookie, pl.ID)) != 0 {
 		t.Fatalf("new content: %+v", content)
 	}
 
@@ -303,9 +303,8 @@ func TestWarnings(t *testing.T) {
 	m["addonVariantIds"] = []string{c.Opt}
 	resp := save(api, user.Cookie, content, nil, []any{m, placement(foreign, other.Main, 20, 20)})
 	wantCode(t, resp, http.StatusOK, "")
-	saved := decode[plans.PlanContent](t, resp)
-	if w := saved.Warnings; len(w) != 1 || w[0].PlacementID != foreign || w[0].Code != plans.WarnProductTypeNotInProject {
-		t.Fatalf("warnings: %+v", w)
+	if fs := planFindings(t, api, user.Cookie, pl.ID); len(fs) != 1 || fs[0].Refs.ItemID == nil || *fs[0].Refs.ItemID != foreign || fs[0].Code != string(plans.WarnProductTypeNotInProject) {
+		t.Fatalf("warnings: %+v", fs)
 	}
 
 	// Deactivate the required and the optional add-on, then the variant.
@@ -326,17 +325,20 @@ func TestWarnings(t *testing.T) {
 			}
 		}
 	}
-	got := getContent(t, api, user.Cookie, pl.ID).Warnings
-	codes := map[plans.PlanWarningCode]bool{}
-	for _, w := range got {
-		if w.PlacementID == main {
-			codes[w.Code] = true
+	codes := map[string]checkFinding{}
+	for _, f := range planFindings(t, api, user.Cookie, pl.ID) {
+		if f.Refs.ItemID != nil && *f.Refs.ItemID == main {
+			codes[f.Code] = f
 		}
 	}
 	for _, want := range []plans.PlanWarningCode{plans.WarnVariantInactive, plans.WarnRequiredAddonUnavailable, plans.WarnAddonUnavailable} {
-		if !codes[want] {
-			t.Errorf("missing warning %s in %+v", want, got)
+		if _, ok := codes[string(want)]; !ok {
+			t.Errorf("missing warning %s in %+v", want, codes)
 		}
+	}
+	// The add-on warnings name the add-on (D453).
+	if f := codes[string(plans.WarnAddonUnavailable)]; f.Params["addonProductName"] == nil || f.Params["addonVariantName"] == nil {
+		t.Errorf("add-on names: %+v", f.Params)
 	}
 
 	// A deleted variant keeps the placement (variant null, warning) and the
@@ -354,11 +356,7 @@ func TestWarnings(t *testing.T) {
 	stale = placement(foreign, other.Main, 20, 20) // as the editor had it before the delete
 	resp = save(api, user.Cookie, loaded, nil, []any{m, stale})
 	wantCode(t, resp, http.StatusOK, "")
-	found := false
-	for _, w := range decode[plans.PlanContent](t, resp).Warnings {
-		found = found || (w.PlacementID == foreign && w.Code == plans.WarnVariantDeleted)
-	}
-	if !found {
+	if !slices.Contains(codesOf(planFindings(t, api, user.Cookie, pl.ID), foreign), string(plans.WarnVariantDeleted)) {
 		t.Errorf("no variant_deleted warning")
 	}
 
@@ -392,7 +390,8 @@ func TestWarnings(t *testing.T) {
 		if f.Refs.TargetPlanID == nil || *f.Refs.TargetPlanID != pl.ID || f.Refs.ItemID == nil || *f.Refs.ItemID != item {
 			t.Errorf("refs of %s: %+v", f.Code, f.Refs)
 		}
-		if f.Severity != string(plans.WarningSeverity[f.Code]) {
+		// Literal severities (D453): what the editors and the Checks tab show.
+		if want := map[string]string{"variant_deleted": "error", "variant_inactive": "warning", "required_addon_unavailable": "warning"}[f.Code]; f.Severity != want {
 			t.Errorf("severity of %s: %s", f.Code, f.Severity)
 		}
 		want[f.Code] = true
@@ -402,7 +401,7 @@ func TestWarnings(t *testing.T) {
 			t.Errorf("checks lack %s: %+v", code, all.Findings)
 		}
 	}
-	if all.Counts.Errors < 2 {
+	if all.Counts.Errors < 1 {
 		t.Errorf("errors counted: %d", all.Counts.Errors)
 	}
 	second := createPlan(t, api, user.Cookie, version, "Upstairs", 1000, 1000)

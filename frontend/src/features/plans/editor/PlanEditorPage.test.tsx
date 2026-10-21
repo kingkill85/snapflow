@@ -129,6 +129,7 @@ describe('PlanEditorPage', () => {
     await user.click(await screen.findByRole('tab', { name: 'Problems (1)' }))
     const panel = screen.getByRole('tabpanel', { name: 'Problems (1)' })
     expect(within(panel).getByText('M1: the variant is inactive in the catalog.')).toBeInTheDocument()
+    expect(asked.length).toBeGreaterThan(0)
     expect(asked.every((id) => id === plan(1).id)).toBe(true)
     await user.click(within(panel).getByRole('button', { name: 'Show: M1: the variant is inactive in the catalog.' }))
     const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })

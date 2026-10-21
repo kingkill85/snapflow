@@ -51,8 +51,6 @@ export const content = (over: Partial<PlanContent> = {}): PlanContent => ({
   zones: [],
   placements: [],
   needs: [],
-  needWarnings: [],
-  warnings: [],
   ...over,
 })
 

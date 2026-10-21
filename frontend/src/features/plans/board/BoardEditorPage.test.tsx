@@ -32,7 +32,6 @@ const content = (over: Partial<BoardContent> = {}): BoardContent => ({
   capacityTe: 12,
   usedTe: 0,
   capabilities: {},
-  warnings: [],
   ...over,
 })
 
@@ -125,6 +124,7 @@ describe('BoardEditorPage', () => {
     const panel = screen.getByRole('tabpanel', { name: 'Problems (2)' })
     expect(within(panel).getByText('Notes')).toBeInTheDocument()
     expect(within(panel).getByText("The enclosure's rows and TE per row are unknown: enter the rows yourself.")).toBeInTheDocument()
+    expect(asked.length).toBeGreaterThan(0)
     expect(asked.every((id) => id === board.id)).toBe(true)
     await user.click(within(panel).getByRole('button', { name: 'Show: PS1: the rail width is unknown, counted as 1 TE.' }))
     expect(within(screen.getByRole('tabpanel', { name: 'Inspector' })).getByText('PS1: the rail width is unknown, counted as 1 TE.')).toBeInTheDocument()

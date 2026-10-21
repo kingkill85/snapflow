@@ -37,6 +37,15 @@ describe('FindingsList', () => {
     expect(onShow).toHaveBeenCalledWith(findings[1])
   })
 
+  it('names the add-on of an add-on warning (D453)', () => {
+    renderWithProviders(
+      <FindingsList
+        findings={[{ severity: 'warning', code: 'addon_unavailable', refs: { targetPlanId: plan, itemId: 'a' }, params: { label: 'D1', addonProductName: { en: 'Push button' }, addonVariantName: { en: 'White' } } }]}
+      />,
+    )
+    expect(screen.getByText('D1: a chosen add-on is not available (Push button – White).')).toBeInTheDocument()
+  })
+
   it('says when there is nothing and picks the findings of one item', () => {
     renderWithProviders(<FindingsList findings={[]} />)
     expect(screen.getByText('No problems found.')).toBeInTheDocument()

@@ -15,7 +15,7 @@ import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, N
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
-import { FindingsList } from '@/features/checks'
+import { FindingsList, markedIds } from '@/features/checks'
 
 import { defaultPlacementSize, imageAspect, paletteProducts, useCatalogVariants } from './catalog'
 import { documentOf, isSymbol, type PlanDocument, toContentInput } from './document'
@@ -233,10 +233,14 @@ function PlanEditor({ plan, content, project, variants }: Props) {
   }, [findings, plan.id])
   const needWarnings = useMemo(() => {
     const map = new Map<string, Finding[]>()
-    for (const f of findings) if (f.refs.planId === plan.id && f.refs.needId) map.set(f.refs.needId, [...(map.get(f.refs.needId) ?? []), f])
+    // need_unconnected: the need lists show the coverage (NeedConnections); the Problems tab lists it.
+    for (const f of findings)
+      if (f.refs.planId === plan.id && f.refs.needId && f.code !== 'need_unconnected') map.set(f.refs.needId, [...(map.get(f.refs.needId) ?? []), f])
     return map
   }, [findings, plan.id])
-  const needWarningIds = useMemo(() => new Set(needWarnings.keys()), [needWarnings])
+  // Markers only for errors and warnings (D454).
+  const needWarningIds = useMemo(() => markedIds(needWarnings), [needWarnings])
+  const markedPlacements = useMemo(() => markedIds(warnings), [warnings])
 
   const save = useCallback(
     async (snapshot: PlanDocument) => {
@@ -410,7 +414,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       document={doc}
       selection={state.selection}
       variants={variantsById}
-      warnings={warnings}
+      marked={markedPlacements}
       errorIds={errorIds}
       editable={editable}
       tool={wide ? tool : 'pan'}
@@ -639,7 +643,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       content: (
         <FindingsList
           findings={findings}
-          names={planWiring?.wiring.findingNames}
+          names={planWiring ? (f) => planWiring.wiring.findingNames(f, plan.id) : undefined}
           onShow={(f) => {
             const id = f.refs.needId && f.refs.planId === plan.id ? f.refs.needId : f.refs.targetPlanId === plan.id ? f.refs.itemId : undefined
             if (!id || !(doc.placements.some((p) => p.id === id) || doc.needs.some((n) => n.id === id))) return

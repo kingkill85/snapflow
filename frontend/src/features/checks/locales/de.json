@@ -56,7 +56,8 @@
     "module_overlap": "{{item}}: Das Gerät überlappt ein anderes (seine Breite hat sich im Katalog geändert): verschieben.",
     "need_function_type_inactive": "{{need}}: Die Funktion ist im Katalog inaktiv.",
     "need_outside_zones": "{{need}}: Das Symbol liegt außerhalb aller Zonen.",
-    "need_load_type_not_allowed": "{{need}}: Die Funktion erlaubt diese Lastart nicht mehr."
+    "need_load_type_not_allowed": "{{need}}: Die Funktion erlaubt diese Lastart nicht mehr.",
+    "withAddon": "{{text}} ({{product}} – {{variant}})."
   },
   "candidate": {
     "channel_overload_w": "würde {{loadW}} W aufnehmen (höchstens {{limitW}} W)",
@@ -186,7 +187,7 @@
     "openFor": "Öffnen: {{text}}",
     "unconnected_one": "{{count}} Bedarf hat nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
     "unconnected_other": "{{count}} Bedarfe haben nicht verbundene Einheiten (siehe Nicht verbundene Bedarfe)",
-    "version": "Version (Netze)",
+    "version": "Version (Netzwerke)",
     "show": "Zeigen",
     "showFor": "Zeigen: {{text}}"
   },

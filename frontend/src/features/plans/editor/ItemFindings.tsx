@@ -7,5 +7,5 @@ import { usePlanWiring } from './plan-wiring'
 export function ItemFindings({ findings }: { findings: Finding[] }) {
   const planWiring = usePlanWiring()
   if (findings.length === 0) return null
-  return <FindingsList findings={findings} names={planWiring?.wiring.findingNames} headings={false} />
+  return <FindingsList findings={findings} names={planWiring ? (f) => planWiring.wiring.findingNames(f, planWiring.planId) : undefined} headings={false} />
 }

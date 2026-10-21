@@ -2,10 +2,13 @@ package plans
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/kingkill85/snapflow/backend/internal/platform/auth"
+	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 )
 
 // FindingSeverity is how much a plan content warning matters in the checks
@@ -22,10 +25,11 @@ const (
 // placement, need and board codes; one namespace with the checks codes,
 // D453). The checks endpoint reports the warnings as findings with it.
 var WarningSeverity = map[string]FindingSeverity{
-	// Nothing can be ordered or a module physically does not fit.
-	string(WarnVariantDeleted):           SeverityError,
-	string(WarnModuleOverlap):            SeverityError,
-	string(WarnRequiredAddonUnavailable): SeverityError,
+	// Nothing can be ordered, or the board cannot be installed as drawn
+	// (amends D374: saving still accepts overlap and overflow).
+	string(WarnVariantDeleted): SeverityError,
+	string(WarnModuleOverlap):  SeverityError,
+	string(WarnRowOverflow):    SeverityError,
 	// The catalog changed under the plan: review.
 	string(WarnVariantInactive):          SeverityWarning,
 	string(WarnProductInactive):          SeverityWarning,
@@ -35,7 +39,7 @@ var WarningSeverity = map[string]FindingSeverity{
 	string(WarnAddonUnavailable):         SeverityWarning,
 	string(WarnAddonNotLinked):           SeverityWarning,
 	string(WarnModuleMountingFloorplan):  SeverityWarning,
-	string(WarnRowOverflow):              SeverityWarning,
+	string(WarnRequiredAddonUnavailable): SeverityWarning,
 	string(WarnNeedFunctionTypeInactive): SeverityWarning,
 	string(WarnNeedLoadTypeNotAllowed):   SeverityWarning,
 	string(WarnNeedOutsideZones):         SeverityWarning,
@@ -55,11 +59,15 @@ type ContentFinding struct {
 	ItemID         *uuid.UUID
 	NeedID         *uuid.UUID
 	AddonVariantID *uuid.UUID
+	// AddonProductName and AddonVariantName name the add-on (nil when the
+	// catalog no longer has it).
+	AddonProductName, AddonVariantName *i18n.Text
 }
 
 // ContentFindings returns the content warnings of every plan of a version
 // (floorplans: placements and needs; boards: modules and enclosure), in plan
-// order. The wiring checks include them (D453).
+// order. The wiring checks include them (D453). Each plan is read in its own
+// snapshot, apart from the checks' snapshot of the version.
 func (s *Service) ContentFindings(ctx context.Context, versionID uuid.UUID) ([]ContentFinding, error) {
 	if _, err := auth.Require(ctx, auth.PermProjectsRead); err != nil {
 		return nil, err
@@ -96,5 +104,34 @@ func (s *Service) ContentFindings(ctx context.Context, versionID uuid.UUID) ([]C
 			add(p, string(w.Code), nil, &id, nil)
 		}
 	}
-	return out, nil
+	return s.nameAddons(ctx, out)
+}
+
+// nameAddons adds the names of the add-ons of add-on warnings (one catalog
+// lookup).
+func (s *Service) nameAddons(ctx context.Context, list []ContentFinding) ([]ContentFinding, error) {
+	var ids []uuid.UUID
+	for _, f := range list {
+		if f.AddonVariantID != nil {
+			ids = append(ids, *f.AddonVariantID)
+		}
+	}
+	if len(ids) == 0 {
+		return list, nil
+	}
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	variants, err := s.products.BOMVariants(ctx, slices.Compact(ids))
+	if err != nil {
+		return nil, err
+	}
+	for i, f := range list {
+		if f.AddonVariantID == nil {
+			continue
+		}
+		if v, ok := variants[*f.AddonVariantID]; ok {
+			pn, vn := v.ProductName, v.VariantName
+			list[i].AddonProductName, list[i].AddonVariantName = &pn, &vn
+		}
+	}
+	return list, nil
 }

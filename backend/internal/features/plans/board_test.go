@@ -40,16 +40,6 @@ func rowsOf(b plans.BoardContent) []any {
 	return out
 }
 
-func warningCodes(b plans.BoardContent, id uuid.UUID) []string {
-	var out []string
-	for _, w := range b.Warnings {
-		if w.ModuleID != nil && *w.ModuleID == id {
-			out = append(out, string(w.Code))
-		}
-	}
-	return out
-}
-
 func TestBoards(t *testing.T) {
 	api := apptest.New(t)
 	c := api.NewBoardCatalog()
@@ -97,9 +87,15 @@ func TestBoards(t *testing.T) {
 	})
 	wantCode(t, resp, http.StatusOK, "")
 	b = decode[plans.BoardContent](t, resp)
-	if !slices.Contains(warningCodes(b, nowidth), "module_width_unknown") || !slices.Contains(warningCodes(b, sensor), "module_mounting_floorplan") ||
-		!slices.Contains(warningCodes(b, over), "row_overflow") || len(warningCodes(b, act)) != 0 {
-		t.Errorf("warnings: %+v", b.Warnings)
+	fs := planFindings(t, api, user.Cookie, b.PlanID)
+	if !slices.Contains(codesOf(fs, nowidth), "module_width_unknown") || !slices.Contains(codesOf(fs, sensor), "module_mounting_floorplan") ||
+		!slices.Contains(codesOf(fs, over), "row_overflow") || len(codesOf(fs, act)) != 0 {
+		t.Errorf("warnings: %+v", fs)
+	}
+	for _, f := range fs {
+		if want := map[string]string{"module_width_unknown": "info", "module_mounting_floorplan": "warning", "row_overflow": "error"}[f.Code]; want != "" && f.Severity != want {
+			t.Errorf("severity of %s: %s", f.Code, f.Severity)
+		}
 	}
 	if b.UsedTE != 12 || b.Rows[0].UsedTE != 6 || b.Rows[1].UsedTE != 6 || b.Modules[2].WidthTE != 1 {
 		t.Errorf("TE: %v %+v", b.UsedTE, b.Rows)

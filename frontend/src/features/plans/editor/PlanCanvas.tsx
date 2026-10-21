@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Text, Wedge } from 'react-konva'
 
 import type { Floorplan } from '../api'
-import type { Finding, PlanNeed, PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { PlanNeed, PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import {
   angleTo,
   boundsOf,
@@ -84,8 +84,8 @@ type Props = {
   document: PlanDocument
   selection: string[]
   variants: Map<string, VariantSearchItem>
-  /** The plan's findings by placement (a marker on the symbol). */
-  warnings: Map<string, Finding[]>
+  /** Placements with an error or warning finding (a marker on the symbol, D454). */
+  marked: Set<string>
   /** Items with a save error (drawn in the danger colour). */
   errorIds: Set<string>
   editable: boolean
@@ -142,7 +142,7 @@ export function PlanCanvas({
   document,
   selection,
   variants,
-  warnings,
+  marked,
   errorIds,
   editable,
   tool,
@@ -509,7 +509,7 @@ export function PlanCanvas({
                 placement={shown(p)}
                 image={url ? images.get(url) : undefined}
                 color={variant?.productType.color ?? theme.muted}
-                warning={(warnings.get(p.id)?.length ?? 0) > 0 || !variant}
+                warning={marked.has(p.id) || !variant}
                 error={errorIds.has(p.id)}
                 selected={selected.has(p.id)}
                 k={k}

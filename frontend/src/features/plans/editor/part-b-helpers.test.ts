@@ -101,7 +101,7 @@ describe('resize all of this product', () => {
   })
 
   it('is one undo step', () => {
-    let state = initEditor(documentOf({ planId: pid(501), contentUpdatedAt: '', scale: null, zones: [], placements, needs: [], warnings: [], needWarnings: [] }))
+    let state = initEditor(documentOf({ planId: pid(501), contentUpdatedAt: '', scale: null, zones: [], placements, needs: [] }))
     state = editorReducer(state, { type: 'change', action: { type: 'updatePlacements', changes: resizeChanges(placements, a.id, { width: 80 }, variants, true) } })
     expect(state.history.present.placements.map((p) => p.width)).toEqual([80, 80, 60])
     const back = undo(state.history)

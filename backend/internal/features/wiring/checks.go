@@ -140,6 +140,10 @@ func contentFindings(st *state, list []plans.ContentFinding) []Finding {
 		if c.AddonVariantID != nil {
 			f.Params["addonVariantId"] = c.AddonVariantID.String()
 		}
+		if c.AddonProductName != nil {
+			f.Params["addonProductName"] = *c.AddonProductName
+			f.Params["addonVariantName"] = *c.AddonVariantName
+		}
 		out = append(out, f)
 	}
 	return out

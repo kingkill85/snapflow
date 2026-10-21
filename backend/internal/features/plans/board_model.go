@@ -99,5 +99,5 @@ type BoardContent struct {
 	UsedTE             float64       `json:"usedTe" doc:"Sum of the modules' widths"`
 	// Capabilities of every variant used (modules and enclosure), by id.
 	Capabilities map[string]capabilities.Capabilities `json:"capabilities" doc:"Capability summary of every variant used (modules, enclosure), by variant id"`
-	Warnings     []BoardWarning                       `json:"warnings"`
+	Warnings     []BoardWarning                       `json:"-"` // reported by the checks (D453)
 }

@@ -56,7 +56,8 @@
     "module_overlap": "{{item}}: the module overlaps another one (its width changed in the catalog): move it.",
     "need_function_type_inactive": "{{need}}: the function is inactive in the catalog.",
     "need_outside_zones": "{{need}}: the symbol lies outside every zone.",
-    "need_load_type_not_allowed": "{{need}}: the function no longer allows this load type."
+    "need_load_type_not_allowed": "{{need}}: the function no longer allows this load type.",
+    "withAddon": "{{text}} ({{product}} – {{variant}})."
   },
   "candidate": {
     "channel_overload_w": "would draw {{loadW}} W (at most {{limitW}} W)",

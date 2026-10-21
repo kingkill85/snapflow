@@ -275,7 +275,7 @@ func Register(api huma.API, svc *Service) {
 		Path:        "/api/plans/{id}/content",
 		Summary:     "Replace a plan's zones, placements and needs",
 		Description: "Saves the whole content in one transaction and returns it with the computed zone of every " +
-			"placement and load symbol and the warnings. Needs the caller's live edit lock (409 plan.lock_required) and the content " +
+			"placement and load symbol (warnings: GET /api/versions/{versionId}/checks, D453). Needs the caller's live edit lock (409 plan.lock_required) and the content " +
 			"as last read (409 plan.stale).",
 		Tags:         []string{tag},
 		MaxBodyBytes: maxContentBytes,
@@ -309,7 +309,7 @@ func Register(api huma.API, svc *Service) {
 		Method:      http.MethodGet,
 		Path:        "/api/plans/{id}/board",
 		Summary:     "Get a board's enclosure, rows and modules",
-		Description: "With the capability summary of every variant used and the warnings. A floorplan is 409 plan.wrong_kind.",
+		Description: "With the capability summary of every variant used (warnings: the checks, D453). A floorplan is 409 plan.wrong_kind.",
 		Tags:        []string{tag},
 	}, func(ctx context.Context, in *idParam) (*boardOutput, error) {
 		c, err := svc.BoardContent(ctx, in.ID)
@@ -325,7 +325,7 @@ func Register(api huma.API, svc *Service) {
 		Path:        "/api/plans/{id}/board",
 		Summary:     "Replace a board's enclosure, rows and modules",
 		Description: "Saves the whole board in one transaction (rows fitted to an enclosure of known size) and returns it " +
-			"with widths, capabilities and warnings. Overlapping modules in a row are 422 board.overlap. Needs the " +
+			"with widths, capabilities (warnings: the checks, D453). Overlapping modules in a row are 422 board.overlap. Needs the " +
 			"caller's live edit lock (409 plan.lock_required) and the content as last read (409 plan.stale).",
 		Tags:         []string{tag},
 		MaxBodyBytes: maxContentBytes,
