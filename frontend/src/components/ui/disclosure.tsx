@@ -40,7 +40,7 @@ export function Disclosure({ title, description, open, onOpenChange, defaultOpen
         <ChevronRight aria-hidden="true" className={cn('mt-0.5 size-4 shrink-0 text-muted transition-transform', isOpen && 'rotate-90')} />
         <span className="min-w-0 space-y-0.5">
           <span className="block text-sm font-medium group-hover:text-primary">{title}</span>
-          {description && <span className="block text-sm text-muted">{description}</span>}
+          {description && <span className="block text-xs text-muted">{description}</span>}
         </span>
       </button>
       <div id={contentId} role="group" aria-label={title} hidden={!isOpen} className="space-y-4 pl-6">

@@ -218,7 +218,7 @@ function KnxObjectsEditor({ form }: { form: Form }) {
   return (
     <div role="group" aria-label={t('field.knxObjects')} className="space-y-2">
       <p className="text-sm font-medium">{t('field.knxObjects')}</p>
-      <p className="text-sm text-muted">{t('field.knxObjectsHint')}</p>
+      <p className="text-xs text-muted">{t('field.knxObjectsHint')}</p>
       {fields.map((field, j) => (
         <RepeaterItem
           key={field.id}

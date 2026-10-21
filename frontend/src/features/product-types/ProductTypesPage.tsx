@@ -120,7 +120,8 @@ export function ProductTypesPage() {
         </TypeBadge>
       ),
     },
-    { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code> },
+    // Tablets: the key gives way to topology and addressing (the row actions fit).
+    { header: t('field.key'), cell: (p) => <code className="text-xs">{p.key}</code>, className: 'md:max-lg:hidden' },
     { header: t('field.topology'), cell: (p) => t(`topology.${p.topology}`) },
     // "–" for none: a scheme is the exception, not the rule.
     { header: t('field.addressing'), cell: (p) => (p.addressing === 'none' ? '–' : t(`addressing.${p.addressing}`)) },
