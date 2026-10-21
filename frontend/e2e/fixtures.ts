@@ -17,6 +17,8 @@ export type Attribute = {
   required?: boolean
   unit?: string
   scope?: 'product' | 'variant'
+  /** The catalog field this attribute fills (capabilities). */
+  fieldKey?: string
   min?: number
   max?: number
   itemType?: 'text' | 'number' | 'integer' | 'boolean' | 'enum'
