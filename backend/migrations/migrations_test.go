@@ -448,6 +448,11 @@ VALUES ($1, $2, $3, $3, '{"en":"Dimmer"}', '{"en":"4x"}', 'DIM-4', $4, 'knx', '{
 ON CONFLICT (version_id, kind) DO UPDATE SET last_seq = document_counters.last_seq + 1 RETURNING last_seq`, version, tenant).Scan(&next); err != nil || next != 5 {
 		t.Errorf("next proposal seq: %d %v", next, err)
 	}
+	var policy, insert bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'document_counters' AND policyname = 'tenant_isolation'),
+    has_table_privilege('snapflow_app', 'document_counters', 'INSERT')`).Scan(&policy, &insert); err != nil || !policy || !insert {
+		t.Errorf("document_counters policy %v, app insert %v: %v", policy, insert, err)
+	}
 	var rls bool
 	if err := db.QueryRow(ctx, `SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE relname = 'document_counters'`).Scan(&rls); err != nil || !rls {
 		t.Errorf("document_counters row-level security: %v %v", rls, err)

@@ -381,6 +381,9 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	if err != nil {
 		return nil, err
 	}
+	if s.sequencer == nil {
+		return nil, errors.New("proposals: no sequencer registered")
+	}
 	exp, ok := s.exporters.Get(in.Exporter)
 	if !ok {
 		return nil, apperr.Invalid("body.exporter", "proposal.exporter_unknown", "unknown exporter").With("exporters", strings.Join(s.exporters.Keys(), ", "))
@@ -407,9 +410,6 @@ func (s *Service) Generate(ctx context.Context, versionID uuid.UUID, in Generate
 	// Reserve the sequence (short transaction; a failed run leaves a gap).
 	var seq int32
 	err = s.inScope(ctx, actor, pgx.TxOptions{}, func(tx pgx.Tx, _ *store.Queries) error {
-		if s.sequencer == nil {
-			return errors.New("proposals: no sequencer registered")
-		}
 		seq, err = s.sequencer.NextSeq(ctx, tx, versionID, KindProposal)
 		return err
 	})
