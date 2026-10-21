@@ -304,13 +304,10 @@ function AttributeRow({ itemId, form, name, index, readOnly, catalogFields, expa
           </div>
         )}
       </div>
-      <CatalogFieldFormDialog
-        open={newField !== null}
-        onOpenChange={(open) => !open && setNewField(null)}
-        item={null}
-        prefill={newField ?? undefined}
-        onSaved={onFieldCreated}
-      />
+      {/* Mounted only while open: a category has many rows. */}
+      {newField && (
+        <CatalogFieldFormDialog open onOpenChange={(open) => !open && setNewField(null)} item={null} prefill={newField} onSaved={onFieldCreated} />
+      )}
       <div className="grid items-start gap-4 sm:grid-cols-3">
         <FormSelectField
           control={form.control}
