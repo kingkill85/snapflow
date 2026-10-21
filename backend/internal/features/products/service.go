@@ -228,12 +228,15 @@ func (s *Service) Create(ctx context.Context, in ProductCreate) (Product, error)
 		}
 		return s.detail(ctx, actor, row)
 	}
+	// Product and variant errors come back together, so the form shows all of them in one round.
+	var errs []apperr.FieldError
 	pin, err := s.validateProduct(ctx, in.ProductInput, nil, Known{})
-	if err != nil {
-		return Product{}, err
-	}
-	cat, err := s.cats.Get(ctx, pin.CategoryID)
-	if err != nil {
+	var invalid *apperr.Error
+	switch {
+	case err == nil:
+	case errors.As(err, &invalid) && invalid.Code == "validation.failed":
+		errs = append(errs, invalid.Fields...)
+	default:
 		return Product{}, err
 	}
 	fv := *in.FirstVariant
@@ -241,7 +244,17 @@ func (s *Service) Create(ctx context.Context, in ProductCreate) (Product, error)
 	if len(vin.Name.Trimmed()) == 0 {
 		vin.Name = standardVariantName()
 	}
-	vin, errs := NormalizeVariant(cat, vin, nil, "body.firstVariant")
+	// Without a valid category (reported above) the variant attributes cannot be checked; the rest can.
+	var cat categories.Category
+	if c, err := s.cats.Get(ctx, pin.CategoryID); err == nil {
+		cat = c
+	} else if !hasCode(err, "category.not_found") {
+		return Product{}, err
+	} else {
+		vin.Attributes = nil
+	}
+	vin, verrs := NormalizeVariant(cat, vin, nil, "body.firstVariant")
+	errs = append(errs, verrs...)
 	if len(errs) > 0 {
 		return Product{}, apperr.Validation(errs...)
 	}

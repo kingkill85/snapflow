@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 
@@ -42,9 +42,17 @@ export function SingleVariantSection({ product, variant, category, locked, linkS
     queryClient.setQueryData(productKey, (p: Product | undefined) =>
       p ? { ...p, variants: p.variants.map((v) => (v.id === updated.id ? updated : v)) } : p,
     )
+    // Capabilities and the "Still missing" lines are computed from the variant: fetched again.
+    void queryClient.invalidateQueries({ queryKey: productKey })
     onSaved()
     setGeneration((g) => g + 1)
   }
+  // Gone (e.g. a second variant turned the section into the list): its unsaved state goes with it.
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  })
+  useEffect(() => () => onDirtyChangeRef.current(false), [])
   const reload = async () => {
     await queryClient.invalidateQueries({ queryKey: productKey })
     setGeneration((g) => g + 1)

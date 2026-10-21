@@ -128,6 +128,8 @@ describe('ProductEditorPage', () => {
     expect(posted).toBeUndefined()
     await u.type(screen.getByLabelText(/^Price/), '27,5')
     await u.type(screen.getByLabelText('SKU'), ' M1-STD ')
+    // The first variant's attributes, in their own section.
+    await u.click(within(region('Variant')).getByLabelText('Gloss'))
     await u.click(screen.getByRole('button', { name: 'Create' }))
 
     // The new product's page, to add its variants.
@@ -153,7 +155,7 @@ describe('ProductEditorPage', () => {
       },
       isActive: true,
       mounting: '',
-      firstVariant: { price: '27.5', sku: 'M1-STD' },
+      firstVariant: { price: '27.5', sku: 'M1-STD', attributes: { gloss: true } },
     })
   }, 30_000)
 
@@ -320,6 +322,37 @@ describe('ProductEditorPage', () => {
     expect(inAttributes('Channel currents')).toHaveAccessibleDescription('Enter a number.')
     expect(inAttributes('Power')).toHaveFocus()
     expect(puts).toEqual([])
+  })
+
+  it('asks a required variant attribute on create and shows its server error there', async () => {
+    const withVoltage = {
+      ...gatewayCategory,
+      attributes: [{ key: 'voltage', label: { en: 'Voltage' }, type: 'integer' as const, scope: 'variant' as const, required: true }],
+    }
+    const bodies: ProductCreate[] = []
+    server.use(
+      http.get('/api/product-types', () => HttpResponse.json({ items: types })),
+      http.get('/api/categories', () => HttpResponse.json({ items: [withVoltage] })),
+      http.post('/api/products', async ({ request }) => {
+        bodies.push((await request.json()) as ProductCreate)
+        return problem(422, { code: 'validation.failed', fields: [{ location: 'body.firstVariant.attributes.voltage', code: 'attribute.required' }] })
+      }),
+    )
+    const u = userEvent.setup()
+    renderRoutes(routes, { me: adminMe, route: '/catalog/products/new' })
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument()
+    await chooseOption(u, screen.getByLabelText('System'), 'Zigbee')
+    await chooseOption(u, screen.getByLabelText('Category'), withVoltage.name.en)
+    await u.type(screen.getByLabelText('Model number'), 'G1')
+    await u.type(await translation(u, document.body, 'Name', 'en'), 'Gateway')
+    await u.type(screen.getByLabelText(/^Price/), '10')
+    const voltage = within(region('Variant')).getByLabelText(/^Voltage/)
+    await u.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please check the highlighted fields.')
+    expect(voltage).toHaveAttribute('aria-invalid', 'true')
+    expect(voltage).toHaveAccessibleDescription(/This value is required\./)
+    expect(bodies[0].firstVariant).toEqual({ price: '10', attributes: {} })
   })
 
   it('shows server errors of attribute values at their inputs, list items at their list', async () => {

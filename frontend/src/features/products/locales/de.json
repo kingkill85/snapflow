@@ -34,7 +34,9 @@
     "attributes": "Attribute",
     "attributesHint": "Werte der Attribute der Kategorie, die pro Produkt gesetzt werden.",
     "variants": "Varianten",
-    "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör."
+    "variantsHint": "Die verkaufbaren Ausführungen dieses Produkts, jeweils mit eigenem Preis, Bild und Zubehör.",
+    "variant": "Variante",
+    "variantHint": "Werte der Attribute der ersten Variante; weitere Varianten fügen Sie auf der Produktseite hinzu."
   },
   "field": {
     "productType": "System",
