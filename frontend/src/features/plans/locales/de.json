@@ -53,7 +53,7 @@
     "label": "Planbereich",
     "products": "Produkte",
     "zones": "Zonen",
-    "inspector": "Eigenschaften",
+    "inspector": "Details",
     "layers": "Ebenen",
     "findings": "Probleme",
     "findingsCount_one": "Probleme ({{count}})",

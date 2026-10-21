@@ -692,7 +692,7 @@ function PlanEditor({ plan, content, project, variants }: Props) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : canvasArea}</div>
         <aside ref={setPanel} aria-label={t('panel.label')} className="relative flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
-          <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
+          <Tabs label={t('panel.label')} size="sm" tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
       <CalibrateDialog

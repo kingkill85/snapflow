@@ -16,7 +16,7 @@ const viewports = [
 ]
 const labels = {
   en: { saved: 'Saved', inspector: 'Inspector', problems: /^Problems/ },
-  de: { saved: 'Gespeichert', inspector: 'Eigenschaften', problems: /^Probleme/ },
+  de: { saved: 'Gespeichert', inspector: 'Details', problems: /^Probleme/ },
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -57,6 +57,11 @@ for (const lang of ['en', 'de'] as const) {
           if (step.act) await step.act(page)
           await page.waitForTimeout(300)
           await expectNoHorizontalOverflow(page)
+          if (step.editor) {
+            // The panel tabs with the Problems count fit the panel (no tab scrolls out of view).
+            const tabs = page.getByRole('tablist').last()
+            expect(await tabs.evaluate((el) => el.scrollWidth - el.clientWidth), 'the panel tabs overflow').toBeLessThanOrEqual(0)
+          }
           await page.screenshot({ path: `e2e/screenshots/findings-${step.name}-${viewport.name}-${colorScheme}-${lang}.png`, fullPage: step.fullPage ?? false })
           await page.keyboard.press('Escape')
         }
