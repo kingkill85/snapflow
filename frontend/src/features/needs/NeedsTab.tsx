@@ -48,9 +48,7 @@ export function NeedsTab({ projectId, versionId }: { projectId: string; versionI
       <Totals totals={rooms.totals} functionTypes={rooms.functionTypes} />
 
       {applied != null && (
-        <Notice tone="success">
-          <span role="status">{t('rooms.applied', { count: applied })}</span>
-        </Notice>
+        <Notice tone="success">{t('rooms.applied', { count: applied })}</Notice>
       )}
 
       {rooms.plans.map((plan) => (
@@ -218,7 +216,14 @@ function RoomRow({ room, path, canUpdate, onAutoConnect }: { room: Room; path: s
           </Button>
         )}
         {open && canUpdate && (
-          <Button variant="secondary" size="sm" onClick={onAutoConnect} aria-label={room.zoneId ? t('rooms.autoConnectFor', { name }) : t('rooms.autoConnectAll')}>
+          <Button
+            variant="secondary"
+            size="sm"
+            // The whole-version label is long: on a phone it wraps inside the card instead of running past it.
+            className="h-auto min-h-8 max-w-full py-1 text-left whitespace-normal"
+            onClick={onAutoConnect}
+            aria-label={room.zoneId ? t('rooms.autoConnectFor', { name }) : t('rooms.autoConnectAll')}
+          >
             <Plug aria-hidden />
             {room.zoneId ? t('rooms.autoConnect') : t('rooms.autoConnectAll')}
           </Button>
