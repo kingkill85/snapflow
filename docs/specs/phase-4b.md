@@ -11,7 +11,7 @@ Spec written 2026-10-21, after phase 4a. Source: the same data-model and UI revi
 | 4b-3 | One problem list: plan and board warnings and the checks findings share codes, severities and one component | no |
 | 4b-4 | Needs tab as room overview | no |
 | 4b-5 | Model cleanups: drop `network_assignments.pinned`, one document counter table, no presentation facts in `version_items` | yes |
-| 4b-6 | Attributes and fields as one concept: every category attribute is a catalog field | yes |
+| 4b-6 | **Parked** (user, 2026-10-21: "6 weiß ich nicht, klingt wild"): attributes and fields as one concept. Re-evaluate after go-live with real catalog data; the section below stays as the design if it is picked up | yes |
 
 Rules that hold for every step: CLAUDE.md (business rules in Go services once, design-system components, i18n en + de, generated code only via `make generate`, new goose migrations only), the 4a vocabulary (Systems, Functions, Channel kinds, Setup), and frontend parity with the backend.
 
@@ -92,7 +92,10 @@ Three changes from the data-model review, one migration each (goose, never edit 
 - Decisions: D456 (the three cleanups and why).
 - Tests: migrations up/down with data; BOM order and badges follow a reorder and a recolour in the catalog; proposal and installation numbers continue across the migration; networks members still report pinned correctly.
 
-## 4b-6 Attributes and fields as one concept
+## 4b-6 Attributes and fields as one concept (parked)
+
+Not built in phase 4b. The user was unsure about the migration's reach; 4a-3's "Create a new field…" from the attribute row and the readiness checks cover the daily need. Kept as the design for a later decision.
+
 
 Today a category has its own attribute list (`categories.attributes`, `instance_attributes`: key, label, description, type, unit, options, min, max, required, scope, optional `fieldKey`) and the catalog has fields (`catalog_fields`: key, label, type, unit, options, meaning). An admin defines "Channels" on the category and links it to a field. Goal: one concept. A **field** says what a value is (key, label, type, unit, options, meaning); a **category** says which fields its products have and how (order, scope, required, min, max, description).
 
