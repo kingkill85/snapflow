@@ -86,4 +86,20 @@ test('connections: checks, auto-connect, a hand move, a bus line near its limit,
   await expect(livingList).not.toContainText('Door')
   await page.goto(checksUrl)
   await expect(card(page, /^Bus line /)).toContainText('Near limit')
+
+  // One problem list (D453, D454): the dimmer's product goes inactive; the Checks tab lists it under the
+  // board with a link that opens the board editor on D1, and the editor's Problems tab lists it too.
+  await api.updateProduct(s.dimmer.id, { isActive: false })
+  await page.goto(checksUrl)
+  const findings = page.getByRole('region', { name: 'Findings' })
+  const boardGroup = findings.getByRole('region', { name: 'Main board' })
+  const inactive = /^D1\b.*: the product is inactive in the catalog\.$/
+  await expect(boardGroup.getByText(inactive)).toBeVisible()
+  await expect(findings.getByRole('region', { name: 'Version (networks)' })).toContainText('Line 1: 130 of 160 mA used')
+  await boardGroup.getByRole('link', { name: /^Open: D1\b.*the product is inactive/ }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByText(inactive)).toBeVisible()
+  await page.getByRole('tab', { name: /^Problems \(\d+\)$/ }).click()
+  const problems = page.getByRole('tabpanel', { name: /^Problems/ })
+  await problems.getByRole('button', { name: /^Show: D1\b.*the product is inactive/ }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Inspector' }).getByText(inactive)).toBeVisible()
 })

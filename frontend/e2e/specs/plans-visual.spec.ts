@@ -44,7 +44,7 @@ const labels = {
     del: (n: string) => `${n} löschen`,
     products: 'Produkte',
     zones: 'Zonen',
-    inspector: 'Eigenschaften',
+    inspector: 'Details',
     layers: 'Ebenen',
     calibrate: 'Maßstab kalibrieren',
     saved: 'Gespeichert',

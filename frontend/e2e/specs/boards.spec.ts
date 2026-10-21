@@ -77,6 +77,10 @@ test('boards: enclosure, modules, totals, BOM, networks', async ({ page, api }) 
   await expect(page.getByTestId('board-totals')).toHaveText('3 modules · 10 / 24 TE')
   await expect(page.getByText('4 / 12 TE')).toBeVisible()
 
+  // The board's problems (D454): the plan's findings from the checks, here none.
+  await page.getByRole('tab', { name: /^Problems/ }).click()
+  await expect(page.getByRole('tabpanel', { name: /^Problems/ }).getByText('No problems found.')).toBeVisible()
+
   // The BOM: modules and the enclosure.
   await page.getByRole('link', { name: new RegExp(project.name) }).click()
   await expect(page.getByText('3 modules · 10 of 24 TE')).toBeVisible()

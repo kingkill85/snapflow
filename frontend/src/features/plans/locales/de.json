@@ -53,8 +53,11 @@
     "label": "Planbereich",
     "products": "Produkte",
     "zones": "Zonen",
-    "inspector": "Eigenschaften",
-    "layers": "Ebenen"
+    "inspector": "Details",
+    "layers": "Ebenen",
+    "findings": "Probleme",
+    "findingsCount_one": "Probleme ({{count}})",
+    "findingsCount_other": "Probleme ({{count}})"
   },
   "zones": {
     "empty": "Noch keine Zonen.",
@@ -123,22 +126,6 @@
     "resizeAllHint_one": "Größenänderungen gelten für die {{count}} Platzierung dieses Produkts auf dem Plan",
     "resizeAllHint_other": "Größenänderungen gelten für alle {{count}} Platzierungen dieses Produkts auf dem Plan",
     "manyDetailNeeds": "Produkte: {{products}} · Zonen: {{zones}} · Bedarfssymbole: {{needs}}"
-  },
-  "warning": {
-    "variant_deleted": "Dieses Produkt wurde aus dem Katalog gelöscht.",
-    "variant_inactive": "Diese Variante ist im Katalog inaktiv.",
-    "product_inactive": "Dieses Produkt ist im Katalog inaktiv.",
-    "category_inactive": "Die Kategorie des Produkts ist inaktiv.",
-    "product_type_inactive": "Das System ist inaktiv.",
-    "product_type_not_in_project": "Das System ist für dieses Projekt nicht gewählt.",
-    "required_addon_unavailable": "Ein erforderliches Zubehör ist nicht verfügbar.",
-    "addon_unavailable": "Ein gewähltes Zubehör ist nicht verfügbar.",
-    "addon_not_linked": "Ein gewähltes Zubehör gehört nicht mehr zu dieser Variante.",
-    "module_width_unknown": "Die Breite des Produkts auf der Hutschiene ist unbekannt: gezählt als 1 TE.",
-    "module_mounting_floorplan": "Dieses Produkt ist nicht für den Verteiler gedacht.",
-    "row_overflow": "Das Gerät reicht über die Kapazität der Reihe hinaus.",
-    "enclosure_size_unknown": "Reihen und TE pro Reihe des Gehäuses sind unbekannt: Reihen selbst eingeben.",
-    "module_overlap": "Das Gerät überlappt ein anderes (seine Breite hat sich im Katalog geändert): verschieben."
   },
   "save": {
     "saved": "Gespeichert",
@@ -222,11 +209,6 @@
     "zoneOfSymbol": "Zone",
     "noZone": "Außerhalb aller Zonen",
     "limit": "Ein Plan kann höchstens {{max}} Bedarfe haben: Es wurde nichts hinzugefügt."
-  },
-  "needWarning": {
-    "need_function_type_inactive": "Die Funktion ist im Katalog inaktiv.",
-    "need_outside_zones": "Das Symbol liegt außerhalb aller Zonen.",
-    "need_load_type_not_allowed": "Die Funktion erlaubt diese Lastart nicht mehr."
   },
   "needUnits_one": "{{count}} Stück",
   "needUnits_other": "{{count}} Stück",

@@ -204,7 +204,7 @@ func (s *Service) load(ctx context.Context, actor auth.Actor, versionID uuid.UUI
 	if d.wiring, err = s.wiring.Wiring(ctx, versionID); err != nil {
 		return nil, err
 	}
-	if d.checks, err = s.wiring.Checks(ctx, versionID); err != nil {
+	if d.checks, err = s.wiring.Checks(ctx, versionID, nil); err != nil {
 		return nil, err
 	}
 	if d.networks, err = s.networks.Get(ctx, versionID); err != nil {

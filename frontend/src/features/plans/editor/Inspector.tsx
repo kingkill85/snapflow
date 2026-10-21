@@ -2,7 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { InstanceAttributeDefinition, NeedWarning, PlanNeed, PlanPlacement, PlanWarning, PlanZone, VariantSearchItem } from '@/api/generated/model'
+import type { Finding, InstanceAttributeDefinition, PlanNeed, PlanPlacement, PlanZone, VariantSearchItem } from '@/api/generated/model'
 import { useGetCategory } from '@/api/generated/categories/categories'
 import { useGetProduct } from '@/api/generated/products/products'
 import { AttributeValuesEditor } from '@/catalog/AttributeValuesEditor'
@@ -24,6 +24,7 @@ import type { ActiveVertex } from './PlanCanvas'
 import { usePlanWiring } from './plan-wiring'
 import { changeProduct, clampGeometry, resizeChanges } from './placements'
 import { minZonePoints, removeVertex, zoneColors } from './zones'
+import { ItemFindings } from './ItemFindings'
 
 type Props = {
   placements: PlanPlacement[]
@@ -34,7 +35,8 @@ type Props = {
   allNeeds: PlanNeed[]
   allZones: PlanZone[]
   needCatalog: NeedCatalog
-  needWarnings: Map<string, NeedWarning[]>
+  /** The plan's findings by need (D454). */
+  needWarnings: Map<string, Finding[]>
   /** Every placement of the plan ("resize all of this product"). */
   allPlacements: PlanPlacement[]
   variants: Map<string, VariantSearchItem>
@@ -43,7 +45,8 @@ type Props = {
   products: PaletteProduct[]
   /** The plan image: positions and sizes stay inside it. */
   image: Size
-  warnings: Map<string, PlanWarning[]>
+  /** The plan's findings by placement (D454). */
+  warnings: Map<string, Finding[]>
   /** Save errors per item id, translated. */
   errors: Map<string, string[]>
   editable: boolean
@@ -253,7 +256,7 @@ function PlacementInspector({ placement: p, allPlacements, variants, allVariants
         />
       )}
       <ErrorList messages={errors.get(p.id) ?? []} />
-      {itemWarnings.length > 0 && <Warnings warnings={itemWarnings} placement={p} productId={variant?.productId} />}
+      <ItemFindings findings={itemWarnings} />
       {variant && (
         <SelectField
           label={t('inspector.variant')}
@@ -348,27 +351,6 @@ export function ProductPicker({ products, current, onPick }: { products: Palette
         {tc('action.cancel')}
       </Button>
     </div>
-  )
-}
-
-/** The placement's warnings with texts (add-on warnings name the add-on when the product is loaded). */
-export function Warnings({ warnings, placement, productId }: { warnings: { code: string; addonVariantId?: string }[]; placement: { variantId: string | null }; productId?: string }) {
-  const { t } = useTranslation('plans')
-  const localize = useLocalized()
-  const product = useGetProduct(productId ?? '', { query: { enabled: !!productId && warnings.some((w) => w.addonVariantId) } })
-  const addons = product.data?.variants.find((v) => v.id === placement.variantId)?.addons ?? []
-  return (
-    <ul className="space-y-1 rounded-control border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-      {warnings.map((w) => {
-        const addon = w.addonVariantId ? addons.find((a) => a.addonVariantId === w.addonVariantId) : undefined
-        return (
-          <li key={`${w.code}-${w.addonVariantId ?? ''}`}>
-            {t(`warning.${w.code}` as 'warning.variant_deleted')}
-            {addon && ` (${localize(addon.productName)} – ${localize(addon.variantName)})`}
-          </li>
-        )
-      })}
-    </ul>
   )
 }
 

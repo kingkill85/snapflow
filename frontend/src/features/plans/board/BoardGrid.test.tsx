@@ -29,7 +29,7 @@ function harness(doc: BoardDocument) {
         selection={state.selection}
         variants={new Map()}
         widthOf={widthOf}
-        warnings={new Map()}
+        marked={new Set()}
         errorIds={new Set()}
         editable
         dispatch={dispatch}

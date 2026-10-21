@@ -2,7 +2,7 @@ import { Plug, Unplug } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { ZoneStatus } from '@/api/generated/model'
+import type { Finding, ZoneStatus } from '@/api/generated/model'
 import { useDeleteConnection, useGetChecks } from '@/api/generated/wiring/wiring'
 import { Badge, Button, ErrorMessage, IconButton, Notice } from '@/components/ui'
 import { ConnectDialog, type ConnectTarget, statusTone, useFindingText, useRefreshWiring, useWiringModel } from '@/features/checks'
@@ -14,9 +14,12 @@ import { PlanWiringContext as Context, type PlanWiring, usePlanWiring } from './
  * provides the wiring model, the zone statuses of the checks and one connect picker; the zone inspector's
  * need rows and the symbol inspector show a need's connections through `NeedConnections`.
  */
+const noFindings: Finding[] = []
+
 export function PlanWiringProvider({ versionId, planId, children }: { versionId: string; planId: string; children: (value: PlanWiring) => ReactNode }) {
   const wiring = useWiringModel(versionId)
-  const checks = useGetChecks(versionId)
+  // The plan's findings (?planId=, D454) and the version's zones; refreshed with the wiring after each save.
+  const checks = useGetChecks(versionId, { planId })
   const refresh = useRefreshWiring(versionId)
   const findingText = useFindingText()
   const [target, setTarget] = useState<ConnectTarget | null>(null)
@@ -31,6 +34,7 @@ export function PlanWiringProvider({ versionId, planId, children }: { versionId:
     planId,
     wiring,
     zoneStatus,
+    findings: checks.data?.findings ?? noFindings,
     refresh,
     connect: (needId) => {
       setWarnings([])

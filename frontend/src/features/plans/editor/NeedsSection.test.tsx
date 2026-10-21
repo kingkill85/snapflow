@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useReducer } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { NeedWarning, PlanNeed, PlanZone } from '@/api/generated/model'
+import type { Finding, PlanNeed, PlanZone } from '@/api/generated/model'
 import { renderWithProviders } from '@/test/render'
 import { chooseOption } from '@/test/select'
 
@@ -28,7 +28,7 @@ const zone: PlanZone = {
 const need = (n: number, over: Partial<PlanNeed> = {}): PlanNeed => ({ ...newNeed(functionTypes[0].id, zone.id), id: pid(1300 + n), ...over })
 
 /** The inspector over a real reducer with undo buttons, so steps can be checked. */
-function Harness({ needs, selection, spy, warnings = new Map(), errors = new Map() }: { needs: PlanNeed[]; selection: string[]; spy: (a: EditorAction) => void; warnings?: Map<string, NeedWarning[]>; errors?: Map<string, string[]> }) {
+function Harness({ needs, selection, spy, warnings = new Map(), errors = new Map() }: { needs: PlanNeed[]; selection: string[]; spy: (a: EditorAction) => void; warnings?: Map<string, Finding[]>; errors?: Map<string, string[]> }) {
   const start: PlanDocument = { scale: null, zones: [zone], placements: [], needs }
   const [state, dispatch] = useReducer(editorReducer, start, initEditor)
   const doc = state.history.present
@@ -78,7 +78,7 @@ describe('zone needs section', () => {
         needs={needs}
         selection={[zone.id]}
         spy={vi.fn()}
-        warnings={new Map([[pid(1302), [{ needId: pid(1302), code: 'need_function_type_inactive' }]]])}
+        warnings={new Map([[pid(1302), [{ severity: 'warning', code: 'need_function_type_inactive', refs: { planId: 'p', needId: pid(1302) }, params: { label: 'Window' } }]]])}
         errors={new Map([[pid(1301), ['Must be between 1 and 100.']]])}
       />,
     )
@@ -86,7 +86,7 @@ describe('zone needs section', () => {
     const first = within(section).getByRole('listitem', { name: '3 × Dimmable light · 60 W · LED · Ceiling' })
     expect(within(first).getByText('Over the table')).toBeInTheDocument()
     expect(within(first).getByRole('alert')).toHaveTextContent('Must be between 1 and 100.')
-    expect(within(section).getByText('The function is inactive in the catalog.')).toBeInTheDocument()
+    expect(within(section).getByText('Window: the function is inactive in the catalog.')).toBeInTheDocument()
 
     await user.click(within(section).getByRole('button', { name: 'Move 1 × Blind · Window up' }))
     expect(needsOf()).toEqual([

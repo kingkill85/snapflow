@@ -2,7 +2,7 @@ import { TriangleAlert } from 'lucide-react'
 import { type CSSProperties, type DragEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BoardWarning, VariantSearchItem } from '@/api/generated/model'
+import type { VariantSearchItem } from '@/api/generated/model'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -23,7 +23,8 @@ type Props = {
   selection: string[]
   variants: Map<string, VariantSearchItem>
   widthOf: (m: BoardModuleDoc) => number
-  warnings: Map<string, BoardWarning[]>
+  /** Modules with an error or warning finding (a marker on the module, D454). */
+  marked: Set<string>
   errorIds: Set<string>
   editable: boolean
   dispatch: (action: BoardEditorAction) => void
@@ -44,7 +45,7 @@ type Preview = { rowId: string; offsetTe: number; width: number } | null
  * nearest free gap, 0.5 TE grid), arrows move the focused module, Delete
  * removes it. Everything else (undo, copy, ...) is in the page's shortcuts.
  */
-export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorIds, editable, dispatch, onPlace, armed, productWidth, channelUse }: Props) {
+export function BoardGrid({ doc, selection, variants, widthOf, marked, errorIds, editable, dispatch, onPlace, armed, productWidth, channelUse }: Props) {
   const { t } = useTranslation('plans')
   const separator = useDecimalSeparator()
   const ref = useRef<HTMLDivElement>(null)
@@ -208,7 +209,7 @@ export function BoardGrid({ doc, selection, variants, widthOf, warnings, errorId
                         pxPerTe={pxPerTe}
                         variant={m.variantId ? variants.get(m.variantId) : undefined}
                         selected={selection.includes(m.id)}
-                        warned={(warnings.get(m.id)?.length ?? 0) > 0 || m.offsetTe + widthOf(m) > row.capacityTe}
+                        warned={marked.has(m.id) || m.offsetTe + widthOf(m) > row.capacityTe}
                         failed={errorIds.has(m.id)}
                         editable={editable}
                         te={te}

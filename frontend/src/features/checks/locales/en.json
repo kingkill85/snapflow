@@ -39,7 +39,25 @@
     "bus_line_address_invalid": "{{name}}: the line address \"{{address}}\" cannot be read",
     "bus_line_address_duplicate": "{{name}}: {{count}} lines use the line address {{prefix}}",
     "address_device_zero": "{{item}}: address {{address}} uses device 0, which is reserved for the line coupler",
-    "unknown": "Check {{code}}"
+    "unknown": "Check {{code}}",
+    "variant_deleted": "{{item}}: the product was deleted from the catalog.",
+    "variant_inactive": "{{item}}: the variant is inactive in the catalog.",
+    "product_inactive": "{{item}}: the product is inactive in the catalog.",
+    "category_inactive": "{{item}}: the product's category is inactive.",
+    "product_type_inactive": "{{item}}: the system is inactive.",
+    "product_type_not_in_project": "{{item}}: the system is not chosen for this project.",
+    "required_addon_unavailable": "{{item}}: a required add-on is not available.",
+    "addon_unavailable": "{{item}}: a chosen add-on is not available.",
+    "addon_not_linked": "{{item}}: a chosen add-on no longer belongs to this variant.",
+    "module_width_unknown": "{{item}}: the rail width is unknown, counted as 1 TE.",
+    "module_mounting_floorplan": "{{item}}: this product is not meant for a board.",
+    "row_overflow": "{{item}}: the module reaches beyond the row's capacity.",
+    "enclosure_size_unknown": "The enclosure's rows and TE per row are unknown: enter the rows yourself.",
+    "module_overlap": "{{item}}: the module overlaps another one (its width changed in the catalog): move it.",
+    "need_function_type_inactive": "{{need}}: the function is inactive in the catalog.",
+    "need_outside_zones": "{{need}}: the symbol lies outside every zone.",
+    "need_load_type_not_allowed": "{{need}}: the function no longer allows this load type.",
+    "withAddon": "{{text}} ({{product}} – {{variant}})."
   },
   "candidate": {
     "channel_overload_w": "would draw {{loadW}} W (at most {{limitW}} W)",
@@ -168,13 +186,10 @@
     "open": "Open",
     "openFor": "Open: {{text}}",
     "unconnected_one": "{{count}} need has units that are not connected (listed under Unconnected needs)",
-    "unconnected_other": "{{count}} needs have units that are not connected (listed under Unconnected needs)"
-  },
-  "area": {
-    "needs": "Needs",
-    "connections": "Connections",
-    "boards": "Boards",
-    "networks": "Networks"
+    "unconnected_other": "{{count}} needs have units that are not connected (listed under Unconnected needs)",
+    "version": "Version (networks)",
+    "show": "Show",
+    "showFor": "Show: {{text}}"
   },
   "unconnected": {
     "title": "Unconnected needs",
@@ -214,5 +229,10 @@
     "bus_line": "a bus line that no longer exists",
     "gateway": "a gateway that no longer exists",
     "other": "a network that no longer exists"
+  },
+  "severityOne": {
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Note"
   }
 }

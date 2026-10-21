@@ -32,7 +32,6 @@ const content = (over: Partial<BoardContent> = {}): BoardContent => ({
   capacityTe: 12,
   usedTe: 0,
   capabilities: {},
-  warnings: [],
   ...over,
 })
 
@@ -105,6 +104,34 @@ const open = (query = '') =>
   )
 
 describe('BoardEditorPage', () => {
+  it('lists the board\'s findings in the Problems tab and selects the module with Show (D454)', async () => {
+    const user = userEvent.setup()
+    const mod = { id: pid(301), rowId: row, offsetTe: 0, variantId: catalog[0].id, widthTe: 1, label: 'PS1', existing: false, addonVariantIds: [], instanceValues: {} }
+    const findings: Checks['findings'] = [
+      { severity: 'info', code: 'module_width_unknown', refs: { targetPlanId: board.id, itemId: mod.id }, params: { label: 'PS1' } },
+      { severity: 'info', code: 'enclosure_size_unknown', refs: { targetPlanId: board.id }, params: {} },
+    ]
+    serve(content({ modules: [mod] }), project, emptyWiring, { ...emptyChecks, findings })
+    const asked: string[] = []
+    server.use(
+      http.get('/api/versions/:v/checks', ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get('planId') ?? '')
+        return HttpResponse.json({ ...emptyChecks, findings })
+      }),
+    )
+    open()
+    await user.click(await screen.findByRole('tab', { name: 'Problems (2)' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Problems (2)' })
+    expect(within(panel).getByText('Notes')).toBeInTheDocument()
+    expect(within(panel).getByText("The enclosure's rows and TE per row are unknown: enter the rows yourself.")).toBeInTheDocument()
+    expect(asked.length).toBeGreaterThan(0)
+    expect(asked.every((id) => id === board.id)).toBe(true)
+    await user.click(within(panel).getByRole('button', { name: 'Show: PS1: the rail width is unknown, counted as 1 TE.' }))
+    expect(within(screen.getByRole('tabpanel', { name: 'Inspector' })).getByText('PS1: the rail width is unknown, counted as 1 TE.')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Board' }))
+    expect(within(screen.getByRole('tabpanel', { name: 'Board' })).getByText("The enclosure's rows and TE per row are unknown: enter the rows yourself.")).toBeInTheDocument()
+  })
+
   it('offers board products only, places one by keyboard, moves it, undoes, autosaves', async () => {
     const { saved } = serve()
     const user = userEvent.setup()

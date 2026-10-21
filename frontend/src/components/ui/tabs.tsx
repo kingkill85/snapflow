@@ -13,6 +13,8 @@ type TabsProps<K extends string> = {
   className?: string
   /** Replaces the panel's padding, e.g. for page-level tabs (default `p-3`). */
   panelClassName?: string
+  /** `sm`: tighter padding and a smaller label, for a narrow side panel with many tabs (the plan and board editors). */
+  size?: 'md' | 'sm'
 }
 
 /**
@@ -20,7 +22,7 @@ type TabsProps<K extends string> = {
  * between tabs; only the active panel is rendered. Used e.g. by the plan
  * editor's side panel.
  */
-export function Tabs<K extends string>({ label, tabs, value, onValueChange, className, panelClassName }: TabsProps<K>) {
+export function Tabs<K extends string>({ label, tabs, value, onValueChange, className, panelClassName, size = 'md' }: TabsProps<K>) {
   const id = useId()
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const active = tabs.find((t) => t.key === value) ?? tabs[0]
@@ -66,7 +68,8 @@ export function Tabs<K extends string>({ label, tabs, value, onValueChange, clas
               onClick={() => onValueChange(tab.key)}
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
-                '-mb-px shrink-0 border-b-2 px-2 py-2 text-sm font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+                '-mb-px shrink-0 border-b-2 py-2 font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+                size === 'sm' ? 'px-1 text-[13px]' : 'px-2 text-sm',
                 selected ? 'border-primary text-ink' : 'border-transparent text-muted hover:text-ink',
               )}
             >

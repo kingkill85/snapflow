@@ -37,6 +37,7 @@ import type {
   Connections,
   DisconnectInput,
   Error,
+  GetChecksParams,
   Removed,
   Wiring
 } from '../model';
@@ -294,17 +295,19 @@ export const useUndoAutoConnect = <TError = ErrorType<Error>,
       return useMutation(getUndoAutoConnectMutationOptions(options), queryClient);
     }
     /**
- * Zone coverage, board channels and TE, bus lines, gateways and the findings; computed on demand.
+ * Zone coverage, board channels and TE, bus lines, gateways and the findings (with every plan's content warnings, D453); computed on demand.
  * @summary Evaluate a version
  */
 export const getChecks = (
     versionId: string,
+    params?: GetChecksParams,
  signal?: AbortSignal
 ) => {
 
 
       return apiClient<Checks>(
-      {url: `/api/versions/${versionId}/checks`, method: 'GET', signal
+      {url: `/api/versions/${versionId}/checks`, method: 'GET',
+        params, signal
     },
       );
     }
@@ -312,23 +315,25 @@ export const getChecks = (
 
 
 
-export const getGetChecksQueryKey = (versionId: string,) => {
+export const getGetChecksQueryKey = (versionId: string,
+    params?: GetChecksParams,) => {
     return [
-    `/api/versions/${versionId}/checks`
+    `/api/versions/${versionId}/checks`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetChecksQueryOptions = <TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
+export const getGetChecksQueryOptions = <TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(versionId: string,
+    params?: GetChecksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetChecksQueryKey(versionId);
+  const queryKey =  queryOptions?.queryKey ?? getGetChecksQueryKey(versionId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChecks>>> = ({ signal }) => getChecks(versionId, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChecks>>> = ({ signal }) => getChecks(versionId,params, signal);
 
 
 
@@ -342,7 +347,8 @@ export type GetChecksQueryError = ErrorType<Error>
 
 
 export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(
- versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>> & Pick<
+ versionId: string,
+    params: undefined |  GetChecksParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChecks>>,
           TError,
@@ -352,7 +358,8 @@ export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TErr
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>> & Pick<
+ versionId: string,
+    params?: GetChecksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChecks>>,
           TError,
@@ -362,7 +369,8 @@ export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TErr
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
+ versionId: string,
+    params?: GetChecksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -370,11 +378,12 @@ export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TErr
  */
 
 export function useGetChecks<TData = Awaited<ReturnType<typeof getChecks>>, TError = ErrorType<Error>>(
- versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
+ versionId: string,
+    params?: GetChecksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChecks>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetChecksQueryOptions(versionId,options)
+  const queryOptions = getGetChecksQueryOptions(versionId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

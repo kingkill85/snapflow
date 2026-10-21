@@ -32,6 +32,11 @@ type removedOutput struct{ Body Removed }
 
 type checksOutput struct{ Body Checks }
 
+type checksInput struct {
+	VersionID uuid.UUID `path:"versionId" format:"uuid"`
+	PlanID    uuid.UUID `query:"planId" format:"uuid" required:"false" doc:"Only the findings that refer to this plan (as need plan, target plan or item plan), counted alike"`
+}
+
 type previewOutput struct{ Body AutoConnectPreview }
 
 type applyOutput struct{ Body AutoConnectResult }
@@ -141,10 +146,15 @@ func Register(api huma.API, svc *Service) {
 		Method:      http.MethodGet,
 		Path:        "/api/versions/{versionId}/checks",
 		Summary:     "Evaluate a version",
-		Description: "Zone coverage, board channels and TE, bus lines, gateways and the findings; computed on demand.",
-		Tags:        []string{tag},
-	}, func(ctx context.Context, in *versionParam) (*checksOutput, error) {
-		out, err := svc.Checks(ctx, in.VersionID)
+		Description: "Zone coverage, board channels and TE, bus lines, gateways and the findings (with every plan's content " +
+			"warnings, D453); computed on demand.",
+		Tags: []string{tag},
+	}, func(ctx context.Context, in *checksInput) (*checksOutput, error) {
+		var plan *uuid.UUID
+		if in.PlanID != uuid.Nil {
+			plan = &in.PlanID
+		}
+		out, err := svc.Checks(ctx, in.VersionID, plan)
 		if err != nil {
 			return nil, err
 		}

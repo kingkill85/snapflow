@@ -91,7 +91,7 @@ export function NetworksTab({ projectId, versionId }: { projectId: string; versi
   const refresh = useRefreshNetworks(versionId)
   const assign = useSetNetworkAssignments()
   const reorder = useReorderBusLines()
-  const checks = useGetChecks(versionId, { query: everyVisit })
+  const checks = useGetChecks(versionId, undefined, { query: everyVisit })
   const addresses = useGetAddresses(versionId, { query: everyVisit })
   const assignAddresses = useAssignAddresses()
   const clearAddresses = useClearAutomaticAddresses()

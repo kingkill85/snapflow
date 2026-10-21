@@ -38,7 +38,7 @@ const labels = {
   },
   de: {
     zones: 'Zonen',
-    inspector: 'Eigenschaften',
+    inspector: 'Details',
     layers: 'Ebenen',
     saved: 'Gespeichert',
     needs: 'Bedarf',

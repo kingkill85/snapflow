@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { ZoneStatus } from '@/api/generated/model'
+import type { Finding, ZoneStatus } from '@/api/generated/model'
 import type { WiringModel } from '@/features/checks'
 
 /** The editor's connections context (3d), provided by `PlanWiringProvider` in connections.tsx. */
@@ -9,6 +9,8 @@ export type PlanWiring = {
   planId: string
   wiring: WiringModel
   zoneStatus: Map<string, ZoneStatus>
+  /** The plan's findings (checks with ?planId=, D454): content warnings, connection and network problems. */
+  findings: Finding[]
   connect: (needId: string) => void
   refresh: () => Promise<unknown>
 }

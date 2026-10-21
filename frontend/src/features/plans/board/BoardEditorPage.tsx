@@ -5,14 +5,14 @@ import { useTranslation } from 'react-i18next'
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { BoardContent, BoardStatus, BoardWarning, Capabilities, Plan, Project, VariantSearchItem } from '@/api/generated/model'
+import type { BoardContent, BoardStatus, Capabilities, Finding, Plan, Project, VariantSearchItem } from '@/api/generated/model'
 import { getBoardContent, getGetBoardContentQueryKey, getListPlansQueryKey, saveBoardContent, useGetBoardContent, useGetPlan } from '@/api/generated/plans/plans'
 import { useGetProject } from '@/api/generated/projects/projects'
 import { useGetChecks } from '@/api/generated/wiring/wiring'
 import { isModKey, isTypingTarget } from '@/canvas'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, ConfirmDialog, EmptyState, ErrorMessage, IconButton, Loading, Notice, Page, type TabItem, Tabs, TextLink, useErrorMessage } from '@/components/ui'
-import { boardStatus, itemKey, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
+import { boardStatus, FindingsList, itemKey, markedIds, StatusChip, useRefreshWiring, useWiringModel } from '@/features/checks'
 import { fresh, isNotFound, versionPath } from '@/features/projects/paths'
 import { useLocalized } from '@/i18n/localized'
 import { cn } from '@/lib/cn'
@@ -98,7 +98,9 @@ function useFillHeight() {
   return { ref, height }
 }
 
-type PanelTab = 'products' | 'board' | 'inspector'
+type PanelTab = 'products' | 'board' | 'inspector' | 'findings'
+
+const noFindings: Finding[] = []
 type Props = { plan: Plan; content: BoardContent; project: Project; variants: VariantSearchItem[] }
 
 function BoardEditor({ plan, content, project, variants }: Props) {
@@ -135,7 +137,8 @@ function BoardEditor({ plan, content, project, variants }: Props) {
 
   // Connections and checks (step 3d): version data, refreshed after each save.
   const wiring = useWiringModel(plan.versionId)
-  const checks = useGetChecks(plan.versionId)
+  // The board's findings (?planId=, D454) and the version's boards; refreshed with the wiring after each save.
+  const checks = useGetChecks(plan.versionId, { planId: plan.id })
   const refreshWiring = useRefreshWiring(plan.versionId)
   const boardCheck = checks.data?.boards.find((b) => b.planId === plan.id)
   const channelUseOf = useCallback(
@@ -170,11 +173,16 @@ function BoardEditor({ plan, content, project, variants }: Props) {
   const products = useMemo(() => boardPaletteProducts(variants, project.productTypeIds), [variants, project.productTypeIds])
   const enclosures = useMemo(() => enclosureVariants(variants, project.productTypeIds), [variants, project.productTypeIds])
 
+  // The board's findings (D453, D454) by module and the board's own (enclosure); as saved (the checks are
+  // refreshed after each save).
+  const findings = checks.data?.findings ?? noFindings
   const warnings = useMemo(() => {
-    const map = new Map<string, BoardWarning[]>()
-    for (const w of server.warnings) if (w.moduleId) map.set(w.moduleId, [...(map.get(w.moduleId) ?? []), w])
+    const map = new Map<string, Finding[]>()
+    for (const f of findings) if (f.refs.targetPlanId === plan.id && f.refs.itemId) map.set(f.refs.itemId, [...(map.get(f.refs.itemId) ?? []), f])
     return map
-  }, [server.warnings])
+  }, [findings, plan.id])
+  const markedModules = useMemo(() => markedIds(warnings), [warnings])
+  const boardFindings = useMemo(() => findings.filter((f) => f.refs.targetPlanId === plan.id && !f.refs.itemId && !f.refs.planId), [findings, plan.id])
 
   const save = useCallback(
     async (snapshot: BoardDocument) => {
@@ -410,7 +418,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
       selection={state.selection}
       variants={variantsById}
       widthOf={widthOf}
-      warnings={warnings}
+      marked={markedModules}
       errorIds={errorIds}
       editable={editable}
       dispatch={(action) => {
@@ -451,7 +459,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
     {
       key: 'board',
       label: t('board.tab'),
-      content: <BoardSettings doc={doc} enclosures={enclosures} variants={variantsById} caps={caps} widthOf={widthOf} editable={editable} dispatch={dispatch} warnings={server.warnings} enclosureDeleted={server.enclosureDeleted} />,
+      content: <BoardSettings doc={doc} enclosures={enclosures} variants={variantsById} caps={caps} widthOf={widthOf} editable={editable} dispatch={dispatch} warnings={boardFindings} wiring={wiring} enclosureDeleted={server.enclosureDeleted} />,
     },
     {
       key: 'inspector',
@@ -473,7 +481,23 @@ function BoardEditor({ plan, content, project, variants }: Props) {
           versionId={plan.versionId}
           planId={plan.id}
           wiring={wiring}
-          findings={checks.data?.findings}
+          findings={findings}
+        />
+      ),
+    },
+    {
+      key: 'findings',
+      label: findings.length > 0 ? t('panel.findingsCount', { count: findings.length }) : t('panel.findings'),
+      content: (
+        <FindingsList
+          findings={findings}
+          names={(f) => wiring.findingNames(f, plan.id)}
+          onShow={(f) => {
+            const id = f.refs.targetPlanId === plan.id ? f.refs.itemId : undefined
+            if (!id || !doc.modules.some((m) => m.id === id)) return
+            dispatch({ type: 'select', ids: [id] })
+            setTab('inspector')
+          }}
         />
       ),
     },
@@ -500,7 +524,7 @@ function BoardEditor({ plan, content, project, variants }: Props) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">{lock.state.status === 'acquiring' ? <Loading /> : grid}</div>
         <aside aria-label={t('panel.label')} className="relative flex w-[21rem] shrink-0 flex-col border-l border-line bg-surface lg:w-96">
-          <Tabs label={t('panel.label')} tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
+          <Tabs label={t('panel.label')} size="sm" tabs={tabs} value={tab} onValueChange={setTab} className="h-full" />
         </aside>
       </div>
     </div>
@@ -512,7 +536,7 @@ function BoardCheck({ check, kindName }: { check: BoardStatus; kindName: (id: st
   const { t } = useTranslation('plans')
   const list = check.channels.map((c) => `${kindName(c.outputKindId)}${c.alternative ? ` (${t('board.channelAlternative')})` : ''} ${c.free}/${c.total}`).join(', ')
   return (
-    <span data-testid="board-check" className="flex items-center gap-2 text-sm text-muted">
+    <span data-testid="board-check" className="flex min-w-0 max-w-full items-center gap-2 text-sm text-muted">
       <StatusChip status={boardStatus(check)} />
       {list && <span className="hidden truncate lg:inline">{t('board.channelTotals', { list })}</span>}
     </span>

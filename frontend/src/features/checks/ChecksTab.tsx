@@ -1,9 +1,9 @@
-import { CircleCheck, Plug, Undo2, Wand2 } from 'lucide-react'
+import { Plug, Undo2, Wand2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useListPlans } from '@/api/generated/plans/plans'
-import type { Checks, Finding, NeedInfo } from '@/api/generated/model'
+import type { Checks, Finding, NeedInfo, Plan } from '@/api/generated/model'
 import { useGetChecks, useUndoAutoConnect } from '@/api/generated/wiring/wiring'
 import { Badge, Button, EmptyState, ErrorMessage, Loading, Notice, Section, TextLink } from '@/components/ui'
 import { boardPath, editorPath } from '@/features/plans/paths'
@@ -12,22 +12,22 @@ import { useLocalized } from '@/i18n/localized'
 
 import { AutoConnectDialog } from './AutoConnectDialog'
 import { ConnectDialog, type ConnectTarget } from './ConnectDialog'
-import { areaOf, areas, boardStatus, useFindingText, worstStatus } from './format'
+import { boardStatus, worstStatus } from './format'
+import { FindingsList } from './FindingsList'
 import { StatusChip } from './StatusChip'
 import { useRefreshWiring, useWiringModel } from './wiring'
 
 /** Checks change with every edit elsewhere: fetched on every visit. */
 const everyVisit = { staleTime: 0, refetchOnMount: 'always' } as const
 
-const severities = ['error', 'warning', 'info'] as const
 /**
- * The Checks tab of a version (step 3d): overview cards, the findings grouped by severity and area with links
+ * The Checks tab of a version (step 3d): overview cards, the findings grouped by plan and severity with links
  * to the editor that fixes them, the unconnected needs with Connect… and Auto-connect with preview and undo.
  * Everything shown is computed by the API (rule 1).
  */
 export function ChecksTab({ projectId, versionId }: { projectId: string; versionId: string }) {
   const { t } = useTranslation('checks')
-  const checks = useGetChecks(versionId, { query: everyVisit })
+  const checks = useGetChecks(versionId, undefined, { query: everyVisit })
   const wiring = useWiringModel(versionId)
   const plans = useListPlans(versionId)
   const refresh = useRefreshWiring(versionId)
@@ -40,7 +40,6 @@ export function ChecksTab({ projectId, versionId }: { projectId: string; version
   if (wiring.query.isError) return <ErrorMessage error={wiring.query.error} />
   if (checks.isPending || wiring.query.isPending) return <Loading />
   const data = checks.data
-  const planKind = new Map<string, string>((plans.data ?? []).map((p) => [p.id, p.kind]))
 
   const undoBatch = async () => {
     if (!applied?.batchId) return
@@ -99,7 +98,7 @@ export function ChecksTab({ projectId, versionId }: { projectId: string; version
       <Overview checks={data} kindName={wiring.kindNameByKey} />
 
       <Section title={t('findings.title')} description={t('findings.count', { errors: data.counts.errors, warnings: data.counts.warnings, infos: data.counts.infos })}>
-        <Findings checks={data} projectId={projectId} versionId={versionId} wiring={wiring} planKind={planKind} />
+        <Findings checks={data} projectId={projectId} versionId={versionId} wiring={wiring} plans={plans.data ?? []} />
       </Section>
 
       <Section title={t('unconnected.title')} description={unconnected.length > 0 ? t('unconnected.description', { count: unconnected.length }) : undefined}>
@@ -200,22 +199,21 @@ function Overview({ checks, kindName }: { checks: Checks; kindName: (key: string
 }
 
 
+/** The findings of the version grouped by plan, then severity, each with a link to the editor that fixes it (D454). */
 function Findings({
   checks,
   projectId,
   versionId,
   wiring,
-  planKind,
+  plans,
 }: {
   checks: Checks
   projectId: string
   versionId: string
   wiring: ReturnType<typeof useWiringModel>
-  planKind: Map<string, string>
+  plans: Plan[]
 }) {
-  const { t } = useTranslation('checks')
-  const text = useFindingText()
-  if (checks.findings.length === 0) return <EmptyState title={t('findings.none')} icon={<CircleCheck aria-hidden className="size-4 text-success" />} />
+  const planKind = new Map<string, string>(plans.map((p) => [p.id, p.kind]))
   const linkOf = (f: Finding): string | null => {
     const r = f.refs
     if (f.code === 'network_assignment_dangling') return `${versionPath(projectId, versionId)}?tab=networks`
@@ -232,51 +230,7 @@ function Findings({
     if (r.targetPlanId) return planKind.get(r.targetPlanId) === 'board' ? boardPath(projectId, versionId, r.targetPlanId) : editorPath(projectId, versionId, r.targetPlanId)
     return null
   }
-  return (
-    <div className="space-y-5">
-      {severities.map((sev) => {
-        const list = checks.findings.filter((f) => f.severity === sev)
-        if (list.length === 0) return null
-        return (
-          <div key={sev} className="space-y-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <Badge variant={sev === 'error' ? 'danger' : sev === 'warning' ? 'warning' : 'neutral'}>{list.length}</Badge>
-              {t(`severity.${sev}`)}
-            </h3>
-            {areas.map((area) => {
-              const all = list.filter((f) => areaOf(f.code) === area)
-              if (all.length === 0) return null
-              // Unconnected needs are listed with Connect… in their own section below: one line here (D417).
-              const unconnected = all.filter((f) => f.code === 'need_unconnected').length
-              const inArea = all.filter((f) => f.code !== 'need_unconnected')
-              return (
-                <div key={area} className="space-y-1 pl-2">
-                  <h4 className="text-xs font-medium text-muted">{t(`area.${area}`)}</h4>
-                  <ul className="space-y-1 text-sm">
-                    {unconnected > 0 && <li>{t('findings.unconnected', { count: unconnected })}</li>}
-                    {inArea.map((f, i) => {
-                      const link = linkOf(f)
-                      const words = text(f, wiring.findingNames(f))
-                      return (
-                        <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                          <span>{words}</span>
-                          {link && (
-                            <TextLink to={link} aria-label={t('findings.openFor', { text: words })}>
-                              {t('findings.open')}
-                            </TextLink>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              )
-            })}
-          </div>
-        )
-      })}
-    </div>
-  )
+  return <FindingsList findings={checks.findings} names={wiring.findingNames} linkOf={linkOf} plans={plans.map((p) => ({ id: p.id, name: p.name }))} collapseUnconnected />
 }
 
 function Unconnected({

@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { LoadType, NeedWarning, PlanNeed, PlanZone, RoomTemplate } from '@/api/generated/model'
+import type { Finding, LoadType, PlanNeed, PlanZone, RoomTemplate } from '@/api/generated/model'
 import { useDecimalSeparator } from '@/catalog/decimal'
 import { Button, errorKey, Field, IconButton, Notice, SelectField, TextareaField, useFieldError } from '@/components/ui'
 import { formatWatts, maxPowerW, parsePower } from '@/features/needs'
@@ -13,13 +13,15 @@ import { isSymbol, type NeedPatch } from './document'
 import type { EditorAction } from './editor-state'
 import { functionTypeOptions, type NeedCatalog, useNeedText } from './need-catalog'
 import { allowedLoadTypes, applyTemplate, functionTypePatch, maxNeeds, needZoneId, newNeed } from './needs'
+import { ItemFindings } from './ItemFindings'
 
 type SectionProps = {
   zoneId: string
   needs: PlanNeed[]
   zones: PlanZone[]
   catalog: NeedCatalog
-  warnings: Map<string, NeedWarning[]>
+  /** The plan's findings by need (D454). */
+  warnings: Map<string, Finding[]>
   errors: Map<string, string[]>
   editable: boolean
   dispatch: (action: EditorAction) => void
@@ -166,8 +168,7 @@ export function ZoneNeeds({ zoneId, needs: all, zones, catalog, warnings, errors
 }
 
 /** Save errors and warnings of one need. */
-export function NeedMessages({ errors, warnings }: { errors: string[]; warnings: NeedWarning[] }) {
-  const { t } = useTranslation('plans')
+export function NeedMessages({ errors, warnings }: { errors: string[]; warnings: Finding[] }) {
   return (
     <>
       {errors.length > 0 && (
@@ -177,13 +178,7 @@ export function NeedMessages({ errors, warnings }: { errors: string[]; warnings:
           ))}
         </ul>
       )}
-      {warnings.length > 0 && (
-        <ul className="space-y-1 rounded-control border border-warning/40 bg-warning/10 px-2 py-1 text-sm text-warning">
-          {warnings.map((w) => (
-            <li key={w.code}>{t(`needWarning.${w.code}`)}</li>
-          ))}
-        </ul>
-      )}
+      <ItemFindings findings={warnings} />
     </>
   )
 }
@@ -292,7 +287,7 @@ export function NeedInspector({
   need: PlanNeed
   zoneName: string | undefined
   catalog: NeedCatalog
-  warnings: NeedWarning[]
+  warnings: Finding[]
   errors: string[]
   editable: boolean
   dispatch: (action: EditorAction) => void

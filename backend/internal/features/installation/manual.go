@@ -21,6 +21,7 @@ import (
 	"github.com/kingkill85/snapflow/backend/internal/features/projects"
 	"github.com/kingkill85/snapflow/backend/internal/features/wiring"
 	"github.com/kingkill85/snapflow/backend/internal/platform/document"
+	"github.com/kingkill85/snapflow/backend/internal/platform/i18n"
 	"github.com/kingkill85/snapflow/backend/internal/platform/planimage"
 )
 
@@ -328,6 +329,11 @@ func findingText(d *data, f wiring.Finding) string {
 		}
 	}
 	rule := l.finding(f.Code, f.Params)
+	// An add-on warning names the add-on (D453).
+	if p, ok := f.Params["addonProductName"].(i18n.Text); ok {
+		v, _ := f.Params["addonVariantName"].(i18n.Text)
+		rule += " (" + strings.TrimSpace(text(p, l)+" – "+text(v, l)) + ")"
+	}
 	if len(subject) == 0 {
 		return rule
 	}

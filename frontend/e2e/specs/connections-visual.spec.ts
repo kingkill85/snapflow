@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures'
 import { autoConnect, catalog, complete, json, villa } from '../villa-seed'
 
-// The Checks tab, the auto-connect dialog, the connect picker (need and
+// The Checks tab (findings by plan, D454), the editors' Problems tab, the auto-connect dialog, the connect picker (need and
 // channel mode), the board inspector's channel list, the floorplan zone
 // statuses, the Networks statuses and a read-only project (step 3d) at phone,
 // tablet and desktop width, light and dark, English and German: nothing
@@ -27,16 +27,18 @@ const labels = {
     zones: 'Zones',
     saved: 'Saved',
     connectChannel: /^Connect a need to /,
+    problems: /^Problems/,
   },
   de: {
     auto: 'Automatisch verbinden…',
     preview: 'Vorschau',
     apply: 'Übernehmen',
     undo: 'Automatisches Verbinden rückgängig',
-    inspector: 'Eigenschaften',
+    inspector: 'Details',
     zones: 'Zonen',
     saved: 'Gespeichert',
     connectChannel: /^Bedarf mit .* verbinden$/,
+    problems: /^Probleme/,
   },
 }
 
@@ -136,6 +138,9 @@ for (const lang of ['en', 'de'] as const) {
           await p.waitForLoadState('networkidle')
         },
       },
+      // The editors' Problems tab (D454): the plan's findings from the checks.
+      { name: 'board-problems', path: () => board(done), editor: true, wide: true, act: (p) => p.getByRole('tab', { name: l.problems }).click() },
+      { name: 'floorplan-problems', path: () => floor(done), editor: true, wide: true, act: (p) => p.getByRole('tab', { name: l.problems }).click() },
       { name: 'floorplan-zones', path: () => floor(done), editor: true, wide: true, act: (p) => p.getByRole('tab', { name: l.zones, exact: true }).click() },
       { name: 'floorplan-zone-needs', path: () => floor(done), editor: true, wide: true, act: (p) => selectZone(p, cat.names.drawing[lang]) },
       { name: 'networks', path: () => `/projects/${done.project.id}?tab=networks`, fullPage: true },

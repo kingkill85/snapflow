@@ -2,17 +2,17 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BoardWarning, Capabilities, Finding, VariantSearchItem } from '@/api/generated/model'
+import type { Capabilities, Finding, VariantSearchItem } from '@/api/generated/model'
 import { useListOutputKinds } from '@/api/generated/output-kinds/output-kinds'
 import { formatDecimal, parseDecimal, useDecimalSeparator } from '@/catalog/decimal'
 import { Button, Field, IconButton, Notice, SelectField, SwitchField } from '@/components/ui'
-import type { WiringModel } from '@/features/checks'
+import { FindingsList, type WiringModel } from '@/features/checks'
 import { useDescribeCapabilities } from '@/features/products/describe-capabilities'
 import { useLocalized } from '@/i18n/localized'
 
 import type { PaletteProduct } from '../editor/catalog'
 import { AddressLine } from '../editor/AddressLine'
-import { Addons, ItemInstanceValues, ProductPicker, Warnings } from '../editor/Inspector'
+import { Addons, ItemInstanceValues, ProductPicker } from '../editor/Inspector'
 import { type BoardDocument, type BoardModuleDoc, enclosureSize, fitToEnclosure, type ModulePatch, newId, rowUsed, slotIn } from './board'
 import type { BoardEditorAction } from './board-state'
 import { ModuleChannels } from './ModuleChannels'
@@ -29,13 +29,15 @@ type SettingsProps = {
   widthOf: (m: BoardModuleDoc) => number
   editable: boolean
   dispatch: (action: BoardEditorAction) => void
-  warnings: BoardWarning[]
+  /** The board's own findings (the enclosure: no module, D454). */
+  warnings: Finding[]
+  wiring?: WiringModel
   /** The stored enclosure's variant was deleted from the catalog (kept until removed explicitly). */
   enclosureDeleted?: boolean
 }
 
 /** The Board tab: the enclosure (D357 explained) and, without an enclosure of known size, the rows editor. */
-export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editable, dispatch, warnings, enclosureDeleted = false }: SettingsProps) {
+export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editable, dispatch, warnings, wiring, enclosureDeleted = false }: SettingsProps) {
   const { t } = useTranslation('plans')
   const localize = useLocalized()
   const separator = useDecimalSeparator()
@@ -81,7 +83,7 @@ export function BoardSettings({ doc, enclosures, variants, caps, widthOf, editab
           onChange={(e) => dispatch({ type: 'change', action: { type: 'setEnclosureFlags', patch: { enclosureExisting: e.target.checked } } })}
         />
       )}
-      {warnings.some((w) => w.code === 'enclosure_size_unknown') && <Notice tone="warning">{t('warning.enclosure_size_unknown')}</Notice>}
+      {warnings.length > 0 && <FindingsList findings={warnings} names={wiring?.findingNames} headings={false} />}
       {size ? (
         <Notice>{t('board.fromEnclosure', { rows: size.rows, te: formatDecimal(size.te, separator) })}</Notice>
       ) : (
@@ -157,7 +159,8 @@ type InspectorProps = {
   products: PaletteProduct[]
   caps: (variantId: string) => Capabilities | undefined
   widthOf: (m: BoardModuleDoc) => number
-  warnings: Map<string, BoardWarning[]>
+  /** The board's findings by module (D454). */
+  warnings: Map<string, Finding[]>
   errors: Map<string, string[]>
   editable: boolean
   dispatch: (action: BoardEditorAction) => void
@@ -223,7 +226,9 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
     }
     update({ rowId, offsetTe: offset })
   }
-  const itemWarnings = warnings.get(m.id) ?? []
+  // Channel and connection errors show at their channel (ModuleChannels); everything else here, channel
+  // warnings (min_load, power_unknown, limit_unknown) included (D454).
+  const itemWarnings = (warnings.get(m.id) ?? []).filter((f) => !(f.severity === 'error' && (f.refs.outputKindId || f.refs.connectionIds?.length)))
   const te = (n: number) => formatDecimal(n, separator)
 
   return (
@@ -244,7 +249,7 @@ function OneModule({ doc, module: m, variants, allVariants, products, caps, widt
           ))}
         </ul>
       )}
-      {itemWarnings.length > 0 && <Warnings warnings={itemWarnings} placement={m} productId={variant?.productId} />}
+      {itemWarnings.length > 0 && <FindingsList findings={itemWarnings} names={wiring ? (f) => wiring.findingNames(f, planId) : undefined} headings={false} />}
       {variant && (
         <SelectField
           label={t('inspector.variant')}

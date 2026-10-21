@@ -113,6 +113,36 @@ const open = (prepare?: (client: QueryClient) => void, query = '') =>
   )
 
 describe('PlanEditorPage', () => {
+  it('lists the plan\'s findings in the Problems tab, shows one in the inspector and refreshes them after a save (D454)', async () => {
+    const user = userEvent.setup()
+    const p1 = placement(1, { label: 'M1' })
+    const findings: Checks['findings'] = [{ severity: 'warning', code: 'variant_inactive', refs: { targetPlanId: plan(1).id, itemId: p1.id }, params: { label: 'M1' } }]
+    const { saved } = serve({ content: content({ placements: [p1] }), checks: { ...emptyChecks, findings, counts: { ...emptyChecks.counts, warnings: 1 } } })
+    const asked: string[] = []
+    server.use(
+      http.get('/api/versions/:v/checks', ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get('planId') ?? '')
+        return HttpResponse.json({ ...emptyChecks, findings })
+      }),
+    )
+    open()
+    await user.click(await screen.findByRole('tab', { name: 'Problems (1)' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Problems (1)' })
+    expect(within(panel).getByText('M1: the variant is inactive in the catalog.')).toBeInTheDocument()
+    expect(asked.length).toBeGreaterThan(0)
+    expect(asked.every((id) => id === plan(1).id)).toBe(true)
+    await user.click(within(panel).getByRole('button', { name: 'Show: M1: the variant is inactive in the catalog.' }))
+    const inspector = screen.getByRole('tabpanel', { name: 'Inspector' })
+    expect(within(inspector).getByText('M1: the variant is inactive in the catalog.')).toBeInTheDocument()
+
+    const before = asked.length
+    await user.click(screen.getByRole('tab', { name: 'Products' }))
+    await user.click(within(screen.getByRole('tabpanel', { name: 'Products' })).getByRole('button', { name: /Motion sensor/ }))
+    await user.click(screen.getByRole('button', { name: 'place here' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    await waitFor(() => expect(asked.length).toBeGreaterThan(before))
+  })
+
   it('says a board does not exist on the floorplan route, without asking for floorplan content', async () => {
     // No handler for /content: a request for it would fail the test.
     server.use(

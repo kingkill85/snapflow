@@ -86,8 +86,8 @@ func TestBoardOverlapRules(t *testing.T) {
 	// The actuator grows to 5 TE in the catalog: the stored modules overlap.
 	w.setWidth(t, w.c.Actuator, 5)
 	b = getBoard(t, w.api, w.cookie, b.PlanID)
-	if !slices.Contains(warningCodes(b, p1), "module_overlap") || slices.Contains(warningCodes(b, p2), "module_overlap") {
-		t.Fatalf("overlap warning: %+v", b.Warnings)
+	if fs := planFindings(t, w.api, w.cookie, b.PlanID); !slices.Contains(codesOf(fs, p1), "module_overlap") || slices.Contains(codesOf(fs, p2), "module_overlap") {
+		t.Fatalf("overlap warning: %+v", fs)
 	}
 	// Saving unchanged (or a label change) keeps it.
 	ma := module(a, r, w.c.Actuator, 0.5)
@@ -193,13 +193,9 @@ func TestBoardEnclosureAndDeletedVariants(t *testing.T) {
 		wantCode(t, w.api.Delete("/api/products/"+pid.String()+"/variants/"+v.String(), admin), http.StatusNoContent, "")
 	}
 	b = getBoard(t, w.api, w.cookie, b.PlanID)
-	encWarn := false
-	for _, x := range b.Warnings {
-		if x.ModuleID == nil && x.Code == "variant_deleted" {
-			encWarn = true
-		}
-	}
-	if !b.EnclosureDeleted || b.EnclosureVariantID != nil || !encWarn || !slices.Contains(warningCodes(b, a), "variant_deleted") {
+	fs := planFindings(t, w.api, w.cookie, b.PlanID)
+	encWarn := slices.Contains(codesOf(fs, uuid.Nil), "variant_deleted")
+	if !b.EnclosureDeleted || b.EnclosureVariantID != nil || !encWarn || !slices.Contains(codesOf(fs, a), "variant_deleted") {
 		t.Fatalf("deleted: %+v", b)
 	}
 	// Saving with null keeps both (BOM lines from the snapshot).

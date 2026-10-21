@@ -52,19 +52,39 @@ describe('ChecksTab', () => {
     expect(screen.getAllByText('Near limit').length).toBeGreaterThan(0)
   })
 
-  it('groups findings by severity and area and links to the editors', async () => {
+  it('groups findings by plan, then severity, and links to the editors (D454)', async () => {
     serveChecks()
     render()
     const findings = await screen.findByRole('region', { name: 'Findings' })
     expect(within(findings).getByText('Dimmer output 1', { exact: false })).toHaveTextContent('D1 · Dimmer output 1 (Main board): 140 W connected, at most 100 W')
-    expect(within(findings).getByText('Connections')).toBeInTheDocument()
-    expect(within(findings).getByText('Networks')).toBeInTheDocument()
+    expect(within(within(findings).getByRole('region', { name: 'Main board' })).getByText('Errors')).toBeInTheDocument()
+    expect(within(findings).getByRole('region', { name: 'Ground floor' })).toHaveTextContent('1 need has units that are not connected')
+    expect(within(findings).getByRole('region', { name: 'Version (networks)' })).toHaveTextContent('KNX 1: 612 of 640 mA used')
     const links = within(findings).getAllByRole('link')
     expect(links[0]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/boards/${boardId}?select=${dimmer}`)
     // Unconnected needs are one line here; they are listed with Connect… below (D417).
     expect(within(findings).getByText('1 need has units that are not connected (listed under Unconnected needs)')).toBeInTheDocument()
     expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks#line-${lineId}`)
     expect(within(findings).getByText('KNX 1: 612 of 640 mA used (reserve 20 %)')).toBeInTheDocument()
+  })
+
+  it('lists the plans\' content warnings under their plan with a link that selects the item (D453)', async () => {
+    serveChecks({
+      checks: {
+        ...checks,
+        findings: [
+          { severity: 'info', code: 'module_width_unknown', refs: { targetPlanId: boardId, itemId: relay }, params: { label: 'R1' } },
+          { severity: 'warning', code: 'need_outside_zones', refs: { planId: floorId, needId: ceiling }, params: { label: 'Spots' } },
+        ],
+      },
+    })
+    render()
+    const findings = await screen.findByRole('region', { name: 'Findings' })
+    const board = within(findings).getByRole('region', { name: 'Main board' })
+    expect(within(board).getByText('Notes')).toBeInTheDocument()
+    expect(within(board).getByRole('link', { name: /rail width is unknown/ })).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/boards/${boardId}?select=${relay}`)
+    const floor = within(findings).getByRole('region', { name: 'Ground floor' })
+    expect(within(floor).getByRole('link', { name: /outside every zone/ })).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${ceiling}`)
   })
 
   it('lists unconnected needs by plan and zone and connects one with the picker', async () => {
@@ -177,8 +197,9 @@ describe('ChecksTab', () => {
     expect(within(findings).getByText('Presence sensor is on no bus line')).toBeInTheDocument()
     expect(within(findings).getByText('PIR 1 is assigned to a gateway that no longer exists')).toBeInTheDocument()
     const links = within(findings).getAllByRole('link')
-    expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${sensor}`)
-    expect(links[2]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks`)
+    // The floorplan's group first, then the board the plans list does not know (version group).
+    expect(links[0]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}/plans/${floorId}?select=${sensor}`)
+    expect(links[1]).toHaveAttribute('href', `/projects/${projectId}/versions/${versionId}?tab=networks`)
   })
 
   it('links address findings to the device or line in the Networks tab', async () => {
@@ -195,7 +216,7 @@ describe('ChecksTab', () => {
     })
     render()
     const findings = await screen.findByRole('region', { name: 'Findings' })
-    expect(within(findings).getAllByText('Networks').length).toBeGreaterThan(0)
+    expect(within(findings).getByRole('region', { name: 'Version (networks)' })).toBeInTheDocument()
     expect(within(findings).getByText('KNX 1: 3 devices without address')).toBeInTheDocument()
     const links = within(findings).getAllByRole('link')
     const tab = `/projects/${projectId}/versions/${versionId}?tab=networks`

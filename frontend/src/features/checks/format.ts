@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { Finding } from '@/api/generated/model'
 import { formatDecimal, useDecimalSeparator } from '@/catalog/decimal'
+import { useLocalized } from '@/i18n/localized'
 
 /**
  * Names a finding's text needs that the API gives only as ids or keys
@@ -93,6 +94,24 @@ export const findingCodes = [
   'bus_line_address_invalid',
   'bus_line_address_duplicate',
   'address_device_zero',
+  // The plans' content warnings (D453): one namespace with the checks codes.
+  'variant_deleted',
+  'variant_inactive',
+  'product_inactive',
+  'category_inactive',
+  'product_type_inactive',
+  'product_type_not_in_project',
+  'required_addon_unavailable',
+  'addon_unavailable',
+  'addon_not_linked',
+  'module_width_unknown',
+  'module_mounting_floorplan',
+  'row_overflow',
+  'enclosure_size_unknown',
+  'module_overlap',
+  'need_function_type_inactive',
+  'need_outside_zones',
+  'need_load_type_not_allowed',
 ] as const
 export type FindingCode = (typeof findingCodes)[number]
 
@@ -105,6 +124,8 @@ const isCandidateCode = (code: string): code is (typeof candidateCodes)[number] 
 
 const isCode = (code: string): code is FindingCode => (findingCodes as readonly string[]).includes(code)
 
+const isI18nText = (v: unknown): v is Record<string, string> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
 const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
 
 /**
@@ -115,6 +136,7 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim(
 export function useFindingText() {
   const { t } = useTranslation('checks')
   const separator = useDecimalSeparator()
+  const localize = useLocalized()
   /**
    * `candidate`: the rule a candidate in the connect picker breaks, worded as what the connection would do
    * ("would draw 17.39 A at 230 V (at most 16 A)") and without the channel's name for the limits, so equal
@@ -154,7 +176,13 @@ export function useFindingText() {
     // Several load types on a channel: the share of the mix's limit, not an effective limit in W or A (D417).
     if (finding.params?.mixedLoads === true && finding.code === 'channel_overload_w') return t('finding.channel_overload_w_mixed', all)
     if (finding.params?.mixedLoads === true && finding.code === 'channel_overload_a') return t('finding.channel_overload_a_mixed', all)
-    return isCode(finding.code) ? t(`finding.${finding.code}`, all) : t('finding.unknown', all)
+    if (!isCode(finding.code)) return t('finding.unknown', all)
+    const words = t(`finding.${finding.code}`, all)
+    // An add-on warning names the add-on (D453).
+    const addon = finding.params?.addonProductName
+    if (!isI18nText(addon)) return words
+    const variant = finding.params?.addonVariantName
+    return t('finding.withAddon', { text: words.replace(/\.$/, ''), product: localize(addon), variant: isI18nText(variant) ? localize(variant) : '' })
   }
 }
 
@@ -166,16 +194,3 @@ export function useReasonText() {
       ? t(`reason.${reason as UnconnectableReason}`, { functionType: functionType ?? t('fallback.functionType') })
       : reason
 }
-
-export const areas = ['needs', 'connections', 'boards', 'networks'] as const
-type Area = (typeof areas)[number]
-
-/** The area a finding belongs to (only for grouping the list). */
-export function areaOf(code: string): Area {
-  if (code === 'need_unconnected' || code === 'units_exceeded') return 'needs'
-  if (code.startsWith('board_')) return 'boards'
-  if (code.startsWith('address_')) return 'networks'
-  if (code.startsWith('bus_') || code.startsWith('network_') || code.startsWith('gateway_') || code.startsWith('wireless_')) return 'networks'
-  return 'connections'
-}
-

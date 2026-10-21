@@ -87,8 +87,8 @@ export function useWiringModel(versionId: string, enabled = true) {
       return [t('need.text', { count: n.quantity, name }), n.label.trim()].filter(Boolean).join(' · ')
     }
     const needPlace = (n: NeedInfo) => [n.planName, n.zoneName || t('need.noZone')].join(' · ')
-    /** The names a finding's text needs, resolved from its refs and params. */
-    const findingNames = (f: Finding): FindingNames => {
+    /** The names a finding's text needs, resolved from its refs and params; on `openPlanId` (an editor) without that plan's name. */
+    const findingNames = (f: Finding, openPlanId?: string): FindingNames => {
       const r = f.refs
       const need = r.planId && r.needId ? needs.get(needKey(r.planId, r.needId)) : undefined
       const item = r.targetPlanId && r.itemId ? items.get(itemKey(r.targetPlanId, r.itemId)) : undefined
@@ -104,8 +104,8 @@ export function useWiringModel(versionId: string, enabled = true) {
       const paramItem = f.refs.itemId ? paramLabel || paramProduct || undefined : undefined
       const paramBoard = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : undefined
       return {
-        need: need ? `${needText(need)} (${needPlace(need)})` : undefined,
-        item: item ? `${itemName(item)} (${item.planName})` : paramItem,
+        need: need ? `${needText(need)} (${need.planId === openPlanId ? need.zoneName || t('need.noZone') : needPlace(need)})` : undefined,
+        item: item ? (item.planId === openPlanId ? itemName(item) : `${itemName(item)} (${item.planName})`) : paramItem,
         channel:
           r.targetPlanId && r.itemId && r.outputKindId && r.channelNo != null
             ? channelText({ targetPlanId: r.targetPlanId, targetItemId: r.itemId, outputKindId: r.outputKindId, channelNo: r.channelNo })
