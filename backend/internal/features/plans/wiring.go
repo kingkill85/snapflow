@@ -38,6 +38,8 @@ type WiringPlan struct {
 type WiringZone struct {
 	ID   uuid.UUID
 	Name string
+	// ShortName as entered (empty: derived from the name on labels).
+	ShortName string
 }
 
 // WiringNeed is a need of a floorplan.
@@ -110,7 +112,7 @@ func (s *Service) WiringData(ctx context.Context, tx pgx.Tx, versionID uuid.UUID
 	}
 	for _, z := range zones {
 		if i, ok := index[z.PlanID]; ok {
-			out.Plans[i].Zones = append(out.Plans[i].Zones, WiringZone{ID: z.ID, Name: z.Name})
+			out.Plans[i].Zones = append(out.Plans[i].Zones, WiringZone{ID: z.ID, Name: z.Name, ShortName: z.ShortName})
 		}
 	}
 	for _, n := range needs {

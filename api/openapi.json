@@ -10766,6 +10766,203 @@
         ],
         "type": "object"
       },
+      "Room": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "description": "Connected units without errors, each need counted up to its quantity",
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The zone's name; empty outside every zone",
+            "type": "string"
+          },
+          "needs": {
+            "description": "In need order",
+            "items": {
+              "$ref": "#/components/schemas/RoomNeed"
+            },
+            "type": "array"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "shortName": {
+            "description": "The zone's short name as entered; empty when none is set",
+            "type": "string"
+          },
+          "status": {
+            "description": "covered: every unit connected; partial: some; missing: none; none: the zone has no needs",
+            "enum": [
+              "covered",
+              "partial",
+              "missing",
+              "none"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "description": "Sum of the needs' quantities",
+            "format": "int64",
+            "type": "integer"
+          },
+          "zoneId": {
+            "description": "null: needs outside every zone",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "planId",
+          "zoneId",
+          "name",
+          "shortName",
+          "needs",
+          "units",
+          "connectedUnits",
+          "status"
+        ],
+        "type": "object"
+      },
+      "RoomCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "needs": {
+            "description": "Number of needs",
+            "format": "int64",
+            "type": "integer"
+          },
+          "powerW": {
+            "description": "Sum of quantity × power per unit of the needs with a power, a decimal string with 2 decimals",
+            "examples": [
+              "420.50"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needs",
+          "units",
+          "connectedUnits",
+          "powerW"
+        ],
+        "type": "object"
+      },
+      "RoomFunctionTotal": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/RoomCounts"
+          },
+          "functionType": {
+            "$ref": "#/components/schemas/RoomFunctionType"
+          }
+        },
+        "required": [
+          "functionType",
+          "counts"
+        ],
+        "type": "object"
+      },
+      "RoomFunctionType": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
+      "RoomNeed": {
+        "additionalProperties": false,
+        "properties": {
+          "connectedUnits": {
+            "description": "Units connected without errors, at most the quantity",
+            "format": "int64",
+            "type": "integer"
+          },
+          "functionType": {
+            "$ref": "#/components/schemas/RoomFunctionType"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "powerW": {
+            "description": "Power per unit in W, a decimal string with 2 decimals; null for unknown",
+            "examples": [
+              "7.50"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "functionType",
+          "quantity",
+          "powerW",
+          "label",
+          "connectedUnits"
+        ],
+        "type": "object"
+      },
+      "RoomPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "planId",
+          "name",
+          "rooms"
+        ],
+        "type": "object"
+      },
       "RoomTemplate": {
         "additionalProperties": false,
         "properties": {
@@ -11096,6 +11293,51 @@
           "name",
           "isActive",
           "lines"
+        ],
+        "type": "object"
+      },
+      "Rooms": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/api/schemas/Rooms.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ConnectionActions"
+          },
+          "functionTypes": {
+            "description": "Counts per function type, by key",
+            "items": {
+              "$ref": "#/components/schemas/RoomFunctionTotal"
+            },
+            "type": "array"
+          },
+          "plans": {
+            "description": "Every floorplan in plan order",
+            "items": {
+              "$ref": "#/components/schemas/RoomPlan"
+            },
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/RoomCounts"
+          },
+          "versionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "plans",
+          "totals",
+          "functionTypes",
+          "can"
         ],
         "type": "object"
       },
@@ -20354,6 +20596,49 @@
         "summary": "Preview the totals of the documents a generation would write",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/versions/{versionId}/rooms": {
+      "get": {
+        "description": "Every zone of every floorplan with its needs and connected units, plus the needs outside every zone per plan (D455).",
+        "operationId": "getRooms",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rooms"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The room overview of a version",
+        "tags": [
+          "wiring"
         ]
       }
     },

@@ -265,7 +265,7 @@ SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY positi
 SELECT id, name, kind, position FROM plans WHERE version_id = $1 ORDER BY position, id;
 
 -- name: WiringZones :many
-SELECT z.plan_id, z.id, z.name
+SELECT z.plan_id, z.id, z.name, z.short_name
 FROM plan_zones z JOIN plans p ON p.id = z.plan_id
 WHERE p.version_id = $1
 ORDER BY z.plan_id, z.position;

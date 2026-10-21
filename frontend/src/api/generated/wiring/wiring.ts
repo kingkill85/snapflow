@@ -39,6 +39,7 @@ import type {
   Error,
   GetChecksParams,
   Removed,
+  Rooms,
   Wiring
 } from '../model';
 
@@ -830,6 +831,99 @@ export const useUpdateConnection = <TError = ErrorType<Error>,
       return useMutation(getUpdateConnectionMutationOptions(options), queryClient);
     }
     /**
+ * Every zone of every floorplan with its needs and connected units, plus the needs outside every zone per plan (D455).
+ * @summary The room overview of a version
+ */
+export const getRooms = (
+    versionId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return apiClient<Rooms>(
+      {url: `/api/versions/${versionId}/rooms`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getGetRoomsQueryKey = (versionId: string,) => {
+    return [
+    `/api/versions/${versionId}/rooms`
+    ] as const;
+    }
+
+
+export const getGetRoomsQueryOptions = <TData = Awaited<ReturnType<typeof getRooms>>, TError = ErrorType<Error>>(versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRoomsQueryKey(versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRooms>>> = ({ signal }) => getRooms(versionId, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetRoomsQueryResult = NonNullable<Awaited<ReturnType<typeof getRooms>>>
+export type GetRoomsQueryError = ErrorType<Error>
+
+
+export function useGetRooms<TData = Awaited<ReturnType<typeof getRooms>>, TError = ErrorType<Error>>(
+ versionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRooms>>,
+          TError,
+          Awaited<ReturnType<typeof getRooms>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetRooms<TData = Awaited<ReturnType<typeof getRooms>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRooms>>,
+          TError,
+          Awaited<ReturnType<typeof getRooms>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetRooms<TData = Awaited<ReturnType<typeof getRooms>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary The room overview of a version
+ */
+
+export function useGetRooms<TData = Awaited<ReturnType<typeof getRooms>>, TError = ErrorType<Error>>(
+ versionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRooms>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetRoomsQueryOptions(versionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * The data the editors and the Checks tab show connections with (labels, channel numbering D387).
  * @summary Channels of every item and needs with their connections
  */
