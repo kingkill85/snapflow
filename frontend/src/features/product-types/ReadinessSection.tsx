@@ -65,7 +65,7 @@ export function ReadinessSection() {
       ) : readiness.isError ? (
         <ErrorMessage error={readiness.error} />
       ) : (
-        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="readiness">
+        <ul className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="readiness">
           {cards.map((c) => (
             <li key={c.key} aria-label={c.name} className="min-w-0 space-y-3 rounded-control border border-line bg-surface p-4">
               <div className="space-y-0.5">
