@@ -141,10 +141,10 @@ describe('ProductTypesPage', () => {
     await u.type(within(dialog).getByLabelText('Abbreviation'), ' knx ')
     await u.type(within(dialog).getByLabelText('Colour'), '#FFCC00')
     // The defaults shown follow the topology.
-    expect(within(dialog).queryByLabelText('Default bus current')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Bus current per device')).not.toBeInTheDocument()
     await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Wireless')
     expect(within(dialog).queryByLabelText('Devices per line')).not.toBeInTheDocument()
-    await u.type(within(dialog).getByLabelText('Default wireless places'), '1')
+    await u.type(within(dialog).getByLabelText('Gateway places per device'), '1')
     // Addressing offers the schemes of the topology.
     await chooseOption(u, within(dialog).getByLabelText('Addressing'), 'EUI-64 (Zigbee IEEE)')
     // The preview follows the form; a light colour gets black text.
@@ -276,7 +276,7 @@ describe('ProductTypesPage', () => {
     expect(within(dialog).getByLabelText('Abbreviation')).toHaveValue('ZB')
     expect(within(dialog).getByLabelText('Colour')).toHaveValue('#1f6feb')
     expect(within(dialog).getByLabelText('Active')).toBeChecked()
-    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('10')
+    expect(within(dialog).getByLabelText('Bus current per device')).toHaveValue('10')
     expect(within(dialog).getByLabelText(/^Reserve/)).toHaveValue('25')
     expect(within(dialog).getByLabelText('Devices per line')).toHaveValue('64')
 
@@ -432,7 +432,7 @@ describe('ProductTypesPage', () => {
     expect(within(row('KNX bus')).getByText('KNX individual address')).toBeInTheDocument()
     await u.click(within(row('KNX bus')).getByRole('button', { name: 'Edit' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit system' })
-    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('10')
+    expect(within(dialog).getByLabelText('Bus current per device')).toHaveValue('10')
     // Voltage and reserve at their defaults: Advanced is collapsed.
     const advanced = within(dialog).getByRole('button', { name: /Advanced/ })
     expect(advanced).toHaveAttribute('aria-expanded', 'false')
@@ -440,10 +440,10 @@ describe('ProductTypesPage', () => {
 
     await chooseOption(u, within(dialog).getByLabelText('Topology'), 'None')
     expect(within(dialog).queryByLabelText('Addressing')).not.toBeInTheDocument()
-    expect(within(dialog).queryByLabelText('Default bus current')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Bus current per device')).not.toBeInTheDocument()
     // Back to bus: the cleared values stay cleared.
     await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Bus')
-    expect(within(dialog).getByLabelText('Default bus current')).toHaveValue('')
+    expect(within(dialog).getByLabelText('Bus current per device')).toHaveValue('')
     await chooseOption(u, within(dialog).getByLabelText('Topology'), 'Wireless')
     await u.click(within(dialog).getByRole('button', { name: 'Update' }))
 

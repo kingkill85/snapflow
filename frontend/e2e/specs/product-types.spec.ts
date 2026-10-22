@@ -138,9 +138,9 @@ test('the editor follows the topology and keeps voltage and reserve under Advanc
   await expect(row(page, type.key)).toContainText('KNX individual address')
   await row(page, type.key).getByRole('button', { name: 'Edit' }).click()
   const dialog = page.getByRole('dialog', { name: 'Edit system' })
-  await expect(dialog.getByLabel('Default bus current')).toHaveValue('10')
+  await expect(dialog.getByLabel('Bus current per device')).toHaveValue('10')
   await expect(dialog.getByLabel('Devices per line')).toHaveValue('64')
-  await expect(dialog.getByLabel('Default wireless places')).toHaveCount(0)
+  await expect(dialog.getByLabel('Gateway places per device')).toHaveCount(0)
   // At their defaults, voltage and reserve are tucked away.
   const advanced = dialog.getByRole('button', { name: /^Advanced/ })
   await expect(advanced).toHaveAttribute('aria-expanded', 'false')
@@ -148,8 +148,8 @@ test('the editor follows the topology and keeps voltage and reserve under Advanc
 
   // Wireless: the bus settings go and are cleared, addressing offers EUI-64.
   await chooseOption(dialog.getByLabel('Topology'), 'Wireless')
-  await expect(dialog.getByLabel('Default bus current')).toHaveCount(0)
-  await dialog.getByLabel('Default wireless places').fill('2')
+  await expect(dialog.getByLabel('Bus current per device')).toHaveCount(0)
+  await dialog.getByLabel('Gateway places per device').fill('2')
   await chooseOption(dialog.getByLabel('Addressing'), 'EUI-64 (Zigbee IEEE)')
   await advanced.click()
   await dialog.getByLabel(/^Reserve/).fill('30')
@@ -166,7 +166,7 @@ test('the editor follows the topology and keeps voltage and reserve under Advanc
   await expect(dialog.getByLabel(/^Reserve/)).toHaveValue('30')
   await chooseOption(dialog.getByLabel('Topology'), 'None')
   await expect(dialog.getByLabel('Addressing')).toHaveCount(0)
-  await expect(dialog.getByLabel('Default wireless places')).toHaveCount(0)
+  await expect(dialog.getByLabel('Gateway places per device')).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Update' }).click()
   await expect(dialog).toBeHidden()
   expect(await api.productType(type.id)).toMatchObject({ topology: 'none', addressing: 'none' })

@@ -44,8 +44,8 @@ Order of the form:
 1. Key, name, abbreviation, colour (as today).
 2. **Topology** (Bus / Wireless / None) with the existing hint.
 3. Fields of the chosen topology only:
-   - Bus: Addressing (None / KNX individual address / HDL Buspro), Default bus current, Devices per line.
-   - Wireless: Addressing (None / EUI-64), Default wireless places.
+   - Bus: Addressing (None / KNX individual address / HDL Buspro), Bus current per device, Devices per line.
+   - Wireless: Addressing (None / EUI-64), Gateway places per device.
    - None: nothing.
    Switching the topology clears the fields that no longer apply (the database constraint `product_types_addressing_topology_check` rejects a mismatch; the form must never send one).
 4. **Advanced** (collapsed by default; expanded when a value differs from its default): Switched voltage (default 230, hint as today) and Reserve (default 20, hint as today). Hidden entirely for topology None? No: voltage matters for amp limits on any system that switches mains; keep both under Advanced for every topology.
