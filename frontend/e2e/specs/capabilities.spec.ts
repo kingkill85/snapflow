@@ -221,8 +221,8 @@ test('an output kind lists its alternatives; a product type takes its topology',
   await row(page, type.name.en).getByRole('button', { name: 'Edit' }).click()
   const typeDialog = page.getByRole('dialog', { name: 'Edit system' })
   await chooseOption(typeDialog.getByRole('combobox', { name: /^Topology/ }), 'Wireless')
-  await expect(typeDialog.getByLabel(/^Default bus current/)).toHaveCount(0)
-  await typeDialog.getByLabel(/^Default wireless places/).fill('2')
+  await expect(typeDialog.getByLabel(/^Bus current per device/)).toHaveCount(0)
+  await typeDialog.getByLabel(/^Gateway places per device/).fill('2')
   await typeDialog.getByRole('button', { name: 'Update' }).click()
   await expect(typeDialog).toBeHidden()
   expect((await api.productType(type.id)) as unknown as { topology: string; defaultWirelessPlacesUsed: number }).toMatchObject({
